@@ -130,7 +130,7 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Core\AlignmentEnums.h" />
+    <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />

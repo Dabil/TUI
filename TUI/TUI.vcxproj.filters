@@ -26,7 +26,7 @@
     <ClInclude Include="Core\Rect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Core\AlignmentEnums.h">
+    <ClInclude Include="Core\Enums.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Core\Size.h">
