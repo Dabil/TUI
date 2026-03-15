@@ -127,9 +127,6 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
