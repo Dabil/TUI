@@ -32,7 +32,7 @@ void ScreenBuffer::clear(const Style& style = Style())
 
 int ScreenBuffer::getWidth() const
 {
-
+    return m_width;
 }
 
 int ScreenBuffer::getHeight() const
