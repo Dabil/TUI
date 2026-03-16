@@ -42,7 +42,7 @@ int ScreenBuffer::getHeight() const
 
 bool ScreenBuffer::inBounds(int x, int y) const
 {
-
+    return x >= 0 && x < m_width && y >= 0 && y < m_height;
 }
 
 const ScreenCell& ScreenBuffer::getCell(int x, int y) const
