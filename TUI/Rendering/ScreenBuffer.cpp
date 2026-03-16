@@ -1,13 +1,10 @@
 #include "Rendering/ScreenBuffer.h"
 
-ScreenBuffer::ScreenBuffer()
-{
-
-}
+ScreenBuffer::ScreenBuffer() = default;
 
 ScreenBuffer::ScreenBuffer(int width, int height)
 {
-
+	resize(width, height);
 }
 
 void ScreenBuffer::resize(int width, int height)
