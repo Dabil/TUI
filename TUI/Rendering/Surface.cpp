@@ -3,8 +3,8 @@
 Surface::Surface() = default;
 
 Surface::Surface(int width, int height)
+	  : m_buffer(width, height)
 {
-
 }
 
 void Surface::resize(int width, int height)
