@@ -89,7 +89,10 @@ void ScreenBuffer::writeChar(int x, int y, char glyph, const Style& style)
 
 void ScreenBuffer::writeString(int x, int y, const std::string& text, const Style& style)
 {
-
+    for (std::size_t i = 0; i < text.size(); ++i)
+    {
+        writeChar(x + static_cast<int>(i), y, text[i], style);
+    }
 }
 
 void ScreenBuffer::fillRect(const Rect& rect, char glyph, const Style& style)
