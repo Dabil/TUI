@@ -14,7 +14,7 @@ void Surface::resize(int width, int height)
 
 void Surface::clear(const Style& style)
 {
-
+	m_buffer.clear(style);
 }
 
 ScreenBuffer& Surface::buffer()
