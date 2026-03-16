@@ -97,7 +97,18 @@ void ScreenBuffer::writeString(int x, int y, const std::string& text, const Styl
 
 void ScreenBuffer::fillRect(const Rect& rect, char glyph, const Style& style)
 {
+    const int xStart = std::max(0, rect.position.x);
+    const int yStart = std::max(0, rect.position.y);
+    const int xEnd = std::min(m_width, rect.position.x + rect.size.width);
+    const int yEnd = std::min(m_height, rect.position.y + rect.size.height);
 
+    for (int y = yStart; y < yEnd; ++y)
+    {
+        for (int x = xStart; x < xEnd; ++x)
+        {
+            writeChar(x, y, glyph, style);
+        }
+    }
 }
 
 void ScreenBuffer::drawFrame(const Rect& rect, const Style& style)
