@@ -164,5 +164,5 @@ std::string ScreenBuffer::renderToString() const
 
 int ScreenBuffer::index(int x, int y) const
 {
-
+    return y * m_width + x;
 }
