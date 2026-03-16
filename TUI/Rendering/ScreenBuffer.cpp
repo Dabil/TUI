@@ -113,7 +113,32 @@ void ScreenBuffer::fillRect(const Rect& rect, char glyph, const Style& style)
 
 void ScreenBuffer::drawFrame(const Rect& rect, const Style& style)
 {
+    if (rect.size.width < 2 || rect.size.height < 2)
+    {
+        return;
+    }
 
+    const int left = rect.position.x;
+    const int right = rect.position.x + rect.size.width - 1;
+    const int top = rect.position.y;
+    const int bottom = rect.position.y + rect.size.height - 1;
+
+    writeChar(left, top, '+', style);
+    writeChar(right, top, '+', style);
+    writeChar(left, bottom, '+', style);
+    writeChar(right, bottom, '+', style);
+
+    for (int x = left + 1; x < right; ++x)
+    {
+        writeChar(x, top, '-', style);
+        writeChar(x, bottom, '-', style);
+    }
+
+    for (int y = top + 1; y < bottom; ++y)
+    {
+        writeChar(left, y, '|', style);
+        writeChar(right, y, '|', style);
+    }
 }
 
 std::string ScreenBuffer::renderToString() const
