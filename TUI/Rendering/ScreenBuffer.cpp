@@ -1,5 +1,7 @@
 #include "Rendering/ScreenBuffer.h"
 
+#include <stdexcept>
+
 ScreenBuffer::ScreenBuffer() = default;
 
 ScreenBuffer::ScreenBuffer(int width, int height)
@@ -9,7 +11,14 @@ ScreenBuffer::ScreenBuffer(int width, int height)
 
 void ScreenBuffer::resize(int width, int height)
 {
+    if (width < 0 || height < 0)
+    {
+        throw std::invalid_argument("ScreenBuffer dimensions cannot be negative.");
+    }
 
+    m_width = width;
+    m_height = height;
+    m_cells.assign(static_cast<std::size_t>(m_width * m_height), ScreenCell{});
 }
 
 void ScreenBuffer::clear(const Style& style = Style())
