@@ -57,12 +57,22 @@ const ScreenCell& ScreenBuffer::getCell(int x, int y) const
 
 ScreenCell& ScreenBuffer::getCell(int x, int y)
 {
+    if (!inBounds(x, y))
+    {
+        throw std::out_of_range("ScreenBuffer::getCell out of bounds.");
+    }
 
+    return m_cells[static_cast<std::size_t>(index(x, y))];
 }
 
 void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 {
+    if (!inBounds(x, y))
+    {
+        return;
+    }
 
+    m_cells[static_cast<std::size_t>(index(x, y))] = cell;
 }
 
 void ScreenBuffer::writeChar(int x, int y, char glyph, const Style& style)
