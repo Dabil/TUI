@@ -143,7 +143,23 @@ void ScreenBuffer::drawFrame(const Rect& rect, const Style& style)
 
 std::string ScreenBuffer::renderToString() const
 {
+    std::string out;
+    out.reserve(static_cast<std::size_t>(m_width * m_height + m_height));
 
+    for (int y = 0; y < m_height; ++y)
+    {
+        for (int x = 0; x < m_width; ++x)
+        {
+            out.push_back(static_cast<char>(getCell(x, y).glyph));
+        }
+
+        if (y + 1 < m_height)
+        {
+            out.push_back('\n');
+        }
+    }
+
+    return out;
 }
 
 int ScreenBuffer::index(int x, int y) const
