@@ -9,7 +9,7 @@ Surface::Surface(int width, int height)
 
 void Surface::resize(int width, int height)
 {
-
+	m_buffer.resize(width, height);
 }
 
 void Surface::clear(const Style& style)
