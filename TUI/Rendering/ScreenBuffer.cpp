@@ -77,7 +77,14 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 
 void ScreenBuffer::writeChar(int x, int y, char glyph, const Style& style)
 {
+    if (!inBounds(x, y))
+    {
+        return;
+    }
 
+    ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
+    cell.glyph = static_cast<char32_t>(static_cast<unsigned char>(glyph));
+    cell.style = style;
 }
 
 void ScreenBuffer::writeString(int x, int y, const std::string& text, const Style& style)
