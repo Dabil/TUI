@@ -37,7 +37,7 @@ int ScreenBuffer::getWidth() const
 
 int ScreenBuffer::getHeight() const
 {
-
+    return m_height;
 }
 
 bool ScreenBuffer::inBounds(int x, int y) const
