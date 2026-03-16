@@ -47,7 +47,12 @@ bool ScreenBuffer::inBounds(int x, int y) const
 
 const ScreenCell& ScreenBuffer::getCell(int x, int y) const
 {
+    if (!inBounds(x, y))
+    {
+        throw std::out_of_range("ScreenBuffer::getCell out of bounds.");
+    }
 
+    return m_cells[static_cast<std::size_t>(index(x, y))];
 }
 
 ScreenCell& ScreenBuffer::getCell(int x, int y)
