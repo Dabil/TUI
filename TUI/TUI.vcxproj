@@ -131,12 +131,16 @@
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
+    <ClInclude Include="Rendering\ConsoleRenderer.h" />
+    <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
     <ClInclude Include="Rendering\Surface.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
+    <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
   </ItemGroup>
