@@ -23,7 +23,11 @@ void ScreenBuffer::resize(int width, int height)
 
 void ScreenBuffer::clear(const Style& style = Style())
 {
-
+    for (auto& cell : m_cells)
+    {
+        cell.glyph = U' ';
+        cell.style = style;
+    }
 }
 
 int ScreenBuffer::getWidth() const
