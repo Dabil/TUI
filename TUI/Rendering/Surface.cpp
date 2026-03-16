@@ -19,10 +19,10 @@ void Surface::clear(const Style& style)
 
 ScreenBuffer& Surface::buffer()
 {
-
+	return m_buffer;
 }
 
 const ScreenBuffer& Surface::buffer() const
 {
-
+	return m_buffer;
 }
