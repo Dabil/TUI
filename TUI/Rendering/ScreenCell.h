@@ -1,7 +1,6 @@
 #pragma once
 
-// Assuming future file
-#include "Rendering/Style.h"
+#include "Rendering/Styles/Style.h"
 
 struct ScreenCell
 {
