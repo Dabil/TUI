@@ -168,7 +168,17 @@ bool ConsoleRenderer::pollResize()
 
 void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
 {
+    for (int y = 0; y < frame.getHeight(); ++y)
+    {
+        moveCursor(0, y);
 
+        for (int x = 0; x < frame.getWidth(); ++x)
+        {
+            const ScreenCell& cell = frame.getCell(x, y);
+            setStyle(cell.style);
+            writeGlyph(cell.glyph);
+        }
+    }
 }
 
 void ConsoleRenderer::writeDirtySpans(const ScreenBuffer& frame)
