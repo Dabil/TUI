@@ -127,7 +127,14 @@ void ConsoleRenderer::present(const ScreenBuffer& frame) override
 
 void ConsoleRenderer::resize(int width, int height) override
 {
+    m_consoleWidth = width;
+    m_consoleHeight = height;
 
+    m_previousFrame.resize(width, height);
+    m_previousFrame.clear();
+
+    m_firstPresent = true;
+    m_currentStyle = Style{};
 }
 
 int ConsoleRenderer::getConsoleWidth() const
