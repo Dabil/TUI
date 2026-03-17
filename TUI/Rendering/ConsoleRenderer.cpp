@@ -222,8 +222,9 @@ void ConsoleRenderer::setStyle(const Style& style)
         return;
     }
 
-    HANDLE hOut = getStdOutHandle();
-    SetConsoleTextAttribute(hOut, styleToAttributes(style));
+    const WORD attributes = styleToAttributes(style, m_defaultAttributes);
+    SetConsoleTextAttribute(m_hOut, attributes);
+
     m_currentStyle = style;
 }
 
