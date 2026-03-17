@@ -87,7 +87,17 @@ bool ConsoleRenderer::initialize() override
 
 void ConsoleRenderer::shutdown() override
 {
+    if (!m_initialized)
+    {
+        return;
+    }
 
+    resetStyle();
+    restoreConsoleState();
+
+    m_initialized = false;
+    m_firstPresent = true;
+    m_currentStyle = Style{};
 }
 
 void ConsoleRenderer::present(const ScreenBuffer& frame) override
