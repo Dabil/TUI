@@ -385,6 +385,10 @@ void ConsoleRenderer::setStyle(const Style& style)
 
 void ConsoleRenderer::resetStyle()
 {
+    {
+        SetConsoleTextAttribute(m_hOut, m_defaultAttributes);
+        m_currentStyle = Style{};
+    }
 }
 
 void ConsoleRenderer::writeGlyph(char32_t glyph)
