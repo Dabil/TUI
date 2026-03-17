@@ -144,6 +144,29 @@ namespace
 
         return attributes;
     }
+ 
+    std::wstring codePointToUtf16(char32_t cp)
+    {
+        if (cp <= 0xFFFF)
+        {
+            return std::wstring(1, static_cast<wchar_t>(cp));
+        }
+
+        if (cp > 0x10FFFF)
+        {
+            return L"?";
+        }
+
+        cp -= 0x10000;
+        const wchar_t high = static_cast<wchar_t>(0xD800 + ((cp >> 10) & 0x3FF));
+        const wchar_t low = static_cast<wchar_t>(0xDC00 + (cp & 0x3FF));
+
+        std::wstring result;
+        result.push_back(high);
+        result.push_back(low);
+        return result;
+    }
+
 }
 
 ConsoleRenderer::ConsoleRenderer() = default;
