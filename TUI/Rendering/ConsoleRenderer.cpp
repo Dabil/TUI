@@ -57,6 +57,18 @@ namespace
         default:                          return 0;
         }
     }
+
+    WORD swapForegroundToBackground(WORD fg)
+    {
+        WORD bg = 0;
+
+        if (fg & FOREGROUND_RED)       bg |= BACKGROUND_RED;
+        if (fg & FOREGROUND_GREEN)     bg |= BACKGROUND_GREEN;
+        if (fg & FOREGROUND_BLUE)      bg |= BACKGROUND_BLUE;
+        if (fg & FOREGROUND_INTENSITY) bg |= BACKGROUND_INTENSITY;
+
+        return bg;
+    }
 }
 
 ConsoleRenderer::ConsoleRenderer() = default;
