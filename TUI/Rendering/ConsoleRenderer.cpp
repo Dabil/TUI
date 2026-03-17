@@ -420,7 +420,58 @@ bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
 
 bool ConsoleRenderer::configureConsole()
 {
+    if (!SetConsoleOutputCP(CP_UTF8))
+    {
+        return false;
+    }
 
+    if (!SetConsoleCP(CP_UTF8))
+    {
+        return false;
+    }
+
+    if (m_haveOriginalOutputMode)
+    {
+        DWORD outMode = m_originalOutputMode;
+        outMode |= ENABLE_PROCESSED_OUTPUT;
+        outMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
+        outMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+
+        if (!SetConsoleMode(m_hOut, outMode))
+        {
+            DWORD fallbackMode = m_originalOutputMode;
+            fallbackMode |= ENABLE_PROCESSED_OUTPUT;
+            fallbackMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
+
+            if (!SetConsoleMode(m_hOut, fallbackMode))
+            {
+                return false;
+            }
+        }
+    }
+
+    if (m_haveOriginalInputMode)
+    {
+        DWORD inMode = m_originalInputMode;
+        inMode |= ENABLE_PROCESSED_INPUT;
+        inMode |= ENABLE_WINDOW_INPUT;
+        inMode |= ENABLE_EXTENDED_FLAGS;
+        inMode &= ~ENABLE_QUICK_EDIT_MODE;
+
+        if (!SetConsoleMode(m_hIn, inMode))
+        {
+            return false;
+        }
+    }
+
+    CONSOLE_CURSOR_INFO cursorInfo{};
+    if (GetConsoleCursorInfo(m_hOut, &cursorInfo))
+    {
+        cursorInfo.bVisible = FALSE;
+        SetConsoleCursorInfo(m_hOut, &cursorInfo);
+    }
+
+    return true;
 }
 
 void ConsoleRenderer::restoreConsoleState() 
