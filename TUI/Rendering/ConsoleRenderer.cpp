@@ -406,7 +406,16 @@ void ConsoleRenderer::writeGlyph(char32_t glyph)
 
 bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
 {
+    CONSOLE_SCREEN_BUFFER_INFO info{};
+    if (!GetConsoleScreenBufferInfo(m_hOut, &info))
+    {
+        return false;
+    }
 
+    width = static_cast<int>(info.srWindow.Right - info.srWindow.Left + 1);
+    height = static_cast<int>(info.srWindow.Bottom - info.srWindow.Top + 1);
+
+    return width > 0 && height > 0;
 }
 
 bool ConsoleRenderer::configureConsole()
