@@ -165,3 +165,48 @@ bool ConsoleRenderer::pollResize()
     resize(newWidth, newHeight);
     return true;
 }
+
+void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
+{
+
+}
+
+void ConsoleRenderer::writeDirtySpans(const ScreenBuffer& frame)
+{
+
+}
+
+void ConsoleRenderer::moveCursor(int x, int y)
+{
+
+}
+
+void ConsoleRenderer::setStyle(const Style& style)
+{
+
+}
+
+void ConsoleRenderer::resetStyle()
+{
+
+}
+
+void ConsoleRenderer::writeGlyph(char32_t glyph)
+{
+
+}
+
+bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
+{
+
+}
+
+bool ConsoleRenderer::configureConsole()
+{
+
+}
+
+void ConsoleRenderer::restoreConsoleState() 
+{
+
+}
