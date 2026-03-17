@@ -31,6 +31,8 @@ class ScreenBuffer;
 class IRenderer
 {
 public:
+    virtual ~IRenderer() = default;
+
     virtual bool initialize() = 0;
     virtual void shutdown() = 0;
     virtual void present(const ScreenBuffer& frame) = 0;
