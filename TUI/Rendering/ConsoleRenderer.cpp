@@ -208,11 +208,11 @@ void ConsoleRenderer::writeDirtySpans(const ScreenBuffer& frame)
 
 void ConsoleRenderer::moveCursor(int x, int y)
 {
-    HANDLE hOut = getStdOutHandle();
     COORD pos{};
     pos.X = static_cast<SHORT>(x);
     pos.Y = static_cast<SHORT>(y);
-    SetConsoleCursorPosition(hOut, pos);
+
+    SetConsoleCursorPosition(m_hOut, pos);
 }
 
 void ConsoleRenderer::setStyle(const Style& style)
