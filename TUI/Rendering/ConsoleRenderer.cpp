@@ -4,10 +4,13 @@
 #include <string>
 #include <vector>
 
+#include "Rendering/Styles/Color.h"
+
 ConsoleRenderer::ConsoleRenderer() = default;
 
-ConsoleRenderer::~ConsoleRenderer() override
+ConsoleRenderer::~ConsoleRenderer()
 {
+    shutdown();
 }
 
 bool ConsoleRenderer::initialize() override
