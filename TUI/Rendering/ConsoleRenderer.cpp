@@ -139,12 +139,12 @@ void ConsoleRenderer::resize(int width, int height) override
 
 int ConsoleRenderer::getConsoleWidth() const
 {
-
+    return m_consoleWidth;
 }
 
 int ConsoleRenderer::getConsoleHeight() const
 {
-
+    return m_consoleHeight;
 }
 
 bool ConsoleRenderer::pollResize()
