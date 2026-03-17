@@ -149,5 +149,19 @@ int ConsoleRenderer::getConsoleHeight() const
 
 bool ConsoleRenderer::pollResize()
 {
+    int newWidth = 0;
+    int newHeight = 0;
 
+    if (!queryVisibleConsoleSize(newWidth, newHeight))
+    {
+        return false;
+    }
+
+    if (newWidth == m_consoleWidth && newHeight == m_consoleHeight)
+    {
+        return false;
+    }
+
+    resize(newWidth, newHeight);
+    return true;
 }
