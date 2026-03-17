@@ -5,7 +5,7 @@
 
 #include "Core/Rect.h"
 #include "Rendering/ScreenCell.h"
-#include "Rendering/Style.h"
+#include "Rendering/Styles/Style.h"
 
 class ScreenBuffer
 {
