@@ -393,7 +393,15 @@ void ConsoleRenderer::resetStyle()
 
 void ConsoleRenderer::writeGlyph(char32_t glyph)
 {
+    const std::wstring utf16 = codePointToUtf16(glyph);
 
+    DWORD written = 0;
+    WriteConsoleW(
+        m_hOut,
+        utf16.data(),
+        static_cast<DWORD>(utf16.size()),
+        &written,
+        nullptr);
 }
 
 bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
