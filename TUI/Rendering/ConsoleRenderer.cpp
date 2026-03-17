@@ -1,4 +1,4 @@
-#include "ConsoleRenderer.h"
+#include "Rendering/ConsoleRenderer.h"
 
 #include <stdexcept>
 #include <string>
@@ -8,6 +8,12 @@
 
 namespace
 {
+    constexpr WORD kForegroundMask =
+        FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+
+    constexpr WORD kBackgroundMask =
+        BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+
     WORD basicForegroundBits(Color::Basic color)
     {
         switch (color)
@@ -144,7 +150,7 @@ namespace
 
         return attributes;
     }
- 
+
     std::wstring codePointToUtf16(char32_t cp)
     {
         if (cp <= 0xFFFF)
@@ -166,7 +172,6 @@ namespace
         result.push_back(low);
         return result;
     }
-
 }
 
 ConsoleRenderer::ConsoleRenderer() = default;
@@ -176,7 +181,7 @@ ConsoleRenderer::~ConsoleRenderer()
     shutdown();
 }
 
-bool ConsoleRenderer::initialize() override
+bool ConsoleRenderer::initialize()
 {
     if (m_initialized)
     {
@@ -248,7 +253,7 @@ bool ConsoleRenderer::initialize() override
     return true;
 }
 
-void ConsoleRenderer::shutdown() override
+void ConsoleRenderer::shutdown()
 {
     if (!m_initialized)
     {
@@ -263,7 +268,7 @@ void ConsoleRenderer::shutdown() override
     m_currentStyle = Style{};
 }
 
-void ConsoleRenderer::present(const ScreenBuffer& frame) override
+void ConsoleRenderer::present(const ScreenBuffer& frame)
 {
     if (!m_initialized)
     {
@@ -288,7 +293,7 @@ void ConsoleRenderer::present(const ScreenBuffer& frame) override
     m_previousFrame = frame;
 }
 
-void ConsoleRenderer::resize(int width, int height) override
+void ConsoleRenderer::resize(int width, int height)
 {
     m_consoleWidth = width;
     m_consoleHeight = height;
@@ -385,10 +390,8 @@ void ConsoleRenderer::setStyle(const Style& style)
 
 void ConsoleRenderer::resetStyle()
 {
-    {
-        SetConsoleTextAttribute(m_hOut, m_defaultAttributes);
-        m_currentStyle = Style{};
-    }
+    SetConsoleTextAttribute(m_hOut, m_defaultAttributes);
+    m_currentStyle = Style{};
 }
 
 void ConsoleRenderer::writeGlyph(char32_t glyph)
@@ -474,7 +477,7 @@ bool ConsoleRenderer::configureConsole()
     return true;
 }
 
-void ConsoleRenderer::restoreConsoleState() 
+void ConsoleRenderer::restoreConsoleState()
 {
     if (m_hOut != INVALID_HANDLE_VALUE && m_hOut != nullptr)
     {
