@@ -32,6 +32,31 @@ namespace
         default:                          return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
         }
     }
+
+    WORD basicBackgroundBits(Color::Basic color)
+    {
+        switch (color)
+        {
+        case Color::Basic::Black:         return 0;
+        case Color::Basic::Red:           return BACKGROUND_RED;
+        case Color::Basic::Green:         return BACKGROUND_GREEN;
+        case Color::Basic::Yellow:        return BACKGROUND_RED | BACKGROUND_GREEN;
+        case Color::Basic::Blue:          return BACKGROUND_BLUE;
+        case Color::Basic::Magenta:       return BACKGROUND_RED | BACKGROUND_BLUE;
+        case Color::Basic::Cyan:          return BACKGROUND_GREEN | BACKGROUND_BLUE;
+        case Color::Basic::White:         return BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE;
+
+        case Color::Basic::BrightBlack:   return BACKGROUND_INTENSITY;
+        case Color::Basic::BrightRed:     return BACKGROUND_RED | BACKGROUND_INTENSITY;
+        case Color::Basic::BrightGreen:   return BACKGROUND_GREEN | BACKGROUND_INTENSITY;
+        case Color::Basic::BrightYellow:  return BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_INTENSITY;
+        case Color::Basic::BrightBlue:    return BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+        case Color::Basic::BrightMagenta: return BACKGROUND_RED | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+        case Color::Basic::BrightCyan:    return BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+        case Color::Basic::BrightWhite:   return BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+        default:                          return 0;
+        }
+    }
 }
 
 ConsoleRenderer::ConsoleRenderer() = default;
