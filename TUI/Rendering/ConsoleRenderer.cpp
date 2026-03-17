@@ -217,6 +217,14 @@ void ConsoleRenderer::moveCursor(int x, int y)
 
 void ConsoleRenderer::setStyle(const Style& style)
 {
+    if (style == m_currentStyle)
+    {
+        return;
+    }
+
+    HANDLE hOut = getStdOutHandle();
+    SetConsoleTextAttribute(hOut, styleToAttributes(style));
+    m_currentStyle = style;
 }
 
 void ConsoleRenderer::resetStyle()
