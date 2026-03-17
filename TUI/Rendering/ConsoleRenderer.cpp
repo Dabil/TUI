@@ -183,7 +183,19 @@ void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
 
 void ConsoleRenderer::writeDirtySpans(const ScreenBuffer& frame)
 {
+    const std::vector<DirtySpan> spans = FrameDiff::diffRows(m_previousFrame, frame);
 
+    for (const DirtySpan& span : spans)
+    {
+        moveCursor(span.xStart, span.y);
+
+        for (int x = span.xStart; x <= span.xEnd; ++x)
+        {
+            const ScreenCell& cell = frame.getCell(x, span.y);
+            setStyle(cell.style);
+            writeGlyph(cell.glyph);
+        }
+    }
 }
 
 void ConsoleRenderer::moveCursor(int x, int y)
