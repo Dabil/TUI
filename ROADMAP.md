@@ -1,5 +1,5 @@
 TUI MASTER ROADMAP
-REVISED DETAILED ROADMAP
+REVISED: 03-17-26 DETAILED ROADMAP
 ========================================
 
 PROJECT GOAL
@@ -7,7 +7,7 @@ Build a clean, extensible Text UI engine that:
 
 1. feels natural to author in C++
 2. supports page-building without Visual Studio later
-3. preserves the best ideas from the old TUI
+3. preserves the best ideas from the old TUI "Rogue-Like" Engine
 4. avoids baking old API mistakes into the new architecture
 5. supports future windows, widgets, menus, panels, popups, and alternate renderers
 
@@ -55,7 +55,7 @@ These principles govern the whole roadmap.
 - widgets
 - polish/backends
 
-These principles align with the original roadmap emphasis on foundational layers first, clean separation of screen composition from output, and building reusable systems before higher-level UI features. :contentReference[oaicite:4]{index=4} :contentReference[oaicite:5]{index=5} :contentReference[oaicite:6]{index=6}
+These principles align with the original roadmap emphasis on foundational layers first, clean separation of screen composition from output, and building reusable systems before higher-level UI features. 
 
 
 
@@ -113,7 +113,7 @@ PURPOSE
 Build the stable rendering core that everything else depends on.
 
 WHY THIS PHASE COMES FIRST
-Without this phase, every later system becomes harder to design and may require refactoring. This matches the earlier roadmap’s emphasis on logical screen representation, diff redraw, and keeping output separate from composition. :contentReference[oaicite:7]{index=7} :contentReference[oaicite:8]{index=8}
+Without this phase, every later system becomes harder to design and may require refactoring. This matches the earlier roadmap’s emphasis on logical screen representation, diff redraw, and keeping output separate from composition. 
 
 IMPLEMENT IN THIS PHASE
 
@@ -223,8 +223,7 @@ PURPOSE
 Create a real style system that preserves the authoring feel of ansi.h + BannerThemes.h, without tying the engine to raw ANSI transport strings.
 
 WHY THIS PHASE COMES EARLY
-Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern from BannerThemes and the composable styling vocabulary from ansi.h. :contentReference[oaicite:9]{index=9} :contentReference[oaicite:10]{index=10}
-
+Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern from BannerThemes and the composable styling vocabulary from ansi.h. 
 IMPLEMENT IN THIS PHASE
 
 3.1 Color abstraction
@@ -269,7 +268,7 @@ ConsoleRenderer maps Style to backend capabilities
 - model should still preserve future richness
 
 3.7 Preserve-style semantics
-Needed because earlier docs explicitly relied on preserving destination formatting when no style override was supplied. :contentReference[oaicite:11]{index=11}
+Needed because earlier docs explicitly relied on preserving destination formatting when no style override was supplied. 
 
 OUTPUT OF PHASE 2
 A backend-agnostic style system with console-native authoring feel.
@@ -302,7 +301,7 @@ PURPOSE
 Create reusable visual objects for composition.
 
 WHY THIS PHASE COMES BEFORE PAGE API
-The page API must have stable primitives to place. The old docs show that authored screens heavily depended on reusable ASCII assets, text blocks, boxes, and generated banner content. :contentReference[oaicite:12]{index=12} :contentReference[oaicite:13]{index=13}
+The page API must have stable primitives to place. The old docs show that authored screens heavily depended on reusable ASCII assets, text blocks, boxes, and generated banner content. 
 
 IMPLEMENT IN THIS PHASE
 
@@ -370,7 +369,7 @@ PURPOSE
 Replace the old confusing write mode names with a clear and scalable compositing model.
 
 WHY THIS PHASE IS FOUNDATIONAL
-The page API should not be built on ambiguous concepts like “transparent” and “fully transparent.” The writing/compositing model must be correct first so page-authoring functions stay intuitive. This directly addresses the weakness discovered in the old API and preserves the old functionality without the naming confusion. The old docs clearly show that multiple write modes were essential, but the names were not ideal. :contentReference[oaicite:14]{index=14} 
+The page API should not be built on ambiguous concepts like “transparent” and “fully transparent.” The writing/compositing model must be correct first so page-authoring functions stay intuitive. This directly addresses the weakness discovered in the old API and preserves the old functionality without the naming confusion. The old docs clearly show that multiple write modes were essential, but the names were not ideal. 
 
 DEFINE IN THIS PHASE
 
@@ -674,7 +673,7 @@ PURPOSE
 Support layered UI, panels, popups, and future overlapping windows.
 
 WHY THIS PHASE COMES BEFORE WIDGETS
-Widgets and dialogs need a layered composition environment. This follows the original architecture guidance around surfaces/layers, panels/windows, and reusable popup structure. :contentReference[oaicite:17]{index=17} 
+Widgets and dialogs need a layered composition environment. This follows the original architecture guidance around surfaces/layers, panels/windows, and reusable popup structure. 
 
 IMPLEMENT IN THIS PHASE
 
@@ -964,7 +963,7 @@ IMPLEMENT IN THIS PHASE
 - invalidate rect
 - invalidate whole page
 - invalidate element/window
-This was part of the earlier architecture guidance and belongs here once richer UI is present. :contentReference[oaicite:19]{index=19}
+This was part of the earlier architecture guidance and belongs here once richer UI is present. 
 
 OUTPUT OF PHASE 13
 Stable time-based polish features layered on top of a finished UI model.
