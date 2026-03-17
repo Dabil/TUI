@@ -476,5 +476,38 @@ bool ConsoleRenderer::configureConsole()
 
 void ConsoleRenderer::restoreConsoleState() 
 {
+    if (m_hOut != INVALID_HANDLE_VALUE && m_hOut != nullptr)
+    {
+        SetConsoleTextAttribute(m_hOut, m_defaultAttributes);
 
+        if (m_haveOriginalOutputMode)
+        {
+            SetConsoleMode(m_hOut, m_originalOutputMode);
+        }
+
+        CONSOLE_CURSOR_INFO cursorInfo{};
+        if (GetConsoleCursorInfo(m_hOut, &cursorInfo))
+        {
+            cursorInfo.bVisible = m_cursorWasVisible ? TRUE : FALSE;
+            SetConsoleCursorInfo(m_hOut, &cursorInfo);
+        }
+    }
+
+    if (m_hIn != INVALID_HANDLE_VALUE && m_hIn != nullptr)
+    {
+        if (m_haveOriginalInputMode)
+        {
+            SetConsoleMode(m_hIn, m_originalInputMode);
+        }
+    }
+
+    if (m_originalOutputCodePage != 0)
+    {
+        SetConsoleOutputCP(m_originalOutputCodePage);
+    }
+
+    if (m_originalInputCodePage != 0)
+    {
+        SetConsoleCP(m_originalInputCodePage);
+    }
 }
