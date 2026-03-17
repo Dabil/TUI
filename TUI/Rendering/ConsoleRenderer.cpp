@@ -8,9 +8,29 @@
 
 namespace
 {
-    HANDLE getStdOutHandle()
+    WORD basicForegroundBits(Color::Basic color)
     {
-        return GetStdHandle(STD_OUTPUT_HANDLE);
+        switch (color)
+        {
+        case Color::Basic::Black:         return 0;
+        case Color::Basic::Red:           return FOREGROUND_RED;
+        case Color::Basic::Green:         return FOREGROUND_GREEN;
+        case Color::Basic::Yellow:        return FOREGROUND_RED | FOREGROUND_GREEN;
+        case Color::Basic::Blue:          return FOREGROUND_BLUE;
+        case Color::Basic::Magenta:       return FOREGROUND_RED | FOREGROUND_BLUE;
+        case Color::Basic::Cyan:          return FOREGROUND_GREEN | FOREGROUND_BLUE;
+        case Color::Basic::White:         return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+
+        case Color::Basic::BrightBlack:   return FOREGROUND_INTENSITY;
+        case Color::Basic::BrightRed:     return FOREGROUND_RED | FOREGROUND_INTENSITY;
+        case Color::Basic::BrightGreen:   return FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+        case Color::Basic::BrightYellow:  return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_INTENSITY;
+        case Color::Basic::BrightBlue:    return FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+        case Color::Basic::BrightMagenta: return FOREGROUND_RED | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+        case Color::Basic::BrightCyan:    return FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+        case Color::Basic::BrightWhite:   return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE | FOREGROUND_INTENSITY;
+        default:                          return FOREGROUND_RED | FOREGROUND_GREEN | FOREGROUND_BLUE;
+        }
     }
 }
 
@@ -230,7 +250,6 @@ void ConsoleRenderer::setStyle(const Style& style)
 
 void ConsoleRenderer::resetStyle()
 {
-
 }
 
 void ConsoleRenderer::writeGlyph(char32_t glyph)
