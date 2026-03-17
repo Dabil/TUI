@@ -6,6 +6,14 @@
 
 #include "Rendering/Styles/Color.h"
 
+namespace
+{
+    HANDLE getStdOutHandle()
+    {
+        return GetStdHandle(STD_OUTPUT_HANDLE);
+    }
+}
+
 ConsoleRenderer::ConsoleRenderer() = default;
 
 ConsoleRenderer::~ConsoleRenderer()
@@ -209,7 +217,6 @@ void ConsoleRenderer::moveCursor(int x, int y)
 
 void ConsoleRenderer::setStyle(const Style& style)
 {
-
 }
 
 void ConsoleRenderer::resetStyle()
