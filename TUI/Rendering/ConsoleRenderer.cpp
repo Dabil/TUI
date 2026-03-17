@@ -81,6 +81,69 @@ namespace
 
         return fg;
     }
+
+    WORD styleToAttributes(const Style& style, WORD defaultAttributes)
+    {
+        WORD attributes = defaultAttributes;
+
+        if (style.hasForeground() && style.foreground()->isBasic())
+        {
+            attributes &= ~kForegroundMask;
+            attributes |= basicForegroundBits(style.foreground()->basic());
+        }
+
+        if (style.hasBackground() && style.background()->isBasic())
+        {
+            attributes &= ~kBackgroundMask;
+            attributes |= basicBackgroundBits(style.background()->basic());
+        }
+
+        if (style.bold())
+        {
+            attributes |= FOREGROUND_INTENSITY;
+        }
+
+        if (style.dim())
+        {
+            attributes &= ~FOREGROUND_INTENSITY;
+        }
+
+        if (style.reverse())
+        {
+            const WORD fg = attributes & kForegroundMask;
+            const WORD bg = attributes & kBackgroundMask;
+
+            attributes &= ~kForegroundMask;
+            attributes &= ~kBackgroundMask;
+
+            attributes |= swapBackgroundToForeground(bg);
+            attributes |= swapForegroundToBackground(fg);
+
+            attributes |= COMMON_LVB_REVERSE_VIDEO;
+        }
+        else
+        {
+            attributes &= ~COMMON_LVB_REVERSE_VIDEO;
+        }
+
+        if (style.underline())
+        {
+            attributes |= COMMON_LVB_UNDERSCORE;
+        }
+        else
+        {
+            attributes &= ~COMMON_LVB_UNDERSCORE;
+        }
+
+        if (style.invisible())
+        {
+            const WORD bg = attributes & kBackgroundMask;
+            attributes &= ~kForegroundMask;
+            attributes |= swapBackgroundToForeground(bg);
+        }
+
+        return attributes;
+    }
 }
 
 ConsoleRenderer::ConsoleRenderer() = default;
