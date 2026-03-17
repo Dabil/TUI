@@ -35,6 +35,11 @@ public:
 
     virtual bool initialize() = 0;
     virtual void shutdown() = 0;
+
     virtual void present(const ScreenBuffer& frame) = 0;
     virtual void resize(int width, int height) = 0;
+    virtual bool pollResize() = 0;
+
+    virtual int getConsoleWidth() const = 0;
+    virtual int getConsoleHeight() const = 0;
 };
