@@ -128,6 +128,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="App\Application.h" />
+    <ClInclude Include="App\ScreenManager.h" />
     <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
@@ -143,6 +144,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App\Application.cpp" />
+    <ClCompile Include="App\ScreenManager.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
