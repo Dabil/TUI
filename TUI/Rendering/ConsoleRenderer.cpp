@@ -102,7 +102,27 @@ void ConsoleRenderer::shutdown() override
 
 void ConsoleRenderer::present(const ScreenBuffer& frame) override
 {
+    if (!m_initialized)
+    {
+        throw std::runtime_error("ConsoleRenderer::present called before initialize().");
+    }
 
+    if (m_firstPresent ||
+        m_previousFrame.getWidth() != frame.getWidth() ||
+        m_previousFrame.getHeight() != frame.getHeight())
+    {
+        m_previousFrame.resize(frame.getWidth(), frame.getHeight());
+        m_previousFrame.clear();
+
+        writeFullFrame(frame);
+
+        m_previousFrame = frame;
+        m_firstPresent = false;
+        return;
+    }
+
+    writeDirtySpans(frame);
+    m_previousFrame = frame;
 }
 
 void ConsoleRenderer::resize(int width, int height) override
