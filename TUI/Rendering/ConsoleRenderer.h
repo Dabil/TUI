@@ -14,6 +14,7 @@ public:
     ConsoleRenderer();
     ~ConsoleRenderer() override;
 
+    bool maximizeConsole();
     bool initialize() override;
     void shutdown() override;
     void present(const ScreenBuffer& frame) override;

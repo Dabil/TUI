@@ -181,6 +181,52 @@ ConsoleRenderer::~ConsoleRenderer()
     shutdown();
 }
 
+bool ConsoleRenderer::maximizeConsole()
+{
+    if (m_hOut == INVALID_HANDLE_VALUE || m_hOut == nullptr)
+    {
+        return false;
+    }
+
+    // Get the largest possible console window size
+    COORD largestSize = GetLargestConsoleWindowSize(m_hOut);
+    if (largestSize.X == 0 || largestSize.Y == 0)
+    {
+        return false;
+    }
+
+    // Step 1: Resize the screen buffer FIRST (must be >= window size)
+    COORD bufferSize;
+    bufferSize.X = largestSize.X;
+    bufferSize.Y = largestSize.Y;
+
+    if (!SetConsoleScreenBufferSize(m_hOut, bufferSize))
+    {
+        return false;
+    }
+
+    // Step 2: Resize the visible window
+    SMALL_RECT windowRect;
+    windowRect.Left = 0;
+    windowRect.Top = 0;
+    windowRect.Right = largestSize.X - 1;
+    windowRect.Bottom = largestSize.Y - 1;
+
+    if (!SetConsoleWindowInfo(m_hOut, TRUE, &windowRect))
+    {
+        return false;
+    }
+
+    // Step 3 (Optional but recommended): Maximize the window via WinAPI
+    HWND hwnd = GetConsoleWindow();
+    if (hwnd != nullptr)
+    {
+        ShowWindow(hwnd, SW_MAXIMIZE);
+    }
+
+    return true;
+}
+
 bool ConsoleRenderer::initialize()
 {
     if (m_initialized)
@@ -236,6 +282,8 @@ bool ConsoleRenderer::initialize()
         restoreConsoleState();
         return false;
     }
+
+    maximizeConsole();
 
     if (!queryVisibleConsoleSize(m_consoleWidth, m_consoleHeight))
     {
