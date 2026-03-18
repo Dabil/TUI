@@ -389,15 +389,60 @@ bool ConsoleRenderer::pollResize()
 
 void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
 {
-    for (int y = 0; y < frame.getHeight(); ++y)
-    {
-        moveCursor(0, y);
+    const int width = frame.getWidth();
+    const int height = frame.getHeight();
 
-        for (int x = 0; x < frame.getWidth(); ++x)
+    for (int y = 0; y < height; ++y)
+    {
+        int x = 0;
+
+        while (x < width)
         {
-            const ScreenCell& cell = frame.getCell(x, y);
-            setStyle(cell.style);
-            writeGlyph(cell.glyph);
+            const ScreenCell& firstCell = frame.getCell(x, y);
+            const Style& runStyle = firstCell.style;
+            const int runStart = x;
+
+            // Extend this run while the style stays the same.
+            while (x < width)
+            {
+                const ScreenCell& cell = frame.getCell(x, y);
+                if (!(cell.style == runStyle))
+                {
+                    break;
+                }
+
+                ++x;
+            }
+
+            const int runEnd = x - 1;
+
+            // Build one UTF-16 string for the whole run.
+            std::wstring runText;
+            runText.reserve(static_cast<size_t>(runEnd - runStart + 1));
+
+            for (int writeX = runStart; writeX <= runEnd; ++writeX)
+            {
+                const ScreenCell& cell = frame.getCell(writeX, y);
+                runText += codePointToUtf16(cell.glyph);
+            }
+
+            // Position once for the run.
+            moveCursor(runStart, y);
+
+            // Apply style once for the run.
+            setStyle(runStyle);
+
+            // Write the whole run in one console call.
+            if (!runText.empty())
+            {
+                DWORD written = 0;
+                WriteConsoleW(
+                    m_hOut,
+                    runText.data(),
+                    static_cast<DWORD>(runText.size()),
+                    &written,
+                    nullptr);
+            }
         }
     }
 }
