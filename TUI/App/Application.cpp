@@ -78,7 +78,7 @@ void Application::handleResize()
 
 void Application::update(double deltaTime)
 {
-
+    m_screenManager->update(deltaTime);
 }
 
 void Application::render()
