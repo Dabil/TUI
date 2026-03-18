@@ -141,6 +141,7 @@
     <ClInclude Include="Rendering\Styles\Color.h" />
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Surface.h" />
+    <ClInclude Include="Screens\Screen.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App\Application.cpp" />
