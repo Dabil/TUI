@@ -7,6 +7,7 @@
 #include "App/ScreenManager.h"
 #include "Rendering/Surface.h"
 #include "Screens/ShowcaseScreen.h"
+#include "Rendering/Styles/Themes.h"
 
 Application::Application() = default;
 
@@ -83,5 +84,9 @@ void Application::update(double deltaTime)
 
 void Application::render()
 {
+    m_surface->clear(Themes::Background);
 
+    m_screenManager->drawCurrentScreen(*m_surface);
+
+    m_renderer->present(m_surface->buffer());
 }
