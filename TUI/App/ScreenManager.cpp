@@ -31,7 +31,7 @@ void ScreenManager::clearScreens()
 
 bool ScreenManager::hasScreens() const
 {
-
+    return !m_screenStack.empty();
 }
 
 Screen* ScreenManager::currentScreen()
