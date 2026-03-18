@@ -36,7 +36,12 @@ bool ScreenManager::hasScreens() const
 
 Screen* ScreenManager::currentScreen()
 {
+    if (m_screenStack.empty())
+    {
+        return nullptr;
+    }
 
+    return m_screenStack.back().get();
 }
 
 void ScreenManager::update(double deltaTime)
