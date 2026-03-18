@@ -1,5 +1,8 @@
 #include "APP/Application.h"
 
+#include <thread>
+#include <chrono>
+
 #include "Rendering/ConsoleRenderer.h"
 
 Application::Application() = default;
@@ -32,7 +35,23 @@ bool Application::initialize()
 
 void Application::run()
 {
+    using clock = std::chrono::high_resolution_clock;
 
+    auto previousTime = clock::now();
+
+    while (m_running)
+    {
+        auto currentTime = clock::now();
+        std::chrono::duration<double> delta = currentTime - previousTime;
+        previousTime = currentTime;
+
+        handleResize();
+
+        update(delta.count());
+        render();
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(16));
+    }
 }
 
 void Application::shutdown()
