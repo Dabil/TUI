@@ -4,6 +4,9 @@
 #include <chrono>
 
 #include "Rendering/ConsoleRenderer.h"
+#include "App/ScreenManager.h"
+#include "Rendering/Surface.h"
+#include "Screens/ShowcaseScreen.h"
 
 Application::Application() = default;
 
@@ -64,7 +67,13 @@ void Application::shutdown()
 
 void Application::handleResize()
 {
+    if (m_renderer->pollResize())
+    {
+        m_width = m_renderer->getConsoleWidth();
+        m_height = m_renderer->getConsoleHeight();
 
+        m_surface->resize(m_width, m_height);
+    }
 }
 
 void Application::update(double deltaTime)
