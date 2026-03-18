@@ -14,7 +14,11 @@ void ScreenManager::pushScreen(std::unique_ptr<Screen> screen)
 
 void ScreenManager::popScreen()
 {
-
+    if (!m_screenStack.empty())
+    {
+        m_screenStack.back()->onExit();
+        m_screenStack.pop_back();
+    }
 }
 
 void ScreenManager::clearScreens()
