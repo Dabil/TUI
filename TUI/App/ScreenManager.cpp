@@ -56,5 +56,10 @@ void ScreenManager::update(double deltaTime)
 
 void ScreenManager::drawCurrentScreen(Surface& surface)
 {
+    Screen* screen = currentScreen();
 
+    if (screen)
+    {
+        screen->draw(surface);
+    }
 }
