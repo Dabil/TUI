@@ -23,7 +23,10 @@ void ScreenManager::popScreen()
 
 void ScreenManager::clearScreens()
 {
-
+    while (!m_screenStack.empty())
+    {
+        popScreen();
+    }
 }
 
 bool ScreenManager::hasScreens() const
