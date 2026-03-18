@@ -1,4 +1,4 @@
-#include "APP/Application.h"
+#include "App/Application.h"
 
 #include <thread>
 #include <chrono>
