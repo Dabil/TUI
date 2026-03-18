@@ -1,8 +1,15 @@
 #include "App/ScreenManager.h"
 
+#include "Screens/Screen.h"
+#include "Rendering/Surface.h"
+
 void ScreenManager::pushScreen(std::unique_ptr<Screen> screen)
 {
-
+    if (screen)
+    {
+        screen->onEnter();
+        m_screenStack.push_back(std::move(screen));
+    }
 }
 
 void ScreenManager::popScreen()
