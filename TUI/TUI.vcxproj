@@ -127,6 +127,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="App\Application.h" />
+    <ClInclude Include="App\ScreenManager.h" />
     <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
@@ -139,8 +141,12 @@
     <ClInclude Include="Rendering\Styles\Color.h" />
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Surface.h" />
+    <ClInclude Include="Screens\Screen.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="App\Application.cpp" />
+    <ClCompile Include="App\ScreenManager.cpp" />
+    <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
