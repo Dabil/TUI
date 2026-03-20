@@ -7,7 +7,7 @@
 #include "Utilities/Unicode/UnicodeWidth.h"
 
 /*
-    This is now the Unicode text placement layer.
+    This is the Unicode text placement layer.
 
     Notes on the narrow compatibility APIs:
 
