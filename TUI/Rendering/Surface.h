@@ -2,6 +2,16 @@
 
 #include "Rendering/ScreenBuffer.h"
 
+/*
+    Update:
+
+    Mostly no change. It is already a good wrapper around ScreenBuffeer
+
+    Checklist:
+        - No API change required
+        - REbuild only if includes need adjustment
+*/
+
 class Surface
 {
 public:
