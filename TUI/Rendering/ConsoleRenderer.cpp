@@ -153,14 +153,19 @@ namespace
 
     std::wstring codePointToUtf16(char32_t cp)
     {
-        if (cp <= 0xFFFF)
-        {
-            return std::wstring(1, static_cast<wchar_t>(cp));
-        }
-
         if (cp > 0x10FFFF)
         {
             return L"?";
+        }
+
+        if (cp >= 0xD800 && cp <= 0xDFFF)
+        {
+            return L"?";
+        }
+
+        if (cp <= 0xFFFF)
+        {
+            return std::wstring(1, static_cast<wchar_t>(cp));
         }
 
         cp -= 0x10000;
@@ -384,15 +389,60 @@ bool ConsoleRenderer::pollResize()
 
 void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
 {
-    for (int y = 0; y < frame.getHeight(); ++y)
-    {
-        moveCursor(0, y);
+    const int width = frame.getWidth();
+    const int height = frame.getHeight();
 
-        for (int x = 0; x < frame.getWidth(); ++x)
+    for (int y = 0; y < height; ++y)
+    {
+        int x = 0;
+
+        while (x < width)
         {
-            const ScreenCell& cell = frame.getCell(x, y);
-            setStyle(cell.style);
-            writeGlyph(cell.glyph);
+            const ScreenCell& firstCell = frame.getCell(x, y);
+            const Style& runStyle = firstCell.style;
+            const int runStart = x;
+
+            // Extend this run while the style stays the same.
+            while (x < width)
+            {
+                const ScreenCell& cell = frame.getCell(x, y);
+                if (!(cell.style == runStyle))
+                {
+                    break;
+                }
+
+                ++x;
+            }
+
+            const int runEnd = x - 1;
+
+            // Build one UTF-16 string for the whole run.
+            std::wstring runText;
+            runText.reserve(static_cast<size_t>(runEnd - runStart + 1));
+
+            for (int writeX = runStart; writeX <= runEnd; ++writeX)
+            {
+                const ScreenCell& cell = frame.getCell(writeX, y);
+                runText += codePointToUtf16(cell.glyph);
+            }
+
+            // Position once for the run.
+            moveCursor(runStart, y);
+
+            // Apply style once for the run.
+            setStyle(runStyle);
+
+            // Write the whole run in one console call.
+            if (!runText.empty())
+            {
+                DWORD written = 0;
+                WriteConsoleW(
+                    m_hOut,
+                    runText.data(),
+                    static_cast<DWORD>(runText.size()),
+                    &written,
+                    nullptr);
+            }
         }
     }
 }
@@ -403,13 +453,56 @@ void ConsoleRenderer::writeDirtySpans(const ScreenBuffer& frame)
 
     for (const DirtySpan& span : spans)
     {
-        moveCursor(span.xStart, span.y);
+        const int y = span.y;
+        int x = span.xStart;
 
-        for (int x = span.xStart; x <= span.xEnd; ++x)
+        while (x <= span.xEnd)
         {
-            const ScreenCell& cell = frame.getCell(x, span.y);
-            setStyle(cell.style);
-            writeGlyph(cell.glyph);
+            const ScreenCell& firstCell = frame.getCell(x, y);
+            const Style& runStyle = firstCell.style;
+            const int runStart = x;
+
+            // Find the end of this contiguous style run.
+            while (x <= span.xEnd)
+            {
+                const ScreenCell& cell = frame.getCell(x, y);
+                if (!(cell.style == runStyle))
+                {
+                    break;
+                }
+
+                ++x;
+            }
+
+            const int runEnd = x - 1;
+
+            // Build one UTF-16 string for the whole run.
+            std::wstring runText;
+            runText.reserve(static_cast<size_t>(runEnd - runStart + 1));
+
+            for (int writeX = runStart; writeX <= runEnd; ++writeX)
+            {
+                const ScreenCell& cell = frame.getCell(writeX, y);
+                runText += codePointToUtf16(cell.glyph);
+            }
+
+            // Position once for the run.
+            moveCursor(runStart, y);
+
+            // Apply style once for the run.
+            setStyle(runStyle);
+
+            // Write the whole run in one console call.
+            DWORD written = 0;
+            if (!runText.empty())
+            {
+                WriteConsoleW(
+                    m_hOut,
+                    runText.c_str(),
+                    static_cast<DWORD>(runText.size()),
+                    &written,
+                    nullptr);
+            }
         }
     }
 }
