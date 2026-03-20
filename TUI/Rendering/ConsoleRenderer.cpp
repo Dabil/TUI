@@ -5,6 +5,18 @@
 #include <vector>
 
 #include "Rendering/Styles/Color.h"
+#include "Utilities/Unicode/UnicodeConversion.h"
+
+/*
+    ConsoleRenderer is now a backend/output layer.
+
+    Checklist:
+        - Remove local codePointToUtf16 ownership
+        - Use UnicodeConversion::u32ToUtf16
+        - Present only visible leading glyphs
+        - Skip continuation glyph rendering
+        - Group output into same-style spans
+*/
 
 namespace
 {
@@ -124,7 +136,6 @@ namespace
 
             attributes |= swapBackgroundToForeground(bg);
             attributes |= swapForegroundToBackground(fg);
-
             attributes |= COMMON_LVB_REVERSE_VIDEO;
         }
         else
@@ -151,26 +162,25 @@ namespace
         return attributes;
     }
 
-    std::wstring codePointToUtf16(char32_t cp)
+    bool isContinuationCell(const ScreenCell& cell)
     {
-        if (cp <= 0xFFFF)
+        return cell.kind == CellKind::WideTrailing ||
+            cell.kind == CellKind::CombiningContinuation;
+    }
+
+    char32_t cellToPresentedGlyph(const ScreenCell& cell)
+    {
+        if (isContinuationCell(cell))
         {
-            return std::wstring(1, static_cast<wchar_t>(cp));
+            return U' ';
         }
 
-        if (cp > 0x10FFFF)
+        if (cell.kind == CellKind::Glyph)
         {
-            return L"?";
+            return cell.glyph;
         }
 
-        cp -= 0x10000;
-        const wchar_t high = static_cast<wchar_t>(0xD800 + ((cp >> 10) & 0x3FF));
-        const wchar_t low = static_cast<wchar_t>(0xDC00 + (cp & 0x3FF));
-
-        std::wstring result;
-        result.push_back(high);
-        result.push_back(low);
-        return result;
+        return U' ';
     }
 }
 
@@ -188,15 +198,13 @@ bool ConsoleRenderer::maximizeConsole()
         return false;
     }
 
-    // Get the largest possible console window size
     COORD largestSize = GetLargestConsoleWindowSize(m_hOut);
     if (largestSize.X == 0 || largestSize.Y == 0)
     {
         return false;
     }
 
-    // Step 1: Resize the screen buffer FIRST (must be >= window size)
-    COORD bufferSize;
+    COORD bufferSize{};
     bufferSize.X = largestSize.X;
     bufferSize.Y = largestSize.Y;
 
@@ -205,8 +213,7 @@ bool ConsoleRenderer::maximizeConsole()
         return false;
     }
 
-    // Step 2: Resize the visible window
-    SMALL_RECT windowRect;
+    SMALL_RECT windowRect{};
     windowRect.Left = 0;
     windowRect.Top = 0;
     windowRect.Right = largestSize.X - 1;
@@ -217,7 +224,6 @@ bool ConsoleRenderer::maximizeConsole()
         return false;
     }
 
-    // Step 3 (Optional but recommended): Maximize the window via WinAPI
     HWND hwnd = GetConsoleWindow();
     if (hwnd != nullptr)
     {
@@ -353,16 +359,6 @@ void ConsoleRenderer::resize(int width, int height)
     m_currentStyle = Style{};
 }
 
-int ConsoleRenderer::getConsoleWidth() const
-{
-    return m_consoleWidth;
-}
-
-int ConsoleRenderer::getConsoleHeight() const
-{
-    return m_consoleHeight;
-}
-
 bool ConsoleRenderer::pollResize()
 {
     int newWidth = 0;
@@ -382,18 +378,32 @@ bool ConsoleRenderer::pollResize()
     return true;
 }
 
+int ConsoleRenderer::getConsoleWidth() const
+{
+    return m_consoleWidth;
+}
+
+int ConsoleRenderer::getConsoleHeight() const
+{
+    return m_consoleHeight;
+}
+
+TextBackendCapabilities ConsoleRenderer::textCapabilities() const
+{
+    TextBackendCapabilities capabilities;
+    capabilities.supportsUtf16Output = true;
+    capabilities.supportsCombiningMarks = false;
+    capabilities.supportsEastAsianWide = true;
+    capabilities.supportsEmoji = false;
+    capabilities.supportsFontFallback = false;
+    return capabilities;
+}
+
 void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
 {
     for (int y = 0; y < frame.getHeight(); ++y)
     {
-        moveCursor(0, y);
-
-        for (int x = 0; x < frame.getWidth(); ++x)
-        {
-            const ScreenCell& cell = frame.getCell(x, y);
-            setStyle(cell.style);
-            writeGlyph(cell.glyph);
-        }
+        writeSpan(frame, y, 0, frame.getWidth() - 1);
     }
 }
 
@@ -403,13 +413,77 @@ void ConsoleRenderer::writeDirtySpans(const ScreenBuffer& frame)
 
     for (const DirtySpan& span : spans)
     {
-        moveCursor(span.xStart, span.y);
+        writeSpan(frame, span.y, span.xStart, span.xEnd);
+    }
+}
 
-        for (int x = span.xStart; x <= span.xEnd; ++x)
+void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, int xEnd)
+{
+    if (y < 0 || y >= frame.getHeight())
+    {
+        return;
+    }
+
+    if (frame.getWidth() <= 0)
+    {
+        return;
+    }
+
+    if (xStart < 0)
+    {
+        xStart = 0;
+    }
+
+    if (xEnd >= frame.getWidth())
+    {
+        xEnd = frame.getWidth() - 1;
+    }
+
+    if (xStart > xEnd)
+    {
+        return;
+    }
+
+    int x = xStart;
+
+    while (x <= xEnd)
+    {
+        const ScreenCell& firstCell = frame.getCell(x, y);
+        const Style runStyle = firstCell.style;
+        const int runStart = x;
+
+        std::u32string runText;
+        runText.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
+
+        while (x <= xEnd)
         {
-            const ScreenCell& cell = frame.getCell(x, span.y);
-            setStyle(cell.style);
-            writeGlyph(cell.glyph);
+            const ScreenCell& cell = frame.getCell(x, y);
+            if (cell.style != runStyle)
+            {
+                break;
+            }
+
+            runText.push_back(cellToPresentedGlyph(cell));
+            ++x;
+        }
+
+        moveCursor(runStart, y);
+        setStyle(runStyle);
+
+        if (!runText.empty())
+        {
+            const std::wstring utf16 = UnicodeConversion::u32ToUtf16(runText);
+
+            if (!utf16.empty())
+            {
+                DWORD written = 0;
+                WriteConsoleW(
+                    m_hOut,
+                    utf16.data(),
+                    static_cast<DWORD>(utf16.size()),
+                    &written,
+                    nullptr);
+            }
         }
     }
 }
@@ -440,19 +514,6 @@ void ConsoleRenderer::resetStyle()
 {
     SetConsoleTextAttribute(m_hOut, m_defaultAttributes);
     m_currentStyle = Style{};
-}
-
-void ConsoleRenderer::writeGlyph(char32_t glyph)
-{
-    const std::wstring utf16 = codePointToUtf16(glyph);
-
-    DWORD written = 0;
-    WriteConsoleW(
-        m_hOut,
-        utf16.data(),
-        static_cast<DWORD>(utf16.size()),
-        &written,
-        nullptr);
 }
 
 bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
