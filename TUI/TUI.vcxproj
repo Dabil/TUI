@@ -156,6 +156,7 @@
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
+    <ClCompile Include="Rendering\Styles\Color.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp" />
