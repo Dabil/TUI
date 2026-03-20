@@ -2,6 +2,17 @@
 
 #include <vector>
 
+/*
+    Update:
+
+    Very small change. Struct can stay, but comparison now depends on
+    richer cell metadata.
+
+    Checklist:
+        - Keep same public API
+        - No signature change required
+*/
+
 class ScreenBuffer;
 
 struct DirtySpan
