@@ -82,7 +82,7 @@ The engine is evolving into a flexible **terminal UI framework** for building co
 		C++17
 
 	Build steps:
-		git clone https://github.com/Dabil/TUI.git
+		git clone https://github.com/YOURNAME/YOURPROJECT.git
 		open TUI.sln
 		build
 		run

@@ -2,16 +2,6 @@
 
 #include <memory>
 
-/*
-    Update:
-
-    Change only if you want renderer-agnostic naming later. 
-    For Phase 1 Unicode, almost no change
-
-    Checklist:
-        - No Unicode-specific change required
-*/
-
 class ScreenManager;
 class IRenderer;
 class Surface;
