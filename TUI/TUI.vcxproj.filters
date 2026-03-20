@@ -60,24 +60,6 @@
     <ClInclude Include="Screens\Screen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\Text\TextTypes.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Rendering\Text\TextCluster.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utilities\Unicode\UnicodeConversion.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utilities\Unicode\UnicodeWidth.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Utilities\Unicode\GraphemeSegmentation.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\ShowcaseScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -99,15 +81,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\FrameDiff.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utilities\Unicode\UnicodeWidth.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

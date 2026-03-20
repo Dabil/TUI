@@ -141,13 +141,7 @@
     <ClInclude Include="Rendering\Styles\Color.h" />
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Surface.h" />
-    <ClInclude Include="Rendering\Text\TextCluster.h" />
-    <ClInclude Include="Rendering\Text\TextTypes.h" />
     <ClInclude Include="Screens\Screen.h" />
-    <ClInclude Include="Screens\ShowcaseScreen.h" />
-    <ClInclude Include="Utilities\Unicode\GraphemeSegmentation.h" />
-    <ClInclude Include="Utilities\Unicode\UnicodeConversion.h" />
-    <ClInclude Include="Utilities\Unicode\UnicodeWidth.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App\Application.cpp" />
@@ -157,9 +151,6 @@
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
-    <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
-    <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp" />
-    <ClCompile Include="Utilities\Unicode\UnicodeWidth.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

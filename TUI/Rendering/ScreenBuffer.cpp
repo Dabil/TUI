@@ -1,6 +1,5 @@
 #include "Rendering/ScreenBuffer.h"
 
-#include <algorithm>
 #include <stdexcept>
 
 ScreenBuffer::ScreenBuffer() = default;
@@ -22,7 +21,7 @@ void ScreenBuffer::resize(int width, int height)
     m_cells.assign(static_cast<std::size_t>(m_width * m_height), ScreenCell{});
 }
 
-void ScreenBuffer::clear(const Style& style)
+void ScreenBuffer::clear(const Style& style = Style())
 {
     for (auto& cell : m_cells)
     {
