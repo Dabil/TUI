@@ -145,7 +145,7 @@
     <ClInclude Include="Rendering\Surface.h" />
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
-    <ClInclude Include="Rendering\Themes.h" />
+    <ClInclude Include="Rendering\Styles\Themes.h" />
     <ClInclude Include="Screens\Screen.h" />
     <ClInclude Include="Screens\ShowcaseScreen.h" />
     <ClInclude Include="Utilities\Unicode\GraphemeSegmentation.h" />
