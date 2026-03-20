@@ -164,6 +164,7 @@
     <ClCompile Include="Rendering\Styles\StyleBuilder.cpp" />
     <ClCompile Include="Rendering\Styles\StyleMerge.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
+    <ClCompile Include="Screens\ShowcaseScreen.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeWidth.cpp" />
