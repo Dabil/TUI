@@ -4,9 +4,23 @@
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Text/TextTypes.h"
 
 #define NOMINMAX
 #include <windows.h>
+
+/*
+    Purpose:
+
+    ConsoleRenderer is the Windows console backend/output layer.
+
+    For Phase 1 Unicode readiness:
+        - ScreenBuffer owns logical Unicode placement
+        - Unicode conversion is centralized outside the renderer
+        - the renderer writes visible runs only
+        - continuation cells are skipped during presentation
+        - backend capability reporting is exposed through IRenderer
+*/
 
 class ConsoleRenderer : public IRenderer
 {
@@ -15,23 +29,27 @@ public:
     ~ConsoleRenderer() override;
 
     bool maximizeConsole();
+
     bool initialize() override;
     void shutdown() override;
+
     void present(const ScreenBuffer& frame) override;
     void resize(int width, int height) override;
+    bool pollResize() override;
 
-    int getConsoleWidth() const;
-    int getConsoleHeight() const;
-    bool pollResize();
+    int getConsoleWidth() const override;
+    int getConsoleHeight() const override;
+
+    TextBackendCapabilities textCapabilities() const override;
 
 private:
     void writeFullFrame(const ScreenBuffer& frame);
     void writeDirtySpans(const ScreenBuffer& frame);
+    void writeSpan(const ScreenBuffer& frame, int y, int xStart, int xEnd);
 
     void moveCursor(int x, int y);
     void setStyle(const Style& style);
     void resetStyle();
-    void writeGlyph(char32_t glyph);
 
     bool queryVisibleConsoleSize(int& width, int& height) const;
     bool configureConsole();
@@ -53,8 +71,10 @@ private:
 
     UINT m_originalOutputCodePage = 0;
     UINT m_originalInputCodePage = 0;
+
     DWORD m_originalOutputMode = 0;
     DWORD m_originalInputMode = 0;
+
     bool m_haveOriginalOutputMode = false;
     bool m_haveOriginalInputMode = false;
     bool m_cursorWasVisible = true;
