@@ -3,6 +3,37 @@
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/StyleBuilder.h"
 
+/*
+
+keep theme files very simple:
+
+each theme namespace returns plain logical Style 
+values themes are semantic, not transport-specific
+page code asks for things like 
+
+UIThemes::DialogTitle()
+BannerThemes::WarningBanner() 
+
+instead of hardcoding color/attribute combinations 
+everywhere. renderer/backend limitations are 
+handled later by policy/capability code, not inside themes
+
+This preserves the older “named theme” authoring feel 
+while fitting the new backend-agnostic architecture cleanly.
+
+A good follow-up cleanup would be to either retire 
+Rendering/Styles/Themes.h entirely, or turn it into a 
+compatibility header that just includes these three 
+new headers 
+
+- AppThemes.h
+- UIThemes.h
+- BannerThemes.h
+
+so older call sites keep compiling.
+
+*/
+
 namespace Themes
 {
     // =========================================================
