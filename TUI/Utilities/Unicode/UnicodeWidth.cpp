@@ -53,9 +53,9 @@ namespace
     bool isCommonControl(char32_t codePoint)
     {
         return codePoint == U'\0' ||
-            codePoint == U'\t' ||
-            codePoint == U'\n' ||
-            codePoint == U'\r';
+               codePoint == U'\t' ||
+               codePoint == U'\n' ||
+               codePoint == U'\r';
     }
 }
 
