@@ -99,6 +99,9 @@
     <ClInclude Include="Rendering\Styles\BannerThemes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -147,6 +150,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Styles\StylePolicy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
