@@ -4,6 +4,7 @@
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
 
 #define NOMINMAX
@@ -20,6 +21,11 @@
         - the renderer writes visible runs only
         - continuation cells are skipped during presentation
         - backend capability reporting is exposed through IRenderer
+
+    For Phase 2 style mapping:
+        - Style remains a logical model only
+        - renderer-side policy decides how unsupported features are handled
+        - backend mapping occurs at presentation time only
 */
 
 class ConsoleRenderer : public IRenderer
@@ -67,6 +73,7 @@ private:
     bool m_firstPresent = true;
 
     Style m_currentStyle{};
+    StylePolicy m_stylePolicy{};
     WORD m_defaultAttributes = 0;
 
     UINT m_originalOutputCodePage = 0;
@@ -78,4 +85,5 @@ private:
     bool m_haveOriginalOutputMode = false;
     bool m_haveOriginalInputMode = false;
     bool m_cursorWasVisible = true;
+    bool m_virtualTerminalEnabled = false;
 };
