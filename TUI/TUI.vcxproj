@@ -133,6 +133,7 @@
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
+    <ClInclude Include="Rendering\Backends\ConsoleCapabilityDetector.h" />
     <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\FrameDiff.h" />
@@ -161,6 +162,7 @@
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Rendering\Backends\ConsoleCapabilityDetector.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
