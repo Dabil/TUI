@@ -457,29 +457,41 @@ main.cpp
 ============================================================
 
 PURPOSE
-Create a real style system that preserves the authoring feel of ansi.h + BannerThemes.h, without tying the engine to raw ANSI transport strings.
+Create a real style system that preserves the authoring feel of ansi graphics with Themes.h, without tying the engine to raw ANSI transport strings.
 
 WHY THIS PHASE COMES EARLY
-Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern from BannerThemes and the composable styling vocabulary from ansi.h. 
+Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern from Themes and the composable styling vocabulary of ansi graphics.
+
 IMPLEMENT IN THIS PHASE
 
 UPDATE NOTES:
 - No Unicode conflicts
 - Must remain backend-agnostic
 - Style must not assume ANSI transport
+- Capability detection must inform rendering decisions without changing authored style data
+- Diagnostic reporting must explain backend adaptation without coupling page code to backend internals
 
 ADDITION:
 - Style system must survive round-trip across:
   - ScreenBuffer
   - Renderer
   - alternate backends
+- Output capability detection must determine what the active backend can actually render
+- Capability limits must not destroy or downgrade authored style intent inside the logical model
+- The renderer must be able to record what output adjustments were made so authors can understand display differences
 
 3.1 Color abstraction
 Support:
 - standard colors
 - bright colors
-- 256 / RGB representation
-- future-capable 24-bit RGB true color representation
+- 256 color representation
+- RGB representation
+- future-capable 24-bit true color representation
+
+Requirements:
+- color model must be backend-independent
+- color model must distinguish logical color intent from backend realization
+- authored colors must remain representable even if active backend cannot fully display them
 
 3.2 Style struct
 Support:
@@ -494,12 +506,39 @@ Support:
 - invisible
 - strike
 
+Requirements:
+- Style is a logical description of appearance
+- Style must not encode transport strings
+- Style must be storable in ScreenCell / ScreenBuffer without loss of intent
+- unsupported fields must still remain preserved in the logical model
+
 3.3 Policy and Emulation
+Define backend behavior for unsupported style features.
+
+Support:
+- direct support when backend can render a style field
+- graceful downgrade when backend cannot render a style field
+- optional emulation policy where appropriate
+- explicit separation between:
+  - logical style intent
+  - backend capability
+  - output mapping decision
+
+Examples:
+- true color may downgrade to nearest 256 or 16-color approximation
+- underline may be dropped if backend does not support it
+- blink may be ignored, mapped according to backend policy, or emulated by the renderer.
+- unsupported effects must not corrupt other style fields
 
 3.4 Style composition
 Support authoring like:
 - style::Bold + style::Fg(Color::Red)
 - style::Bold + style::Fg(Color::Red) + style::Bg(Color::Green)
+
+Requirements:
+- composition must remain clean and author-friendly
+- composition must operate on logical Style objects
+- composed styles must remain independent of backend capability limits
 
 3.5 Style merge behavior
 Support:
@@ -507,22 +546,193 @@ Support:
 - preserve destination style
 - merge style fields
 
+Requirements:
+- merge semantics must be explicit and reusable
+- merge behavior must preserve authored style intent
+- preserve-style behavior must remain available even when backend output is downgraded
+
 3.6 Semantic theme namespaces
 Examples:
-- BannerThemes
+- AppThemes
 - UIThemes
+- BannerThemes
 - GameThemes later
+- etc
+
+Requirements:
+- themes produce logical styles, not backend escape sequences
+- themes must not depend on ConsoleRenderer internals
+- themes should remain portable across future render backends
 
 3.7 Backend mapping
-ConsoleRenderer maps Style to backend capabilities
-- initial backend may support only a subset
-- model should still preserve future richness
+ConsoleRenderer maps Style to backend capabilities.
+
+Requirements:
+- initial backend may support only a subset of Style richness
+- model must still preserve future richness
+- backend mapping must use capability information rather than hardcoded assumptions
+- style-to-output conversion must be isolated from style authoring APIs
 
 3.8 Preserve-style semantics
-Needed because earlier docs explicitly relied on preserving destination formatting when no style override was supplied. 
+Needed because earlier docs explicitly relied on preserving destination formatting when no style override was supplied.
+
+Requirements:
+- preserve-style behavior must work at the logical buffer level
+- renderer downgrade must not alter stored logical styles
+- absence of a new style override must keep the existing stored style intact
+
+3.9 Console capability model
+Add a capability model that records what the active output backend can actually support.
+
+Purpose:
+- detect available console output features at startup
+- store backend capability information in a reusable structured form
+- allow renderer mapping code to choose direct output, downgrade, or omission
+- keep authored style richer than currently available output when necessary
+
+Support:
+- VT / ANSI processing available or not
+- standard 16-color support
+- bright color support
+- 256-color support
+- RGB / true color support
+- bold support
+- dim support
+- underline support
+- reverse support
+- invisible support
+- strike support
+- blink support
+- preserve-style-safe fallback behavior
+- optional future flags for alternate backends
+
+Requirements:
+- capability model must describe backend output ability, not authoring limits
+- capability detection must be separate from Style and Color definitions
+- capability information must be queryable by renderer mapping code
+- capability information must be stable enough to cache after initialization
+- capability detection must fail safely when a feature cannot be confirmed
+- unknown support should prefer conservative fallback behavior
+
+3.10 Console capability detection
+Provide detection logic for the active console backend.
+
+Responsibilities:
+- inspect console mode / backend state during renderer initialization
+- determine whether VT processing is enabled or can be enabled
+- determine broad color/output tiers supported by the backend
+- populate ConsoleCapabilities for later rendering decisions
+- expose detection results to renderer code without spreading platform checks throughout the codebase
+
+Requirements:
+- detection logic must live in backend-specific code, not in Style or theme code
+- detection should identify capability tiers rather than over-promise exact rendering behavior
+- unsupported or uncertain features should be marked conservatively
+- detection must not require the style authoring layer to know Windows console details
+- future backends must be able to supply their own capability implementations
+
+3.11 Renderer downgrade and adaptation behavior
+Use Style + ConsoleCapabilities together to determine actual output behavior.
+
+Support:
+- render exact style when supported
+- approximate color when partial support exists
+- omit unsupported effects safely
+- preserve logical style in ScreenBuffer regardless of rendered downgrade
+
+Requirements:
+- adaptation must occur during backend mapping/output
+- downgrade rules must be centralized and predictable
+- output adaptation must not mutate authored theme/style definitions
+- output adaptation must not mutate stored ScreenCell styles unless explicitly requested by a separate transformation step
+- an output file must be created that users can inspect to see what was set 
+
+3.12 Capability diagnostics model
+Add a diagnostics/reporting model that records capability state and renderer adaptation decisions.
+
+Purpose:
+- explain why authored styles may not appear exactly as intended
+- expose backend limitations to page authors and developers
+- record what the renderer did when exact output was not possible
+- provide a stable debugging aid without requiring source-level backend knowledge
+
+Support:
+- record detected backend capabilities
+- record renderer output policy decisions
+- record style fields that were:
+  - rendered directly
+  - downgraded
+  - approximated
+  - omitted
+  - emulated
+  - preserved logically but not rendered physically
+- record summary statistics and representative examples where helpful
+
+Requirements:
+- diagnostics must report backend realization decisions, not alter them
+- diagnostics must remain optional and non-invasive
+- diagnostics must not become required for normal rendering
+- diagnostics data should be structured enough for future tooling
+- diagnostics output should remain understandable to page authors
+
+3.13 Renderer diagnostics logging
+Provide a file-based diagnostics output that authors can inspect after startup or render activity.
+
+Purpose:
+- save capability and adaptation information to a human-readable file
+- help page authors understand why display output differs from authored intent
+- make backend limitations visible during development and testing
+
+Possible contents:
+- renderer/backend identity
+- console mode / VT status
+- detected capability flags
+- supported color tier
+- supported decoration features
+- downgrade rules currently in effect
+- emulation rules currently in effect
+- examples of unsupported style requests encountered during rendering
+- summary of omitted or approximated style effects
+
+Examples of reported events:
+- RGB foreground requested, downgraded to nearest 16-color value
+- underline requested, omitted because backend does not support underline
+- blink requested, not emitted because blink is disabled or unsupported
+- reverse requested, emitted directly
+- logical style preserved in ScreenBuffer, physical output adapted in renderer
+
+Requirements:
+- diagnostics logging must be separate from normal render output
+- diagnostics file generation must not clutter console output
+- diagnostics logging should be optional or configurable
+- diagnostics logging must not require page authors to change how they author styles
+- diagnostics file format should be simple, readable, and stable
+- renderer should be able to append events or write a fresh report per run according to configuration
+
+3.14 Author-facing rendering hints
+Use diagnostics output to help page authors improve pages without exposing backend internals everywhere.
+
+Purpose:
+- help authors choose styles that are more portable
+- help identify when a theme depends on features unavailable in the current console
+- support future validation and tooling
+
+Support:
+- capability summary section
+- warnings about unsupported theme/style usage
+- suggestions for portable alternatives where reasonable
+- distinction between:
+  - authored logical style
+  - backend-supported style
+  - actual rendered result
+
+Requirements:
+- hints must be advisory only
+- hints must not force authors to target one backend
+- hints must not weaken the backend-agnostic style model
 
 OUTPUT OF PHASE 2
-A backend-agnostic style system with console-native authoring feel. Full support for 
+A backend-agnostic style system with console-native authoring feel, plus a capability-aware backend mapping layer that can detect available console output features, preserve logical style richness, safely adapt rendered output to the active backend, and emit diagnostics explaining why authored styles may be displayed differently.
 
 FILES / FOLDERS NEEDED
 
@@ -537,10 +747,42 @@ Rendering/Styles/
   BannerThemes.h
   UIThemes.h
 
+Rendering/Capabilities/
+  ConsoleCapabilities.h
+  ConsoleCapabilities.cpp
+  CapabilityReport.h
+  CapabilityReport.cpp
+
+Rendering/Diagnostics/
+  RenderDiagnostics.h
+  RenderDiagnostics.cpp
+  RenderDiagnosticsWriter.h
+  RenderDiagnosticsWriter.cpp
+
+Rendering/Backends/
+  ConsoleCapabilityDetector.h
+  ConsoleCapabilityDetector.cpp
+
 Optional if kept outside Rendering:
 UI/Styles/
   FrameStyle.h
   UIStyle.h
+
+DEFINITION OF DONE
+
+- Color abstraction supports logical standard, bright, 256, and RGB color representations
+- Style represents logical appearance without transport coupling
+- Style composition API supports ansi-like authoring syntax
+- Style merge behavior supports replace, preserve, and merge semantics
+- Semantic themes produce reusable backend-agnostic logical styles
+- ConsoleCapabilities records active backend output capabilities in structured form
+- Console capability detection runs during renderer initialization
+- ConsoleRenderer maps Style through capability-aware backend conversion
+- Unsupported output features are downgraded, omitted, approximated, or emulated safely
+- Diagnostics model records backend capability state and renderer adaptation behavior
+- Diagnostics writer can save a readable report file for authors and developers
+- ScreenBuffer and ScreenCell preserve logical style intent even when active output is limited
+- Architecture remains portable to alternate render backends
 
 
 
