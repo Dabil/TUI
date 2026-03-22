@@ -25,6 +25,11 @@ Color Color::FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
     return Color(red, green, blue);
 }
 
+Color Color::FromTrueColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
+{
+    return Color(red, green, blue);
+}
+
 Color::Kind Color::kind() const
 {
     return m_kind;
@@ -50,6 +55,11 @@ bool Color::isRgb() const
     return m_kind == Kind::Rgb;
 }
 
+bool Color::isTrueColor() const
+{
+    return isRgb();
+}
+
 Color::Basic Color::basic() const
 {
     return m_basic;
@@ -73,6 +83,38 @@ std::uint8_t Color::green() const
 std::uint8_t Color::blue() const
 {
     return m_blue;
+}
+
+bool Color::isBrightBasic() const
+{
+    if (m_kind != Kind::Basic)
+    {
+        return false;
+    }
+
+    switch (m_basic)
+    {
+    case Basic::BrightBlack:
+    case Basic::BrightRed:
+    case Basic::BrightGreen:
+    case Basic::BrightYellow:
+    case Basic::BrightBlue:
+    case Basic::BrightMagenta:
+    case Basic::BrightCyan:
+    case Basic::BrightWhite:
+        return true;
+
+    case Basic::Black:
+    case Basic::Red:
+    case Basic::Green:
+    case Basic::Yellow:
+    case Basic::Blue:
+    case Basic::Magenta:
+    case Basic::Cyan:
+    case Basic::White:
+    default:
+        return false;
+    }
 }
 
 bool Color::operator==(const Color& other) const
