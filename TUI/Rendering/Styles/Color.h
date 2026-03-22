@@ -41,6 +41,7 @@ public:
     static Color FromBasic(Basic basic);
     static Color FromIndexed256(std::uint8_t index);
     static Color FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
+    static Color FromTrueColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
     Kind kind() const;
 
@@ -48,6 +49,7 @@ public:
     bool isBasic() const;
     bool isIndexed256() const;
     bool isRgb() const;
+    bool isTrueColor() const;
 
     Basic basic() const;
     std::uint8_t index256() const;
@@ -55,13 +57,15 @@ public:
     std::uint8_t green() const;
     std::uint8_t blue() const;
 
+    bool isBrightBasic() const;
+
     bool operator==(const Color& other) const;
     bool operator!=(const Color& other) const;
 
 private:
     explicit Color(Kind kind);
-    Color(Basic basic);
-    Color(std::uint8_t index256);
+    explicit Color(Basic basic);
+    explicit Color(std::uint8_t index256);
     Color(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
 private:
