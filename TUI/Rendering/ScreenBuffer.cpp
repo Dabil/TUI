@@ -25,6 +25,23 @@
     Any operation that clears or overwrites a cell must also reset metadata.
     That keeps ScreenBuffer cell state fully self-consistent and prevents
     stale future-extension flags/priority data from surviving clear paths.
+
+    Phase 2 Refactor:
+
+    Phase 2 preserve-style policy:
+    If a write occurs with no style override, the destination logical style
+    is preserved from the target cell's existing stored style source.
+
+    This now supports these logical cases:
+        - Writing a glyph with an explicit Style still replaces the destination styling for that write
+        - Writing a glyph with std::optional<Style>{} preserves the destination cell’s existing logical style
+        - Writing text with no style override preserves each destination cell’s existing logical style cell-by-cell
+        - Filling a region with no style override preserves each destination cell’s existing logical style while changing glyphs
+        - Drawing a frame with no style override preserves whatever styling already exists under the frame path
+        - Writing over the trailing half of a wide glyph preserves style from the owning leading cell
+        - Renderer downgrade or omission still does not rewrite anything back into ScreenBuffer
+
+    A good next cleanup step would be to update higher-level page/object write helpers to call these new optional-style overloads in the places where older preserve-formatting behavior is expected.
 */
 
 namespace
@@ -136,15 +153,11 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
         return;
     }
 
-    // Any direct set must first remove any existing structural occupancy
-    // at the target position so we do not leave behind stale wide-trailing
-    // or continuation relationships.
     clearOccupiedTrail(x, y);
 
     ScreenCell normalized = cell;
     normalized.glyph = UnicodeConversion::sanitizeCodePoint(normalized.glyph);
 
-    // Empty cells are normalized to a clean empty state.
     if (normalized.kind == CellKind::Empty)
     {
         ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
@@ -156,15 +169,11 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
         return;
     }
 
-    // A visible glyph cell must obey the measured display width of the glyph.
     if (normalized.kind == CellKind::Glyph)
     {
         const CellWidth measuredWidth =
             UnicodeWidth::measureCodePointWidth(normalized.glyph);
 
-        // Phase 1 policy:
-        // Do not materialize a standalone zero-width glyph as an authored
-        // visible cell. The buffer is a cell grid, not a full grapheme store.
         if (measuredWidth == CellWidth::Zero)
         {
             ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
@@ -206,8 +215,6 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
         return;
     }
 
-    // A trailing cell is only valid when it follows an existing width-2
-    // leading glyph cell. setCell() should not create an orphan trailing cell.
     if (normalized.kind == CellKind::WideTrailing)
     {
         if (!inBounds(x - 1, y))
@@ -233,9 +240,6 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
         return;
     }
 
-    // Phase 1 does not use authored standalone combining continuation cells
-    // as a primary storage model. Normalize them away rather than allowing
-    // inconsistent invisible state into the buffer.
     if (normalized.kind == CellKind::CombiningContinuation)
     {
         clearCell(x, y);
@@ -299,6 +303,11 @@ void ScreenBuffer::setCellStyle(int x, int y, const Style& style)
 
 void ScreenBuffer::writeCodePoint(int x, int y, char32_t glyph, const Style& style)
 {
+    writeCodePoint(x, y, glyph, std::optional<Style>(style));
+}
+
+void ScreenBuffer::writeCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride)
+{
     if (!inBounds(x, y))
     {
         return;
@@ -309,14 +318,6 @@ void ScreenBuffer::writeCodePoint(int x, int y, char32_t glyph, const Style& sty
 
     if (width == CellWidth::Zero)
     {
-        /*
-            Phase 1 policy:
-
-            A zero-width code point is treated as attached to the previous
-            visible cell on the row if one exists. Because ScreenCell stores
-            a single visible glyph only, we keep redraw stable by not
-            materializing a separate visible cell for the combining mark.
-        */
         for (int previousX = x - 1; previousX >= 0; --previousX)
         {
             const ScreenCell& previousCell =
@@ -341,14 +342,19 @@ void ScreenBuffer::writeCodePoint(int x, int y, char32_t glyph, const Style& sty
 
     if (width == CellWidth::Two)
     {
-        writeDoubleWidthCodePoint(x, y, glyph, style);
+        writeDoubleWidthCodePoint(x, y, glyph, styleOverride);
         return;
     }
 
-    writeSingleWidthCodePoint(x, y, glyph, style);
+    writeSingleWidthCodePoint(x, y, glyph, styleOverride);
 }
 
 void ScreenBuffer::writeText(int x, int y, std::u32string_view text, const Style& style)
+{
+    writeText(x, y, text, std::optional<Style>(style));
+}
+
+void ScreenBuffer::writeText(int x, int y, std::u32string_view text, const std::optional<Style>& styleOverride)
 {
     if (!inBounds(x, y))
     {
@@ -379,7 +385,7 @@ void ScreenBuffer::writeText(int x, int y, std::u32string_view text, const Style
         const CellWidth width = UnicodeWidth::measureCodePointWidth(glyph);
         const int advance = cellWidthToInt(width);
 
-        writeCodePoint(cursorX, y, glyph, style);
+        writeCodePoint(cursorX, y, glyph, styleOverride);
 
         if (advance > 0)
         {
@@ -390,6 +396,11 @@ void ScreenBuffer::writeText(int x, int y, std::u32string_view text, const Style
 
 void ScreenBuffer::fillRect(const Rect& rect, char32_t glyph, const Style& style)
 {
+    fillRect(rect, glyph, std::optional<Style>(style));
+}
+
+void ScreenBuffer::fillRect(const Rect& rect, char32_t glyph, const std::optional<Style>& styleOverride)
+{
     const int xStart = std::max(0, rect.position.x);
     const int yStart = std::max(0, rect.position.y);
     const int xEnd = std::min(m_width, rect.position.x + rect.size.width);
@@ -399,7 +410,7 @@ void ScreenBuffer::fillRect(const Rect& rect, char32_t glyph, const Style& style
     {
         for (int x = xStart; x < xEnd; ++x)
         {
-            writeCodePoint(x, y, glyph, style);
+            writeCodePoint(x, y, glyph, styleOverride);
         }
     }
 }
@@ -407,6 +418,27 @@ void ScreenBuffer::fillRect(const Rect& rect, char32_t glyph, const Style& style
 void ScreenBuffer::drawFrame(
     const Rect& rect,
     const Style& style,
+    char32_t topLeft,
+    char32_t topRight,
+    char32_t bottomLeft,
+    char32_t bottomRight,
+    char32_t horizontal,
+    char32_t vertical)
+{
+    drawFrame(
+        rect,
+        std::optional<Style>(style),
+        topLeft,
+        topRight,
+        bottomLeft,
+        bottomRight,
+        horizontal,
+        vertical);
+}
+
+void ScreenBuffer::drawFrame(
+    const Rect& rect,
+    const std::optional<Style>& styleOverride,
     char32_t topLeft,
     char32_t topRight,
     char32_t bottomLeft,
@@ -424,21 +456,21 @@ void ScreenBuffer::drawFrame(
     const int top = rect.position.y;
     const int bottom = rect.position.y + rect.size.height - 1;
 
-    writeCodePoint(left, top, topLeft, style);
-    writeCodePoint(right, top, topRight, style);
-    writeCodePoint(left, bottom, bottomLeft, style);
-    writeCodePoint(right, bottom, bottomRight, style);
+    writeCodePoint(left, top, topLeft, styleOverride);
+    writeCodePoint(right, top, topRight, styleOverride);
+    writeCodePoint(left, bottom, bottomLeft, styleOverride);
+    writeCodePoint(right, bottom, bottomRight, styleOverride);
 
     for (int x = left + 1; x < right; ++x)
     {
-        writeCodePoint(x, top, horizontal, style);
-        writeCodePoint(x, bottom, horizontal, style);
+        writeCodePoint(x, top, horizontal, styleOverride);
+        writeCodePoint(x, bottom, horizontal, styleOverride);
     }
 
     for (int y = top + 1; y < bottom; ++y)
     {
-        writeCodePoint(left, y, vertical, style);
-        writeCodePoint(right, y, vertical, style);
+        writeCodePoint(left, y, vertical, styleOverride);
+        writeCodePoint(right, y, vertical, styleOverride);
     }
 }
 
@@ -482,28 +514,41 @@ void ScreenBuffer::writeChar(int x, int y, char32_t glyph, const Style& style)
     writeCodePoint(x, y, glyph, style);
 }
 
+void ScreenBuffer::writeChar(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride)
+{
+    writeCodePoint(x, y, glyph, styleOverride);
+}
+
 void ScreenBuffer::writeUtf8Char(int x, int y, std::string_view utf8Glyph, const Style& style)
 {
     writeCodePoint(x, y, decodeFirstCodePointUtf8(utf8Glyph), style);
 }
 
+void ScreenBuffer::writeUtf8Char(int x, int y, std::string_view utf8Glyph, const std::optional<Style>& styleOverride)
+{
+    writeCodePoint(x, y, decodeFirstCodePointUtf8(utf8Glyph), styleOverride);
+}
+
 void ScreenBuffer::writeChar(int x, int y, char glyph, const Style& style)
 {
-    /*
-        Legacy compatibility helper only.
-
-        A single char is not a real Unicode character API. We deliberately
-        treat it as a one-byte UTF-8 input fragment and decode through the
-        Unicode conversion seam so this function no longer promotes raw bytes
-        directly to U+00XX.
-    */
     const std::string_view oneByte(&glyph, 1);
     writeUtf8Char(x, y, oneByte, style);
+}
+
+void ScreenBuffer::writeChar(int x, int y, char glyph, const std::optional<Style>& styleOverride)
+{
+    const std::string_view oneByte(&glyph, 1);
+    writeUtf8Char(x, y, oneByte, styleOverride);
 }
 
 void ScreenBuffer::writeString(int x, int y, const std::string& text, const Style& style)
 {
     writeText(x, y, UnicodeConversion::utf8ToU32(text), style);
+}
+
+void ScreenBuffer::writeString(int x, int y, const std::string& text, const std::optional<Style>& styleOverride)
+{
+    writeText(x, y, UnicodeConversion::utf8ToU32(text), styleOverride);
 }
 
 std::string ScreenBuffer::renderToString() const
@@ -583,22 +628,34 @@ void ScreenBuffer::clearOccupiedTrail(int x, int y)
 
 void ScreenBuffer::writeSingleWidthCodePoint(int x, int y, char32_t glyph, const Style& style)
 {
+    writeSingleWidthCodePoint(x, y, glyph, std::optional<Style>(style));
+}
+
+void ScreenBuffer::writeSingleWidthCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride)
+{
     if (!inBounds(x, y))
     {
         return;
     }
 
+    const Style resolvedStyle = resolveWriteStyle(x, y, styleOverride);
+
     clearOccupiedTrail(x, y);
 
     ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
     cell.glyph = glyph;
-    cell.style = style;
+    cell.style = resolvedStyle;
     cell.kind = CellKind::Glyph;
     cell.width = CellWidth::One;
     cell.metadata = ScreenCellMetadata{};
 }
 
 void ScreenBuffer::writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const Style& style)
+{
+    writeDoubleWidthCodePoint(x, y, glyph, std::optional<Style>(style));
+}
+
+void ScreenBuffer::writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride)
 {
     if (!inBounds(x, y))
     {
@@ -610,20 +667,75 @@ void ScreenBuffer::writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const
         return;
     }
 
+    const Style resolvedStyle = resolveWriteStyle(x, y, styleOverride);
+
     clearOccupiedTrail(x, y);
     clearOccupiedTrail(x + 1, y);
 
     ScreenCell& leading = m_cells[static_cast<std::size_t>(index(x, y))];
     leading.glyph = glyph;
-    leading.style = style;
+    leading.style = resolvedStyle;
     leading.kind = CellKind::Glyph;
     leading.width = CellWidth::Two;
     leading.metadata = ScreenCellMetadata{};
 
     ScreenCell& trailing = m_cells[static_cast<std::size_t>(index(x + 1, y))];
     trailing.glyph = U' ';
-    trailing.style = style;
+    trailing.style = resolvedStyle;
     trailing.kind = CellKind::WideTrailing;
     trailing.width = CellWidth::Zero;
     trailing.metadata = ScreenCellMetadata{};
+}
+
+Style ScreenBuffer::resolveWriteStyle(int x, int y, const std::optional<Style>& styleOverride) const
+{
+    if (styleOverride.has_value())
+    {
+        return *styleOverride;
+    }
+
+    if (!inBounds(x, y))
+    {
+        return Style{};
+    }
+
+    return getStyleSourceCell(x, y).style;
+}
+
+const ScreenCell& ScreenBuffer::getStyleSourceCell(int x, int y) const
+{
+    const ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
+
+    if (cell.kind == CellKind::WideTrailing && inBounds(x - 1, y))
+    {
+        const ScreenCell& left = m_cells[static_cast<std::size_t>(index(x - 1, y))];
+
+        if (left.kind == CellKind::Glyph && left.width == CellWidth::Two)
+        {
+            return left;
+        }
+    }
+
+    if (cell.kind == CellKind::CombiningContinuation)
+    {
+        for (int previousX = x - 1; previousX >= 0; --previousX)
+        {
+            const ScreenCell& previousCell =
+                m_cells[static_cast<std::size_t>(index(previousX, y))];
+
+            if (previousCell.kind == CellKind::CombiningContinuation)
+            {
+                continue;
+            }
+
+            if (previousCell.kind == CellKind::WideTrailing)
+            {
+                continue;
+            }
+
+            return previousCell;
+        }
+    }
+
+    return cell;
 }

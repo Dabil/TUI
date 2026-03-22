@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -18,6 +19,11 @@
         - narrow string APIs remain as convenience wrappers only
         - width-aware write helpers stay private
         - renderer behavior remains outside this class
+
+    For Phase 2 preserve-style semantics:
+        - explicit Style arguments still mean "apply this logical style"
+        - std::optional<Style> overloads allow "preserve destination style"
+        - renderer downgrade never mutates stored logical styles
 */
 
 class ScreenBuffer
@@ -42,13 +48,27 @@ public:
 
     // Primary Unicode API
     void writeCodePoint(int x, int y, char32_t glyph, const Style& style);
+    void writeCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
+
     void writeText(int x, int y, std::u32string_view text, const Style& style);
+    void writeText(int x, int y, std::u32string_view text, const std::optional<Style>& styleOverride);
 
     void fillRect(const Rect& rect, char32_t glyph, const Style& style);
+    void fillRect(const Rect& rect, char32_t glyph, const std::optional<Style>& styleOverride);
 
     void drawFrame(
         const Rect& rect,
         const Style& style,
+        char32_t topLeft = U'+',
+        char32_t topRight = U'+',
+        char32_t bottomLeft = U'+',
+        char32_t bottomRight = U'+',
+        char32_t horizontal = U'-',
+        char32_t vertical = U'|');
+
+    void drawFrame(
+        const Rect& rect,
+        const std::optional<Style>& styleOverride,
         char32_t topLeft = U'+',
         char32_t topRight = U'+',
         char32_t bottomLeft = U'+',
@@ -67,11 +87,18 @@ public:
         writeChar(char, ...) is legacy compatibility only.
     */
     void writeChar(int x, int y, char32_t glyph, const Style& style);
+    void writeChar(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
+
     void writeUtf8Char(int x, int y, std::string_view utf8Glyph, const Style& style);
+    void writeUtf8Char(int x, int y, std::string_view utf8Glyph, const std::optional<Style>& styleOverride);
 
     // Legacy convenience wrappers
     void writeChar(int x, int y, char glyph, const Style& style);
+    void writeChar(int x, int y, char glyph, const std::optional<Style>& styleOverride);
+
     void writeString(int x, int y, const std::string& text, const Style& style);
+    void writeString(int x, int y, const std::string& text, const std::optional<Style>& styleOverride);
+
     std::string renderToString() const;
 
 private:
@@ -79,8 +106,15 @@ private:
 
     void clearCell(int x, int y);
     void clearOccupiedTrail(int x, int y);
+
     void writeSingleWidthCodePoint(int x, int y, char32_t glyph, const Style& style);
+    void writeSingleWidthCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
+
     void writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const Style& style);
+    void writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
+
+    Style resolveWriteStyle(int x, int y, const std::optional<Style>& styleOverride) const;
+    const ScreenCell& getStyleSourceCell(int x, int y) const;
 
 private:
     int m_width = 0;
