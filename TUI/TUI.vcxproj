@@ -138,11 +138,14 @@
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
+    <ClInclude Include="Rendering\Styles\AppThemes.h" />
+    <ClInclude Include="Rendering\Styles\BannerThemes.h" />
     <ClInclude Include="Rendering\Styles\Color.h" />
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Styles\StyleBuilder.h" />
     <ClInclude Include="Rendering\Styles\StyleMerge.h" />
     <ClInclude Include="Rendering\Styles\StylePolicy.h" />
+    <ClInclude Include="Rendering\Styles\UIThemes.h" />
     <ClInclude Include="Rendering\Surface.h" />
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
