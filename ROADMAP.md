@@ -21,42 +21,190 @@ The engine should be built in layers so that later features are built on stable 
 
 These principles govern the whole roadmap.
 
-0.1 Keep the renderer core low-level
-- ScreenBuffer should remain a logical cell grid
-- renderer/presentation should stay separate
-- platform-specific code belongs in backend code only
+0.1 Keep the renderer core low-level and Unicode-native
+- ScreenBuffer must remain a logical cell grid (not a text engine)
+- Internal text representation must use:
+  - char32_t
+  - std::u32string
+- The renderer operates on display cells, not bytes or UTF-8 strings
+- Rendering/presentation must stay separate from composition and layout
+- Platform-specific code belongs strictly in backend implementations
 
-0.2 Build authoring API on top of the rendering core
-- do not force page-building behavior directly into the lowest-level cell store
-- build a PageComposer/PageBuffer layer on top of ScreenBuffer
+----------------------------------------
 
-0.3 Build interpreter on top of the same API
-- the interpreter should not be its own separate engine
-- it should call the same PageComposer functions the C++ API uses
+0.2 Separate text model, layout, and encoding layers
+- The system must clearly separate:
+  1) Internal text model (U32 code points)
+  2) Text layout (width, grapheme segmentation, wrapping)
+  3) Backend encoding (UTF-8, UTF-16, etc.)
+- Encoding conversion must be centralized in a dedicated UnicodeConversion layer
+- No UTF-8/UTF-16 logic should exist inside:
+  - ScreenBuffer
+  - widgets
+  - layout/composition systems
+- Backends consume already-laid-out cells and handle only transport encoding
 
-0.4 Preserve intent, not old implementation quirks
-- old APIs are references
-- if an old feature fits cleanly, preserve it
-- if an old feature causes architectural confusion, redesign it
+----------------------------------------
 
-0.5 Use explicit compositing semantics
-- avoid unclear names like writeTransparentObject / writeFullyTransparentObject
-- use clear write intent and policy-based compositing
+0.3 Treat text as display cells, not characters or bytes
+- The engine must be cell-aware, not byte-aware
+- One code point does not always equal one cell
+- The system must support:
+  - width 0 (combining marks)
+  - width 1 (standard characters)
+  - width 2 (CJK, emoji by policy)
+- ScreenBuffer stores final placed cells only
+- Text layout systems determine how code points map to cells
 
-0.6 Build foundations first
-- rendering
-- style
+----------------------------------------
+
+0.4 Keep ScreenBuffer simple, but correct
+- ScreenBuffer is responsible for:
+  - storing cells
+  - bounds safety
+  - overwrite behavior
+  - placement of text runs
+- ScreenBuffer is NOT responsible for:
+  - grapheme segmentation
+  - encoding conversion
+  - font capability decisions
+- Cells may include lightweight metadata (e.g., continuation / wide trailing)
+- The buffer must preserve visual correctness for wide and combining characters
+
+----------------------------------------
+
+0.5 Build authoring API on top of the rendering core
+- Do not force page-building behavior into ScreenBuffer
+- Build a PageComposer / PageBuffer layer on top
+- That layer is responsible for:
+  - layout
+  - alignment
+  - wrapping
+  - higher-level text behavior
+- This keeps the core reusable and predictable
+
+----------------------------------------
+
+0.6 Build interpreter on top of the same API
+- The interpreter must not be a separate rendering engine
+- It must call the same PageComposer and text APIs as C++
+- This guarantees consistent behavior between:
+  - programmatic UI
+  - interpreted UI
+- Unicode behavior must be identical across both paths
+
+----------------------------------------
+
+0.7 Preserve intent, not implementation quirks
+- Legacy APIs (ANSI-style, ASCII assumptions) are references only
+- Preserve:
+  - authoring ergonomics
+  - semantic meaning
+- Redesign:
+  - ASCII-only assumptions
+  - byte-oriented APIs
+  - renderer-driven text decisions
+- Unicode correctness takes priority over backward quirks
+
+----------------------------------------
+
+0.8 Use explicit compositing semantics
+- Avoid unclear naming like:
+  - writeTransparentObject
+  - writeFullyTransparentObject
+- Use clear compositing policies:
+  - overwrite
+  - merge
+  - preserve
+- Compositing must operate on fully-formed cells, not raw text
+
+----------------------------------------
+
+0.9 Keep backend renderers pure and dumb
+- Backends (e.g., ConsoleRenderer) must:
+  - render already-laid-out cells
+  - map styles to platform output
+  - handle encoding conversion (e.g., UTF-16 for Win32)
+  - skip continuation cells
+- Backends must NOT:
+  - determine character width
+  - perform grapheme segmentation
+  - decide layout or wrapping
+- Backend limitations must be exposed via capability reporting
+
+----------------------------------------
+
+0.10 Design for real-world terminal limitations
+- Unicode correctness in the engine does not guarantee correct display
+- Rendering depends on:
+  - terminal host (conhost, Windows Terminal, etc.)
+  - font support
+  - fallback behavior
+- The system must expose backend capabilities (e.g., emoji support, combining marks)
+- Higher-level systems may adapt behavior based on these capabilities
+
+----------------------------------------
+
+0.11 Build foundations in the correct order
+- rendering (cell grid + Unicode correctness)
+- style system
+- text layout (width + grapheme awareness)
 - object model
 - compositing
-- page API
+- page API (PageComposer)
 - interpreter
 - input/events/focus
 - panels/windows
 - widgets
 - polish/backends
 
+
+
 These principles align with the original roadmap emphasis on foundational layers first, clean separation of screen composition from output, and building reusable systems before higher-level UI features. 
 
+============================================================
+UPDATED GLOBAL RULE (CRITICAL)
+============================================================
+
+The engine must follow this invariant:
+
+- Input boundary: UTF-8
+- Internal model: UTF-32 (char32_t / std::u32string)
+- Layout: grapheme + width aware
+- Storage: ScreenCell grid
+- Output: backend-specific encoding (UTF-16 for Win32)
+
+NO EXCEPTIONS.
+
+FORMAT SUPPORT POLICY
+
+1. Unified object rule
+- All reusable loaded/generated visual text content must normalize into TextObject
+
+2. Loader/exporter split
+- Parsers/loaders interpret source formats
+- Exporters/save systems write supported target formats
+- Neither changes the rendering core model
+
+3. Encoding boundary rule
+- Text file input must decode at the boundary
+- Internal model remains UTF-32
+- Legacy code-page handling belongs only in conversion/loader utilities
+
+4. Terminal-art rule
+- ANSI-style sources are imported as structured glyph/style data
+- Do not treat raw escape replay as the engine’s primary representation
+
+5. Lossy export rule
+- Saving/exporting to older formats is allowed only with explicit approximation/clamping behavior
+- Never silently discard unsupported style or layout semantics
+
+6. Future declarative format rule
+- JSON / YAML / INI and similar structured formats belong to later phases as page/layout/widget declarations
+- They must compile down to the same engine APIs, not create a second UI system
+
+7. Future animation format rule
+- Multi-frame text/ANSI formats belong in animation-oriented phases once timing/invalidation systems exist
 
 
 ============================================================
@@ -110,10 +258,16 @@ The roadmap below follows this order intentionally.
 ============================================================
 
 PURPOSE
-Build the stable rendering core that everything else depends on.
+Build the stable, Unicode-correct rendering core that everything else depends on.
 
 WHY THIS PHASE COMES FIRST
-Without this phase, every later system becomes harder to design and may require refactoring. This matches the earlier roadmap’s emphasis on logical screen representation, diff redraw, and keeping output separate from composition. 
+Without this phase, every later system becomes harder to design and may require refactoring. This phase establishes:
+- logical screen representation
+- diff-based redraw
+- strict separation of rendering vs composition
+- a Unicode-native internal text model
+
+This ensures all future systems operate on correct display semantics rather than ASCII assumptions.
 
 IMPLEMENT IN THIS PHASE
 
@@ -127,51 +281,121 @@ IMPLEMENT IN THIS PHASE
 
 2.2 ScreenCell
 Each cell should be able to represent:
-- glyph
+- glyph (char32_t)
 - style/theme reference
-- optional future metadata (priority, flags, etc.)
+- cell metadata for display correctness (priority, flags, etc.)
+
+Required metadata:
+- CellKind:
+  - Empty
+  - Glyph
+  - WideTrailing
+  - CombiningContinuation
+
+  Goal:
+- support wide characters and combining marks without breaking layout
+- remain lightweight and value-type
 
 2.3 ScreenBuffer
 Responsibilities:
 - logical width/height
 - resize
 - clear
-- get/set cell
+- get/set cell (cell-safe)
 - inBounds
-- writeChar
-- writeString
+- Unicode-native writing
+- text placement (not text parsing)
 - fillRect
 - drawFrame
-- renderToString for debugging/testing
+- debug export (Unicode-safe)
 
-2.4 Surface
+PRIMARY API (Unicode-native):
+- writeCodePoint(int x, int y, char32_t glyph, const Style&)
+- writeText(int x, int y, const std::u32string&, const Style&)
+- fillRect(const Rect&, char32_t glyph, const Style&)
+- renderToU32String()
+- renderToUtf8String()
+
+LEGACY WRAPPERS (forwarding only):
+- writeChar(..., char, ...)
+- writeString(..., std::string, ...)
+→ must decode UTF-8 and forward
+
+IMPORTANT RULES:
+- ScreenBuffer operates on display cells, not bytes
+- must handle:
+  - width 0 (combining)
+  - width 1
+  - width 2 (CJK/emoji)
+- must manage trailing cells for wide glyphs
+- must clean up overwritten continuation cells
+
+NOT RESPONSIBLE FOR:
+- UTF-8 decoding logic
+- grapheme segmentation
+- font capability decisions
+
+2.4 Unicode utilities (NEW - REQUIRED)
+Utilities/Unicode/
+
+- UnicodeConversion
+  - utf8ToU32
+  - u32ToUtf8
+  - u32ToUtf16
+  - codePointToUtf16
+
+- UnicodeWidth
+  - measureCodePointWidth(char32_t)
+
+- UnicodeGrapheme (Phase 1 basic / Phase 5 expanded)
+  - segmentGraphemeClusters(...)
+
+
+2.5 Surface
 Responsibilities:
 - wrap a ScreenBuffer
 - serve as an off-screen composition target
 - later support layering/window composition
 
-2.5 IRenderer
+2.6 IRenderer
 Responsibilities:
 - initialize
 - shutdown
 - present(ScreenBuffer)
 - resize
+- textCapabilities()
 
-2.6 ConsoleRenderer
+2.7 ConsoleRenderer
 Responsibilities:
 - all Win32 console-specific work
-- UTF-8/output setup
+- UTF-16 output (not UTF-8 logic internally)
 - live console size detection
 - diff-based presentation
 - resize polling
 
-2.7 FrameDiff
+STRICT RULES:
+- must NOT:
+  - compute character width
+  - perform grapheme segmentation
+  - interpret text meaning
+- must:
+  - render already-laid-out cells
+  - skip continuation cells
+  - map Style → console attributes
+  - use UnicodeConversion utilities
+
+2.8 FrameDiff
 Responsibilities:
 - compare previous vs current frame
 - dirty row/span detection
 - support efficient redraw
 
-2.8 Application loop
+Must compare:
+- glyph
+- style
+- cell metadata (CellKind)
+
+2.9 Application loop
 Responsibilities:
 - initialize renderer
 - create main surface
@@ -179,15 +403,23 @@ Responsibilities:
 - per-frame render
 - live resize polling
 
-2.9 Resize handling
+2.10 Resize handling
 - startup size detection
 - live resize detection
 - resize logical surface and previous frame on size changes
 
 OUTPUT OF PHASE 1
-A stable logical rendering engine with live resizing and efficient redraw.
+A Unicode-correct logical rendering engine with:
+- proper cell semantics
+- correct wide/combining behavior
+- backend-independent text model
+- efficient redraw
 
 FILES / FOLDERS NEEDED
+
+App/
+  Application.h
+  Application.cpp
 
 Core/
   Point.h
@@ -207,9 +439,14 @@ Rendering/
   ConsoleRenderer.h
   ConsoleRenderer.cpp
 
-App/
-  Application.h
-  Application.cpp
+  Utilities/
+  Unicode/
+    UnicodeConversion.h
+    UnicodeConversion.cpp
+    UnicodeWidth.h
+    UnicodeWidth.cpp
+    UnicodeGrapheme.h
+    UnicodeGrapheme.cpp
 
 main.cpp
 
@@ -226,11 +463,23 @@ WHY THIS PHASE COMES EARLY
 Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern from BannerThemes and the composable styling vocabulary from ansi.h. 
 IMPLEMENT IN THIS PHASE
 
+UPDATE NOTES:
+- No Unicode conflicts
+- Must remain backend-agnostic
+- Style must not assume ANSI transport
+
+ADDITION:
+- Style system must survive round-trip across:
+  - ScreenBuffer
+  - Renderer
+  - alternate backends
+
 3.1 Color abstraction
 Support:
 - standard colors
 - bright colors
-- future-capable 256 / RGB representation
+- 256 / RGB representation
+- future-capable 24-bit RGB true color representation
 
 3.2 Style struct
 Support:
@@ -245,33 +494,35 @@ Support:
 - invisible
 - strike
 
-3.3 Style composition
+3.3 Policy and Emulation
+
+3.4 Style composition
 Support authoring like:
 - style::Bold + style::Fg(Color::Red)
 - style::Bold + style::Fg(Color::Red) + style::Bg(Color::Green)
 
-3.4 Style merge behavior
+3.5 Style merge behavior
 Support:
 - replace style
 - preserve destination style
 - merge style fields
 
-3.5 Semantic theme namespaces
+3.6 Semantic theme namespaces
 Examples:
 - BannerThemes
 - UIThemes
 - GameThemes later
 
-3.6 Backend mapping
+3.7 Backend mapping
 ConsoleRenderer maps Style to backend capabilities
 - initial backend may support only a subset
 - model should still preserve future richness
 
-3.7 Preserve-style semantics
+3.8 Preserve-style semantics
 Needed because earlier docs explicitly relied on preserving destination formatting when no style override was supplied. 
 
 OUTPUT OF PHASE 2
-A backend-agnostic style system with console-native authoring feel.
+A backend-agnostic style system with console-native authoring feel. Full support for 
 
 FILES / FOLDERS NEEDED
 
@@ -298,57 +549,289 @@ UI/Styles/
 ============================================================
 
 PURPOSE
-Create reusable visual objects for composition.
+Create reusable visual objects for composition. 
 
-WHY THIS PHASE COMES BEFORE PAGE API
-The page API must have stable primitives to place. The old docs show that authored screens heavily depended on reusable ASCII assets, text blocks, boxes, and generated banner content. 
+WHY THIS PHASE COMES EARLY
+Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern and the composable styling vocabulary from ansi.h. 
+
+The page API must have stable primitives to place. The user must be able to rely on authored screens that depend on reusable text assets, text blocks, boxes, ANSI art, and generated banner content.
+
+This phase must define a single reusable text-asset object model, while plain text, ANSI art, binary text art, and banner/font formats are handled by dedicated loaders or generators that normalize content into that shared object.
+
+UPDATE NOTES:
+- No Unicode conflicts
+- Must remain backend-agnostic
+- Style must not assume ANSI transport
+- All text loaded from files must be decoded at the boundary and normalized immediately
+- UTF-8 text sources must be converted to std::u32string immediately
+- TextObject is the unified internal object model for reusable placed text assets
+- Do NOT split the object model into:
+  - AsciiObject
+  - AnsiObject
+  - UnicodeObject
+- Those distinctions belong to loaders/parsers, not to the core composition type
+
+ADDITION:
+- Style system must survive round-trip across:
+  - ScreenBuffer
+  - Renderer
+  - alternate backends
+
+ARCHITECTURE RULE
+
+Use this pipeline:
+
+File or generator format
+    ↓
+Loader / parser
+    ↓
+Unified internal object model
+    ↓
+ScreenBuffer
+
+Examples:
+- .txt / .asc / .nfo / .diz → PlainTextLoader → TextObject
+- .ans / .bin / .xbin / .adf → AnsiLoader / BinaryArtLoader → TextObject
+- FIGlet / TOIlet → AsciiBanner → TextObject
+
+WHY THIS IS THE CORRECT MODEL
+
+ASCII is mostly an input/content constraint
+ANSI is a formatting/control-sequence format
+Unicode is the engine’s internal text representation model
+
+If the project creates separate core object types like:
+- AsciiObject
+- AnsiObject
+- UnicodeObject
+
+then it mixes different concerns into the type system and creates:
+- duplicated width/height/storage logic
+- duplicated draw logic
+- awkward conversions
+- confusion about what PageComposer should accept
+- difficulty supporting mixed-format content later
+
+Instead:
+- one object type
+- many loaders/parsers
+- one rendering target
+
+That is the cleanest and most extensible design.
+
+TEXT OBJECT STORAGE MODEL
+
+TextObject should internally store normalized display content suitable for placement into ScreenBuffer.
+
+Minimum responsibilities:
+- own normalized internal content
+- width
+- height
+- loaded state
+- optional source metadata
+- optional per-cell style information
+- optional future metadata for compositing / layering
+
+RECOMMENDED STORAGE SHAPE
+
+Because this roadmap now includes:
+- .ans
+- .bin
+- .xbin
+- .adf
+- styled loaded assets
+
+TextObject should prefer a cell-grid-backed internal representation rather than a simple vector of plain strings.
+
+That means TextObject should be able to represent:
+- glyph
+- style
+- empty cells
+- alignment-preserving spaces
+- optional metadata needed for imported art
+
+This keeps imported terminal-art assets first-class and avoids losing style/layout fidelity.
 
 IMPLEMENT IN THIS PHASE
-
-4.1 AsciiObject core
+4.1 TextObject core
 Support:
 - FromFile
 - FromTextBlock
 - width / height
 - loaded state
+- draw into ScreenBuffer
+- normalized internal cell/text storage
+- style-aware imported content support
+
+IMPORTANT:
+- TextObject is a reusable visual object
+- TextObject is NOT a renderer
+- TextObject should contain no backend-specific output logic
 
 4.2 Factory helpers
 Support:
 - Rectangle
 - Bordered box
-- optional line/block helpers
+- optional line helpers
+- optional fill/block helpers
 - optional FIGlet text helper if it fits cleanly
 
-4.3 Asset loading / caching layer
+Rules:
+- factory helpers return TextObject
+- factory helpers remain renderer-independent
+- generated objects must be valid Unicode-aware object content
+
+4.3 Plain text loader family
+Support loading:
+- .asc
+- .txt
+- .nfo
+- .diz
+
+Responsibilities:
+- decode file text at the boundary
+- support UTF-8 text input
+- support legacy text-art encodings when explicitly needed
+- normalize content into TextObject
+- preserve intended line breaks and spacing
+
+Notes:
+- .nfo and .diz may require optional legacy code page support for classic art compatibility
+- code-page handling must remain in loader/conversion utilities, never in ScreenBuffer or PageComposer
+
+4.4 Text asset saving support
+Support saving where it makes architectural sense:
+- save TextObject to:
+  - .txt
+  - .asc
+  - .diz
+- optional save to .nfo when encoding policy is defined
+- export plain text representations from TextObject
+
+Rules:
+- plain-text save paths must be explicit about encoding
+- UTF-8 should be the default outbound text format unless a legacy format explicitly requires another encoding
+- save/export logic must not bypass the unified object model
+
+4.5 ANSI / terminal art loader family
+Support loading:
+- .ans
+- .bin
+- .xbin
+- .adf
+
+Responsibilities:
+- parse source format into:
+  - glyphs
+  - styles
+  - positioning/layout semantics as supported
+- normalize imported content into TextObject
+- never replay raw ANSI directly to the backend as the primary model
+
+Rules:
+- ANSI/control-sequence semantics must be translated into internal Style semantics
+- imported content must become engine-owned structured data
+- unknown or unsupported commands must fail gracefully without crashing
+
+4.6 ANSI / terminal art saving support
+Support saving where it makes architectural sense:
+- save/export TextObject to:
+  - .ans
+  - .bin
+- optional later:
+  - .xbin
+  - .adf
+
+Rules:
+- saving to terminal-art formats is an exporter responsibility
+- exporter behavior must be explicit about format limitations
+- if a TextObject contains styling/features the target format cannot express, exporter must:
+  - clamp
+  - approximate
+  - or fail clearly
+- never hide lossy conversion
+
+4.7 Asset loading / caching layer
 Goal:
-- load ASCII assets from Assets directory
+- load text assets from Assets directory
 - centralize lookup
 - avoid repeated disk work
+- centralize format detection and dispatch
 
-4.4 Optional AsciiBanner integration
-- support FIGlet and TOIlet loading
-- support renderLines
-- support draw into ScreenBuffer
+Responsibilities:
+- asset path resolution
+- extension/type dispatch
+- cache previously loaded normalized TextObject content
+- support future asset catalogs
+
+4.8 AsciiBanner integration
+Support:
+- FIGlet loading
+- TOIlet loading
+- renderLines
+- create TextObject output
+- draw into ScreenBuffer through TextObject flow
 - keep this as an object/text-generation helper, not a renderer
 
+Rules:
+- banner generation returns reusable object content
+- banner generation must not directly write to the backend
+- banner output should normalize into TextObject
+
+4.9 Font loader support for custom bitmap/pseudo-graphical fonts
+Support loading:
+- .fon / custom bitmap font mapping formats
+
+Purpose:
+- custom UI font themes
+- pseudo-graphical rendering in console
+- character-to-glyph mapping support for generated text objects
+
+Rules:
+- this is a font/asset loading concern, not a renderer concern
+- font loaders may feed:
+  - AsciiBanner-like generators
+  - future glyph/theme systems
+- do not turn ScreenBuffer into a font engine
+
 OUTPUT OF PHASE 3
-Reusable visual assets that the page layer can place and compose.
+Reusable visual assets that the page layer can place and compose, built around one unified TextObject model with format-specific loaders/parsers and optional exporters.
+
+By the end of this phase the engine should support:
+- one primary reusable text object type
+- plain text asset loading
+- ANSI / terminal art loading
+- banner/font-generated text objects
+- centralized asset lookup and caching
+- saving/export where format fidelity makes sense
 
 FILES / FOLDERS NEEDED
 
 Rendering/Objects/
-  AsciiObject.h
-  AsciiObject.cpp
+  TextObject.h
+  TextObject.cpp
   AsciiBanner.h
   AsciiBanner.cpp
   ObjectFactory.h
   ObjectFactory.cpp
+  PlainTextLoader.h
+  PlainTextLoader.cpp
+  AnsiLoader.h
+  AnsiLoader.cpp
+  BinaryArtLoader.h
+  BinaryArtLoader.cpp
+  TextObjectExporter.h
+  TextObjectExporter.cpp
+  FontLoader.h
+  FontLoader.cpp
 
 Assets/
   ASCII/
+  ANSI/
   Fonts/
     FIGlet/
     TOIlet/
+    Bitmap/
 
 Utilities/
   AssetPaths.h
@@ -370,6 +853,17 @@ Replace the old confusing write mode names with a clear and scalable compositing
 
 WHY THIS PHASE IS FOUNDATIONAL
 The page API should not be built on ambiguous concepts like “transparent” and “fully transparent.” The writing/compositing model must be correct first so page-authoring functions stay intuitive. This directly addresses the weakness discovered in the old API and preserves the old functionality without the naming confusion. The old docs clearly show that multiple write modes were essential, but the names were not ideal. 
+
+UPDATE NOTES:
+
+- All compositing operates on fully-resolved ScreenCell objects
+- Must respect:
+  - continuation cells
+  - wide glyph boundaries
+- Must NOT split wide glyphs
+
+NEW RULE:
+- compositing must treat a wide glyph as an atomic visual unit
 
 DEFINE IN THIS PHASE
 
@@ -461,6 +955,20 @@ IMPORTANT DESIGN DECISION
 Do not put all authoring behavior directly onto low-level ScreenBuffer.
 Build a higher-level PageComposer or PageBuffer layer that writes into ScreenBuffer.
 
+UPDATE NOTES:
+
+TEXT API MUST CHANGE TO:
+
+- writeText(x, y, std::u32string, style)
+- writeTextUtf8(...) → wrapper only
+
+Text layout responsibilities:
+- must use UnicodeWidth + grapheme segmentation
+- must NOT assume 1 char = 1 column
+
+render() MUST BECOME:
+- renderToUtf8String()
+
 API 1.0 SHOULD INCLUDE
 
 6.1 Page clearing
@@ -510,6 +1018,16 @@ This preserves the old layering workflow described in the docs.
 - anchor helpers
 - named placement helpers
 
+6.11 Structured data-driven object creation hooks
+Prepare PageComposer to support future structured formats without coupling this phase to those parsers.
+
+Future object/layout formats should be able to resolve into:
+- TextObject
+- PageComposer placement calls
+- region/alignment-based placement
+
+This keeps later declarative formats aligned with the same composition model rather than creating a second UI system.
+
 OUTPUT OF PHASE 5
 The first complete authoring API for building pages cleanly in C++.
 
@@ -540,6 +1058,13 @@ Allow people to build pages without Visual Studio.
 
 WHY THIS PHASE COMES HERE
 The interpreter should map onto an already-stable PageComposer API. It should not define the engine primitives; it should consume them.
+
+UPDATE NOTES:
+
+- ALL file input is UTF-8
+- Interpreter must:
+  - decode → U32 immediately
+  - never operate on std::string internally
 
 IMPLEMENT IN THIS PHASE
 
@@ -581,6 +1106,32 @@ Commands should cover:
 7.7 Testing/examples
 - create sample page files
 - verify parity with equivalent C++ page definitions
+
+7.8 Structured page/config input formats (initial declarative layer)
+Support later parsing/import for:
+- .json
+- .yaml
+- .ini
+
+Purpose:
+- declarative page descriptions
+- configuration-driven authored screens
+- future style/theme/layout definitions
+
+Rules:
+- these formats must compile down to the same PageComposer / TextObject / style APIs
+- they must not introduce a second rendering or composition model
+- use them for page/layout description, not as a replacement for ScreenBuffer or TextObject
+
+7.9 Structured asset references
+Structured page files may reference:
+- TextObject assets
+- fonts
+- themes
+- regions
+- screen templates
+
+All references must resolve through centralized asset/path systems.
 
 OUTPUT OF PHASE 6
 A first interpreted page system that uses the same engine as the C++ API.
@@ -663,6 +1214,34 @@ Input/
   CommandMap.h
   CommandMap.cpp
 
+============================================================
+8–15 PHASES Rules
+============================================================
+
+GLOBAL UPDATE (applies to ALL REMAINING PHASES):
+
+1. All text input:
+   - UTF-8 at boundaries only
+   - internal = std::u32string
+
+2. All layout:
+   - must use UnicodeWidth
+   - must support width 0 / 1 / 2
+
+3. No system may:
+   - assume fixed-width characters
+   - assume ASCII
+
+4. Rendering:
+   - always operates on ScreenCell grid
+
+5. Widgets / UI:
+   - must use grapheme-aware layout
+   - must not break wide glyphs across boundaries
+
+6. Debug / Testing:
+   - must use UTF-8 snapshot output
+   - must not truncate to char
 
 
 ============================================================
@@ -775,6 +1354,16 @@ IMPLEMENT IN THIS PHASE
 or
 - help/about popup
 
+10.6 Structured configuration support for menus and status content
+Optional use of:
+- .json
+- .yaml
+- .ini
+
+for menu definitions, command hints, and authored interactive metadata, provided they resolve into the same runtime UI model.
+
+This should remain data-driven configuration on top of the existing engine, not a competing architecture.
+
 OUTPUT OF PHASE 9
 The first genuinely usable interactive TUI pages.
 
@@ -823,6 +1412,25 @@ IMPLEMENT IN THIS PHASE
 - reports
 - help text
 - logs
+
+11.4 Tile / grid-based content formats
+Support grid-oriented asset/layout loading for larger structured content areas.
+
+Candidate formats:
+- .csv grid layouts
+- custom tile/grid definitions
+- Cogmind-style tileset-inspired mapping formats later if needed
+
+Purpose:
+- maps
+- dashboards
+- structured panels
+- tile-oriented authored layouts
+
+Rules:
+- tile/grid data must normalize into engine-owned structures
+- visible rendering must still end in ScreenCell / ScreenBuffer composition
+- no special bypass around the rendering core
 
 OUTPUT OF PHASE 10
 A reusable scrolling system for complex text-heavy screens.
@@ -923,6 +1531,14 @@ IMPLEMENT IN THIS PHASE
 - instantiate widgets
 - attach to page/screen
 
+13.4 Structured widget/layout import
+Allow future import of widget/layout definitions from:
+- .json
+- .yaml
+- .ini
+
+These must instantiate the same widget trees and PageComposer placement semantics used by native code and interpreted page scripts.
+
 OUTPUT OF PHASE 12
 Interpreted interactive page layouts, not just static screens.
 
@@ -964,6 +1580,22 @@ IMPLEMENT IN THIS PHASE
 - invalidate whole page
 - invalidate element/window
 This was part of the earlier architecture guidance and belongs here once richer UI is present. 
+
+14.5 Animated / multi-frame text asset formats
+Support later loading/playback of time-based text assets such as:
+- multi-frame .ans animation
+- .txt frame sequences
+- custom .anim format
+
+Purpose:
+- animated banners
+- splash/title effects
+- lightweight TUI motion systems
+
+Rules:
+- animations must be modeled as frame sequences or time-based asset sets
+- playback must compose through existing surfaces/buffers
+- animation formats must not bypass compositing or PageComposer placement semantics
 
 OUTPUT OF PHASE 13
 Stable time-based polish features layered on top of a finished UI model.
@@ -1105,12 +1737,22 @@ TUI/
 │   │   └── UIThemes.h
 │   │
 │   ├── Objects/
-│   │   ├── AsciiObject.h
-│   │   ├── AsciiObject.cpp
+│   │   ├── TextObject.h
+│   │   ├── TextObject.cpp
 │   │   ├── AsciiBanner.h
 │   │   ├── AsciiBanner.cpp
 │   │   ├── ObjectFactory.h
-│   │   └── ObjectFactory.cpp
+│   │   ├── ObjectFactory.cpp
+│   │   ├── PlainTextLoader.h
+│   │   ├── PlainTextLoader.cpp
+│   │   ├── AnsiLoader.h
+│   │   ├── AnsiLoader.cpp
+│   │   ├── BinaryArtLoader.h
+│   │   ├── BinaryArtLoader.cpp
+│   │   ├── TextObjectExporter.h
+│   │   ├── TextObjectExporter.cpp
+│   │   ├── FontLoader.h
+│   │   └── FontLoader.cpp
 │   │
 │   └── Composition/
 │       ├── SourceMask.h
@@ -1225,6 +1867,13 @@ TUI/
 ├── Game/
 ├── Data/
 ├── Utilities/
+│   ├── Unicode/
+│   │   ├── UnicodeConversions.h
+│   │   ├── UnicodeConversions.cpp
+│   │   ├── UnicodeWidth.h
+│   │   ├── UnicodeWidth.cpp
+│   │   ├── UnicodeGrapheme.h
+│   │   ├── UnicodeGrampheme.cpp
 │   ├── AssetPaths.h
 │   ├── AssetPaths.cpp
 │   ├── StringUtils.h
@@ -1234,9 +1883,11 @@ TUI/
 │
 ├── Assets/
 │   ├── ASCII/
+│   ├── ANSI/
 │   ├── Fonts/
 │   │   ├── FIGlet/
-│   │   └── TOIlet/
+│   │   ├── TOIlet/
+│   │   └── Bitmap/
 │   ├── Pages/
 │   ├── Screens/
 │   └── Themes/
@@ -1263,12 +1914,16 @@ Do not jump to widgets or old page ports.
 Build next in this exact order:
 
 1. Finish Phase 1 cleanly if anything remains unstable
-2. Build Phase 2 style system
-3. Build Phase 3 object/asset system cleanly
-4. Build Phase 4 WritePolicy/compositing system
-5. Build Phase 5 PageComposer API 1.0
-6. Test authored pages in C++
-7. Then build Phase 6 interpreter
+2. Finish Phase 2 style system cleanly
+3. Build Phase 3 TextObject / asset system around one unified object model
+4. Add plain text loaders first (.txt / .asc / .nfo / .diz)
+5. Add ANSI / terminal art loaders next (.ans / .bin first, .xbin / .adf after core import path is stable)
+6. Add TextObject export/save support where fidelity is clear
+7. Add banner/font loading and generation support
+8. Build Phase 4 WritePolicy/compositing system
+9. Build Phase 5 PageComposer API 1.0
+10. Test authored pages in C++
+11. Then build Phase 6 interpreter
 
 That is the correct path to avoid temporary solutions.
 
@@ -1317,3 +1972,15 @@ The engine is now intentionally aimed at supporting:
 The key idea is:
 build the page-composition vocabulary first,
 then let both C++ and interpreted pages use it.
+
+============================================================
+OUTPUT OF UPDATED ROADMAP 03/21/26
+============================================================
+
+A fully Unicode-correct TUI engine that:
+
+- preserves clean architecture
+- avoids future refactors
+- supports real-world text (emoji, CJK, combining marks)
+- remains backend-neutral
+- maintains authoring simplicity
