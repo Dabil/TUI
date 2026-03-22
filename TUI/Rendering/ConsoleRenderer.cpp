@@ -16,6 +16,37 @@
         - Present only visible leading glyphs
         - Skip continuation glyph rendering
         - Group output into same-style spans
+
+    Phase 2 Refactor:
+
+    The flow after this refactor is:
+
+    logical Style
+        -> renderer StylePolicy resolution
+        -> backend attribute mapping
+        -> Win32 output
+
+    So:
+
+    Style stays rich and unchanged in ScreenCell / ScreenBuffer
+    ConsoleRenderer uses StylePolicy to 
+    downgrade or omit unsupported features only at presentation time
+    the current console backend still renders through Win32 attributes, 
+    but the policy layer now cleanly preserves future support for richer backends
+
+    For future ConsoleCapabilities work, the clean upgrade path is:
+
+    replace detectConsoleStyleCapabilities(...) with a 
+    translation from your eventual shared ConsoleCapabilities type
+    keep buildStylePolicy(...) as the single place that converts 
+    backend support into renderer mapping behavior
+    expose diagnostics by reporting:
+    whether VT mode was enabled
+    whether RGB/256 colors are direct or downgraded
+    which style fields are direct vs omitted vs emulated
+
+    That gives you a clean renderer-side architecture 
+    without pushing backend assumptions back into authoring code.
 */
 
 namespace
@@ -25,6 +56,23 @@ namespace
 
     constexpr WORD kBackgroundMask =
         BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+
+    struct ConsoleStyleCapabilities
+    {
+        bool supportsBasicColors = true;
+        bool supportsIndexed256Colors = false;
+        bool supportsRgbColors = false;
+
+        bool supportsBold = true;
+        bool supportsDim = true;
+        bool supportsUnderline = true;
+        bool supportsReverse = true;
+        bool supportsInvisible = true;
+        bool supportsStrike = false;
+
+        bool supportsSlowBlink = false;
+        bool supportsFastBlink = false;
+    };
 
     WORD basicForegroundBits(Color::Basic color)
     {
@@ -100,7 +148,105 @@ namespace
         return fg;
     }
 
-    WORD styleToAttributes(const Style& style, WORD defaultAttributes)
+    ConsoleStyleCapabilities detectConsoleStyleCapabilities(bool virtualTerminalEnabled)
+    {
+        ConsoleStyleCapabilities capabilities;
+
+        capabilities.supportsBasicColors = true;
+        capabilities.supportsIndexed256Colors = false;
+        capabilities.supportsRgbColors = false;
+
+        capabilities.supportsBold = true;
+        capabilities.supportsDim = true;
+        capabilities.supportsUnderline = true;
+        capabilities.supportsReverse = true;
+        capabilities.supportsInvisible = true;
+        capabilities.supportsStrike = false;
+
+        capabilities.supportsSlowBlink = false;
+        capabilities.supportsFastBlink = false;
+
+        /*
+            For the current renderer implementation we still use Win32 attribute
+            mapping through SetConsoleTextAttribute, not ANSI transport strings.
+
+            Even if VT processing is enabled, the logical style mapping should
+            remain conservative until an alternate VT output path is introduced.
+        */
+        (void)virtualTerminalEnabled;
+
+        return capabilities;
+    }
+
+    StylePolicy buildStylePolicy(const ConsoleStyleCapabilities& capabilities)
+    {
+        StylePolicy policy = StylePolicy::PreserveIntent();
+
+        policy = policy.withBasicColorMode(
+            capabilities.supportsBasicColors
+            ? ColorRenderMode::Direct
+            : ColorRenderMode::Omit);
+
+        policy = policy.withIndexed256ColorMode(
+            capabilities.supportsIndexed256Colors
+            ? ColorRenderMode::Direct
+            : (capabilities.supportsBasicColors
+                ? ColorRenderMode::DowngradeToBasic
+                : ColorRenderMode::Omit));
+
+        policy = policy.withRgbColorMode(
+            capabilities.supportsRgbColors
+            ? ColorRenderMode::Direct
+            : (capabilities.supportsIndexed256Colors
+                ? ColorRenderMode::DowngradeToIndexed256
+                : (capabilities.supportsBasicColors
+                    ? ColorRenderMode::DowngradeToBasic
+                    : ColorRenderMode::Omit)));
+
+        policy = policy.withBoldMode(
+            capabilities.supportsBold
+            ? TextAttributeRenderMode::Direct
+            : TextAttributeRenderMode::Omit);
+
+        policy = policy.withDimMode(
+            capabilities.supportsDim
+            ? TextAttributeRenderMode::Direct
+            : TextAttributeRenderMode::Omit);
+
+        policy = policy.withUnderlineMode(
+            capabilities.supportsUnderline
+            ? TextAttributeRenderMode::Direct
+            : TextAttributeRenderMode::Omit);
+
+        policy = policy.withReverseMode(
+            capabilities.supportsReverse
+            ? TextAttributeRenderMode::Direct
+            : TextAttributeRenderMode::Omit);
+
+        policy = policy.withInvisibleMode(
+            capabilities.supportsInvisible
+            ? TextAttributeRenderMode::Direct
+            : TextAttributeRenderMode::Omit);
+
+        policy = policy.withStrikeMode(
+            capabilities.supportsStrike
+            ? TextAttributeRenderMode::Direct
+            : TextAttributeRenderMode::Omit);
+
+        policy = policy.withSlowBlinkMode(
+            capabilities.supportsSlowBlink
+            ? BlinkRenderMode::Direct
+            : BlinkRenderMode::Omit);
+
+        policy = policy.withFastBlinkMode(
+            capabilities.supportsFastBlink
+            ? BlinkRenderMode::Direct
+            : BlinkRenderMode::Omit);
+
+        return policy;
+    }
+
+    WORD resolvedStyleToAttributes(const Style& style, WORD defaultAttributes)
     {
         WORD attributes = defaultAttributes;
 
@@ -299,6 +445,11 @@ bool ConsoleRenderer::initialize()
 
     m_previousFrame.resize(m_consoleWidth, m_consoleHeight);
     m_previousFrame.clear();
+
+    const ConsoleStyleCapabilities styleCapabilities =
+        detectConsoleStyleCapabilities(m_virtualTerminalEnabled);
+
+    m_stylePolicy = buildStylePolicy(styleCapabilities);
 
     m_currentStyle = Style{};
     m_firstPresent = true;
@@ -499,15 +650,18 @@ void ConsoleRenderer::moveCursor(int x, int y)
 
 void ConsoleRenderer::setStyle(const Style& style)
 {
-    if (style == m_currentStyle)
+    const ResolvedStyle resolved = m_stylePolicy.resolve(style);
+    const Style& presentedStyle = resolved.presentedStyle;
+
+    if (presentedStyle == m_currentStyle)
     {
         return;
     }
 
-    const WORD attributes = styleToAttributes(style, m_defaultAttributes);
+    const WORD attributes = resolvedStyleToAttributes(presentedStyle, m_defaultAttributes);
     SetConsoleTextAttribute(m_hOut, attributes);
 
-    m_currentStyle = style;
+    m_currentStyle = presentedStyle;
 }
 
 void ConsoleRenderer::resetStyle()
@@ -532,6 +686,8 @@ bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
 
 bool ConsoleRenderer::configureConsole()
 {
+    m_virtualTerminalEnabled = false;
+
     if (!SetConsoleOutputCP(CP_UTF8))
     {
         return false;
@@ -549,7 +705,11 @@ bool ConsoleRenderer::configureConsole()
         outMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
         outMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
-        if (!SetConsoleMode(m_hOut, outMode))
+        if (SetConsoleMode(m_hOut, outMode))
+        {
+            m_virtualTerminalEnabled = true;
+        }
+        else
         {
             DWORD fallbackMode = m_originalOutputMode;
             fallbackMode |= ENABLE_PROCESSED_OUTPUT;
