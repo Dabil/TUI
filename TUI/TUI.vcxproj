@@ -142,6 +142,7 @@
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Styles\StyleBuilder.h" />
     <ClInclude Include="Rendering\Styles\StyleMerge.h" />
+    <ClInclude Include="Rendering\Styles\StylePolicy.h" />
     <ClInclude Include="Rendering\Surface.h" />
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
@@ -163,6 +164,7 @@
     <ClCompile Include="Rendering\Styles\Style.cpp" />
     <ClCompile Include="Rendering\Styles\StyleBuilder.cpp" />
     <ClCompile Include="Rendering\Styles\StyleMerge.cpp" />
+    <ClCompile Include="Rendering\Styles\StylePolicy.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
