@@ -1,5 +1,19 @@
 #include "Rendering/Styles/StyleBuilder.h"
 
+#include "Rendering/Styles/StyleMerge.h"
+
+/*
+Composition behavior with this design is simple and predictable:
+
+left side is the base style
+right side overlays onto it
+foreground/background from the right replace the left if present
+enabled boolean flags on the right are added to the result
+this is still purely logical style composition, not renderer capability mapping
+
+This makes it a good fit for themes, page composition, and any future semantic style namespace layer.
+*/
+
 namespace style
 {
     const Style Bold = Style().withBold();
@@ -24,57 +38,5 @@ namespace style
 
 Style operator+(const Style& left, const Style& right)
 {
-    Style result = left;
-
-    if (right.hasForeground())
-    {
-        result = result.withForeground(*right.foreground());
-    }
-
-    if (right.hasBackground())
-    {
-        result = result.withBackground(*right.background());
-    }
-
-    if (right.bold())
-    {
-        result = result.withBold(true);
-    }
-
-    if (right.dim())
-    {
-        result = result.withDim(true);
-    }
-
-    if (right.underline())
-    {
-        result = result.withUnderline(true);
-    }
-
-    if (right.slowBlink())
-    {
-        result = result.withSlowBlink(true);
-    }
-
-    if (right.fastBlink())
-    {
-        result = result.withFastBlink(true);
-    }
-
-    if (right.reverse())
-    {
-        result = result.withReverse(true);
-    }
-
-    if (right.invisible())
-    {
-        result = result.withInvisible(true);
-    }
-
-    if (right.strike())
-    {
-        result = result.withStrike(true);
-    }
-
-    return result;
+    return StyleMerge::merge(left, right, StyleMergeMode::MergePreserveDestination);
 }
