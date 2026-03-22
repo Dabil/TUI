@@ -5,8 +5,8 @@
 enum class StyleMergeMode
 {
     Replace,
-    MergePreserveDestination,
-    MergePreserveSource
+    PreserveDestination,
+    MergePreserveDestination
 };
 
 class StyleMerge
@@ -16,4 +16,9 @@ public:
         const Style& destination,
         const Style& source,
         StyleMergeMode mode);
+
+private:
+    static Style mergePreserveDestination(
+        const Style& destination,
+        const Style& source);
 };
