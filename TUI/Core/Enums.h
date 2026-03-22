@@ -4,7 +4,7 @@
     TODO:
 
     Checklist:
-        - Add a Unicode-aware frame style enum later if desired
+        - Add a Unicode-aware frame style enum later if
 
     Too early to know what enums would be needed for Unicode, 
     will wait till I actually have a need instead of inventing
