@@ -137,6 +137,8 @@
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
+    <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
+    <ClInclude Include="Rendering\Diagnostics\RenderDiagnosticsWriter.h" />
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
@@ -167,6 +169,8 @@
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
+    <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
+    <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />
