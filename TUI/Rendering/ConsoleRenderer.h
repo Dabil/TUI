@@ -1,13 +1,13 @@
 #pragma once
 
+#include "Rendering/Backends/ConsoleCapabilityDetector.h"
+#include "Rendering/Capabilities/ConsoleCapabilities.h"
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
-#include "Rendering/Backends/ConsoleCapabilityDetector.h"
-#include "Rendering/Capabilities/ConsoleCapabilities.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -24,10 +24,11 @@
         - continuation cells are skipped during presentation
         - backend capability reporting is exposed through IRenderer
 
-    For Phase 2 style mapping:
-        - Style remains a logical model only
-        - renderer-side policy decides how unsupported features are handled
-        - backend mapping occurs at presentation time only
+    For Phase 2 style adaptation:
+        - logical Style stays unchanged in ScreenBuffer
+        - capability detection populates ConsoleCapabilities
+        - StylePolicy resolves unsupported features at presentation time
+        - backend mapping uses resolved presentation style only
 */
 
 class ConsoleRenderer : public IRenderer
@@ -62,13 +63,11 @@ private:
     bool queryVisibleConsoleSize(int& width, int& height) const;
     bool configureConsole();
     void restoreConsoleState();
+    void writeAdaptationReport() const;
 
 private:
     HANDLE m_hOut = INVALID_HANDLE_VALUE;
     HANDLE m_hIn = INVALID_HANDLE_VALUE;
-
-    ConsoleCapabilities m_capabilities{};
-    bool m_virtualTerminalEnabled = false;
 
     int m_consoleWidth = 0;
     int m_consoleHeight = 0;
@@ -79,6 +78,7 @@ private:
 
     Style m_currentStyle{};
     StylePolicy m_stylePolicy{};
+    ConsoleCapabilities m_capabilities{};
     WORD m_defaultAttributes = 0;
 
     UINT m_originalOutputCodePage = 0;

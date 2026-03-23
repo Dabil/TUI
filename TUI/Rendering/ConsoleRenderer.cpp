@@ -1,5 +1,6 @@
 #include "Rendering/ConsoleRenderer.h"
 
+#include <fstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -56,23 +57,6 @@ namespace
 
     constexpr WORD kBackgroundMask =
         BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
-
-    struct ConsoleStyleCapabilities
-    {
-        bool supportsBasicColors = true;
-        bool supportsIndexed256Colors = false;
-        bool supportsRgbColors = false;
-
-        bool supportsBold = true;
-        bool supportsDim = true;
-        bool supportsUnderline = true;
-        bool supportsReverse = true;
-        bool supportsInvisible = true;
-        bool supportsStrike = false;
-
-        bool supportsSlowBlink = false;
-        bool supportsFastBlink = false;
-    };
 
     WORD basicForegroundBits(Color::Basic color)
     {
@@ -148,100 +132,74 @@ namespace
         return fg;
     }
 
-    ConsoleStyleCapabilities detectConsoleStyleCapabilities(bool virtualTerminalEnabled)
-    {
-        ConsoleStyleCapabilities capabilities;
-
-        capabilities.supportsBasicColors = true;
-        capabilities.supportsIndexed256Colors = false;
-        capabilities.supportsRgbColors = false;
-
-        capabilities.supportsBold = true;
-        capabilities.supportsDim = true;
-        capabilities.supportsUnderline = true;
-        capabilities.supportsReverse = true;
-        capabilities.supportsInvisible = true;
-        capabilities.supportsStrike = false;
-
-        capabilities.supportsSlowBlink = false;
-        capabilities.supportsFastBlink = false;
-
-        /*
-            For the current renderer implementation we still use Win32 attribute
-            mapping through SetConsoleTextAttribute, not ANSI transport strings.
-
-            Even if VT processing is enabled, the logical style mapping should
-            remain conservative until an alternate VT output path is introduced.
-        */
-        (void)virtualTerminalEnabled;
-
-        return capabilities;
-    }
-
-    StylePolicy buildStylePolicy(const ConsoleStyleCapabilities& capabilities)
+    StylePolicy buildStylePolicyFromCapabilities(const ConsoleCapabilities& capabilities)
     {
         StylePolicy policy = StylePolicy::PreserveIntent();
 
         policy = policy.withBasicColorMode(
-            capabilities.supportsBasicColors
+            capabilities.supportsBasicColors()
             ? ColorRenderMode::Direct
             : ColorRenderMode::Omit);
 
         policy = policy.withIndexed256ColorMode(
-            capabilities.supportsIndexed256Colors
+            capabilities.supportsIndexed256Colors()
             ? ColorRenderMode::Direct
-            : (capabilities.supportsBasicColors
+            : (capabilities.supportsBasicColors()
                 ? ColorRenderMode::DowngradeToBasic
                 : ColorRenderMode::Omit));
 
         policy = policy.withRgbColorMode(
-            capabilities.supportsRgbColors
+            capabilities.supportsTrueColor()
             ? ColorRenderMode::Direct
-            : (capabilities.supportsIndexed256Colors
+            : (capabilities.supportsIndexed256Colors()
                 ? ColorRenderMode::DowngradeToIndexed256
-                : (capabilities.supportsBasicColors
+                : (capabilities.supportsBasicColors()
                     ? ColorRenderMode::DowngradeToBasic
                     : ColorRenderMode::Omit)));
 
         policy = policy.withBoldMode(
-            capabilities.supportsBold
+            capabilities.supportsBoldDirect()
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
         policy = policy.withDimMode(
-            capabilities.supportsDim
+            capabilities.supportsDimDirect()
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
         policy = policy.withUnderlineMode(
-            capabilities.supportsUnderline
+            capabilities.supportsUnderlineDirect()
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
         policy = policy.withReverseMode(
-            capabilities.supportsReverse
+            capabilities.supportsReverseDirect()
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
         policy = policy.withInvisibleMode(
-            capabilities.supportsInvisible
+            capabilities.supportsInvisibleDirect()
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
         policy = policy.withStrikeMode(
-            capabilities.supportsStrike
+            capabilities.supportsStrikeDirect()
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
         policy = policy.withSlowBlinkMode(
-            capabilities.supportsSlowBlink
+            capabilities.supportsSlowBlinkDirect()
             ? BlinkRenderMode::Direct
-            : BlinkRenderMode::Omit);
+            : (capabilities.mayEmulateSlowBlink()
+                ? BlinkRenderMode::Emulate
+                : BlinkRenderMode::Omit));
 
         policy = policy.withFastBlinkMode(
-            capabilities.supportsFastBlink
+            capabilities.supportsFastBlinkDirect()
             ? BlinkRenderMode::Direct
-            : BlinkRenderMode::Omit);
+            : (capabilities.mayEmulateFastBlink()
+                ? BlinkRenderMode::Emulate
+                : BlinkRenderMode::Omit));
 
         return policy;
     }
@@ -306,6 +264,63 @@ namespace
         }
 
         return attributes;
+    }
+
+    const char* colorTierToString(ConsoleColorTier tier)
+    {
+        switch (tier)
+        {
+        case ConsoleColorTier::None:       return "None";
+        case ConsoleColorTier::Basic16:    return "Basic16";
+        case ConsoleColorTier::Indexed256: return "Indexed256";
+        case ConsoleColorTier::TrueColor:  return "TrueColor";
+        default:                           return "Unknown";
+        }
+    }
+
+    const char* featureSupportToString(ConsoleFeatureSupport support)
+    {
+        switch (support)
+        {
+        case ConsoleFeatureSupport::Unsupported: return "Unsupported";
+        case ConsoleFeatureSupport::Supported:   return "Supported";
+        case ConsoleFeatureSupport::Emulated:    return "Emulated";
+        case ConsoleFeatureSupport::Unknown:     return "Unknown";
+        default:                                 return "Unknown";
+        }
+    }
+
+    const char* colorRenderModeToString(ColorRenderMode mode)
+    {
+        switch (mode)
+        {
+        case ColorRenderMode::Direct:              return "Direct";
+        case ColorRenderMode::DowngradeToBasic:    return "DowngradeToBasic";
+        case ColorRenderMode::DowngradeToIndexed256:return "DowngradeToIndexed256";
+        case ColorRenderMode::Omit:                return "Omit";
+        default:                                   return "Unknown";
+        }
+    }
+
+    const char* textAttributeRenderModeToString(TextAttributeRenderMode mode)
+    {
+        switch (mode)
+        {
+        case TextAttributeRenderMode::Direct: return "Direct";
+        case TextAttributeRenderMode::Omit:   return "Omit";
+        default:                              return "Unknown";
+        }
+    }
+
+    const char* blinkRenderModeToString(BlinkRenderMode mode)
+    {
+        switch (mode)
+        {
+        case BlinkRenderMode::Direct:  return "Direct";
+        case BlinkRenderMode::Omit:    return "Omit";
+        case BlinkRenderMode::Emulate: return "Emulate";
+        default:                       return "Unknown";
+        }
     }
 
     bool isContinuationCell(const ScreenCell& cell)
@@ -446,74 +461,8 @@ bool ConsoleRenderer::initialize()
     m_previousFrame.resize(m_consoleWidth, m_consoleHeight);
     m_previousFrame.clear();
 
-    StylePolicy policy = StylePolicy::PreserveIntent();
-
-    policy = policy.withBasicColorMode(
-        m_capabilities.supportsBasicColors()
-        ? ColorRenderMode::Direct
-        : ColorRenderMode::Omit);
-
-    policy = policy.withIndexed256ColorMode(
-        m_capabilities.supportsIndexed256Colors()
-        ? ColorRenderMode::Direct
-        : (m_capabilities.supportsBasicColors()
-            ? ColorRenderMode::DowngradeToBasic
-            : ColorRenderMode::Omit));
-
-    policy = policy.withRgbColorMode(
-        m_capabilities.supportsTrueColor()
-        ? ColorRenderMode::Direct
-        : (m_capabilities.supportsIndexed256Colors()
-            ? ColorRenderMode::DowngradeToIndexed256
-            : (m_capabilities.supportsBasicColors()
-                ? ColorRenderMode::DowngradeToBasic
-                : ColorRenderMode::Omit)));
-
-    policy = policy.withBoldMode(
-        m_capabilities.supportsBoldDirect()
-        ? TextAttributeRenderMode::Direct
-        : TextAttributeRenderMode::Omit);
-
-    policy = policy.withDimMode(
-        m_capabilities.supportsDimDirect()
-        ? TextAttributeRenderMode::Direct
-        : TextAttributeRenderMode::Omit);
-
-    policy = policy.withUnderlineMode(
-        m_capabilities.supportsUnderlineDirect()
-        ? TextAttributeRenderMode::Direct
-        : TextAttributeRenderMode::Omit);
-
-    policy = policy.withReverseMode(
-        m_capabilities.supportsReverseDirect()
-        ? TextAttributeRenderMode::Direct
-        : TextAttributeRenderMode::Omit);
-
-    policy = policy.withInvisibleMode(
-        m_capabilities.supportsInvisibleDirect()
-        ? TextAttributeRenderMode::Direct
-        : TextAttributeRenderMode::Omit);
-
-    policy = policy.withStrikeMode(
-        m_capabilities.supportsStrikeDirect()
-        ? TextAttributeRenderMode::Direct
-        : TextAttributeRenderMode::Omit);
-
-    policy = policy.withSlowBlinkMode(
-        m_capabilities.supportsSlowBlinkDirect()
-        ? BlinkRenderMode::Direct
-        : (m_capabilities.mayEmulateSlowBlink()
-            ? BlinkRenderMode::Emulate
-            : BlinkRenderMode::Omit));
-
-    policy = policy.withFastBlinkMode(
-        m_capabilities.supportsFastBlinkDirect()
-        ? BlinkRenderMode::Direct
-        : (m_capabilities.mayEmulateFastBlink()
-            ? BlinkRenderMode::Emulate
-            : BlinkRenderMode::Omit));
-
-    m_stylePolicy = policy;
+    m_stylePolicy = buildStylePolicyFromCapabilities(m_capabilities);
+    writeAdaptationReport();
 
     m_currentStyle = Style{};
     m_firstPresent = true;
@@ -828,4 +777,53 @@ void ConsoleRenderer::restoreConsoleState()
     {
         SetConsoleCP(m_originalInputCodePage);
     }
+}
+
+void ConsoleRenderer::writeAdaptationReport() const
+{
+    std::ofstream out("console_style_adaptation_report.txt", std::ios::out | std::ios::trunc);
+    if (!out)
+    {
+        return;
+    }
+
+    out << "Console Style Adaptation Report\n";
+    out << "===============================\n\n";
+
+    out << "Detected backend capabilities\n";
+    out << "-----------------------------\n";
+    out << "Virtual terminal processing: " << (m_capabilities.virtualTerminalProcessing ? "true" : "false") << "\n";
+    out << "Unicode output: " << (m_capabilities.unicodeOutput ? "true" : "false") << "\n";
+    out << "Color tier: " << colorTierToString(m_capabilities.colorTier) << "\n\n";
+
+    out << "Feature support\n";
+    out << "---------------\n";
+    out << "Bold: " << featureSupportToString(m_capabilities.bold) << "\n";
+    out << "Dim: " << featureSupportToString(m_capabilities.dim) << "\n";
+    out << "Underline: " << featureSupportToString(m_capabilities.underline) << "\n";
+    out << "Reverse: " << featureSupportToString(m_capabilities.reverse) << "\n";
+    out << "Invisible: " << featureSupportToString(m_capabilities.invisible) << "\n";
+    out << "Strike: " << featureSupportToString(m_capabilities.strike) << "\n";
+    out << "Slow blink: " << featureSupportToString(m_capabilities.slowBlink) << "\n";
+    out << "Fast blink: " << featureSupportToString(m_capabilities.fastBlink) << "\n\n";
+
+    out << "Resolved renderer adaptation policy\n";
+    out << "----------------------------------\n";
+    out << "Basic colors: " << colorRenderModeToString(m_stylePolicy.basicColorMode()) << "\n";
+    out << "Indexed256 colors: " << colorRenderModeToString(m_stylePolicy.indexed256ColorMode()) << "\n";
+    out << "RGB colors: " << colorRenderModeToString(m_stylePolicy.rgbColorMode()) << "\n";
+    out << "Bold: " << textAttributeRenderModeToString(m_stylePolicy.boldMode()) << "\n";
+    out << "Dim: " << textAttributeRenderModeToString(m_stylePolicy.dimMode()) << "\n";
+    out << "Underline: " << textAttributeRenderModeToString(m_stylePolicy.underlineMode()) << "\n";
+    out << "Reverse: " << textAttributeRenderModeToString(m_stylePolicy.reverseMode()) << "\n";
+    out << "Invisible: " << textAttributeRenderModeToString(m_stylePolicy.invisibleMode()) << "\n";
+    out << "Strike: " << textAttributeRenderModeToString(m_stylePolicy.strikeMode()) << "\n";
+    out << "Slow blink: " << blinkRenderModeToString(m_stylePolicy.slowBlinkMode()) << "\n";
+    out << "Fast blink: " << blinkRenderModeToString(m_stylePolicy.fastBlinkMode()) << "\n\n";
+
+    out << "Notes\n";
+    out << "-----\n";
+    out << "- Logical Style data stored in ScreenBuffer is not modified by these adaptations.\n";
+    out << "- Downgrade and omission are applied only during renderer presentation.\n";
+    out << "- Blink emulation is policy-visible but not implemented in this Win32 attribute output path yet.\n";
 }
