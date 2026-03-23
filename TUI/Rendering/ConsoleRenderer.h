@@ -6,6 +6,8 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
+#include "Rendering/Backends/ConsoleCapabilityDetector.h"
+#include "Rendering/Capabilities/ConsoleCapabilities.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -64,6 +66,9 @@ private:
 private:
     HANDLE m_hOut = INVALID_HANDLE_VALUE;
     HANDLE m_hIn = INVALID_HANDLE_VALUE;
+
+    ConsoleCapabilities m_capabilities{};
+    bool m_virtualTerminalEnabled = false;
 
     int m_consoleWidth = 0;
     int m_consoleHeight = 0;

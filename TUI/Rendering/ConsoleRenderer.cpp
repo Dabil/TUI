@@ -446,10 +446,74 @@ bool ConsoleRenderer::initialize()
     m_previousFrame.resize(m_consoleWidth, m_consoleHeight);
     m_previousFrame.clear();
 
-    const ConsoleStyleCapabilities styleCapabilities =
-        detectConsoleStyleCapabilities(m_virtualTerminalEnabled);
+    StylePolicy policy = StylePolicy::PreserveIntent();
 
-    m_stylePolicy = buildStylePolicy(styleCapabilities);
+    policy = policy.withBasicColorMode(
+        m_capabilities.supportsBasicColors()
+        ? ColorRenderMode::Direct
+        : ColorRenderMode::Omit);
+
+    policy = policy.withIndexed256ColorMode(
+        m_capabilities.supportsIndexed256Colors()
+        ? ColorRenderMode::Direct
+        : (m_capabilities.supportsBasicColors()
+            ? ColorRenderMode::DowngradeToBasic
+            : ColorRenderMode::Omit));
+
+    policy = policy.withRgbColorMode(
+        m_capabilities.supportsTrueColor()
+        ? ColorRenderMode::Direct
+        : (m_capabilities.supportsIndexed256Colors()
+            ? ColorRenderMode::DowngradeToIndexed256
+            : (m_capabilities.supportsBasicColors()
+                ? ColorRenderMode::DowngradeToBasic
+                : ColorRenderMode::Omit)));
+
+    policy = policy.withBoldMode(
+        m_capabilities.supportsBoldDirect()
+        ? TextAttributeRenderMode::Direct
+        : TextAttributeRenderMode::Omit);
+
+    policy = policy.withDimMode(
+        m_capabilities.supportsDimDirect()
+        ? TextAttributeRenderMode::Direct
+        : TextAttributeRenderMode::Omit);
+
+    policy = policy.withUnderlineMode(
+        m_capabilities.supportsUnderlineDirect()
+        ? TextAttributeRenderMode::Direct
+        : TextAttributeRenderMode::Omit);
+
+    policy = policy.withReverseMode(
+        m_capabilities.supportsReverseDirect()
+        ? TextAttributeRenderMode::Direct
+        : TextAttributeRenderMode::Omit);
+
+    policy = policy.withInvisibleMode(
+        m_capabilities.supportsInvisibleDirect()
+        ? TextAttributeRenderMode::Direct
+        : TextAttributeRenderMode::Omit);
+
+    policy = policy.withStrikeMode(
+        m_capabilities.supportsStrikeDirect()
+        ? TextAttributeRenderMode::Direct
+        : TextAttributeRenderMode::Omit);
+
+    policy = policy.withSlowBlinkMode(
+        m_capabilities.supportsSlowBlinkDirect()
+        ? BlinkRenderMode::Direct
+        : (m_capabilities.mayEmulateSlowBlink()
+            ? BlinkRenderMode::Emulate
+            : BlinkRenderMode::Omit));
+
+    policy = policy.withFastBlinkMode(
+        m_capabilities.supportsFastBlinkDirect()
+        ? BlinkRenderMode::Direct
+        : (m_capabilities.mayEmulateFastBlink()
+            ? BlinkRenderMode::Emulate
+            : BlinkRenderMode::Omit));
+
+    m_stylePolicy = policy;
 
     m_currentStyle = Style{};
     m_firstPresent = true;
@@ -686,8 +750,6 @@ bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
 
 bool ConsoleRenderer::configureConsole()
 {
-    m_virtualTerminalEnabled = false;
-
     if (!SetConsoleOutputCP(CP_UTF8))
     {
         return false;
@@ -698,43 +760,27 @@ bool ConsoleRenderer::configureConsole()
         return false;
     }
 
-    if (m_haveOriginalOutputMode)
+    const ConsoleCapabilityDetectionResult detection =
+        ConsoleCapabilityDetector::detectAndConfigure(
+            m_hOut,
+            m_hIn,
+            m_originalOutputMode,
+            m_originalInputMode,
+            m_haveOriginalOutputMode,
+            m_haveOriginalInputMode);
+
+    if (m_haveOriginalOutputMode && !detection.hasConfiguredOutputMode)
     {
-        DWORD outMode = m_originalOutputMode;
-        outMode |= ENABLE_PROCESSED_OUTPUT;
-        outMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
-        outMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-
-        if (SetConsoleMode(m_hOut, outMode))
-        {
-            m_virtualTerminalEnabled = true;
-        }
-        else
-        {
-            DWORD fallbackMode = m_originalOutputMode;
-            fallbackMode |= ENABLE_PROCESSED_OUTPUT;
-            fallbackMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
-
-            if (!SetConsoleMode(m_hOut, fallbackMode))
-            {
-                return false;
-            }
-        }
+        return false;
     }
 
-    if (m_haveOriginalInputMode)
+    if (m_haveOriginalInputMode && !detection.hasConfiguredInputMode)
     {
-        DWORD inMode = m_originalInputMode;
-        inMode |= ENABLE_PROCESSED_INPUT;
-        inMode |= ENABLE_WINDOW_INPUT;
-        inMode |= ENABLE_EXTENDED_FLAGS;
-        inMode &= ~ENABLE_QUICK_EDIT_MODE;
-
-        if (!SetConsoleMode(m_hIn, inMode))
-        {
-            return false;
-        }
+        return false;
     }
+
+    m_capabilities = detection.capabilities;
+    m_virtualTerminalEnabled = detection.virtualTerminalWasEnabled;
 
     CONSOLE_CURSOR_INFO cursorInfo{};
     if (GetConsoleCursorInfo(m_hOut, &cursorInfo))
