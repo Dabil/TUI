@@ -137,6 +137,7 @@
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
+    <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnosticsWriter.h" />
     <ClInclude Include="Rendering\FrameDiff.h" />
@@ -169,6 +170,7 @@
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
+    <ClCompile Include="Rendering\Diagnostics\AuthorRenderingHints.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
