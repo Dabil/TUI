@@ -3,6 +3,8 @@
 #include <fstream>
 #include <ios>
 
+#include "Rendering/Diagnostics/AuthorRenderHints.h"
+
 namespace
 {
     void writeSectionHeader(std::ofstream& out, const char* title)
@@ -147,11 +149,23 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
 
     out << "\n";
 
+    out << "Author-Facing Rendering Hints\n";
+    out << "----------------------------\n";
+
+    const std::vector<std::string> hints = AuthorRenderHints::buildHints(diagnostics);
+    for (const std::string& hint : hints)
+    {
+        out << "- " << hint << "\n";
+    }
+
+    out << "\n";
+
     out << "Notes\n";
     out << "-----\n";
     out << "- Diagnostics describe renderer behavior only.\n";
     out << "- Logical Style data stored in ScreenBuffer is not mutated by diagnostics or adaptation.\n";
-    out << "- Output differences between authored style and visible result may be caused by downgrade, omission, or deferred emulation.\n";
+    out << "- Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.\n";
+    out << "- Author-facing hints are advisory only and do not change rendering behavior.\n";
 
     return true;
 }
