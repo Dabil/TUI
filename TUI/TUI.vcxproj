@@ -156,6 +156,7 @@
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
     <ClInclude Include="Rendering\Styles\Themes.h" />
+    <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\Screen.h" />
     <ClInclude Include="Screens\ShowcaseScreen.h" />
     <ClInclude Include="Screens\WaterEffectScreen.h" />
@@ -182,6 +183,7 @@
     <ClCompile Include="Rendering\Styles\StyleMerge.cpp" />
     <ClCompile Include="Rendering\Styles\StylePolicy.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
+    <ClCompile Include="Screens\Donut3DScreen.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
     <ClCompile Include="Screens\WaterEffectScreen.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
