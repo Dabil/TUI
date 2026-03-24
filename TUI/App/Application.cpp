@@ -8,6 +8,7 @@
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/Themes.h"
 
+#include "Screens/Donut3DScreen.h"
 #include "Screens/WaterEffectScreen.h"
 
 Application::Application() = default;
@@ -32,8 +33,9 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
-    m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
+    switchToWaterEffectScreen();
 
+    m_screenRotationElapsedSeconds = 0.0;
     m_running = true;
     return true;
 }
@@ -80,6 +82,7 @@ void Application::handleResize()
 
 void Application::update(double deltaTime)
 {
+    updateScreenRotation(deltaTime);
     m_screenManager->update(deltaTime);
 }
 
@@ -90,4 +93,37 @@ void Application::render()
     m_screenManager->drawCurrentScreen(*m_surface);
 
     m_renderer->present(m_surface->buffer());
+}
+
+void Application::switchToWaterEffectScreen()
+{
+    m_screenManager->clearScreens();
+    m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
+    m_showingDonutScreen = false;
+}
+
+void Application::switchToDonut3DScreen()
+{
+    m_screenManager->clearScreens();
+    m_screenManager->pushScreen(std::make_unique<Donut3DScreen>());
+    m_showingDonutScreen = true;
+}
+
+void Application::updateScreenRotation(double deltaTime)
+{
+    m_screenRotationElapsedSeconds += deltaTime;
+
+    while (m_screenRotationElapsedSeconds >= m_screenRotationIntervalSeconds)
+    {
+        m_screenRotationElapsedSeconds -= m_screenRotationIntervalSeconds;
+
+        if (m_showingDonutScreen)
+        {
+            switchToWaterEffectScreen();
+        }
+        else
+        {
+            switchToDonut3DScreen();
+        }
+    }
 }
