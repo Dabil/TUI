@@ -98,7 +98,7 @@ void Donut3DScreen::draw(Surface& surface)
         Themes::Frame);
 
     buffer.writeString(4, 0, "[ 3D ASCII Donut ]", Themes::Subtitle);
-    buffer.writeString(4, screenHeight - 1, "[ Hue Cycle + Depth Shading + Floor Shadow ]", Themes::Subtitle);
+    buffer.writeString(4, screenHeight - 1, "[ Hue Cycle + Depth Shading ]", Themes::Subtitle);
 
     const int viewportLeft = 1;
     const int viewportTop = 1;
@@ -148,7 +148,6 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
         style::Bg(Color::FromBasic(Color::Basic::Black)));
 
     std::vector<float> luminanceBuffer(static_cast<std::size_t>(width * height), 0.0f);
-    std::vector<float> shadowBuffer(static_cast<std::size_t>(width * height), 0.0f);
 
     const float cosA = std::cos(m_rotationA);
     const float sinA = std::sin(m_rotationA);
@@ -159,9 +158,6 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
 
     float minDepth = 1000000.0f;
     float maxDepth = -1000000.0f;
-
-    const float floorY = (static_cast<float>(height) * 0.9f);
-    const float shadowShiftX = 6.0f;
 
     for (float theta = 0.0f; theta < (Pi * 2.0f); theta += ThetaSpacing)
     {
@@ -232,70 +228,12 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
             {
                 maxDepth = ooz;
             }
-
-            const float closeness = std::clamp((ooz - 0.10f) / 0.18f, 0.0f, 1.0f);
-            const int shadowX = static_cast<int>(std::round(static_cast<float>(xp) + shadowShiftX + (closeness * 2.0f)));
-            const int shadowY = static_cast<int>(std::round(floorY + ((static_cast<float>(yp) - (static_cast<float>(height) * 0.5f)) * 0.18f)));
-
-            if (shadowX >= 0 && shadowX < width && shadowY >= 0 && shadowY < height)
-            {
-                const std::size_t shadowIndex = static_cast<std::size_t>(index(shadowX, shadowY, width));
-                shadowBuffer[shadowIndex] = std::max(shadowBuffer[shadowIndex], 0.35f + (luminance * 0.45f));
-            }
-
-            const int softShadowX1 = shadowX - 1;
-            const int softShadowX2 = shadowX + 1;
-
-            if (softShadowX1 >= 0 && softShadowX1 < width && shadowY >= 0 && shadowY < height)
-            {
-                const std::size_t shadowIndex = static_cast<std::size_t>(index(softShadowX1, shadowY, width));
-                shadowBuffer[shadowIndex] = std::max(shadowBuffer[shadowIndex], 0.18f + (luminance * 0.18f));
-            }
-
-            if (softShadowX2 >= 0 && softShadowX2 < width && shadowY >= 0 && shadowY < height)
-            {
-                const std::size_t shadowIndex = static_cast<std::size_t>(index(softShadowX2, shadowY, width));
-                shadowBuffer[shadowIndex] = std::max(shadowBuffer[shadowIndex], 0.18f + (luminance * 0.18f));
-            }
         }
     }
 
     if (maxDepth <= minDepth)
     {
         maxDepth = minDepth + 0.0001f;
-    }
-
-    for (int y = 0; y < height; ++y)
-    {
-        for (int x = 0; x < width; ++x)
-        {
-            const std::size_t cellIndex = static_cast<std::size_t>(index(x, y, width));
-            const float shadowIntensity = shadowBuffer[cellIndex];
-
-            if (shadowIntensity <= 0.0f)
-            {
-                continue;
-            }
-
-            char32_t shadowGlyph = U'.';
-            Style shadowStyle = style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
-                + style::Bg(Color::FromBasic(Color::Basic::Black));
-
-            if (shadowIntensity > 0.65f)
-            {
-                shadowGlyph = U':';
-                shadowStyle = style::Fg(Color::FromBasic(Color::Basic::Blue))
-                    + style::Bg(Color::FromBasic(Color::Basic::Black));
-            }
-            else if (shadowIntensity > 0.40f)
-            {
-                shadowGlyph = U'.';
-                shadowStyle = style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
-                    + style::Bg(Color::FromBasic(Color::Basic::Black));
-            }
-
-            buffer.writeCodePoint(left + x, top + y, shadowGlyph, shadowStyle);
-        }
     }
 
     for (int y = 0; y < height; ++y)
@@ -311,6 +249,7 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
 
             if (glyph == U' ')
             {
+                buffer.writeCodePoint(left + x, top + y, U' ', style::Bg(Color::FromBasic(Color::Basic::Black)));
                 continue;
             }
 
@@ -330,7 +269,7 @@ Style Donut3DScreen::buildShadedStyle(float normalizedDepth, float luminance) co
     normalizedDepth = std::clamp(normalizedDepth, 0.0f, 1.0f);
     luminance = std::clamp(luminance, 0.0f, 1.0f);
 
-    const int hueOffset = static_cast<int>(m_elapsedSeconds * 0.05) % CyclePaletteCount;
+    const int hueOffset = static_cast<int>(m_elapsedSeconds * 0.20) % CyclePaletteCount;
 
     int depthBand = 0;
     if (normalizedDepth < 0.20f)
