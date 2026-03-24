@@ -1,14 +1,14 @@
 #include "App/Application.h"
 #include "App/ScreenManager.h"
 
-#include <thread>
 #include <chrono>
+#include <thread>
 
-#include "Rendering/Styles/Themes.h"
 #include "Rendering/ConsoleRenderer.h"
 #include "Rendering/Surface.h"
+#include "Rendering/Styles/Themes.h"
 
-#include "Screens/ShowcaseScreen.h"
+#include "Screens/WaterEffectScreen.h"
 
 Application::Application() = default;
 
@@ -32,7 +32,7 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
-    m_screenManager->pushScreen(std::make_unique<ShowcaseScreen>());
+    m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
 
     m_running = true;
     return true;
@@ -86,7 +86,7 @@ void Application::update(double deltaTime)
 void Application::render()
 {
     m_surface->clear(Themes::AccentSurface);
-    
+
     m_screenManager->drawCurrentScreen(*m_surface);
 
     m_renderer->present(m_surface->buffer());
