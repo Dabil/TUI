@@ -33,9 +33,11 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
-    switchToWaterEffectScreen();
+    m_currentScreenType = ScreenType::WaterEffect;
+    m_screenCycleElapsedSeconds = 0.0;
 
-    m_screenRotationElapsedSeconds = 0.0;
+    switchToScreen(m_currentScreenType);
+
     m_running = true;
     return true;
 }
@@ -82,7 +84,7 @@ void Application::handleResize()
 
 void Application::update(double deltaTime)
 {
-    updateScreenRotation(deltaTime);
+    updateScreenCycle(deltaTime);
     m_screenManager->update(deltaTime);
 }
 
@@ -95,35 +97,49 @@ void Application::render()
     m_renderer->present(m_surface->buffer());
 }
 
-void Application::switchToWaterEffectScreen()
+void Application::switchToScreen(ScreenType screenType)
 {
     m_screenManager->clearScreens();
-    m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
-    m_showingDonutScreen = false;
-}
 
-void Application::switchToDonut3DScreen()
-{
-    m_screenManager->clearScreens();
-    m_screenManager->pushScreen(std::make_unique<Donut3DScreen>());
-    m_showingDonutScreen = true;
-}
-
-void Application::updateScreenRotation(double deltaTime)
-{
-    m_screenRotationElapsedSeconds += deltaTime;
-
-    while (m_screenRotationElapsedSeconds >= m_screenRotationIntervalSeconds)
+    switch (screenType)
     {
-        m_screenRotationElapsedSeconds -= m_screenRotationIntervalSeconds;
+    case ScreenType::WaterEffect:
+        m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
+        break;
 
-        if (m_showingDonutScreen)
-        {
-            switchToWaterEffectScreen();
-        }
-        else
-        {
-            switchToDonut3DScreen();
-        }
+    case ScreenType::Donut3D:
+        m_screenManager->pushScreen(std::make_unique<Donut3DScreen>());
+        break;
+    }
+
+    m_currentScreenType = screenType;
+}
+
+void Application::advanceScreen()
+{
+    switch (m_currentScreenType)
+    {
+    case ScreenType::WaterEffect:
+        switchToScreen(ScreenType::Donut3D);
+        break;
+
+    case ScreenType::Donut3D:
+        switchToScreen(ScreenType::Starfield);
+        break;
+
+    case ScreenType::Starfield:
+        switchToScreen(ScreenType::WaterEffect);
+        break;
+    }
+}
+
+void Application::updateScreenCycle(double deltaTime)
+{
+    m_screenCycleElapsedSeconds += deltaTime;
+
+    while (m_screenCycleElapsedSeconds >= m_screenCycleIntervalSeconds)
+    {
+        m_screenCycleElapsedSeconds -= m_screenCycleIntervalSeconds;
+        advanceScreen();
     }
 }

@@ -1,0 +1,39 @@
+Console Style Adaptation Report
+===============================
+
+Detected backend capabilities
+-----------------------------
+Virtual terminal processing: true
+Unicode output: true
+Color tier: Basic16
+
+Feature support
+---------------
+Bold: Supported
+Dim: Supported
+Underline: Supported
+Reverse: Supported
+Invisible: Supported
+Strike: Unsupported
+Slow blink: Unsupported
+Fast blink: Unsupported
+
+Resolved renderer adaptation policy
+----------------------------------
+Basic colors: Direct
+Indexed256 colors: DowngradeToBasic
+RGB colors: DowngradeToBasic
+Bold: Direct
+Dim: Direct
+Underline: Direct
+Reverse: Direct
+Invisible: Direct
+Strike: Omit
+Slow blink: Omit
+Fast blink: Omit
+
+Notes
+-----
+- Logical Style data stored in ScreenBuffer is not modified by these adaptations.
+- Downgrade and omission are applied only during renderer presentation.
+- Blink emulation is policy-visible but not implemented in this Win32 attribute output path yet.
