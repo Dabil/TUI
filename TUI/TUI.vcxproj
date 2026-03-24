@@ -158,6 +158,7 @@
     <ClInclude Include="Rendering\Styles\Themes.h" />
     <ClInclude Include="Screens\Screen.h" />
     <ClInclude Include="Screens\ShowcaseScreen.h" />
+    <ClInclude Include="Screens\WaterEffectScreen.h" />
     <ClInclude Include="Utilities\Unicode\GraphemeSegmentation.h" />
     <ClInclude Include="Utilities\Unicode\UnicodeConversion.h" />
     <ClInclude Include="Utilities\Unicode\UnicodeWidth.h" />
@@ -182,6 +183,7 @@
     <ClCompile Include="Rendering\Styles\StylePolicy.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
+    <ClCompile Include="Screens\WaterEffectScreen.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeWidth.cpp" />
