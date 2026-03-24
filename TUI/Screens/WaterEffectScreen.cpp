@@ -18,6 +18,10 @@ namespace
     constexpr int MaxVisualAmplitude = 64;
     constexpr float Pi = 3.1415926535f;
 
+    // Approximate "5-10 frames later" using a 60 FPS-style timing window.
+    constexpr float SecondaryDropDelaySeconds = 45.0f / 60.0f;
+    constexpr float SecondaryDropStrengthScale = 0.5f;
+
     constexpr char32_t toUpperAscii(char32_t c)
     {
         if (c >= U'a' && c <= U'z')
@@ -58,9 +62,9 @@ namespace
 
 WaterEffectScreen::WaterEffectScreen()
 {
-        m_modeColor[0] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Green));
-        m_modeColor[1] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Blue));
-        m_modeColor[2] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Red));
+    m_modeColor[0] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Green));
+    m_modeColor[1] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Blue));
+    m_modeColor[2] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Red));
 }
 
 void WaterEffectScreen::onEnter()
@@ -118,12 +122,12 @@ void WaterEffectScreen::draw(Surface& surface)
         break;
 
     case RainMode::LightRain:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Light Rain ", m_modeColor[int (RainMode::LightRain)]);
+        buffer.writeString(startModeXpos, screenHeight - 1, " Light Rain ", m_modeColor[int(RainMode::LightRain)]);
         startModeXpos += 12;
         break;
 
     case RainMode::Burst:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Burst ", m_modeColor[int (RainMode::Burst)]);
+        buffer.writeString(startModeXpos, screenHeight - 1, " Burst ", m_modeColor[int(RainMode::Burst)]);
         startModeXpos += 7;
         break;
     }
@@ -220,6 +224,12 @@ void WaterEffectScreen::spawnRandomDroplet()
     droplet.strength = randomRange(28.0f, 52.0f);
 
     m_droplets.push_back(droplet);
+
+    Droplet secondaryDroplet = droplet;
+    secondaryDroplet.age = -SecondaryDropDelaySeconds;
+    secondaryDroplet.strength *= SecondaryDropStrengthScale;
+
+    m_droplets.push_back(secondaryDroplet);
 }
 
 void WaterEffectScreen::updateDroplets(double deltaTime)
@@ -325,6 +335,11 @@ int WaterEffectScreen::computeAmplitudeAtCell(int x, int y) const
 
     for (const Droplet& droplet : m_droplets)
     {
+        if (droplet.age < 0.0f)
+        {
+            continue;
+        }
+
         const float dx = static_cast<float>(x) - droplet.x;
         const float dy = static_cast<float>(y) - droplet.y;
         const float distance = std::sqrt((dx * dx) + (dy * dy));
