@@ -72,7 +72,7 @@ void WaterEffectScreen::onEnter()
     m_elapsedSeconds = 0.0;
     m_droplets.clear();
 
-    m_rainMode = RainMode::Calm;
+    m_rainMode = RainMode::Sprinkle;
     m_nextDropTime = randomRange(0.8, 2.0);
     m_nextRainModeChangeTime = randomRange(6.0, 12.0);
 }
@@ -116,9 +116,9 @@ void WaterEffectScreen::draw(Surface& surface)
 
     switch (m_rainMode)
     {
-    case RainMode::Calm:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Calm ", m_modeColor[int(RainMode::Calm)]);
-        startModeXpos += 6;
+    case RainMode::Sprinkle:
+        buffer.writeString(startModeXpos, screenHeight - 1, " Sprinkle ", m_modeColor[int(RainMode::Sprinkle)]);
+        startModeXpos += 10;
         break;
 
     case RainMode::LightRain:
@@ -126,9 +126,9 @@ void WaterEffectScreen::draw(Surface& surface)
         startModeXpos += 12;
         break;
 
-    case RainMode::Burst:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Burst ", m_modeColor[int(RainMode::Burst)]);
-        startModeXpos += 7;
+    case RainMode::Pouring:
+        buffer.writeString(startModeXpos, screenHeight - 1, " Pouring ", m_modeColor[int(RainMode::Pouring)]);
+        startModeXpos += 9;
         break;
     }
 
@@ -162,7 +162,7 @@ void WaterEffectScreen::ensureSimulationSize(int width, int height)
 
     m_droplets.clear();
 
-    m_rainMode = RainMode::Calm;
+    m_rainMode = RainMode::Sprinkle;
     m_nextDropTime = m_elapsedSeconds + randomRange(0.8, 2.0);
     m_nextRainModeChangeTime = m_elapsedSeconds + randomRange(6.0, 12.0);
 }
@@ -267,7 +267,7 @@ void WaterEffectScreen::updateRainTiming()
 
         switch (m_rainMode)
         {
-        case RainMode::Calm:
+        case RainMode::Sprinkle:
             interval = randomRange(1.00, 1.50);
             break;
 
@@ -275,7 +275,7 @@ void WaterEffectScreen::updateRainTiming()
             interval = randomRange(0.50, 0.75);
             break;
 
-        case RainMode::Burst:
+        case RainMode::Pouring:
             interval = randomRange(0.05, 0.25);
             break;
         }
@@ -290,7 +290,7 @@ void WaterEffectScreen::chooseNextRainMode()
 
     if (roll < 50)
     {
-        m_rainMode = RainMode::Calm;
+        m_rainMode = RainMode::Sprinkle;
         m_nextRainModeChangeTime = m_elapsedSeconds + randomRange(6.0, 12.0);
     }
     else if (roll < 85)
@@ -300,7 +300,7 @@ void WaterEffectScreen::chooseNextRainMode()
     }
     else
     {
-        m_rainMode = RainMode::Burst;
+        m_rainMode = RainMode::Pouring;
         m_nextRainModeChangeTime = m_elapsedSeconds + randomRange(4.0, 8.0);
     }
 }

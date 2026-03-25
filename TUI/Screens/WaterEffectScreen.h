@@ -32,9 +32,9 @@ private:
 
     enum class RainMode
     {
-        Calm,
+        Sprinkle,
         LightRain,
-        Burst
+        Pouring
     };
 
 private:
@@ -63,7 +63,7 @@ private:
     double m_nextDropTime = 0.0;
     double m_nextRainModeChangeTime = 0.0;
 
-    RainMode m_rainMode = RainMode::Calm;
+    RainMode m_rainMode = RainMode::Sprinkle;
     Style m_modeColor[3];
 
     std::u32string m_primaryText = U"WATER EFFECT";
