@@ -1,69 +1,129 @@
 #include "Rendering/Diagnostics/AuthorRenderHints.h"
 
+#include <sstream>
 #include <string>
 #include <vector>
 
 namespace
 {
-    bool hasAnyCount(
+    std::size_t countOne(
         const CapabilityReport& report,
         StyleFeature feature,
         StyleAdaptationKind kind)
     {
-        return report.getCount(feature, kind) > 0;
+        return report.getCount(feature, kind);
     }
 
-    bool hasAnyColorDowngrade(const CapabilityReport& report)
+    std::size_t countAny(
+        const CapabilityReport& report,
+        StyleFeature feature,
+        std::initializer_list<StyleAdaptationKind> kinds)
     {
-        return
-            hasAnyCount(report, StyleFeature::ForegroundColor, StyleAdaptationKind::Downgraded) ||
-            hasAnyCount(report, StyleFeature::ForegroundColor, StyleAdaptationKind::Approximated) ||
-            hasAnyCount(report, StyleFeature::ForegroundColor, StyleAdaptationKind::LogicalOnly) ||
-            hasAnyCount(report, StyleFeature::BackgroundColor, StyleAdaptationKind::Downgraded) ||
-            hasAnyCount(report, StyleFeature::BackgroundColor, StyleAdaptationKind::Approximated) ||
-            hasAnyCount(report, StyleFeature::BackgroundColor, StyleAdaptationKind::LogicalOnly);
+        std::size_t total = 0;
+
+        for (StyleAdaptationKind kind : kinds)
+        {
+            total += report.getCount(feature, kind);
+        }
+
+        return total;
     }
 
-    bool hasAnyBlinkIssue(const CapabilityReport& report)
+    std::size_t countAcrossFeatures(
+        const CapabilityReport& report,
+        std::initializer_list<StyleFeature> features,
+        std::initializer_list<StyleAdaptationKind> kinds)
     {
-        return
-            hasAnyCount(report, StyleFeature::SlowBlink, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::SlowBlink, StyleAdaptationKind::Emulated) ||
-            hasAnyCount(report, StyleFeature::SlowBlink, StyleAdaptationKind::LogicalOnly) ||
-            hasAnyCount(report, StyleFeature::FastBlink, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::FastBlink, StyleAdaptationKind::Emulated) ||
-            hasAnyCount(report, StyleFeature::FastBlink, StyleAdaptationKind::LogicalOnly);
+        std::size_t total = 0;
+
+        for (StyleFeature feature : features)
+        {
+            total += countAny(report, feature, kinds);
+        }
+
+        return total;
     }
 
-    bool hasAnyDecorationIssue(const CapabilityReport& report)
+    bool hasAnyRuntimeEvidence(const CapabilityReport& report)
     {
-        return
-            hasAnyCount(report, StyleFeature::Underline, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::Underline, StyleAdaptationKind::LogicalOnly) ||
-            hasAnyCount(report, StyleFeature::Strike, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::Strike, StyleAdaptationKind::LogicalOnly);
+        return report.hasRuntimeData();
     }
 
-    bool hasAnyVisibilityIssue(const CapabilityReport& report)
+    std::string makeCountSentence(
+        const char* prefix,
+        std::size_t count,
+        const char* singular,
+        const char* plural)
     {
-        return
-            hasAnyCount(report, StyleFeature::Invisible, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::Invisible, StyleAdaptationKind::LogicalOnly) ||
-            hasAnyCount(report, StyleFeature::Reverse, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::Reverse, StyleAdaptationKind::LogicalOnly);
+        std::ostringstream stream;
+        stream
+            << prefix
+            << count
+            << " "
+            << (count == 1 ? singular : plural);
+        return stream.str();
     }
 
     void addCoreModelExplanation(std::vector<std::string>& hints)
     {
         hints.push_back(
             "Authored logical style is the Style value requested by page/theme code. "
-            "It is preserved in ScreenBuffer even when the active backend cannot display every field directly.");
+            "It remains preserved in ScreenBuffer even when the active backend cannot display every field directly.");
 
         hints.push_back(
-            "Backend-supported style is the subset of logical styling that the active console path reports as directly supported.");
+            "Backend-supported capability describes what the active console path reports as directly supported or policy-eligible.");
 
         hints.push_back(
-            "Actual rendered result is what becomes visible after renderer adaptation such as direct mapping, downgrade, omission, or deferred emulation.");
+            "Actual rendered result is what became visible after runtime renderer adaptation such as direct mapping, downgrade, omission, approximation, or deferred emulation.");
+    }
+
+    void addRuntimeEvidenceOverview(
+        const CapabilityReport& report,
+        std::vector<std::string>& hints)
+    {
+        if (!hasAnyRuntimeEvidence(report))
+        {
+            hints.push_back(
+                "No runtime adaptation events were recorded during this diagnostics session, so author-facing hints are limited to the detected backend capability/policy context.");
+            return;
+        }
+
+        const std::size_t nonDirectEvents = countAcrossFeatures(
+            report,
+            {
+                StyleFeature::ForegroundColor,
+                StyleFeature::BackgroundColor,
+                StyleFeature::Bold,
+                StyleFeature::Dim,
+                StyleFeature::Underline,
+                StyleFeature::SlowBlink,
+                StyleFeature::FastBlink,
+                StyleFeature::Reverse,
+                StyleFeature::Invisible,
+                StyleFeature::Strike
+            },
+            {
+                StyleAdaptationKind::Downgraded,
+                StyleAdaptationKind::Approximated,
+                StyleAdaptationKind::Omitted,
+                StyleAdaptationKind::Emulated,
+                StyleAdaptationKind::LogicalOnly
+            });
+
+            if (nonDirectEvents > 0)
+            {
+                hints.push_back(
+                    makeCountSentence(
+                        "Runtime diagnostics recorded ",
+                        nonDirectEvents,
+                        "non-direct adaptation event",
+                        "non-direct adaptation events"));
+            }
+            else
+            {
+                hints.push_back(
+                    "Runtime diagnostics recorded only direct mappings for the style features encountered during this session.");
+            }
     }
 
     void addCapabilityTierHints(
@@ -75,25 +135,18 @@ namespace
         if (capabilities.colorTier == ConsoleColorTier::Basic16)
         {
             hints.push_back(
-                "This backend is currently operating in Basic16 color mode. "
-                "Indexed256 and RGB authored colors may be reduced to nearest basic console colors.");
+                "The active backend is operating in Basic16 color mode. Rich authored colors may therefore be reduced before final presentation.");
         }
         else if (capabilities.colorTier == ConsoleColorTier::Indexed256)
         {
             hints.push_back(
-                "This backend supports Indexed256 color. Full RGB authored colors may still be approximated to the nearest indexed color.");
-        }
-        else if (capabilities.colorTier == ConsoleColorTier::TrueColor)
-        {
-            hints.push_back(
-                "This backend reports TrueColor capability. Full RGB-authored styles are expected to map more faithfully than lower color tiers.");
+                "The active backend supports Indexed256 color. Full RGB-authored colors may still be approximated or reduced to the nearest indexed entry.");
         }
 
         if (!capabilities.virtualTerminalProcessing)
         {
             hints.push_back(
-                "Virtual terminal processing is not active for this backend path. "
-                "Some decorations and richer terminal features may therefore be unavailable or intentionally treated conservatively.");
+                "Virtual terminal processing is not active for this backend path, so some richer terminal-style effects may be unavailable or handled conservatively.");
         }
     }
 
@@ -101,78 +154,147 @@ namespace
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
-        if (!hasAnyColorDowngrade(report))
+        const std::size_t downgraded =
+            countOne(report, StyleFeature::ForegroundColor, StyleAdaptationKind::Downgraded) +
+            countOne(report, StyleFeature::BackgroundColor, StyleAdaptationKind::Downgraded);
+
+        const std::size_t approximated =
+            countOne(report, StyleFeature::ForegroundColor, StyleAdaptationKind::Approximated) +
+            countOne(report, StyleFeature::BackgroundColor, StyleAdaptationKind::Approximated);
+
+        const std::size_t logicalOnly =
+            countOne(report, StyleFeature::ForegroundColor, StyleAdaptationKind::LogicalOnly) +
+            countOne(report, StyleFeature::BackgroundColor, StyleAdaptationKind::LogicalOnly);
+
+        if (downgraded == 0 && approximated == 0 && logicalOnly == 0)
         {
             return;
         }
 
-        hints.push_back(
-            "One or more authored foreground/background colors were downgraded or approximated for the active backend.");
+        std::ostringstream summary;
+        summary
+            << "Observed color adaptation during rendering: "
+            << downgraded << " downgraded, "
+            << approximated << " approximated, "
+            << logicalOnly << " logical-only color outcome(s).";
+        hints.push_back(summary.str());
 
         hints.push_back(
-            "Portable authoring suggestion: prefer semantic theme colors built from standard or bright basic colors for UI that must look stable across multiple console backends.");
+            "Portable authoring suggestion: prefer semantic theme colors built from standard or bright basic colors where stable cross-backend appearance matters.");
 
-        hints.push_back(
-            "Use RGB or Indexed256 colors when they improve authored intent, but expect older or more limited backends to show a nearest available approximation.");
+        if (logicalOnly > 0)
+        {
+            hints.push_back(
+                "Some authored colors survived logically in the resolved style model but were not physically emitted by the current Win32 attribute path.");
+        }
     }
 
     void addDecorationHints(
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
-        if (!hasAnyDecorationIssue(report))
+        const std::size_t underlineOmitted =
+            countOne(report, StyleFeature::Underline, StyleAdaptationKind::Omitted);
+        const std::size_t underlineLogicalOnly =
+            countOne(report, StyleFeature::Underline, StyleAdaptationKind::LogicalOnly);
+
+        const std::size_t strikeOmitted =
+            countOne(report, StyleFeature::Strike, StyleAdaptationKind::Omitted);
+        const std::size_t strikeLogicalOnly =
+            countOne(report, StyleFeature::Strike, StyleAdaptationKind::LogicalOnly);
+
+        if ((underlineOmitted + underlineLogicalOnly + strikeOmitted + strikeLogicalOnly) == 0)
         {
             return;
         }
 
-        if (hasAnyCount(report, StyleFeature::Underline, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::Underline, StyleAdaptationKind::LogicalOnly))
+        if ((underlineOmitted + underlineLogicalOnly) > 0)
         {
-            hints.push_back(
-                "Underline was requested in authored style, but the active backend did not render all underline requests physically.");
+            std::ostringstream stream;
+            stream
+                << "Underline requests encountered runtime adaptation: "
+                << underlineOmitted << " omitted and "
+                << underlineLogicalOnly << " logical-only case(s).";
+            hints.push_back(stream.str());
         }
 
-        if (hasAnyCount(report, StyleFeature::Strike, StyleAdaptationKind::Omitted) ||
-            hasAnyCount(report, StyleFeature::Strike, StyleAdaptationKind::LogicalOnly))
+        if ((strikeOmitted + strikeLogicalOnly) > 0)
         {
-            hints.push_back(
-                "Strike styling was requested in authored style, but the active backend did not render all strike requests physically.");
+            std::ostringstream stream;
+            stream
+                << "Strike requests encountered runtime adaptation: "
+                << strikeOmitted << " omitted and "
+                << strikeLogicalOnly << " logical-only case(s).";
+            hints.push_back(stream.str());
         }
 
         hints.push_back(
-            "Portable authoring suggestion: when underline or strike carries important meaning, consider also using wording, spacing, framing, icons, or color contrast so the UI remains understandable on simpler backends.");
+            "Portable authoring suggestion: when underline or strike carries important meaning, reinforce it with wording, spacing, framing, icons, or contrast rather than relying on decoration alone.");
     }
 
     void addBlinkHints(
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
-        if (!hasAnyBlinkIssue(report))
+        const std::size_t omitted =
+            countOne(report, StyleFeature::SlowBlink, StyleAdaptationKind::Omitted) +
+            countOne(report, StyleFeature::FastBlink, StyleAdaptationKind::Omitted);
+
+        const std::size_t emulated =
+            countOne(report, StyleFeature::SlowBlink, StyleAdaptationKind::Emulated) +
+            countOne(report, StyleFeature::FastBlink, StyleAdaptationKind::Emulated);
+
+        const std::size_t logicalOnly =
+            countOne(report, StyleFeature::SlowBlink, StyleAdaptationKind::LogicalOnly) +
+            countOne(report, StyleFeature::FastBlink, StyleAdaptationKind::LogicalOnly);
+
+        if ((omitted + emulated + logicalOnly) == 0)
         {
             return;
         }
 
-        hints.push_back(
-            "Blink-related authored styles were encountered, but blink is commonly unsupported, omitted, or deferred to emulation on console backends.");
+        std::ostringstream stream;
+        stream
+            << "Blink styling encountered runtime adaptation: "
+            << omitted << " omitted, "
+            << emulated << " emulated, "
+            << logicalOnly << " logical-only case(s).";
+        hints.push_back(stream.str());
 
         hints.push_back(
-            "Portable authoring suggestion: do not rely on blink as the only signal for urgency. Pair it with stronger text, frame treatment, reverse video, or high-contrast color when possible.");
+            "Portable authoring suggestion: do not rely on blink as the only signal for urgency. Pair it with stronger text, framing, reverse video, or high-contrast color.");
     }
 
     void addVisibilityHints(
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
-        if (!hasAnyVisibilityIssue(report))
+        const std::size_t reverseOmitted =
+            countOne(report, StyleFeature::Reverse, StyleAdaptationKind::Omitted);
+        const std::size_t reverseLogicalOnly =
+            countOne(report, StyleFeature::Reverse, StyleAdaptationKind::LogicalOnly);
+
+        const std::size_t invisibleOmitted =
+            countOne(report, StyleFeature::Invisible, StyleAdaptationKind::Omitted);
+        const std::size_t invisibleLogicalOnly =
+            countOne(report, StyleFeature::Invisible, StyleAdaptationKind::LogicalOnly);
+
+        if ((reverseOmitted + reverseLogicalOnly + invisibleOmitted + invisibleLogicalOnly) == 0)
         {
             return;
         }
 
-        hints.push_back(
-            "Some visibility-related style fields such as reverse or invisible were preserved logically but were not always rendered physically by the active backend.");
+        std::ostringstream stream;
+        stream
+            << "Visibility-related styling encountered runtime adaptation: reverse("
+            << reverseOmitted << " omitted, "
+            << reverseLogicalOnly << " logical-only), invisible("
+            << invisibleOmitted << " omitted, "
+            << invisibleLogicalOnly << " logical-only).";
+        hints.push_back(stream.str());
 
         hints.push_back(
-            "Portable authoring suggestion: when visibility semantics matter, use explicit text labels or layout cues rather than relying only on advanced style flags.");
+            "Portable authoring suggestion: when visibility semantics matter, use explicit text labels or layout cues instead of relying only on advanced style flags.");
     }
 
     void addExampleDrivenHints(
@@ -184,21 +306,19 @@ namespace
 
         for (const StyleAdaptationExample& example : examples)
         {
-            if (example.kind == StyleAdaptationKind::Downgraded ||
-                example.kind == StyleAdaptationKind::Approximated ||
-                example.kind == StyleAdaptationKind::Omitted ||
-                example.kind == StyleAdaptationKind::LogicalOnly ||
-                example.kind == StyleAdaptationKind::Emulated)
+            if (example.kind == StyleAdaptationKind::Direct)
             {
-                std::string hint = "Observed example: ";
-                hint += example.detail;
-                hints.push_back(hint);
+                continue;
+            }
 
-                ++added;
-                if (added >= 3)
-                {
-                    break;
-                }
+            std::string hint = "Observed during rendering: ";
+            hint += example.detail;
+            hints.push_back(hint);
+
+            ++added;
+            if (added >= 4)
+            {
+                break;
             }
         }
     }
@@ -216,19 +336,13 @@ std::vector<std::string> AuthorRenderHints::buildHints(const RenderDiagnostics& 
     const CapabilityReport& report = diagnostics.report();
 
     addCoreModelExplanation(hints);
+    addRuntimeEvidenceOverview(report, hints);
     addCapabilityTierHints(report, hints);
     addColorHints(report, hints);
     addDecorationHints(report, hints);
     addBlinkHints(report, hints);
     addVisibilityHints(report, hints);
     addExampleDrivenHints(report, hints);
-
-    if (hints.empty())
-    {
-        hints.push_back(
-            "No author-facing rendering warnings were generated for this run. "
-            "The authored logical styles either mapped directly or no adaptation events were recorded.");
-    }
 
     return hints;
 }
