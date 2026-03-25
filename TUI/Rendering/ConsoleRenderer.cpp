@@ -1,10 +1,11 @@
 #include "Rendering/ConsoleRenderer.h"
 
-#include <fstream>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "Rendering/Diagnostics/RenderDiagnosticsWriter.h"
 #include "Rendering/Styles/Color.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
@@ -18,36 +19,55 @@
         - Skip continuation glyph rendering
         - Group output into same-style spans
 
-    Phase 2 Refactor:
-
-    The flow after this refactor is:
+    Phase 2 runtime diagnostics flow:
 
     logical Style
         -> renderer StylePolicy resolution
+        -> runtime diagnostics capture
         -> backend attribute mapping
         -> Win32 output
 
-    So:
+    Diagnostics stay renderer-owned.
+    Authoring/theme code remains backend-agnostic.
+    Logical Style data stored in ScreenBuffer is never mutated.
+*/
 
-    Style stays rich and unchanged in ScreenCell / ScreenBuffer
-    ConsoleRenderer uses StylePolicy to 
-    downgrade or omit unsupported features only at presentation time
-    the current console backend still renders through Win32 attributes, 
-    but the policy layer now cleanly preserves future support for richer backends
+/*
 
-    For future ConsoleCapabilities work, the clean upgrade path is:
+Phase 2: Diagnostics Update
+How the new runtime flow works:
 
-    replace detectConsoleStyleCapabilities(...) with a 
-    translation from your eventual shared ConsoleCapabilities type
-    keep buildStylePolicy(...) as the single place that converts 
-    backend support into renderer mapping behavior
-    expose diagnostics by reporting:
-    whether VT mode was enabled
-    whether RGB/256 colors are direct or downgraded
-    which style fields are direct vs omitted vs emulated
+Renderer initialization
+- ConsoleRenderer detects console/backend capabilities through ConsoleCapabilityDetector.
+- It builds StylePolicy from those detected capabilities.
+- It initializes RenderDiagnostics with:
+  - detected ConsoleCapabilities
+  - resolved StylePolicy
+  - cleared runtime counters/examples
+- It writes the first structured report through RenderDiagnosticsWriter.
 
-    That gives you a clean renderer-side architecture 
-    without pushing backend assumptions back into authoring code.
+Rendering path
+- ScreenBuffer still stores authored logical Style exactly as authored.
+- During writeSpan(), ConsoleRenderer calls setStyle(runStyle).
+- setStyle():
+  - resolves the authored Style through StylePolicy
+  - records structured runtime diagnostics into CapabilityReport
+  - then maps only the resolved presentation style to Win32 attributes
+- Diagnostics therefore describe actual renderer adaptation behavior, not just static capability detection.
+
+Diagnostics semantics
+- Direct: authored feature survived unchanged and is physically rendered by the current Win32 path.
+- Downgraded: a richer authored color was reduced to a lower tier.
+- Approximated: same-tier color changed to a nearest available value.
+- Omitted: authored feature was removed by policy.
+- Emulated: policy deferred the feature to renderer emulation.
+- LogicalOnly: the feature still exists in resolved style state, but this Win32 attribute output path does not physically emit it.
+
+Shutdown
+- ConsoleRenderer flushes the final structured diagnostics report through RenderDiagnosticsWriter.
+- The old console_style_adaptation_report.txt path is no longer the active implementation.
+- The main diagnostics file becomes render_diagnostics_report.txt.
+
 */
 
 namespace
@@ -57,6 +77,9 @@ namespace
 
     constexpr WORD kBackgroundMask =
         BACKGROUND_RED | BACKGROUND_GREEN | BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+
+    constexpr std::size_t kMaxRecordedExamples = 24;
+    constexpr std::size_t kMaxExamplesPerFeatureKind = 3;
 
     WORD basicForegroundBits(Color::Basic color)
     {
@@ -266,63 +289,6 @@ namespace
         return attributes;
     }
 
-    const char* colorTierToString(ConsoleColorTier tier)
-    {
-        switch (tier)
-        {
-        case ConsoleColorTier::None:       return "None";
-        case ConsoleColorTier::Basic16:    return "Basic16";
-        case ConsoleColorTier::Indexed256: return "Indexed256";
-        case ConsoleColorTier::TrueColor:  return "TrueColor";
-        default:                           return "Unknown";
-        }
-    }
-
-    const char* featureSupportToString(ConsoleFeatureSupport support)
-    {
-        switch (support)
-        {
-        case ConsoleFeatureSupport::Unsupported: return "Unsupported";
-        case ConsoleFeatureSupport::Supported:   return "Supported";
-        case ConsoleFeatureSupport::Emulated:    return "Emulated";
-        case ConsoleFeatureSupport::Unknown:     return "Unknown";
-        default:                                 return "Unknown";
-        }
-    }
-
-    const char* colorRenderModeToString(ColorRenderMode mode)
-    {
-        switch (mode)
-        {
-        case ColorRenderMode::Direct:              return "Direct";
-        case ColorRenderMode::DowngradeToBasic:    return "DowngradeToBasic";
-        case ColorRenderMode::DowngradeToIndexed256:return "DowngradeToIndexed256";
-        case ColorRenderMode::Omit:                return "Omit";
-        default:                                   return "Unknown";
-        }
-    }
-
-    const char* textAttributeRenderModeToString(TextAttributeRenderMode mode)
-    {
-        switch (mode)
-        {
-        case TextAttributeRenderMode::Direct: return "Direct";
-        case TextAttributeRenderMode::Omit:   return "Omit";
-        default:                              return "Unknown";
-        }
-    }
-
-    const char* blinkRenderModeToString(BlinkRenderMode mode)
-    {
-        switch (mode)
-        {
-        case BlinkRenderMode::Direct:  return "Direct";
-        case BlinkRenderMode::Omit:    return "Omit";
-        case BlinkRenderMode::Emulate: return "Emulate";
-        default:                       return "Unknown";
-        }
-    }
-
     bool isContinuationCell(const ScreenCell& cell)
     {
         return cell.kind == CellKind::WideTrailing ||
@@ -342,6 +308,103 @@ namespace
         }
 
         return U' ';
+    }
+
+    const char* basicColorToString(Color::Basic color)
+    {
+        switch (color)
+        {
+        case Color::Basic::Black:         return "Black";
+        case Color::Basic::Red:           return "Red";
+        case Color::Basic::Green:         return "Green";
+        case Color::Basic::Yellow:        return "Yellow";
+        case Color::Basic::Blue:          return "Blue";
+        case Color::Basic::Magenta:       return "Magenta";
+        case Color::Basic::Cyan:          return "Cyan";
+        case Color::Basic::White:         return "White";
+        case Color::Basic::BrightBlack:   return "BrightBlack";
+        case Color::Basic::BrightRed:     return "BrightRed";
+        case Color::Basic::BrightGreen:   return "BrightGreen";
+        case Color::Basic::BrightYellow:  return "BrightYellow";
+        case Color::Basic::BrightBlue:    return "BrightBlue";
+        case Color::Basic::BrightMagenta: return "BrightMagenta";
+        case Color::Basic::BrightCyan:    return "BrightCyan";
+        case Color::Basic::BrightWhite:   return "BrightWhite";
+        default:                          return "UnknownBasic";
+        }
+    }
+
+    std::string colorToString(const std::optional<Color>& color)
+    {
+        if (!color.has_value())
+        {
+            return "None";
+        }
+
+        if (color->isDefault())
+        {
+            return "Default";
+        }
+
+        std::ostringstream stream;
+
+        if (color->isBasic())
+        {
+            stream << "Basic(" << basicColorToString(color->basic()) << ")";
+            return stream.str();
+        }
+
+        if (color->isIndexed256())
+        {
+            stream << "Indexed256(" << static_cast<int>(color->index256()) << ")";
+            return stream.str();
+        }
+
+        if (color->isRgb())
+        {
+            stream
+                << "Rgb("
+                << static_cast<int>(color->red()) << ","
+                << static_cast<int>(color->green()) << ","
+                << static_cast<int>(color->blue()) << ")";
+            return stream.str();
+        }
+
+        return "UnknownColor";
+    }
+
+    bool rendererPhysicallyRendersColor(const std::optional<Color>& color)
+    {
+        return color.has_value() && (color->isDefault() || color->isBasic());
+    }
+
+    bool shouldCaptureExample(const CapabilityReport& report, StyleFeature feature, StyleAdaptationKind kind)
+    {
+        return report.examples().size() < kMaxRecordedExamples &&
+            report.getCount(feature, kind) <= kMaxExamplesPerFeatureKind;
+    }
+
+    std::string buildColorExampleDetail(
+        const char* label,
+        const std::optional<Color>& authoredColor,
+        const std::optional<Color>& presentedColor)
+    {
+        std::ostringstream detail;
+        detail
+            << label
+            << " authored=" << colorToString(authoredColor)
+            << ", presented=" << colorToString(presentedColor);
+        return detail.str();
+    }
+
+    std::string buildTextExampleDetail(const char* label, bool authoredEnabled, bool presentedEnabled)
+    {
+        std::ostringstream detail;
+        detail
+            << label
+            << " authored=" << (authoredEnabled ? "true" : "false")
+            << ", presented=" << (presentedEnabled ? "true" : "false");
+        return detail.str();
     }
 }
 
@@ -462,7 +525,8 @@ bool ConsoleRenderer::initialize()
     m_previousFrame.clear();
 
     m_stylePolicy = buildStylePolicyFromCapabilities(m_capabilities);
-    writeAdaptationReport();
+    initializeDiagnostics();
+    flushDiagnosticsReport();
 
     m_currentStyle = Style{};
     m_firstPresent = true;
@@ -478,6 +542,7 @@ void ConsoleRenderer::shutdown()
         return;
     }
 
+    flushDiagnosticsReport();
     resetStyle();
     restoreConsoleState();
 
@@ -666,6 +731,8 @@ void ConsoleRenderer::setStyle(const Style& style)
     const ResolvedStyle resolved = m_stylePolicy.resolve(style);
     const Style& presentedStyle = resolved.presentedStyle;
 
+    recordStyleUsage(style, resolved);
+
     if (presentedStyle == m_currentStyle)
     {
         return;
@@ -779,51 +846,287 @@ void ConsoleRenderer::restoreConsoleState()
     }
 }
 
-void ConsoleRenderer::writeAdaptationReport() const
+void ConsoleRenderer::initializeDiagnostics()
 {
-    std::ofstream out("console_style_adaptation_report.txt", std::ios::out | std::ios::trunc);
-    if (!out)
+    m_renderDiagnostics.setEnabled(true);
+    m_renderDiagnostics.setAppendMode(false);
+    m_renderDiagnostics.setOutputPath("render_diagnostics_report.txt");
+    m_renderDiagnostics.resetRuntimeData();
+
+    CapabilityReport& report = m_renderDiagnostics.report();
+    report.setCapabilities(m_capabilities);
+    report.setPolicy(m_stylePolicy);
+}
+
+void ConsoleRenderer::flushDiagnosticsReport() const
+{
+    RenderDiagnosticsWriter::write(m_renderDiagnostics);
+}
+
+void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle)
+{
+    if (!m_renderDiagnostics.isEnabled())
     {
         return;
     }
 
-    out << "Console Style Adaptation Report\n";
-    out << "===============================\n\n";
+    const Style& presentedStyle = resolvedStyle.presentedStyle;
 
-    out << "Detected backend capabilities\n";
-    out << "-----------------------------\n";
-    out << "Virtual terminal processing: " << (m_capabilities.virtualTerminalProcessing ? "true" : "false") << "\n";
-    out << "Unicode output: " << (m_capabilities.unicodeOutput ? "true" : "false") << "\n";
-    out << "Color tier: " << colorTierToString(m_capabilities.colorTier) << "\n\n";
+    recordColorFeature(
+        StyleFeature::ForegroundColor,
+        authoredStyle.foreground(),
+        presentedStyle.foreground());
 
-    out << "Feature support\n";
-    out << "---------------\n";
-    out << "Bold: " << featureSupportToString(m_capabilities.bold) << "\n";
-    out << "Dim: " << featureSupportToString(m_capabilities.dim) << "\n";
-    out << "Underline: " << featureSupportToString(m_capabilities.underline) << "\n";
-    out << "Reverse: " << featureSupportToString(m_capabilities.reverse) << "\n";
-    out << "Invisible: " << featureSupportToString(m_capabilities.invisible) << "\n";
-    out << "Strike: " << featureSupportToString(m_capabilities.strike) << "\n";
-    out << "Slow blink: " << featureSupportToString(m_capabilities.slowBlink) << "\n";
-    out << "Fast blink: " << featureSupportToString(m_capabilities.fastBlink) << "\n\n";
+    recordColorFeature(
+        StyleFeature::BackgroundColor,
+        authoredStyle.background(),
+        presentedStyle.background());
 
-    out << "Resolved renderer adaptation policy\n";
-    out << "----------------------------------\n";
-    out << "Basic colors: " << colorRenderModeToString(m_stylePolicy.basicColorMode()) << "\n";
-    out << "Indexed256 colors: " << colorRenderModeToString(m_stylePolicy.indexed256ColorMode()) << "\n";
-    out << "RGB colors: " << colorRenderModeToString(m_stylePolicy.rgbColorMode()) << "\n";
-    out << "Bold: " << textAttributeRenderModeToString(m_stylePolicy.boldMode()) << "\n";
-    out << "Dim: " << textAttributeRenderModeToString(m_stylePolicy.dimMode()) << "\n";
-    out << "Underline: " << textAttributeRenderModeToString(m_stylePolicy.underlineMode()) << "\n";
-    out << "Reverse: " << textAttributeRenderModeToString(m_stylePolicy.reverseMode()) << "\n";
-    out << "Invisible: " << textAttributeRenderModeToString(m_stylePolicy.invisibleMode()) << "\n";
-    out << "Strike: " << textAttributeRenderModeToString(m_stylePolicy.strikeMode()) << "\n";
-    out << "Slow blink: " << blinkRenderModeToString(m_stylePolicy.slowBlinkMode()) << "\n";
-    out << "Fast blink: " << blinkRenderModeToString(m_stylePolicy.fastBlinkMode()) << "\n\n";
+    recordTextFeature(
+        StyleFeature::Bold,
+        authoredStyle.bold(),
+        presentedStyle.bold(),
+        presentedStyle.bold());
 
-    out << "Notes\n";
-    out << "-----\n";
-    out << "- Logical Style data stored in ScreenBuffer is not modified by these adaptations.\n";
-    out << "- Downgrade and omission are applied only during renderer presentation.\n";
-    out << "- Blink emulation is policy-visible but not implemented in this Win32 attribute output path yet.\n";
+    recordTextFeature(
+        StyleFeature::Dim,
+        authoredStyle.dim(),
+        presentedStyle.dim(),
+        presentedStyle.dim());
+
+    recordTextFeature(
+        StyleFeature::Underline,
+        authoredStyle.underline(),
+        presentedStyle.underline(),
+        presentedStyle.underline());
+
+    recordBlinkFeature(
+        StyleFeature::SlowBlink,
+        authoredStyle.slowBlink(),
+        presentedStyle.slowBlink(),
+        resolvedStyle.emulateSlowBlink,
+        false);
+
+    recordBlinkFeature(
+        StyleFeature::FastBlink,
+        authoredStyle.fastBlink(),
+        presentedStyle.fastBlink(),
+        resolvedStyle.emulateFastBlink,
+        false);
+
+    recordTextFeature(
+        StyleFeature::Reverse,
+        authoredStyle.reverse(),
+        presentedStyle.reverse(),
+        presentedStyle.reverse());
+
+    recordTextFeature(
+        StyleFeature::Invisible,
+        authoredStyle.invisible(),
+        presentedStyle.invisible(),
+        presentedStyle.invisible());
+
+    recordTextFeature(
+        StyleFeature::Strike,
+        authoredStyle.strike(),
+        presentedStyle.strike(),
+        false);
+}
+
+void ConsoleRenderer::recordColorFeature(
+    StyleFeature feature,
+    const std::optional<Color>& authoredColor,
+    const std::optional<Color>& presentedColor)
+{
+    if (!authoredColor.has_value())
+    {
+        return;
+    }
+
+    CapabilityReport& report = m_renderDiagnostics.report();
+
+    if (!presentedColor.has_value())
+    {
+        report.recordOmitted(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Omitted))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Omitted,
+                buildColorExampleDetail("Color omitted", authoredColor, presentedColor));
+        }
+
+        return;
+    }
+
+    if (*presentedColor == *authoredColor)
+    {
+        if (!rendererPhysicallyRendersColor(presentedColor))
+        {
+            report.recordLogicalOnly(feature);
+
+            if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
+            {
+                report.addExample(
+                    feature,
+                    StyleAdaptationKind::LogicalOnly,
+                    buildColorExampleDetail("Color preserved logically but not mapped by Win32 attributes", authoredColor, presentedColor));
+            }
+        }
+        else
+        {
+            report.recordDirect(feature);
+        }
+
+        return;
+    }
+
+    const bool tierChanged = authoredColor->kind() != presentedColor->kind();
+
+    if (tierChanged)
+    {
+        report.recordDowngraded(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Downgraded))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Downgraded,
+                buildColorExampleDetail("Color downgraded", authoredColor, presentedColor));
+        }
+    }
+    else
+    {
+        report.recordApproximated(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Approximated))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Approximated,
+                buildColorExampleDetail("Color approximated", authoredColor, presentedColor));
+        }
+    }
+
+    if (!rendererPhysicallyRendersColor(presentedColor))
+    {
+        report.recordLogicalOnly(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::LogicalOnly,
+                buildColorExampleDetail("Presented color remained non-basic and is not directly emitted by the Win32 attribute path", authoredColor, presentedColor));
+        }
+    }
+}
+
+void ConsoleRenderer::recordTextFeature(
+    StyleFeature feature,
+    bool authoredEnabled,
+    bool presentedEnabled,
+    bool physicallyRendered)
+{
+    if (!authoredEnabled)
+    {
+        return;
+    }
+
+    CapabilityReport& report = m_renderDiagnostics.report();
+
+    if (!presentedEnabled)
+    {
+        report.recordOmitted(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Omitted))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Omitted,
+                buildTextExampleDetail("Style omitted", authoredEnabled, presentedEnabled));
+        }
+
+        return;
+    }
+
+    if (!physicallyRendered)
+    {
+        report.recordLogicalOnly(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::LogicalOnly,
+                buildTextExampleDetail("Style preserved logically but not emitted by the Win32 attribute path", authoredEnabled, presentedEnabled));
+        }
+
+        return;
+    }
+
+    report.recordDirect(feature);
+}
+
+void ConsoleRenderer::recordBlinkFeature(
+    StyleFeature feature,
+    bool authoredEnabled,
+    bool presentedEnabled,
+    bool emulated,
+    bool physicallyRendered)
+{
+    if (!authoredEnabled)
+    {
+        return;
+    }
+
+    CapabilityReport& report = m_renderDiagnostics.report();
+
+    if (emulated)
+    {
+        report.recordEmulated(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Emulated))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Emulated,
+                buildTextExampleDetail("Blink deferred to renderer emulation", authoredEnabled, presentedEnabled));
+        }
+
+        return;
+    }
+
+    if (!presentedEnabled)
+    {
+        report.recordOmitted(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Omitted))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Omitted,
+                buildTextExampleDetail("Blink omitted", authoredEnabled, presentedEnabled));
+        }
+
+        return;
+    }
+
+    if (!physicallyRendered)
+    {
+        report.recordLogicalOnly(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::LogicalOnly,
+                buildTextExampleDetail("Blink preserved logically but not emitted by the Win32 attribute path", authoredEnabled, presentedEnabled));
+        }
+
+        return;
+    }
+
+    report.recordDirect(feature);
 }

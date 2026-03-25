@@ -2,6 +2,7 @@
 
 #include "Rendering/Backends/ConsoleCapabilityDetector.h"
 #include "Rendering/Capabilities/ConsoleCapabilities.h"
+#include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
@@ -29,6 +30,12 @@
         - capability detection populates ConsoleCapabilities
         - StylePolicy resolves unsupported features at presentation time
         - backend mapping uses resolved presentation style only
+
+    For Phase 2 structured diagnostics integration:
+        - ConsoleRenderer owns the renderer/runtime integration point
+        - RenderDiagnostics stores capability, policy, and runtime adaptation data
+        - RenderDiagnosticsWriter serializes the final report
+        - authored logical Style remains unchanged during diagnostics collection
 */
 
 class ConsoleRenderer : public IRenderer
@@ -63,7 +70,26 @@ private:
     bool queryVisibleConsoleSize(int& width, int& height) const;
     bool configureConsole();
     void restoreConsoleState();
-    void writeAdaptationReport() const;
+
+    void initializeDiagnostics();
+    void flushDiagnosticsReport() const;
+
+    void recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle);
+    void recordColorFeature(
+        StyleFeature feature,
+        const std::optional<Color>& authoredColor,
+        const std::optional<Color>& presentedColor);
+    void recordTextFeature(
+        StyleFeature feature,
+        bool authoredEnabled,
+        bool presentedEnabled,
+        bool physicallyRendered);
+    void recordBlinkFeature(
+        StyleFeature feature,
+        bool authoredEnabled,
+        bool presentedEnabled,
+        bool emulated,
+        bool physicallyRendered);
 
 private:
     HANDLE m_hOut = INVALID_HANDLE_VALUE;
@@ -79,6 +105,7 @@ private:
     Style m_currentStyle{};
     StylePolicy m_stylePolicy{};
     ConsoleCapabilities m_capabilities{};
+    RenderDiagnostics m_renderDiagnostics{};
     WORD m_defaultAttributes = 0;
 
     UINT m_originalOutputCodePage = 0;
