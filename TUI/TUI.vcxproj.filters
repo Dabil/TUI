@@ -185,7 +185,7 @@
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Rendering\Diagnostics\AuthorRenderingHints.cpp">
+    <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp">

@@ -173,7 +173,7 @@
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
-    <ClCompile Include="Rendering\Diagnostics\AuthorRenderingHints.cpp" />
+    <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
