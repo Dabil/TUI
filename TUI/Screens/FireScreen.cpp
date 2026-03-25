@@ -73,7 +73,7 @@ void FireScreen::draw(Surface& surface)
         Themes::Frame);
 
     buffer.writeString(4, 0, "[ Fire Simulation ]", Themes::Subtitle);
-    buffer.writeString(4, screenHeight - 1, "[ Python-Style Buffered Flame ]", Themes::Subtitle);
+    buffer.writeString(4, screenHeight - 1, "[ Buffered Flames ]", Themes::Subtitle);
 
     m_fireLeft = 1;
     m_fireTop = 1;
