@@ -19,17 +19,11 @@
         - Skip continuation glyph rendering
         - Group output into same-style spans
 
-    Phase 2 runtime diagnostics flow:
-
-    logical Style
-        -> renderer StylePolicy resolution
-        -> runtime diagnostics capture
-        -> backend attribute mapping
-        -> Win32 output
-
-    Diagnostics stay renderer-owned.
-    Authoring/theme code remains backend-agnostic.
-    Logical Style data stored in ScreenBuffer is never mutated.
+    Phase 2 diagnostics integration:
+        - detect backend capabilities
+        - build StylePolicy from capabilities
+        - record runtime adaptation decisions when authored style is resolved
+        - serialize structured diagnostics through RenderDiagnosticsWriter
 */
 
 /*

@@ -31,11 +31,10 @@
         - StylePolicy resolves unsupported features at presentation time
         - backend mapping uses resolved presentation style only
 
-    For Phase 2 structured diagnostics integration:
-        - ConsoleRenderer owns the renderer/runtime integration point
-        - RenderDiagnostics stores capability, policy, and runtime adaptation data
-        - RenderDiagnosticsWriter serializes the final report
-        - authored logical Style remains unchanged during diagnostics collection
+    For Phase 2 structured diagnostics:
+        - ConsoleRenderer owns the runtime integration point
+        - authored logical style remains unchanged
+        - adaptation decisions are recorded where actual renderer mapping happens
 */
 
 class ConsoleRenderer : public IRenderer
