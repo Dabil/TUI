@@ -1,16 +1,7 @@
+// App/Application.h
 #pragma once
 
 #include <memory>
-
-/*
-    Update:
-
-    Change only if you want renderer-agnostic naming later.
-    For Phase 1 Unicode, almost no change
-
-    Checklist:
-        - No Unicode-specific change required
-*/
 
 class ScreenManager;
 class IRenderer;
@@ -27,13 +18,21 @@ public:
     void shutdown();
 
 private:
+    enum class ScreenType
+    {
+        WaterEffect,
+        Donut3D,
+        Fire
+    };
+
+private:
     void handleResize();
     void update(double deltaTime);
     void render();
 
-    void switchToWaterEffectScreen();
-    void switchToDonut3DScreen();
-    void updateScreenRotation(double deltaTime);
+    void switchToScreen(ScreenType screenType);
+    void advanceScreen();
+    void updateScreenCycle(double deltaTime);
 
 private:
     std::unique_ptr<ScreenManager> m_screenManager;
@@ -41,11 +40,11 @@ private:
     std::unique_ptr<Surface> m_surface;
 
     bool m_running = false;
-    bool m_showingDonutScreen = false;
 
     int m_width = 0;
     int m_height = 0;
 
-    double m_screenRotationElapsedSeconds = 0.0;
-    double m_screenRotationIntervalSeconds = 60.0;
+    ScreenType m_currentScreenType = ScreenType::WaterEffect;
+    double m_screenCycleElapsedSeconds = 0.0;
+    double m_screenCycleIntervalSeconds = 60.0;
 };
