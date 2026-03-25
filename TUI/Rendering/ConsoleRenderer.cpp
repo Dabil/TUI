@@ -6,109 +6,20 @@
 #include <vector>
 
 #include "Rendering/Diagnostics/RenderDiagnosticsWriter.h"
-#include "Rendering/Styles/Color.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 /*
-    ConsoleRenderer is now a backend/output layer.
+    ConsoleRenderer is a backend/output layer.
 
-    Checklist:
-        - Remove local codePointToUtf16 ownership
-        - Use UnicodeConversion::u32ToUtf16
-        - Present only visible leading glyphs
-        - Skip continuation glyph rendering
-        - Group output into same-style spans
+    Rendering flow:
+        logical Style
+            -> StylePolicy resolution
+            -> optional diagnostics recording
+            -> Win32 attribute mapping
+            -> console output
 
-    Phase 2 diagnostics integration:
-        - detect backend capabilities
-        - build StylePolicy from capabilities
-        - record runtime adaptation decisions when authored style is resolved
-        - serialize structured diagnostics through RenderDiagnosticsWriter
-*/
-
-/*
-
-Phase 2: Diagnostics Update
-How the new runtime flow works:
-
-Renderer initialization
-- ConsoleRenderer detects console/backend capabilities through ConsoleCapabilityDetector.
-- It builds StylePolicy from those detected capabilities.
-- It initializes RenderDiagnostics with:
-  - detected ConsoleCapabilities
-  - resolved StylePolicy
-  - cleared runtime counters/examples
-- It writes the first structured report through RenderDiagnosticsWriter.
-
-Rendering path
-- ScreenBuffer still stores authored logical Style exactly as authored.
-- During writeSpan(), ConsoleRenderer calls setStyle(runStyle).
-- setStyle():
-  - resolves the authored Style through StylePolicy
-  - records structured runtime diagnostics into CapabilityReport
-  - then maps only the resolved presentation style to Win32 attributes
-- Diagnostics therefore describe actual renderer adaptation behavior, not just static capability detection.
-
-Diagnostics semantics
-- Direct: authored feature survived unchanged and is physically rendered by the current Win32 path.
-- Downgraded: a richer authored color was reduced to a lower tier.
-- Approximated: same-tier color changed to a nearest available value.
-- Omitted: authored feature was removed by policy.
-- Emulated: policy deferred the feature to renderer emulation.
-- LogicalOnly: the feature still exists in resolved style state, but this Win32 attribute output path does not physically emit it.
-
-Shutdown
-- ConsoleRenderer flushes the final structured diagnostics report through RenderDiagnosticsWriter.
-- The old console_style_adaptation_report.txt path is no longer the active implementation.
-- The main diagnostics file becomes render_diagnostics_report.txt.
-
-*/
-
-/*
-Default behavior
-- Diagnostics are now off by default because RenderDiagnostics starts disabled.
-- initialize() no longer writes any hardcoded report file.
-
-Enable diagnostics
-- Before initialize(), call:
-  - renderer->setDiagnosticsEnabled(true);
-
-Choose overwrite behavior
-- Before initialize(), call:
-  - renderer->setDiagnosticsAppendMode(false);
-- The report writer will truncate the file when shutdown() flushes the final report.
-
-Choose append behavior
-- Before initialize(), call:
-  - renderer->setDiagnosticsAppendMode(true);
-- The report writer will append instead of replace.
-
-Choose a custom path
-- Before initialize(), call:
-  - renderer->setDiagnosticsOutputPath("my_render_report.txt");
-
-Access the full config object directly
-- ConsoleRenderer now exposes:
-  - diagnostics()
-  - diagnostics() const
-- That lets you reuse the existing RenderDiagnostics model without inventing a second config system.
-
-Runtime behavior
-- Capability detection still happens during initialize().
-- The renderer stores capabilities and resolved policy into the structured diagnostics model.
-- Runtime adaptation events are recorded only when diagnostics are enabled.
-- The report is written once at shutdown() through RenderDiagnosticsWriter.
-
-Failure behavior
-- If report writing fails, rendering still proceeds normally.
-- Diagnostics remain fully separate from visible console output and do not alter ScreenBuffer or authored Style data.
-
-A typical call site now looks like this before initialize():
-
-auto renderer = std::make_unique<ConsoleRenderer>();
-renderer->setDiagnosticsEnabled(true);
-renderer->setDiagnosticsAppendMode(false);
-renderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+    Diagnostics are optional and separate from visible output.
+    Logical Style stored in ScreenBuffer remains unchanged.
 */
 
 namespace
@@ -566,8 +477,7 @@ bool ConsoleRenderer::initialize()
     m_previousFrame.clear();
 
     m_stylePolicy = buildStylePolicyFromCapabilities(m_capabilities);
-    initializeDiagnostics();
-    flushDiagnosticsReport();
+    initializeDiagnosticsState();
 
     m_currentStyle = Style{};
     m_firstPresent = true;
@@ -667,6 +577,46 @@ TextBackendCapabilities ConsoleRenderer::textCapabilities() const
     capabilities.supportsEmoji = false;
     capabilities.supportsFontFallback = false;
     return capabilities;
+}
+
+void ConsoleRenderer::setDiagnosticsEnabled(bool enabled)
+{
+    m_renderDiagnostics.setEnabled(enabled);
+}
+
+bool ConsoleRenderer::diagnosticsEnabled() const
+{
+    return m_renderDiagnostics.isEnabled();
+}
+
+void ConsoleRenderer::setDiagnosticsOutputPath(const std::string& outputPath)
+{
+    m_renderDiagnostics.setOutputPath(outputPath);
+}
+
+const std::string& ConsoleRenderer::diagnosticsOutputPath() const
+{
+    return m_renderDiagnostics.outputPath();
+}
+
+void ConsoleRenderer::setDiagnosticsAppendMode(bool appendMode)
+{
+    m_renderDiagnostics.setAppendMode(appendMode);
+}
+
+bool ConsoleRenderer::diagnosticsAppendMode() const
+{
+    return m_renderDiagnostics.appendMode();
+}
+
+RenderDiagnostics& ConsoleRenderer::diagnostics()
+{
+    return m_renderDiagnostics;
+}
+
+const RenderDiagnostics& ConsoleRenderer::diagnostics() const
+{
+    return m_renderDiagnostics;
 }
 
 void ConsoleRenderer::writeFullFrame(const ScreenBuffer& frame)
@@ -887,11 +837,8 @@ void ConsoleRenderer::restoreConsoleState()
     }
 }
 
-void ConsoleRenderer::initializeDiagnostics()
+void ConsoleRenderer::initializeDiagnosticsState()
 {
-    m_renderDiagnostics.setEnabled(true);
-    m_renderDiagnostics.setAppendMode(false);
-    m_renderDiagnostics.setOutputPath("render_diagnostics_report.txt");
     m_renderDiagnostics.resetRuntimeData();
 
     CapabilityReport& report = m_renderDiagnostics.report();
@@ -901,7 +848,13 @@ void ConsoleRenderer::initializeDiagnostics()
 
 void ConsoleRenderer::flushDiagnosticsReport() const
 {
-    RenderDiagnosticsWriter::write(m_renderDiagnostics);
+    if (!m_renderDiagnostics.isEnabled())
+    {
+        return;
+    }
+
+    const bool wroteSuccessfully = RenderDiagnosticsWriter::write(m_renderDiagnostics);
+    (void)wroteSuccessfully;
 }
 
 void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle)

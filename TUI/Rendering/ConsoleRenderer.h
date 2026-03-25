@@ -1,11 +1,15 @@
 #pragma once
 
+#include <optional>
+#include <string>
+
 #include "Rendering/Backends/ConsoleCapabilityDetector.h"
 #include "Rendering/Capabilities/ConsoleCapabilities.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
+#include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
@@ -32,10 +36,9 @@
         - backend mapping uses resolved presentation style only
 
     For Phase 2 structured diagnostics:
-        - diagnostics configuration is renderer-owned
-        - diagnostics are optional and separate from visible console rendering
-        - runtime adaptation events are recorded only when diagnostics are enabled
-        - final report writing uses RenderDiagnosticsWriter
+        - diagnostics are optional and renderer-owned
+        - runtime adaptation decisions are recorded at the real style resolution point
+        - author-facing hints are built from collected report data, not renderer internals
 */
 
 class ConsoleRenderer : public IRenderer
