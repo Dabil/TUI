@@ -10,6 +10,19 @@
     It only describes what the backend can likely present directly.
 
     Conservative defaults are used whenever support is uncertain.
+
+    Important interpretation notes:
+
+    - Supported means the active backend path can defensibly claim direct
+      presentation support for that semantic feature.
+    - Emulated means the renderer may intentionally simulate the feature.
+    - Unsupported means the backend path is known not to provide that feature.
+    - Unknown means support is host-dependent, ambiguous, partially simulated,
+      or otherwise not strong enough to promise as direct support.
+
+    For the current Win32 attribute renderer, Unknown should be preferred over
+    Supported whenever the visible result depends on host quirks or only loosely
+    resembles the authored semantic intent.
 */
 
 enum class ConsoleColorTier

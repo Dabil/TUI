@@ -13,6 +13,11 @@ namespace
             Therefore, even if VT processing can be enabled, the active output
             path should still be described conservatively as BasicWin32 until a
             true VT presentation path is added later.
+
+            In particular, VT enablement alone must not be treated as evidence
+            that the current renderer can defensibly promise richer direct style
+            semantics. The capability object should describe the active render
+            path, not the broadest mode bit that happened to be enabled.
         */
         ConsoleCapabilities capabilities = ConsoleCapabilities::BasicWin32();
         capabilities.virtualTerminalProcessing = virtualTerminalEnabled;
