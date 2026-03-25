@@ -64,6 +64,53 @@ Shutdown
 
 */
 
+/*
+Default behavior
+- Diagnostics are now off by default because RenderDiagnostics starts disabled.
+- initialize() no longer writes any hardcoded report file.
+
+Enable diagnostics
+- Before initialize(), call:
+  - renderer->setDiagnosticsEnabled(true);
+
+Choose overwrite behavior
+- Before initialize(), call:
+  - renderer->setDiagnosticsAppendMode(false);
+- The report writer will truncate the file when shutdown() flushes the final report.
+
+Choose append behavior
+- Before initialize(), call:
+  - renderer->setDiagnosticsAppendMode(true);
+- The report writer will append instead of replace.
+
+Choose a custom path
+- Before initialize(), call:
+  - renderer->setDiagnosticsOutputPath("my_render_report.txt");
+
+Access the full config object directly
+- ConsoleRenderer now exposes:
+  - diagnostics()
+  - diagnostics() const
+- That lets you reuse the existing RenderDiagnostics model without inventing a second config system.
+
+Runtime behavior
+- Capability detection still happens during initialize().
+- The renderer stores capabilities and resolved policy into the structured diagnostics model.
+- Runtime adaptation events are recorded only when diagnostics are enabled.
+- The report is written once at shutdown() through RenderDiagnosticsWriter.
+
+Failure behavior
+- If report writing fails, rendering still proceeds normally.
+- Diagnostics remain fully separate from visible console output and do not alter ScreenBuffer or authored Style data.
+
+A typical call site now looks like this before initialize():
+
+auto renderer = std::make_unique<ConsoleRenderer>();
+renderer->setDiagnosticsEnabled(true);
+renderer->setDiagnosticsAppendMode(false);
+renderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+*/
+
 namespace
 {
     constexpr WORD kForegroundMask =

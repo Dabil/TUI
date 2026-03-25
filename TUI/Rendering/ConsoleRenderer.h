@@ -32,9 +32,10 @@
         - backend mapping uses resolved presentation style only
 
     For Phase 2 structured diagnostics:
-        - ConsoleRenderer owns the runtime integration point
-        - authored logical style remains unchanged
-        - adaptation decisions are recorded where actual renderer mapping happens
+        - diagnostics configuration is renderer-owned
+        - diagnostics are optional and separate from visible console rendering
+        - runtime adaptation events are recorded only when diagnostics are enabled
+        - final report writing uses RenderDiagnosticsWriter
 */
 
 class ConsoleRenderer : public IRenderer
@@ -57,6 +58,18 @@ public:
 
     TextBackendCapabilities textCapabilities() const override;
 
+    void setDiagnosticsEnabled(bool enabled);
+    bool diagnosticsEnabled() const;
+
+    void setDiagnosticsOutputPath(const std::string& outputPath);
+    const std::string& diagnosticsOutputPath() const;
+
+    void setDiagnosticsAppendMode(bool appendMode);
+    bool diagnosticsAppendMode() const;
+
+    RenderDiagnostics& diagnostics();
+    const RenderDiagnostics& diagnostics() const;
+
 private:
     void writeFullFrame(const ScreenBuffer& frame);
     void writeDirtySpans(const ScreenBuffer& frame);
@@ -70,7 +83,7 @@ private:
     bool configureConsole();
     void restoreConsoleState();
 
-    void initializeDiagnostics();
+    void initializeDiagnosticsState();
     void flushDiagnosticsReport() const;
 
     void recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle);
