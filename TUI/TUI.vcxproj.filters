@@ -123,6 +123,9 @@
     <ClInclude Include="Screens\Donut3DScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Screens\FireScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -195,6 +198,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\Donut3DScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\FireScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
