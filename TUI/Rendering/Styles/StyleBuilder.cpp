@@ -16,15 +16,6 @@ This makes it a good fit for themes, page composition, and any future semantic s
 
 namespace style
 {
-    const Style Bold = Style().withBold();
-    const Style Dim = Style().withDim();
-    const Style Underline = Style().withUnderline();
-    const Style SlowBlink = Style().withSlowBlink();
-    const Style FastBlink = Style().withFastBlink();
-    const Style Reverse = Style().withReverse();
-    const Style Invisible = Style().withInvisible();
-    const Style Strike = Style().withStrike();
-
     Style Fg(const Color& color)
     {
         return Style().withForeground(color);
