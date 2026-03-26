@@ -93,19 +93,19 @@ void Donut3DScreen::draw(Surface& surface)
         return;
     }
 
-    buffer.drawFrame(
-        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Frame);
-
-    buffer.writeString(4, 0, "[ 3D ASCII Donut ]", Themes::Subtitle);
-    buffer.writeString(4, screenHeight - 1, "[ Hue Cycle + Depth Shading + Floor Shadow ]", Themes::Subtitle);
-
     const int viewportLeft = 1;
     const int viewportTop = 1;
     const int viewportWidth = std::max(0, screenWidth - 2);
     const int viewportHeight = std::max(0, screenHeight - 2);
 
     renderDonut(surface, viewportLeft, viewportTop, viewportWidth, viewportHeight);
+
+    buffer.drawFrame(
+        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
+        Themes::Frame);
+
+    buffer.writeString(4, 0, "[ 3D ASCII Donut ]", Themes::Subtitle);
+    buffer.writeString(4, screenHeight - 1, "[ Hue Cycle + Depth Shading + Floor Shadow ]", Themes::Subtitle);
 }
 
 void Donut3DScreen::ensureBuffers(int width, int height)

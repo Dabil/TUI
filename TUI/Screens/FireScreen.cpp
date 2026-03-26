@@ -68,13 +68,6 @@ void FireScreen::draw(Surface& surface)
         return;
     }
 
-    buffer.drawFrame(
-        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Frame);
-
-    buffer.writeString(4, 0, "[ Fire Simulation ]", Themes::Subtitle);
-    buffer.writeString(4, screenHeight - 1, "[ Buffered Flames ]", Themes::Subtitle);
-
     m_fireLeft = 1;
     m_fireTop = 1;
 
@@ -100,6 +93,13 @@ void FireScreen::draw(Surface& surface)
             buffer.writeCodePoint(m_fireLeft + x, m_fireTop + y, glyph, style);
         }
     }
+
+    buffer.drawFrame(
+        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
+        Themes::Frame);
+
+    buffer.writeString(4, 0, "[ Fire Simulation ]", Themes::Subtitle);
+    buffer.writeString(4, screenHeight - 1, "[ Buffered Flames ]", Themes::Subtitle);
 }
 
 void FireScreen::ensureSimulationSize(int width, int height)

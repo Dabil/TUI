@@ -103,6 +103,14 @@ void WaterEffectScreen::draw(Surface& surface)
         return;
     }
 
+    m_waveLeft = 1;
+    m_waveTop = 1;
+    m_waveWidth = std::max(0, screenWidth - 2);
+    m_waveHeight = std::max(0, screenHeight - 2);
+
+    ensureSimulationSize(m_waveWidth, m_waveHeight);
+    renderWaveField(surface);
+
     buffer.drawFrame(
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
         Themes::Frame);
@@ -133,14 +141,6 @@ void WaterEffectScreen::draw(Surface& surface)
     }
 
     buffer.writeChar(startModeXpos, screenHeight - 1, U']', Themes::Subtitle);
-
-    m_waveLeft = 1;
-    m_waveTop = 1;
-    m_waveWidth = std::max(0, screenWidth - 2);
-    m_waveHeight = std::max(0, screenHeight - 2);
-
-    ensureSimulationSize(m_waveWidth, m_waveHeight);
-    renderWaveField(surface);
 }
 
 void WaterEffectScreen::ensureSimulationSize(int width, int height)
