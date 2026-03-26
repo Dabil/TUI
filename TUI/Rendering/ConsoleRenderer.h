@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <optional>
 #include <string>
 
@@ -106,6 +107,14 @@ private:
         bool emulated,
         bool physicallyRendered);
 
+    bool shouldForceFullPresentForBlink(const ScreenBuffer& frame);
+    void collectBlinkEmulationUsage(
+        const ScreenBuffer& frame,
+        bool& usesSlowBlinkEmulation,
+        bool& usesFastBlinkEmulation) const;
+    bool isBlinkVisibleForResolvedStyle(const ResolvedStyle& resolvedStyle) const;
+    bool isBlinkCurrentlyVisible(bool fastBlink) const;
+
 private:
     HANDLE m_hOut = INVALID_HANDLE_VALUE;
     HANDLE m_hIn = INVALID_HANDLE_VALUE;
@@ -133,4 +142,9 @@ private:
     bool m_haveOriginalInputMode = false;
     bool m_cursorWasVisible = true;
     bool m_virtualTerminalEnabled = false;
+
+    std::chrono::steady_clock::time_point m_blinkEpoch{};
+    bool m_lastSlowBlinkVisibilityState = true;
+    bool m_lastFastBlinkVisibilityState = true;
+    bool m_lastFrameUsedBlinkEmulation = false;
 };

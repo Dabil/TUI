@@ -1,5 +1,6 @@
 #include "Rendering/ConsoleRenderer.h"
 
+#include <cmath>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -253,16 +254,12 @@ namespace
         policy = policy.withSlowBlinkMode(
             capabilities.supportsSlowBlinkDirect()
             ? BlinkRenderMode::Direct
-            : (capabilities.mayEmulateSlowBlink()
-                ? BlinkRenderMode::Emulate
-                : BlinkRenderMode::Omit));
+            : BlinkRenderMode::Emulate);
 
         policy = policy.withFastBlinkMode(
             capabilities.supportsFastBlinkDirect()
             ? BlinkRenderMode::Direct
-            : (capabilities.mayEmulateFastBlink()
-                ? BlinkRenderMode::Emulate
-                : BlinkRenderMode::Omit));
+            : BlinkRenderMode::Emulate);
 
         return policy;
     }
@@ -448,7 +445,10 @@ namespace
     }
 }
 
-ConsoleRenderer::ConsoleRenderer() = default;
+ConsoleRenderer::ConsoleRenderer()
+    : m_blinkEpoch(std::chrono::steady_clock::now())
+{
+}
 
 ConsoleRenderer::~ConsoleRenderer()
 {
@@ -569,6 +569,10 @@ bool ConsoleRenderer::initialize()
 
     m_currentStyle = Style{};
     m_firstPresent = true;
+    m_blinkEpoch = std::chrono::steady_clock::now();
+    m_lastSlowBlinkVisibilityState = true;
+    m_lastFastBlinkVisibilityState = true;
+    m_lastFrameUsedBlinkEmulation = false;
     m_initialized = true;
 
     return true;
@@ -588,6 +592,9 @@ void ConsoleRenderer::shutdown()
     m_initialized = false;
     m_firstPresent = true;
     m_currentStyle = Style{};
+    m_lastSlowBlinkVisibilityState = true;
+    m_lastFastBlinkVisibilityState = true;
+    m_lastFrameUsedBlinkEmulation = false;
 }
 
 void ConsoleRenderer::present(const ScreenBuffer& frame)
@@ -597,7 +604,10 @@ void ConsoleRenderer::present(const ScreenBuffer& frame)
         throw std::runtime_error("ConsoleRenderer::present called before initialize().");
     }
 
+    const bool forceFullPresentForBlink = shouldForceFullPresentForBlink(frame);
+
     if (m_firstPresent ||
+        forceFullPresentForBlink ||
         m_previousFrame.getWidth() != frame.getWidth() ||
         m_previousFrame.getHeight() != frame.getHeight())
     {
@@ -775,6 +785,18 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
             ++x;
         }
 
+        const ResolvedStyle resolvedRunStyle = m_stylePolicy.resolve(runStyle);
+        if (!isBlinkVisibleForResolvedStyle(resolvedRunStyle))
+        {
+            for (char32_t& glyph : runText)
+            {
+                if (glyph != U' ')
+                {
+                    glyph = U' ';
+                }
+            }
+        }
+
         moveCursor(runStart, y);
         setStyle(runStyle);
 
@@ -794,6 +816,102 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
             }
         }
     }
+}
+
+
+
+bool ConsoleRenderer::shouldForceFullPresentForBlink(const ScreenBuffer& frame)
+{
+    bool usesSlowBlinkEmulation = false;
+    bool usesFastBlinkEmulation = false;
+    collectBlinkEmulationUsage(frame, usesSlowBlinkEmulation, usesFastBlinkEmulation);
+
+    const bool usesBlinkEmulation = usesSlowBlinkEmulation || usesFastBlinkEmulation;
+    const bool currentSlowBlinkVisibilityState = usesSlowBlinkEmulation
+        ? isBlinkCurrentlyVisible(false)
+        : true;
+    const bool currentFastBlinkVisibilityState = usesFastBlinkEmulation
+        ? isBlinkCurrentlyVisible(true)
+        : true;
+
+    if (!usesBlinkEmulation)
+    {
+        m_lastFrameUsedBlinkEmulation = false;
+        m_lastSlowBlinkVisibilityState = true;
+        m_lastFastBlinkVisibilityState = true;
+        return false;
+    }
+
+    const bool slowBlinkChanged =
+        usesSlowBlinkEmulation &&
+        currentSlowBlinkVisibilityState != m_lastSlowBlinkVisibilityState;
+
+    const bool fastBlinkChanged =
+        usesFastBlinkEmulation &&
+        currentFastBlinkVisibilityState != m_lastFastBlinkVisibilityState;
+
+    const bool shouldForce =
+        !m_firstPresent &&
+        m_lastFrameUsedBlinkEmulation &&
+        (slowBlinkChanged || fastBlinkChanged);
+
+    m_lastFrameUsedBlinkEmulation = true;
+    m_lastSlowBlinkVisibilityState = currentSlowBlinkVisibilityState;
+    m_lastFastBlinkVisibilityState = currentFastBlinkVisibilityState;
+
+    return shouldForce;
+}
+
+void ConsoleRenderer::collectBlinkEmulationUsage(
+    const ScreenBuffer& frame,
+    bool& usesSlowBlinkEmulation,
+    bool& usesFastBlinkEmulation) const
+{
+    usesSlowBlinkEmulation = false;
+    usesFastBlinkEmulation = false;
+
+    for (int y = 0; y < frame.getHeight(); ++y)
+    {
+        for (int x = 0; x < frame.getWidth(); ++x)
+        {
+            const ScreenCell& cell = frame.getCell(x, y);
+            const ResolvedStyle resolved = m_stylePolicy.resolve(cell.style);
+
+            usesSlowBlinkEmulation = usesSlowBlinkEmulation || resolved.emulateSlowBlink;
+            usesFastBlinkEmulation = usesFastBlinkEmulation || resolved.emulateFastBlink;
+
+            if (usesSlowBlinkEmulation && usesFastBlinkEmulation)
+            {
+                return;
+            }
+        }
+    }
+}
+
+bool ConsoleRenderer::isBlinkVisibleForResolvedStyle(const ResolvedStyle& resolvedStyle) const
+{
+    if (resolvedStyle.emulateFastBlink && !isBlinkCurrentlyVisible(true))
+    {
+        return false;
+    }
+
+    if (resolvedStyle.emulateSlowBlink && !isBlinkCurrentlyVisible(false))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool ConsoleRenderer::isBlinkCurrentlyVisible(bool fastBlink) const
+{
+    const auto now = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> elapsed = now - m_blinkEpoch;
+
+    const double cycleSeconds = fastBlink ? 0.5 : 1.0;
+    const double phase = std::fmod(elapsed.count(), cycleSeconds);
+
+    return phase < (cycleSeconds * 0.5);
 }
 
 void ConsoleRenderer::moveCursor(int x, int y)
@@ -1174,7 +1292,7 @@ void ConsoleRenderer::recordBlinkFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::Emulated,
-                buildTextExampleDetail("Blink deferred to renderer emulation", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Emulated blink", authoredEnabled, presentedEnabled));
         }
 
         return;
