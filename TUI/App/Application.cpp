@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <thread>
+#include <windows.h>
 
 #include "Rendering/ConsoleRenderer.h"
 #include "Rendering/Surface.h"
@@ -13,6 +14,9 @@
 #include "Screens/FireScreen.h"
 #include "Screens/WaterEffectScreen.h"
 
+// Global pointer used by console control handler
+static Application* g_appInstance = nullptr;
+
 Application::Application() = default;
 
 Application::~Application()
@@ -20,14 +24,48 @@ Application::~Application()
     shutdown();
 }
 
+BOOL WINAPI ConsoleCtrlHandler(DWORD ctrlType)
+{
+    switch (ctrlType)
+    {
+    case CTRL_CLOSE_EVENT:
+    case CTRL_SHUTDOWN_EVENT:
+    case CTRL_LOGOFF_EVENT:
+    {
+        if (g_appInstance != nullptr)
+        {
+            g_appInstance->shutdown();
+        }
+
+        // Give Windows permission to close
+        return TRUE;
+    }
+    default:
+        return FALSE;
+    }
+}
+
 bool Application::initialize()
 {
-    m_renderer = std::make_unique<ConsoleRenderer>();
+    // Register global instance BEFORE anything else
+    g_appInstance = this;
 
-    if (!m_renderer->initialize())
+    // Register console control handler
+    SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
+
+    auto renderer = std::make_unique<ConsoleRenderer>();
+
+    // Enable diagnostics
+    renderer->setDiagnosticsEnabled(true);
+    renderer->setDiagnosticsAppendMode(false);
+    renderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+
+    if (!renderer->initialize())
     {
         return false;
     }
+
+    m_renderer = std::move(renderer);
 
     m_width = m_renderer->getConsoleWidth();
     m_height = m_renderer->getConsoleHeight();
@@ -67,6 +105,16 @@ void Application::run()
 
 void Application::shutdown()
 {
+    if (!m_running)
+    {
+        return;
+    }
+
+    m_running = false;
+
+    // No shutdown() on ScreenManager in current design
+    m_screenManager.reset();
+
     if (m_renderer)
     {
         m_renderer->shutdown();
