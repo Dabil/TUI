@@ -34,6 +34,22 @@ so older call sites keep compiling.
 
 */
 
+/*
+    Can also create styles like this:
+
+    inline Style PanelTitle()
+    {
+        return style::Bold
+            + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
+    }
+
+    But then you will have to use them like this:
+
+    buffer.writeString(4, 0, "[ Some Text Here ]", Themes::PanelTitle());
+
+    Personally I prefer the current ANSI retro feel.
+*/
+
 namespace Themes
 {
     // =========================================================
@@ -61,6 +77,12 @@ namespace Themes
         style::Bold
         + style::Fg(Color::FromBasic(Color::Basic::BrightGreen))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline Style PanelTitle()
+    {
+        return style::Bold
+            + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
+    }
 
 
     // =========================================================
@@ -149,6 +171,13 @@ namespace Themes
         style::Dim
         + style::Fg(Color::FromBasic(Color::Basic::White));
 
+    inline const Style SlowBlink =
+          style::SlowBlink
+        + style::Fg(Color::FromBasic(Color::Basic::White));
+
+    inline const Style FastBlink =
+        style::FastBlink
+        + style::Fg(Color::FromBasic(Color::Basic::White));
 
     // =========================================================
     // Generic framework demo / object styles
