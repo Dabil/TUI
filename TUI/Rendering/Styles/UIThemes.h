@@ -4,119 +4,83 @@
 
 namespace UIThemes
 {
-    inline Style NormalText()
-    {
-        return Style();
-    }
+    inline Style NormalText = Style();
 
-    inline Style DisabledText()
-    {
-        return style::Dim
-            + style::Fg(Color::FromBasic(Color::Basic::BrightBlack));
-    }
+    inline const Style DisabledText =
+          style::Dim
+        + style::Fg(Color::FromBasic(Color::Basic::BrightBlack));
 
-    inline Style Label()
-    {
-        return style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
-    }
 
-    inline Style Value()
-    {
-        return style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
-    }
+    inline const Style Label =
+          style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
+ 
+    inline const Style Value =
+          style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
 
-    inline Style DialogTitle()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-            + style::Bg(Color::FromBasic(Color::Basic::Blue));
-    }
 
-    inline Style PanelTitle()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
-    }
+    inline const Style DialogTitle =
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+ 
 
-    inline Style StatusBar()
-    {
-        return style::Fg(Color::FromBasic(Color::Basic::Black))
-            + style::Bg(Color::FromBasic(Color::Basic::White));
-    }
+    inline const Style PanelTitle =
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
 
-    inline Style Selection()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::Black))
-            + style::Bg(Color::FromBasic(Color::Basic::BrightCyan));
-    }
+    inline const Style StatusBar = 
+          style::Fg(Color::FromBasic(Color::Basic::Black))
+        + style::Bg(Color::FromBasic(Color::Basic::White));
 
-    inline Style Focused()
-    {
-        return style::Bold
-            + style::Underline;
-    }
+    inline const Style Selection = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::Black))
+        + style::Bg(Color::FromBasic(Color::Basic::BrightCyan));
 
-    inline Style ButtonNormal()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-            + style::Bg(Color::FromBasic(Color::Basic::Blue));
-    }
+    inline const Style Focused = 
+          style::Bold
+        + style::Underline;
 
-    inline Style ButtonHot()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightYellow))
-            + style::Bg(Color::FromBasic(Color::Basic::Blue));
-    }
+    inline const Style ButtonNormal = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
 
-    inline Style ButtonDisabled()
-    {
-        return style::Dim
+    inline const Style ButtonHot = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightYellow))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+
+    inline const Style ButtonDisabled = 
+          style::Dim
             + style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
             + style::Bg(Color::FromBasic(Color::Basic::Black));
-    }
 
-    inline Style Border()
-    {
-        return style::Fg(Color::FromBasic(Color::Basic::BrightBlue));
-    }
+    inline const Style Border =
+          style::Fg(Color::FromBasic(Color::Basic::BrightBlue));
 
-    inline Style Header()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-            + style::Bg(Color::FromBasic(Color::Basic::BrightBlack));
-    }
+    inline const Style Header = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
+        + style::Bg(Color::FromBasic(Color::Basic::BrightBlack));
 
-    inline Style Footer()
-    {
-        return style::Fg(Color::FromBasic(Color::Basic::White))
-            + style::Bg(Color::FromBasic(Color::Basic::Black));
-    }
+    inline const Style Footer = 
+          style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
 
-    inline Style Tooltip()
-    {
-        return style::Fg(Color::FromBasic(Color::Basic::Black))
-            + style::Bg(Color::FromBasic(Color::Basic::BrightYellow));
-    }
+    inline const Style Tooltip = 
+          style::Fg(Color::FromBasic(Color::Basic::Black))
+        + style::Bg(Color::FromBasic(Color::Basic::BrightYellow));
 
-    inline Style ErrorText()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightRed));
-    }
+    inline const Style ErrorText = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightRed));
 
-    inline Style WarningText()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightYellow));
-    }
+    inline const Style WarningText = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightYellow));
 
-    inline Style SuccessText()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightGreen));
-    }
+    inline const Style SuccessText = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightGreen));
 }
