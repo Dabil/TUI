@@ -153,7 +153,7 @@ void Application::switchToScreen(ScreenType screenType)
 
     switch (screenType)
     {
-    case ScreenType::Fire:
+    case ScreenType::WaterEffect:
         m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
         break;
 
@@ -161,7 +161,7 @@ void Application::switchToScreen(ScreenType screenType)
         m_screenManager->pushScreen(std::make_unique<Donut3DScreen>());
         break;
 
-    case ScreenType::WaterEffect:
+    case ScreenType::Fire:
         m_screenManager->pushScreen(std::make_unique<FireScreen>());
         break;
     }
