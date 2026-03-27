@@ -611,6 +611,8 @@ bool ConsoleRenderer::initialize()
     m_lastFrameUsedBlinkEmulation = false;
     m_initialized = true;
 
+    flushDiagnosticsReport();
+
     return true;
 }
 
