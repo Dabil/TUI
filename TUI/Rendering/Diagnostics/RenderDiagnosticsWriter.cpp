@@ -70,8 +70,8 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
         << (backendState.virtualTerminalEnableAttempted ? "true" : "false") << "\n";
     out << "VT enable succeeded: "
         << (backendState.virtualTerminalEnableSucceeded ? "true" : "false") << "\n";
-    out << "Configured output mode: ";
 
+    out << "Configured output mode: ";
     if (backendState.hasConfiguredOutputMode)
     {
         out << formatOptionalBackendFlags(backendState.configuredOutputMode) << "\n";
