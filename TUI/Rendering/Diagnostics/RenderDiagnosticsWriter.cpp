@@ -53,7 +53,6 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     const CapabilityReport& report = diagnostics.report();
     const ConsoleCapabilities& capabilities = report.capabilities();
     const StylePolicy& policy = report.policy();
-    const BackendStateSnapshot& backendState = report.backendState();
 
     writeSectionHeader(out, "Render Diagnostics Report");
 
@@ -62,36 +61,6 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "Output path: " << diagnostics.outputPath() << "\n";
     out << "Append mode: " << (diagnostics.appendMode() ? "true" : "false") << "\n";
     out << "Diagnostics enabled: " << (diagnostics.isEnabled() ? "true" : "false") << "\n\n";
-
-    out << "Backend State Snapshot\n";
-    out << "----------------------\n";
-    out << "Renderer identity: " << backendState.rendererIdentity << "\n";
-    out << "VT enable attempted: "
-        << (backendState.virtualTerminalEnableAttempted ? "true" : "false") << "\n";
-    out << "VT enable succeeded: "
-        << (backendState.virtualTerminalEnableSucceeded ? "true" : "false") << "\n";
-
-    out << "Configured output mode: ";
-    if (backendState.hasConfiguredOutputMode)
-    {
-        out << formatOptionalBackendFlags(backendState.configuredOutputMode) << "\n";
-    }
-    else
-    {
-        out << "Unavailable\n";
-    }
-
-    out << "Configured input mode: ";
-    if (backendState.hasConfiguredInputMode)
-    {
-        out << formatOptionalBackendFlags(backendState.configuredInputMode) << "\n";
-    }
-    else
-    {
-        out << "Unavailable\n";
-    }
-
-    out << "\n";
 
     out << "Detected Backend Capabilities\n";
     out << "-----------------------------\n";
@@ -105,6 +74,8 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
         << formatOptionalBackendFlags(capabilities.optionalBackendFlags) << "\n";
     out << "Color tier: "
         << CapabilityReport::toString(capabilities.colorTier) << "\n";
+    out << "Bright basic colors: "
+        << CapabilityReport::toString(capabilities.brightBasicColors) << "\n";
     out << "Bold: "
         << CapabilityReport::toString(capabilities.bold) << "\n";
     out << "Dim: "
@@ -213,6 +184,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "- Diagnostics describe renderer behavior only.\n";
     out << "- Logical Style data stored in ScreenBuffer is not mutated by diagnostics or adaptation.\n";
     out << "- Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.\n";
+    out << "- Bright basic color capability describes palette/intensity color presentation, not bold or dim text semantics.\n";
     out << "- Author-facing hints are advisory only and do not change rendering behavior.\n";
 
     return true;

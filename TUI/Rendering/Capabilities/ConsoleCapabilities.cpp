@@ -28,6 +28,7 @@ ConsoleRenderer should store one ConsoleCapabilities m_capabilities;
 style mapping code should query helpers like:
 supportsTrueColor()
 supportsIndexed256Colors()
+supportsBrightBasicColorsDirect()
 supportsUnderlineDirect()
 usesPreserveStyleSafeFallback()
 mayEmulateSlowBlink()
@@ -40,19 +41,24 @@ diagnostics screens should report both the raw flags and the resulting
 renderer behavior:
 VT enabled or not
 color tier
+bright basic color support
 preserve-style-safe fallback behavior
 optional backend flags
 direct support vs unsupported vs emulated vs unknown
 
 For the current backend, BasicWin32 must stay conservative:
 
-- Basic16 color support is real and directly usable
+- standard basic colors are real and directly usable
+- bright basic colors are also real and directly usable through the Win32
+  attribute intensity palette
+- that bright color support is a color-palette capability, not a promise
+  about bold/dim text semantics
 - decorative/style semantics such as bold, dim, underline, reverse, and
   invisible are not safe to promise as direct support across hosts
 - blink is not directly provided by the Win32 attribute path, but the current
   renderer may intentionally emulate it
 - if the renderer later chooses to approximate a visual effect, that should
-  be reflected in runtime adaptation data rather than overstated here
+    be reflected in runtime adaptation data rather than overstated here
 
 Only use VirtualTerminal() once you truly add a VT output path rather than
 merely enabling the mode flag.
@@ -70,6 +76,13 @@ ConsoleCapabilities ConsoleCapabilities::Conservative()
     capabilities.preserveStyleSafeFallback = true;
     capabilities.optionalBackendFlags = 0;
     capabilities.colorTier = ConsoleColorTier::Basic16;
+
+    /*
+        The existing model already treated Basic16 as available.
+        Keep that practical default, but now expose bright basic colors
+        explicitly rather than leaving them implicit in the tier alone.
+    */
+    capabilities.brightBasicColors = ConsoleFeatureSupport::Supported;
 
     capabilities.bold = ConsoleFeatureSupport::Unknown;
     capabilities.dim = ConsoleFeatureSupport::Unknown;
@@ -95,8 +108,12 @@ ConsoleCapabilities ConsoleCapabilities::BasicWin32()
     /*
         The current renderer writes through Win32 console attributes.
 
-        That path can defensibly claim direct Basic16 color presentation, but
-        several richer style semantics are not reliable enough to advertise as
+        That path can defensibly claim direct standard basic color
+        presentation and direct bright basic color presentation through the
+        intensity-backed 16-color palette. That is still separate from
+        bold/dim text semantics and should not be conflated with them.
+
+        Several richer style semantics are not reliable enough to advertise as
         direct support:
 
         - bold/dim are often approximated through intensity rather than true
@@ -113,6 +130,7 @@ ConsoleCapabilities ConsoleCapabilities::BasicWin32()
         renderer/backend path can intentionally simulate blink timing without
         mutating authored logical style data.
     */
+    capabilities.brightBasicColors = ConsoleFeatureSupport::Supported;
     capabilities.bold = ConsoleFeatureSupport::Unknown;
     capabilities.dim = ConsoleFeatureSupport::Unknown;
     capabilities.underline = ConsoleFeatureSupport::Unknown;
@@ -142,6 +160,7 @@ ConsoleCapabilities ConsoleCapabilities::VirtualTerminal()
         This profile is meant for a future true VT presentation path, not the
         current Win32-attribute renderer.
     */
+    capabilities.brightBasicColors = ConsoleFeatureSupport::Supported;
     capabilities.bold = ConsoleFeatureSupport::Supported;
     capabilities.dim = ConsoleFeatureSupport::Supported;
     capabilities.underline = ConsoleFeatureSupport::Supported;
@@ -159,6 +178,11 @@ bool ConsoleCapabilities::supportsBasicColors() const
     return colorTier >= ConsoleColorTier::Basic16;
 }
 
+bool ConsoleCapabilities::supportsBrightBasicColors() const
+{
+    return brightBasicColors != ConsoleFeatureSupport::Unsupported;
+}
+
 bool ConsoleCapabilities::supportsIndexed256Colors() const
 {
     return colorTier >= ConsoleColorTier::Indexed256;
@@ -167,6 +191,11 @@ bool ConsoleCapabilities::supportsIndexed256Colors() const
 bool ConsoleCapabilities::supportsTrueColor() const
 {
     return colorTier >= ConsoleColorTier::TrueColor;
+}
+
+bool ConsoleCapabilities::supportsBrightBasicColorsDirect() const
+{
+    return brightBasicColors == ConsoleFeatureSupport::Supported;
 }
 
 bool ConsoleCapabilities::supportsBoldDirect() const

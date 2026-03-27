@@ -33,6 +33,11 @@
     backends. A value of zero means no extra backend-specific capability flags
     are currently advertised.
 
+    colorTier remains the broad color-family tier for the backend path.
+    brightBasicColors makes the bright subset of authored basic colors explicit
+    rather than leaving that distinction only implied by Basic16 handling or
+    by Color::Basic enum values.
+
     For the current Win32 attribute renderer, Unknown should be preferred over
     Supported whenever the visible result depends on host quirks or only loosely
     resembles the authored semantic intent.
@@ -69,6 +74,16 @@ struct ConsoleCapabilities
 
     ConsoleColorTier colorTier = ConsoleColorTier::Basic16;
 
+    /*
+        Explicit support for authored bright basic colors such as
+        BrightRed/BrightBlue/BrightWhite.
+
+        This is intentionally separate from bold/dim text semantics.
+        Bright basic colors describe palette/intensity color presentation,
+        not text weight.
+    */
+    ConsoleFeatureSupport brightBasicColors = ConsoleFeatureSupport::Supported;
+
     ConsoleFeatureSupport bold = ConsoleFeatureSupport::Unknown;
     ConsoleFeatureSupport dim = ConsoleFeatureSupport::Unknown;
     ConsoleFeatureSupport underline = ConsoleFeatureSupport::Unknown;
@@ -83,8 +98,11 @@ struct ConsoleCapabilities
     static ConsoleCapabilities VirtualTerminal();
 
     bool supportsBasicColors() const;
+    bool supportsBrightBasicColors() const;
     bool supportsIndexed256Colors() const;
     bool supportsTrueColor() const;
+
+    bool supportsBrightBasicColorsDirect() const;
 
     bool supportsBoldDirect() const;
     bool supportsDimDirect() const;
