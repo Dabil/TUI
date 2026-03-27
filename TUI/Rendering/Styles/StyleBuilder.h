@@ -6,9 +6,9 @@ namespace style
 {
     struct BoldAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withBold();
+            return Style().withBold(value);
         }
 
         operator Style() const
@@ -19,9 +19,9 @@ namespace style
 
     struct DimAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withDim();
+            return Style().withDim(value);
         }
 
         operator Style() const
@@ -32,9 +32,9 @@ namespace style
 
     struct UnderlineAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withUnderline();
+            return Style().withUnderline(value);
         }
 
         operator Style() const
@@ -45,9 +45,9 @@ namespace style
 
     struct SlowBlinkAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withSlowBlink();
+            return Style().withSlowBlink(value);
         }
 
         operator Style() const
@@ -58,9 +58,9 @@ namespace style
 
     struct FastBlinkAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withFastBlink();
+            return Style().withFastBlink(value);
         }
 
         operator Style() const
@@ -71,9 +71,9 @@ namespace style
 
     struct ReverseAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withReverse();
+            return Style().withReverse(value);
         }
 
         operator Style() const
@@ -84,9 +84,9 @@ namespace style
 
     struct InvisibleAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withInvisible();
+            return Style().withInvisible(value);
         }
 
         operator Style() const
@@ -97,9 +97,9 @@ namespace style
 
     struct StrikeAtom
     {
-        Style operator()() const
+        Style operator()(bool value = true) const
         {
-            return Style().withStrike();
+            return Style().withStrike(value);
         }
 
         operator Style() const

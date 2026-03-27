@@ -1065,8 +1065,11 @@ void ConsoleRenderer::initializeDiagnosticsState()
 
     BackendStateSnapshot backendState;
     backendState.rendererIdentity = m_rendererIdentity;
+    backendState.activeRenderPath = "BasicWin32AttributePath";
     backendState.virtualTerminalEnableAttempted = m_virtualTerminalEnableAttempted;
     backendState.virtualTerminalEnableSucceeded = m_virtualTerminalEnableSucceeded;
+    backendState.virtualTerminalProcessingActive = m_capabilities.virtualTerminalProcessing;
+    backendState.activeRenderPathUsesVirtualTerminalOutput = false;
     backendState.configuredOutputMode = static_cast<std::uint32_t>(m_configuredOutputMode);
     backendState.configuredInputMode = static_cast<std::uint32_t>(m_configuredInputMode);
     backendState.hasConfiguredOutputMode = m_haveConfiguredOutputMode;

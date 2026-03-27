@@ -7,6 +7,9 @@
 class Style
 {
 public:
+    using AttributeState = std::optional<bool>;
+
+public:
     Style();
 
     const std::optional<Color>& foreground() const;
@@ -21,8 +24,27 @@ public:
     bool invisible() const;
     bool strike() const;
 
+    const AttributeState& boldState() const;
+    const AttributeState& dimState() const;
+    const AttributeState& underlineState() const;
+    const AttributeState& slowBlinkState() const;
+    const AttributeState& fastBlinkState() const;
+    const AttributeState& reverseState() const;
+    const AttributeState& invisibleState() const;
+    const AttributeState& strikeState() const;
+
     bool hasForeground() const;
     bool hasBackground() const;
+
+    bool hasBold() const;
+    bool hasDim() const;
+    bool hasUnderline() const;
+    bool hasSlowBlink() const;
+    bool hasFastBlink() const;
+    bool hasReverse() const;
+    bool hasInvisible() const;
+    bool hasStrike() const;
+
     bool isEmpty() const;
 
     Style withForeground(const Color& color) const;
@@ -40,6 +62,15 @@ public:
     Style withInvisible(bool value = true) const;
     Style withStrike(bool value = true) const;
 
+    Style withoutBold() const;
+    Style withoutDim() const;
+    Style withoutUnderline() const;
+    Style withoutSlowBlink() const;
+    Style withoutFastBlink() const;
+    Style withoutReverse() const;
+    Style withoutInvisible() const;
+    Style withoutStrike() const;
+
     bool operator==(const Style& other) const;
     bool operator!=(const Style& other) const;
 
@@ -47,12 +78,12 @@ private:
     std::optional<Color> m_foreground;
     std::optional<Color> m_background;
 
-    bool m_bold = false;
-    bool m_dim = false;
-    bool m_underline = false;
-    bool m_slowBlink = false;
-    bool m_fastBlink = false;
-    bool m_reverse = false;
-    bool m_invisible = false;
-    bool m_strike = false;
+    AttributeState m_bold;
+    AttributeState m_dim;
+    AttributeState m_underline;
+    AttributeState m_slowBlink;
+    AttributeState m_fastBlink;
+    AttributeState m_reverse;
+    AttributeState m_invisible;
+    AttributeState m_strike;
 };

@@ -131,6 +131,7 @@ namespace
         std::vector<std::string>& hints)
     {
         const ConsoleCapabilities& capabilities = report.capabilities();
+        const BackendStateSnapshot& backendState = report.backendState();
 
         if (capabilities.colorTier == ConsoleColorTier::Basic16)
         {
@@ -147,6 +148,13 @@ namespace
         {
             hints.push_back(
                 "Virtual terminal processing is not active for this backend path, so some richer terminal-style effects may be unavailable or handled conservatively.");
+        }
+
+        if (backendState.virtualTerminalProcessingActive &&
+            !backendState.activeRenderPathUsesVirtualTerminalOutput)
+        {
+            hints.push_back(
+                "VT processing was enabled successfully for the console session, but the active renderer path is still the conservative Win32 attribute path rather than a VT escape-output path.");
         }
     }
 

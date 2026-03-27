@@ -18,6 +18,7 @@
     It only records:
         - detected backend capabilities
         - selected renderer adaptation policy
+        - backend activation/runtime-path state
         - summary counts of adaptation outcomes
         - optional representative examples
 
@@ -65,9 +66,12 @@ struct StyleAdaptationExample
 struct BackendStateSnapshot
 {
     std::string rendererIdentity = "Unknown";
+    std::string activeRenderPath = "Unknown";
 
     bool virtualTerminalEnableAttempted = false;
     bool virtualTerminalEnableSucceeded = false;
+    bool virtualTerminalProcessingActive = false;
+    bool activeRenderPathUsesVirtualTerminalOutput = false;
 
     std::uint32_t configuredOutputMode = 0;
     std::uint32_t configuredInputMode = 0;

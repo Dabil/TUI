@@ -2,19 +2,19 @@
 
 /*
 
-Short integration note explaining how replace, 
+Short integration note explaining how replace,
 preserve, and merge should be used by callers
 
 Use the modes like this:
 
-Style result = StyleMerge::merge(existingStyle, 
+Style result = StyleMerge::merge(existingStyle,
 incomingStyle, StyleMergeMode::Replace);
 
 Use Replace when:
 
-an object or theme wants to fully define the 
-final style previous logical styling should be 
-discarded 
+an object or theme wants to fully define the
+final style previous logical styling should be
+discarded
 
 Style result = StyleMerge::merge(existingStyle, incomingStyle, StyleMergeMode::PreserveDestination);
 
@@ -26,19 +26,55 @@ Style result = StyleMerge::merge(existingStyle, incomingStyle, StyleMergeMode::M
 
 Use MergePreserveDestination when:
 
-you want “apply this style on top”
-color fields from the incoming style should 
+you want "apply this style on top"
+color fields from the incoming style should
 override only when present
-boolean style flags should be added without 
-erasing existing authored intent
+boolean style fields should override only when
+present so they can explicitly enable or disable
+without erasing unspecified destination fields
 
-This is the right logical merge behavior for 
-ScreenCell, ScreenBuffer, page composition, and 
-theme layering. Renderer downgrade or capability 
-handling should still happen later through 
+This is the right logical merge behavior for
+ScreenCell, ScreenBuffer, page composition, and
+theme layering. Renderer downgrade or capability
+handling should still happen later through
 StylePolicy, not here.
 
 */
+
+namespace
+{
+    void mergeOptionalColor(
+        Style& result,
+        const Style& source,
+        bool foreground)
+    {
+        if (foreground)
+        {
+            if (source.hasForeground())
+            {
+                result = result.withForeground(*source.foreground());
+            }
+        }
+        else
+        {
+            if (source.hasBackground())
+            {
+                result = result.withBackground(*source.background());
+            }
+        }
+    }
+
+    void mergeOptionalAttribute(
+        Style& result,
+        const Style::AttributeState& state,
+        Style(Style::* setter)(bool) const)
+    {
+        if (state.has_value())
+        {
+            result = (result.*setter)(*state);
+        }
+    }
+}
 
 Style StyleMerge::merge(
     const Style& destination,
@@ -67,55 +103,17 @@ Style StyleMerge::mergePreserveDestination(
 {
     Style result = destination;
 
-    if (source.hasForeground())
-    {
-        result = result.withForeground(*source.foreground());
-    }
+    mergeOptionalColor(result, source, true);
+    mergeOptionalColor(result, source, false);
 
-    if (source.hasBackground())
-    {
-        result = result.withBackground(*source.background());
-    }
-
-    if (source.bold())
-    {
-        result = result.withBold(true);
-    }
-
-    if (source.dim())
-    {
-        result = result.withDim(true);
-    }
-
-    if (source.underline())
-    {
-        result = result.withUnderline(true);
-    }
-
-    if (source.slowBlink())
-    {
-        result = result.withSlowBlink(true);
-    }
-
-    if (source.fastBlink())
-    {
-        result = result.withFastBlink(true);
-    }
-
-    if (source.reverse())
-    {
-        result = result.withReverse(true);
-    }
-
-    if (source.invisible())
-    {
-        result = result.withInvisible(true);
-    }
-
-    if (source.strike())
-    {
-        result = result.withStrike(true);
-    }
+    mergeOptionalAttribute(result, source.boldState(), &Style::withBold);
+    mergeOptionalAttribute(result, source.dimState(), &Style::withDim);
+    mergeOptionalAttribute(result, source.underlineState(), &Style::withUnderline);
+    mergeOptionalAttribute(result, source.slowBlinkState(), &Style::withSlowBlink);
+    mergeOptionalAttribute(result, source.fastBlinkState(), &Style::withFastBlink);
+    mergeOptionalAttribute(result, source.reverseState(), &Style::withReverse);
+    mergeOptionalAttribute(result, source.invisibleState(), &Style::withInvisible);
+    mergeOptionalAttribute(result, source.strikeState(), &Style::withStrike);
 
     return result;
 }

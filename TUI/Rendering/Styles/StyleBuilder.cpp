@@ -8,7 +8,8 @@ Composition behavior with this design is simple and predictable:
 left side is the base style
 right side overlays onto it
 foreground/background from the right replace the left if present
-enabled boolean flags on the right are added to the result
+boolean style fields from the right replace the left only when the
+right side explicitly authored that field
 this is still purely logical style composition, not renderer capability mapping
 
 This makes it a good fit for themes, page composition, and any future semantic style namespace layer.

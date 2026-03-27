@@ -31,6 +31,37 @@ namespace
         stream << "0x" << std::hex << std::uppercase << flags;
         return stream.str();
     }
+
+    std::string formatModeValue(std::uint32_t mode, bool hasMode)
+    {
+        if (!hasMode)
+        {
+            return "Unavailable";
+        }
+
+        std::ostringstream stream;
+        stream << "0x" << std::hex << std::uppercase << mode;
+        return stream.str();
+    }
+
+    const char* vtAvailabilityText(const BackendStateSnapshot& backendState)
+    {
+        if (!backendState.virtualTerminalEnableAttempted)
+        {
+            return "Not probed";
+        }
+
+        return backendState.virtualTerminalEnableSucceeded ?
+            "Available (enable attempt succeeded)" :
+            "Unavailable on current configuration (enable attempt failed)";
+    }
+
+    const char* activePathSummaryText(const BackendStateSnapshot& backendState)
+    {
+        return backendState.activeRenderPathUsesVirtualTerminalOutput ?
+            "VT output path" :
+            "Non-VT attribute path";
+    }
 }
 
 bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
@@ -53,6 +84,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     const CapabilityReport& report = diagnostics.report();
     const ConsoleCapabilities& capabilities = report.capabilities();
     const StylePolicy& policy = report.policy();
+    const BackendStateSnapshot& backendState = report.backendState();
 
     writeSectionHeader(out, "Render Diagnostics Report");
 
@@ -61,6 +93,43 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "Output path: " << diagnostics.outputPath() << "\n";
     out << "Append mode: " << (diagnostics.appendMode() ? "true" : "false") << "\n";
     out << "Diagnostics enabled: " << (diagnostics.isEnabled() ? "true" : "false") << "\n\n";
+
+    out << "Backend Activation State\n";
+    out << "------------------------\n";
+    out << "Renderer identity: " << backendState.rendererIdentity << "\n";
+    out << "Active render path: " << backendState.activeRenderPath << "\n";
+    out << "Active render path kind: " << activePathSummaryText(backendState) << "\n";
+    out << "Active render path uses VT output: "
+        << (backendState.activeRenderPathUsesVirtualTerminalOutput ? "true" : "false") << "\n";
+    out << "VT enable attempted: "
+        << (backendState.virtualTerminalEnableAttempted ? "true" : "false") << "\n";
+    out << "VT enable succeeded: "
+        << (backendState.virtualTerminalEnableSucceeded ? "true" : "false") << "\n";
+    out << "VT availability summary: " << vtAvailabilityText(backendState) << "\n";
+    out << "VT processing active in console mode: "
+        << (backendState.virtualTerminalProcessingActive ? "true" : "false") << "\n";
+    out << "Configured output mode: "
+        << formatModeValue(backendState.configuredOutputMode, backendState.hasConfiguredOutputMode) << "\n";
+    out << "Configured input mode: "
+        << formatModeValue(backendState.configuredInputMode, backendState.hasConfiguredInputMode) << "\n";
+
+    if (backendState.virtualTerminalProcessingActive &&
+        !backendState.activeRenderPathUsesVirtualTerminalOutput)
+    {
+        out << "Interpretation: VT processing is active/available at the console mode level, "
+            << "but the renderer is still presenting through its conservative non-VT Win32 attribute path.\n";
+    }
+    else if (!backendState.virtualTerminalProcessingActive &&
+        !backendState.activeRenderPathUsesVirtualTerminalOutput)
+    {
+        out << "Interpretation: VT processing is not active for this session, and the renderer is presenting through its conservative non-VT Win32 attribute path.\n";
+    }
+    else
+    {
+        out << "Interpretation: The active renderer/output path matches the VT activation state reported above.\n";
+    }
+
+    out << "\n";
 
     out << "Detected Backend Capabilities\n";
     out << "-----------------------------\n";
@@ -183,6 +252,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "-----\n";
     out << "- Diagnostics describe renderer behavior only.\n";
     out << "- Logical Style data stored in ScreenBuffer is not mutated by diagnostics or adaptation.\n";
+    out << "- VT enablement/availability and active renderer path are reported separately on purpose.\n";
     out << "- Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.\n";
     out << "- Bright basic color capability describes palette/intensity color presentation, not bold or dim text semantics.\n";
     out << "- Author-facing hints are advisory only and do not change rendering behavior.\n";
