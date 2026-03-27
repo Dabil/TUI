@@ -1,7 +1,9 @@
 #include "Rendering/Diagnostics/RenderDiagnosticsWriter.h"
 
 #include <fstream>
+#include <iomanip>
 #include <ios>
+#include <sstream>
 
 #include "Rendering/Diagnostics/AuthorRenderHints.h"
 
@@ -17,6 +19,25 @@ namespace
         }
 
         out << "\n\n";
+    }
+
+    std::string formatConsoleMode(std::uint32_t mode, bool hasValue)
+    {
+        if (!hasValue)
+        {
+            return "Unavailable";
+        }
+
+        std::ostringstream stream;
+        stream
+            << "0x"
+            << std::uppercase
+            << std::hex
+            << std::setw(8)
+            << std::setfill('0')
+            << mode;
+
+        return stream.str();
     }
 }
 
@@ -40,6 +61,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     const CapabilityReport& report = diagnostics.report();
     const ConsoleCapabilities& capabilities = report.capabilities();
     const StylePolicy& policy = report.policy();
+    const BackendStateSnapshot& backendState = report.backendState();
 
     writeSectionHeader(out, "Render Diagnostics Report");
 
@@ -48,6 +70,18 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "Output path: " << diagnostics.outputPath() << "\n";
     out << "Append mode: " << (diagnostics.appendMode() ? "true" : "false") << "\n";
     out << "Diagnostics enabled: " << (diagnostics.isEnabled() ? "true" : "false") << "\n\n";
+
+    out << "Backend Configuration State\n";
+    out << "---------------------------\n";
+    out << "Renderer/backend identity: " << backendState.rendererIdentity << "\n";
+    out << "VT enable attempted: "
+        << (backendState.virtualTerminalEnableAttempted ? "true" : "false") << "\n";
+    out << "VT enable succeeded: "
+        << (backendState.virtualTerminalEnableSucceeded ? "true" : "false") << "\n";
+    out << "Configured output mode: "
+        << formatConsoleMode(backendState.configuredOutputMode, backendState.hasConfiguredOutputMode) << "\n";
+    out << "Configured input mode: "
+        << formatConsoleMode(backendState.configuredInputMode, backendState.hasConfiguredInputMode) << "\n\n";
 
     out << "Detected Backend Capabilities\n";
     out << "-----------------------------\n";
