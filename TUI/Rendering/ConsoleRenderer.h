@@ -97,13 +97,13 @@ private:
         const std::optional<Color>& presentedColor);
     void recordTextFeature(
         StyleFeature feature,
-        bool authoredEnabled,
+        const Style::AttributeState& authoredState,
         bool presentedEnabled,
         bool physicallyRendered,
         TextAttributeRenderMode renderMode);
     void recordBlinkFeature(
         StyleFeature feature,
-        bool authoredEnabled,
+        const Style::AttributeState& authoredState,
         bool presentedEnabled,
         bool emulated,
         bool physicallyRendered);

@@ -102,13 +102,27 @@ void CapabilityReport::recordLogicalOnly(StyleFeature feature)
 void CapabilityReport::addExample(
     StyleFeature feature,
     StyleAdaptationKind kind,
-    const std::string& detail)
+    const std::string& detail,
+    LogicalStyleValueState logicalState)
 {
     StyleAdaptationExample example;
     example.feature = feature;
     example.kind = kind;
+    example.logicalState = logicalState;
     example.detail = detail;
     m_examples.push_back(example);
+}
+
+void CapabilityReport::addLogicalStateExample(
+    StyleFeature feature,
+    LogicalStyleValueState logicalState,
+    const std::string& detail)
+{
+    StyleLogicalStateExample example;
+    example.feature = feature;
+    example.logicalState = logicalState;
+    example.detail = detail;
+    m_logicalStateExamples.push_back(example);
 }
 
 std::size_t CapabilityReport::getCount(StyleFeature feature, StyleAdaptationKind kind) const
@@ -134,6 +148,11 @@ const std::vector<StyleAdaptationExample>& CapabilityReport::examples() const
     return m_examples;
 }
 
+const std::vector<StyleLogicalStateExample>& CapabilityReport::logicalStateExamples() const
+{
+    return m_logicalStateExamples;
+}
+
 void CapabilityReport::clearRuntimeData()
 {
     for (StyleAdaptationCounter& counter : m_counters)
@@ -142,6 +161,7 @@ void CapabilityReport::clearRuntimeData()
     }
 
     m_examples.clear();
+    m_logicalStateExamples.clear();
 }
 
 bool CapabilityReport::hasRuntimeData() const
@@ -154,7 +174,7 @@ bool CapabilityReport::hasRuntimeData() const
         }
     }
 
-    return !m_examples.empty();
+    return !m_examples.empty() || !m_logicalStateExamples.empty();
 }
 
 const char* CapabilityReport::toString(ConsoleColorTier tier)
@@ -316,6 +336,24 @@ const char* CapabilityReport::toString(StyleAdaptationKind kind)
 
     case StyleAdaptationKind::LogicalOnly:
         return "LogicalOnly";
+
+    default:
+        return "Unknown";
+    }
+}
+
+const char* CapabilityReport::toString(LogicalStyleValueState state)
+{
+    switch (state)
+    {
+    case LogicalStyleValueState::Unspecified:
+        return "Unspecified";
+
+    case LogicalStyleValueState::ExplicitlyEnabled:
+        return "ExplicitlyEnabled";
+
+    case LogicalStyleValueState::ExplicitlyDisabled:
+        return "ExplicitlyDisabled";
 
     default:
         return "Unknown";

@@ -417,10 +417,41 @@ namespace
         return color.has_value() && (color->isDefault() || color->isBasic());
     }
 
+    LogicalStyleValueState logicalStateFromAttributeState(const Style::AttributeState& state)
+    {
+        if (!state.has_value())
+        {
+            return LogicalStyleValueState::Unspecified;
+        }
+
+        return *state
+            ? LogicalStyleValueState::ExplicitlyEnabled
+            : LogicalStyleValueState::ExplicitlyDisabled;
+    }
+
     bool shouldCaptureExample(const CapabilityReport& report, StyleFeature feature, StyleAdaptationKind kind)
     {
         return report.examples().size() < kMaxRecordedExamples &&
             report.getCount(feature, kind) <= kMaxExamplesPerFeatureKind;
+    }
+
+    bool shouldCaptureLogicalStateExample(
+        const CapabilityReport& report,
+        StyleFeature feature,
+        LogicalStyleValueState logicalState)
+    {
+        std::size_t matchingExamples = 0;
+
+        for (const StyleLogicalStateExample& example : report.logicalStateExamples())
+        {
+            if (example.feature == feature && example.logicalState == logicalState)
+            {
+                ++matchingExamples;
+            }
+        }
+
+        return report.logicalStateExamples().size() < kMaxRecordedExamples &&
+            matchingExamples < 1;
     }
 
     std::string buildColorExampleDetail(
@@ -436,12 +467,15 @@ namespace
         return detail.str();
     }
 
-    std::string buildTextExampleDetail(const char* label, bool authoredEnabled, bool presentedEnabled)
+    std::string buildTextExampleDetail(
+        const char* label,
+        LogicalStyleValueState logicalState,
+        bool presentedEnabled)
     {
         std::ostringstream detail;
         detail
             << label
-            << " authored=" << (authoredEnabled ? "true" : "false")
+            << " logicalState=" << CapabilityReport::toString(logicalState)
             << ", presented=" << (presentedEnabled ? "true" : "false");
         return detail.str();
     }
@@ -1107,56 +1141,56 @@ void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const Resolve
 
     recordTextFeature(
         StyleFeature::Bold,
-        authoredStyle.bold(),
+        authoredStyle.boldState(),
         presentedStyle.bold(),
         presentedStyle.bold(),
         m_stylePolicy.boldMode());
 
     recordTextFeature(
         StyleFeature::Dim,
-        authoredStyle.dim(),
+        authoredStyle.dimState(),
         presentedStyle.dim(),
         presentedStyle.dim(),
         m_stylePolicy.dimMode());
 
     recordTextFeature(
         StyleFeature::Underline,
-        authoredStyle.underline(),
+        authoredStyle.underlineState(),
         presentedStyle.underline(),
         presentedStyle.underline(),
         m_stylePolicy.underlineMode());
 
     recordBlinkFeature(
         StyleFeature::SlowBlink,
-        authoredStyle.slowBlink(),
+        authoredStyle.slowBlinkState(),
         presentedStyle.slowBlink(),
         resolvedStyle.emulateSlowBlink,
         false);
 
     recordBlinkFeature(
         StyleFeature::FastBlink,
-        authoredStyle.fastBlink(),
+        authoredStyle.fastBlinkState(),
         presentedStyle.fastBlink(),
         resolvedStyle.emulateFastBlink,
         false);
 
     recordTextFeature(
         StyleFeature::Reverse,
-        authoredStyle.reverse(),
+        authoredStyle.reverseState(),
         presentedStyle.reverse(),
         presentedStyle.reverse(),
         m_stylePolicy.reverseMode());
 
     recordTextFeature(
         StyleFeature::Invisible,
-        authoredStyle.invisible(),
+        authoredStyle.invisibleState(),
         presentedStyle.invisible(),
         presentedStyle.invisible(),
         m_stylePolicy.invisibleMode());
 
     recordTextFeature(
         StyleFeature::Strike,
-        authoredStyle.strike(),
+        authoredStyle.strikeState(),
         presentedStyle.strike(),
         false,
         m_stylePolicy.strikeMode());
@@ -1254,17 +1288,42 @@ void ConsoleRenderer::recordColorFeature(
 
 void ConsoleRenderer::recordTextFeature(
     StyleFeature feature,
-    bool authoredEnabled,
+    const Style::AttributeState& authoredState,
     bool presentedEnabled,
     bool physicallyRendered,
     TextAttributeRenderMode renderMode)
 {
-    if (!authoredEnabled)
+    CapabilityReport& report = m_renderDiagnostics.report();
+    const LogicalStyleValueState logicalState = logicalStateFromAttributeState(authoredState);
+
+    if (shouldCaptureLogicalStateExample(report, feature, logicalState))
+    {
+        std::ostringstream detail;
+        detail
+            << "Logical field observed with state="
+            << CapabilityReport::toString(logicalState)
+            << ", presented=" << (presentedEnabled ? "true" : "false");
+        report.addLogicalStateExample(feature, logicalState, detail.str());
+    }
+
+    if (!authoredState.has_value())
     {
         return;
     }
 
-    CapabilityReport& report = m_renderDiagnostics.report();
+    if (!*authoredState)
+    {
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Direct))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Direct,
+                buildTextExampleDetail("Explicit disable preserved", logicalState, presentedEnabled),
+                logicalState);
+        }
+
+        return;
+    }
 
     if (!presentedEnabled)
     {
@@ -1275,7 +1334,8 @@ void ConsoleRenderer::recordTextFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::Omitted,
-                buildTextExampleDetail("Style omitted", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Style omitted", logicalState, presentedEnabled),
+                logicalState);
         }
 
         return;
@@ -1290,7 +1350,8 @@ void ConsoleRenderer::recordTextFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::LogicalOnly,
-                buildTextExampleDetail("Style preserved logically but not emitted by the Win32 attribute path", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Style preserved logically but not emitted by the Win32 attribute path", logicalState, presentedEnabled),
+                logicalState);
         }
 
         return;
@@ -1305,28 +1366,63 @@ void ConsoleRenderer::recordTextFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::Approximated,
-                buildTextExampleDetail("Style approximated through the current Win32 attribute path", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Style approximated through the current Win32 attribute path", logicalState, presentedEnabled),
+                logicalState);
         }
 
         return;
     }
 
     report.recordDirect(feature);
+
+    if (shouldCaptureExample(report, feature, StyleAdaptationKind::Direct))
+    {
+        report.addExample(
+            feature,
+            StyleAdaptationKind::Direct,
+            buildTextExampleDetail("Style rendered directly", logicalState, presentedEnabled),
+            logicalState);
+    }
 }
 
 void ConsoleRenderer::recordBlinkFeature(
     StyleFeature feature,
-    bool authoredEnabled,
+    const Style::AttributeState& authoredState,
     bool presentedEnabled,
     bool emulated,
     bool physicallyRendered)
 {
-    if (!authoredEnabled)
+    CapabilityReport& report = m_renderDiagnostics.report();
+    const LogicalStyleValueState logicalState = logicalStateFromAttributeState(authoredState);
+
+    if (shouldCaptureLogicalStateExample(report, feature, logicalState))
+    {
+        std::ostringstream detail;
+        detail
+            << "Logical field observed with state="
+            << CapabilityReport::toString(logicalState)
+            << ", presented=" << (presentedEnabled ? "true" : "false");
+        report.addLogicalStateExample(feature, logicalState, detail.str());
+    }
+
+    if (!authoredState.has_value())
     {
         return;
     }
 
-    CapabilityReport& report = m_renderDiagnostics.report();
+    if (!*authoredState)
+    {
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Direct))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Direct,
+                buildTextExampleDetail("Explicit blink disable preserved", logicalState, presentedEnabled),
+                logicalState);
+        }
+
+        return;
+    }
 
     if (emulated)
     {
@@ -1337,7 +1433,8 @@ void ConsoleRenderer::recordBlinkFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::Emulated,
-                buildTextExampleDetail("Emulated blink", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Emulated blink", logicalState, presentedEnabled),
+                logicalState);
         }
 
         return;
@@ -1352,7 +1449,8 @@ void ConsoleRenderer::recordBlinkFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::Omitted,
-                buildTextExampleDetail("Blink omitted", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Blink omitted", logicalState, presentedEnabled),
+                logicalState);
         }
 
         return;
@@ -1367,11 +1465,21 @@ void ConsoleRenderer::recordBlinkFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::LogicalOnly,
-                buildTextExampleDetail("Blink preserved logically but not emitted by the Win32 attribute path", authoredEnabled, presentedEnabled));
+                buildTextExampleDetail("Blink preserved logically but not emitted by the Win32 attribute path", logicalState, presentedEnabled),
+                logicalState);
         }
 
         return;
     }
 
     report.recordDirect(feature);
+
+    if (shouldCaptureExample(report, feature, StyleAdaptationKind::Direct))
+    {
+        report.addExample(
+            feature,
+            StyleAdaptationKind::Direct,
+            buildTextExampleDetail("Blink rendered directly", logicalState, presentedEnabled),
+            logicalState);
+    }
 }

@@ -21,6 +21,7 @@
         - backend activation/runtime-path state
         - summary counts of adaptation outcomes
         - optional representative examples
+        - optional tri-state logical style examples
 
     This model is intended to be optional and non-invasive.
 */
@@ -49,6 +50,13 @@ enum class StyleFeature
     Strike
 };
 
+enum class LogicalStyleValueState
+{
+    Unspecified,
+    ExplicitlyEnabled,
+    ExplicitlyDisabled
+};
+
 struct StyleAdaptationCounter
 {
     StyleFeature feature = StyleFeature::ForegroundColor;
@@ -60,6 +68,14 @@ struct StyleAdaptationExample
 {
     StyleFeature feature = StyleFeature::ForegroundColor;
     StyleAdaptationKind kind = StyleAdaptationKind::Direct;
+    LogicalStyleValueState logicalState = LogicalStyleValueState::Unspecified;
+    std::string detail;
+};
+
+struct StyleLogicalStateExample
+{
+    StyleFeature feature = StyleFeature::ForegroundColor;
+    LogicalStyleValueState logicalState = LogicalStyleValueState::Unspecified;
     std::string detail;
 };
 
@@ -103,12 +119,19 @@ public:
     void addExample(
         StyleFeature feature,
         StyleAdaptationKind kind,
+        const std::string& detail,
+        LogicalStyleValueState logicalState = LogicalStyleValueState::Unspecified);
+
+    void addLogicalStateExample(
+        StyleFeature feature,
+        LogicalStyleValueState logicalState,
         const std::string& detail);
 
     std::size_t getCount(StyleFeature feature, StyleAdaptationKind kind) const;
 
     const std::vector<StyleAdaptationCounter>& counters() const;
     const std::vector<StyleAdaptationExample>& examples() const;
+    const std::vector<StyleLogicalStateExample>& logicalStateExamples() const;
 
     void clearRuntimeData();
     bool hasRuntimeData() const;
@@ -120,6 +143,7 @@ public:
     static const char* toString(BlinkRenderMode mode);
     static const char* toString(StyleFeature feature);
     static const char* toString(StyleAdaptationKind kind);
+    static const char* toString(LogicalStyleValueState state);
 
 private:
     void increment(StyleFeature feature, StyleAdaptationKind kind);
@@ -131,4 +155,5 @@ private:
 
     std::vector<StyleAdaptationCounter> m_counters;
     std::vector<StyleAdaptationExample> m_examples;
+    std::vector<StyleLogicalStateExample> m_logicalStateExamples;
 };

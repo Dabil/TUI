@@ -62,6 +62,95 @@ namespace
             "VT output path" :
             "Non-VT attribute path";
     }
+
+    const char* featureCapabilityText(const CapabilityReport& report, StyleFeature feature)
+    {
+        const ConsoleCapabilities& capabilities = report.capabilities();
+
+        switch (feature)
+        {
+        case StyleFeature::ForegroundColor:
+        case StyleFeature::BackgroundColor:
+            return CapabilityReport::toString(capabilities.colorTier);
+
+        case StyleFeature::Bold:
+            return CapabilityReport::toString(capabilities.bold);
+
+        case StyleFeature::Dim:
+            return CapabilityReport::toString(capabilities.dim);
+
+        case StyleFeature::Underline:
+            return CapabilityReport::toString(capabilities.underline);
+
+        case StyleFeature::SlowBlink:
+            return CapabilityReport::toString(capabilities.slowBlink);
+
+        case StyleFeature::FastBlink:
+            return CapabilityReport::toString(capabilities.fastBlink);
+
+        case StyleFeature::Reverse:
+            return CapabilityReport::toString(capabilities.reverse);
+
+        case StyleFeature::Invisible:
+            return CapabilityReport::toString(capabilities.invisible);
+
+        case StyleFeature::Strike:
+            return CapabilityReport::toString(capabilities.strike);
+
+        default:
+            return "Unknown";
+        }
+    }
+
+    const char* featurePolicyText(const CapabilityReport& report, StyleFeature feature)
+    {
+        const StylePolicy& policy = report.policy();
+
+        switch (feature)
+        {
+        case StyleFeature::ForegroundColor:
+            return CapabilityReport::toString(policy.rgbColorMode());
+
+        case StyleFeature::BackgroundColor:
+            return CapabilityReport::toString(policy.rgbColorMode());
+
+        case StyleFeature::Bold:
+            return CapabilityReport::toString(policy.boldMode());
+
+        case StyleFeature::Dim:
+            return CapabilityReport::toString(policy.dimMode());
+
+        case StyleFeature::Underline:
+            return CapabilityReport::toString(policy.underlineMode());
+
+        case StyleFeature::SlowBlink:
+            return CapabilityReport::toString(policy.slowBlinkMode());
+
+        case StyleFeature::FastBlink:
+            return CapabilityReport::toString(policy.fastBlinkMode());
+
+        case StyleFeature::Reverse:
+            return CapabilityReport::toString(policy.reverseMode());
+
+        case StyleFeature::Invisible:
+            return CapabilityReport::toString(policy.invisibleMode());
+
+        case StyleFeature::Strike:
+            return CapabilityReport::toString(policy.strikeMode());
+
+        default:
+            return "Unknown";
+        }
+    }
+
+    void writeFeatureReferenceLine(std::ofstream& out, const CapabilityReport& report, StyleFeature feature)
+    {
+        out
+            << CapabilityReport::toString(feature)
+            << ": capability=" << featureCapabilityText(report, feature)
+            << ", policy=" << featurePolicyText(report, feature)
+            << "\n";
+    }
 }
 
 bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
@@ -187,6 +276,20 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "Fast blink: "
         << CapabilityReport::toString(policy.fastBlinkMode()) << "\n\n";
 
+    out << "Per-Feature Capability/Policy Reference\n";
+    out << "--------------------------------------\n";
+    writeFeatureReferenceLine(out, report, StyleFeature::ForegroundColor);
+    writeFeatureReferenceLine(out, report, StyleFeature::BackgroundColor);
+    writeFeatureReferenceLine(out, report, StyleFeature::Bold);
+    writeFeatureReferenceLine(out, report, StyleFeature::Dim);
+    writeFeatureReferenceLine(out, report, StyleFeature::Underline);
+    writeFeatureReferenceLine(out, report, StyleFeature::SlowBlink);
+    writeFeatureReferenceLine(out, report, StyleFeature::FastBlink);
+    writeFeatureReferenceLine(out, report, StyleFeature::Reverse);
+    writeFeatureReferenceLine(out, report, StyleFeature::Invisible);
+    writeFeatureReferenceLine(out, report, StyleFeature::Strike);
+    out << "\n";
+
     out << "Adaptation Summary Counts\n";
     out << "-------------------------\n";
 
@@ -213,6 +316,31 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
 
     out << "\n";
 
+    out << "Tri-State Logical Style Examples\n";
+    out << "--------------------------------\n";
+    out << "Legend: Unspecified = field absent in authored style, ExplicitlyEnabled = field authored true, ExplicitlyDisabled = field authored false.\n";
+
+    if (report.logicalStateExamples().empty())
+    {
+        out << "No tri-state logical style examples recorded.\n";
+    }
+    else
+    {
+        for (const StyleLogicalStateExample& example : report.logicalStateExamples())
+        {
+            out
+                << "["
+                << CapabilityReport::toString(example.feature)
+                << " / logical="
+                << CapabilityReport::toString(example.logicalState)
+                << "] "
+                << example.detail
+                << "\n";
+        }
+    }
+
+    out << "\n";
+
     out << "Representative Examples\n";
     out << "-----------------------\n";
 
@@ -229,8 +357,11 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
                 << CapabilityReport::toString(example.feature)
                 << " / "
                 << CapabilityReport::toString(example.kind)
-                << "] "
-                << example.detail
+                << " / logical="
+                << CapabilityReport::toString(example.logicalState)
+                << "] capability=" << featureCapabilityText(report, example.feature)
+                << ", policy=" << featurePolicyText(report, example.feature)
+                << ", detail=" << example.detail
                 << "\n";
         }
     }
@@ -252,8 +383,10 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "-----\n";
     out << "- Diagnostics describe renderer behavior only.\n";
     out << "- Logical Style data stored in ScreenBuffer is not mutated by diagnostics or adaptation.\n";
+    out << "- Tri-state logical reporting exists to distinguish absent fields from explicit enable/disable intent.\n";
     out << "- VT enablement/availability and active renderer path are reported separately on purpose.\n";
     out << "- Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.\n";
+    out << "- Direct rendering can now increase when the backend capability/policy pair safely permits maximal feature use.\n";
     out << "- Bright basic color capability describes palette/intensity color presentation, not bold or dim text semantics.\n";
     out << "- Author-facing hints are advisory only and do not change rendering behavior.\n";
 
