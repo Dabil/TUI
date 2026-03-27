@@ -22,6 +22,13 @@ public:
     void draw(Surface& surface) override;
 
 private:
+    enum class DropComposition
+    {
+        BrightWhiteWhite,   // 25%
+        WhiteOnly,          // 25%
+        GreenOnly           // 50%
+    };
+
     struct Stream
     {
         bool active = false;
@@ -30,6 +37,7 @@ private:
         int length = 0;
         double respawnDelay = 0.0;
         double mutationTimer = 0.0;
+        DropComposition composition = DropComposition::GreenOnly;
         std::vector<char32_t> glyphs;
     };
 
@@ -40,15 +48,18 @@ private:
     void configureActiveStream(Stream& stream);
     void updateStreams(double deltaTime);
     void updatePreview(double deltaTime);
+    void spawnDeadGlyphs(double deltaTime);
 
     void drawRain(ScreenBuffer& buffer) const;
     void drawOverlay(ScreenBuffer& buffer) const;
     void drawPreviewLine(ScreenBuffer& buffer, int x, int y, int availableWidth, int startIndex) const;
 
-    int countActiveStream() const;
+    int countActiveStreams() const;
 
     char32_t randomGlyph();
-    Style styleForTrailIndex(int trailIndex, int streamLength) const;
+
+    Style styleForTrailIndex(int trailIndex, int streamLength, DropComposition composition) const;
+
 private:
     int m_screenWidth = 0;
     int m_screenHeight = 0;

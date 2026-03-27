@@ -13,17 +13,56 @@
 #include "Utilities/Unicode/UnicodeWidth.h"
 
 namespace
-{
+{   // add shedding
     constexpr int MinimumScreenWidth = 48;
     constexpr int MinimumScreenHeight = 14;
     constexpr int FooterRows = 2;
     constexpr double PreviewAdvanceIntervalSeconds = 0.08;
     constexpr double MutationIntervalSeconds = 0.065;
 
-    constexpr int MaximumDigitalDrops = 50;
+    constexpr int MaximumDigitalDrops = 150;
+    constexpr int DeadGlyphsSpawnRate = 25;
+    constexpr int DeadGlyphBlinkRate = 10;
 
+    struct DeadGlyph
+    {
+        int x = 0;
+        int y = 0;
+        char32_t glyph = U' ';
+    };
+
+    std::vector<DeadGlyph> m_deadGlyphs;
+    double m_deadGlyphSpawnAccumulator = 0.0;
+
+    enum class DropComposition
+    {
+        BrightWhiteWhite,   // 25%
+        WhiteOnly,          // 25%
+        GreenOnly           // 50%
+    };
+
+    // use this pool for console
+    std::u32string buildGlyphPool()
+    {
+        return std::u32string(
+            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            U"@#$%&*+=<>"
+            U"[]{}()"
+            U"█▓▒░"
+            U"■□▪▫"
+            U"▲△▼▽"
+            U"◆◇○●"
+            U"◢◣◤◥"
+            U"┌┐└┘├┤┬┴┼"
+            U"╔╗╚╝╠╣╦╩╬"
+            U"│┃─━"
+            U"←↑→↓");
+    }
+
+    // use this pool for terminal
+   /*
     constexpr char32_t RabbitGlyph = U'\U0001F407';
-        
+
     std::u32string buildGlyphPool()
     {
         return std::u32string(
@@ -36,7 +75,7 @@ namespace
             U"♔♕♖♗♘♙♚♛♜♝♞♟"
             U"♪♫")
             + std::u32string(1, RabbitGlyph);
-    }
+    }*/
 }
 
 DigitalRainScreen::DigitalRainScreen()
@@ -102,6 +141,7 @@ void DigitalRainScreen::update(double deltaTime)
     }
 
     updateStreams(deltaTime);
+    spawnDeadGlyphs(deltaTime);
     updatePreview(deltaTime);
 }
 
@@ -141,13 +181,14 @@ void DigitalRainScreen::draw(Surface& surface)
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
         Themes::Frame);
 
+
     drawOverlay(buffer);
 }
 
 void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
 {
-    const int newRainLeft = 1;
-    const int newRainTop = 1;
+    const int newRainLeft = 2;
+    const int newRainTop = 2;
     const int newRainWidth = std::max(0, screenWidth - 2);
     const int newRainHeight = std::max(0, screenHeight - 2 - FooterRows);
 
@@ -193,6 +234,7 @@ void DigitalRainScreen::resetStream(Stream& stream, bool staggerStart)
     stream.length = 0;
     stream.mutationTimer = 0.0;
     stream.glyphs.clear();
+    stream.composition = DropComposition::GreenOnly;
 
     std::uniform_real_distribution<double> delayDistribution(
         0.0,
@@ -208,9 +250,10 @@ void DigitalRainScreen::resetStream(Stream& stream, bool staggerStart)
 
 void DigitalRainScreen::configureActiveStream(Stream& stream)
 {
-    std::uniform_real_distribution<float> speedDistribution(10.0f, 28.0f);
+    std::uniform_real_distribution<float> speedDistribution(0.25f, 28.0f);
     std::uniform_int_distribution<int> lengthDistribution(6, std::max(6, std::min(m_rainHeight, 24)));
     std::uniform_real_distribution<float> headOffsetDistribution(1.0f, static_cast<float>(std::max(2, m_rainHeight / 2)));
+    std::uniform_int_distribution<int> compositionDistribution(0, 99);
 
     stream.active = true;
     stream.speed = speedDistribution(m_rng);
@@ -218,6 +261,21 @@ void DigitalRainScreen::configureActiveStream(Stream& stream)
     stream.headY = -headOffsetDistribution(m_rng);
     stream.mutationTimer = 0.0;
     stream.glyphs.assign(static_cast<std::size_t>(stream.length), U' ');
+
+    const int compositionRoll = compositionDistribution(m_rng);
+
+    if (compositionRoll < 25)
+    {
+        stream.composition = DropComposition::BrightWhiteWhite;
+    }
+    else if (compositionRoll < 50)
+    {
+        stream.composition = DropComposition::WhiteOnly;
+    }
+    else
+    {
+        stream.composition = DropComposition::GreenOnly;
+    }
 
     for (char32_t& glyph : stream.glyphs)
     {
@@ -238,7 +296,7 @@ void DigitalRainScreen::updateStreams(double deltaTime)
             if (stream.respawnDelay <= 0.0)
             {
                 // Enforce global active stream cap
-                if (countActiveStream() < MaximumDigitalDrops)
+                if (countActiveStreams() < MaximumDigitalDrops)
                 {
                     configureActiveStream(stream);
                 }
@@ -310,7 +368,7 @@ void DigitalRainScreen::updatePreview(double deltaTime)
     }
 }
 
-int DigitalRainScreen::countActiveStream() const
+int DigitalRainScreen::countActiveStreams() const
 {
     int count = 0;
 
@@ -325,12 +383,68 @@ int DigitalRainScreen::countActiveStream() const
     return count;
 }
 
+void DigitalRainScreen::spawnDeadGlyphs(double deltaTime)
+{
+    // Accumulate time
+    m_deadGlyphSpawnAccumulator += deltaTime;
+
+    // How many glyphs per second
+    constexpr double spawnRate = static_cast<double>(DeadGlyphsSpawnRate);
+
+    if (spawnRate <= 0.0)
+    {
+        return;
+    }
+
+    const double interval = 1.0 / spawnRate;
+
+    // Spawn as many as needed this frame
+    while (m_deadGlyphSpawnAccumulator >= interval)
+    {
+        m_deadGlyphSpawnAccumulator -= interval;
+
+        if (m_rainWidth <= 0 || m_rainHeight <= 0)
+        {
+            continue;
+        }
+
+        std::uniform_int_distribution<int> xDist(0, m_rainWidth - 1);
+        std::uniform_int_distribution<int> yDist(0, m_rainHeight - 1);
+
+        DeadGlyph glyph;
+        glyph.x = xDist(m_rng);
+        glyph.y = yDist(m_rng);
+        glyph.glyph = randomGlyph();
+
+        m_deadGlyphs.push_back(glyph);
+    }
+
+    // Optional: cap to prevent unbounded growth
+    constexpr std::size_t maxDeadGlyphs = 512;
+    if (m_deadGlyphs.size() > maxDeadGlyphs)
+    {
+        m_deadGlyphs.erase(
+            m_deadGlyphs.begin(),
+            m_deadGlyphs.begin() + (m_deadGlyphs.size() - maxDeadGlyphs));
+    }
+}
+
 void DigitalRainScreen::drawRain(ScreenBuffer& buffer) const
 {
     buffer.fillRect(
         Rect{ Point{ m_rainLeft, m_rainTop }, Size{ m_rainWidth, m_rainHeight } },
         U' ',
         m_backgroundStyle);
+
+    // Draw dead glyphs (background noise layer)
+    for (const DeadGlyph& glyph : m_deadGlyphs)
+    {
+        buffer.writeCodePoint(
+            m_rainLeft + glyph.x,
+            m_rainTop + glyph.y,
+            glyph.glyph,
+            m_tailStyle); // dim / "dead"
+    }
 
     for (int column = 0; column < m_rainWidth; ++column)
     {
@@ -352,7 +466,7 @@ void DigitalRainScreen::drawRain(ScreenBuffer& buffer) const
             }
 
             const char32_t glyph = stream.glyphs[static_cast<std::size_t>(trailIndex)];
-            const Style style = styleForTrailIndex(trailIndex, stream.length);
+            const Style style = styleForTrailIndex(trailIndex, stream.length, stream.composition);
             buffer.writeCodePoint(m_rainLeft + column, m_rainTop + y, glyph, style);
         }
     }
@@ -368,8 +482,19 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
     buffer.writeString(2, footerLabelY, "Pool:", m_labelStyle);
     drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
 
+    // Use this footer for console
     buffer.writeString(2, footerPreviewY, "Sample:", m_labelStyle);
 
+    buffer.writeCodePoint(10, footerPreviewY, U'█', m_previewStyle);
+    buffer.writeCodePoint(12, footerPreviewY, U'◆', m_previewStyle);
+    buffer.writeCodePoint(14, footerPreviewY, U'╬', m_previewStyle);
+    buffer.writeCodePoint(16, footerPreviewY, U'↑', m_previewStyle);
+    buffer.writeCodePoint(18, footerPreviewY, U'△', m_previewStyle);
+
+    buffer.writeString(21, footerPreviewY, "Console-safe fallback glyphs active", m_labelStyle);
+
+    // Use this footer for Terminal
+    /*
     buffer.writeCodePoint(10, footerPreviewY, U'ア', m_previewStyle);
     buffer.writeCodePoint(12, footerPreviewY, U'♔', m_previewStyle);
     buffer.writeCodePoint(14, footerPreviewY, U'☀', m_previewStyle);
@@ -377,6 +502,7 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
     buffer.writeCodePoint(18, footerPreviewY, RabbitGlyph, m_previewStyle);
 
     buffer.writeString(21, footerPreviewY, "Katakana + chess + weather + music + rabbit", m_labelStyle);
+    */
 }
 
 void DigitalRainScreen::drawPreviewLine(ScreenBuffer& buffer, int x, int y, int availableWidth, int startIndex) const
@@ -417,51 +543,81 @@ char32_t DigitalRainScreen::randomGlyph()
     return m_glyphPool[static_cast<std::size_t>(glyphDistribution(m_rng))];
 }
 
-Style DigitalRainScreen::styleForTrailIndex(int trailIndex, int streamLength) const
+Style DigitalRainScreen::styleForTrailIndex(
+    int trailIndex,
+    int streamLength,
+    DropComposition composition) const
 {
     if (streamLength <= 0)
     {
         return m_tailStyle;
     }
 
-    // Keep the head exactly as you said looks good.
-    if (trailIndex == 0)
-    {
-        return m_headStyle;      // BrightWhite
-    }
-
-    if (trailIndex == 1)
-    {
-        return m_secondStyle;    // White
-    }
-
-    // Only allow the final 2 cells of the drop to be BrightBlack.
-    const int brightBlackStart = std::max(2, streamLength - 2);
+    const int brightBlackStart = std::max(0, streamLength - 2);
     if (trailIndex >= brightBlackStart)
     {
-        return m_tailStyle;      // BrightBlack
+        return m_tailStyle;
     }
 
-    // Everything between the white head section and the final 2 dark cells
-    // gets split with more room given to BrightGreen than Green.
-    const int midStart = 2;
-    const int midEnd = brightBlackStart; // exclusive
-    const int midCount = std::max(0, midEnd - midStart);
+    int brightGreenStart = 0;
+    int greenStart = 0;
 
-    if (midCount <= 0)
+    switch (composition)
     {
-        return m_fourthStyle;    // Green fallback
+    case DropComposition::BrightWhiteWhite:
+        // 1 BrightWhite
+        // 1 White
+        // half middle BrightGreen
+        // half middle Green
+        // last 2 BrightBlack
+        if (trailIndex == 0)
+        {
+            return m_headStyle;
+        }
+
+        if (trailIndex == 1)
+        {
+            return m_secondStyle;
+        }
+
+        brightGreenStart = 2;
+        break;
+
+    case DropComposition::WhiteOnly:
+        // 1 White
+        // half middle BrightGreen
+        // half middle Green
+        // last 2 BrightBlack
+        if (trailIndex == 0)
+        {
+            return m_secondStyle;
+        }
+
+        brightGreenStart = 1;
+        break;
+
+    case DropComposition::GreenOnly:
+    default:
+        // half BrightGreen
+        // half Green
+        // last 2 BrightBlack
+        brightGreenStart = 0;
+        break;
     }
 
-    const int midIndex = trailIndex - midStart;
-
-    // Roughly 60% BrightGreen, 40% Green.
-    const int brightGreenCount = std::max(1, (midCount * 3) / 5);
-
-    if (midIndex < brightGreenCount)
+    const int middleCount = std::max(0, brightBlackStart - brightGreenStart);
+    if (middleCount <= 0)
     {
-        return m_thirdStyle;     // BrightGreen
+        return m_fourthStyle;
     }
 
-    return m_fourthStyle;        // Green
+    const int brightGreenCount = (middleCount + 1) / 2;
+    greenStart = brightGreenStart + brightGreenCount;
+
+    if (trailIndex < greenStart)
+    {
+        return m_thirdStyle;
+    }
+
+    return m_fourthStyle;
 }
