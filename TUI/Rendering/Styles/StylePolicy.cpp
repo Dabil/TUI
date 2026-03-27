@@ -31,7 +31,7 @@ StylePolicy StylePolicy::BasicConsole()
     StylePolicy policy;
     policy.m_basicColorMode = ColorRenderMode::Direct;
     policy.m_indexed256ColorMode = ColorRenderMode::DowngradeToBasic;
-    policy.m_rgbColorMode = ColorRenderMode::DowngradeToBasic;
+    policy.m_trueColorColorMode = ColorRenderMode::DowngradeToBasic;
 
     policy.m_boldMode = TextAttributeRenderMode::Direct;
     policy.m_dimMode = TextAttributeRenderMode::Direct;
@@ -154,9 +154,14 @@ ColorRenderMode StylePolicy::indexed256ColorMode() const
     return m_indexed256ColorMode;
 }
 
+ColorRenderMode StylePolicy::trueColorColorMode() const
+{
+    return m_trueColorColorMode;
+}
+
 ColorRenderMode StylePolicy::rgbColorMode() const
 {
-    return m_rgbColorMode;
+    return trueColorColorMode();
 }
 
 TextAttributeRenderMode StylePolicy::boldMode() const
@@ -213,11 +218,16 @@ StylePolicy StylePolicy::withIndexed256ColorMode(ColorRenderMode mode) const
     return copy;
 }
 
-StylePolicy StylePolicy::withRgbColorMode(ColorRenderMode mode) const
+StylePolicy StylePolicy::withTrueColorColorMode(ColorRenderMode mode) const
 {
     StylePolicy copy = *this;
-    copy.m_rgbColorMode = mode;
+    copy.m_trueColorColorMode = mode;
     return copy;
+}
+
+StylePolicy StylePolicy::withRgbColorMode(ColorRenderMode mode) const
+{
+    return withTrueColorColorMode(mode);
 }
 
 StylePolicy StylePolicy::withBoldMode(TextAttributeRenderMode mode) const
@@ -298,9 +308,9 @@ std::optional<Color> StylePolicy::resolveColor(const std::optional<Color>& color
         return applyColorMode(*color, m_indexed256ColorMode);
     }
 
-    if (color->isRgb())
+    if (color->isTrueColor())
     {
-        return applyColorMode(*color, m_rgbColorMode);
+        return applyColorMode(*color, m_trueColorColorMode);
     }
 
     return *color;
@@ -334,8 +344,8 @@ Color StylePolicy::downgradeToBasic(const Color& color) const
         return color;
     }
 
-    const RgbColor rgb = toRgb(color);
-    return Color::FromBasic(rgbToNearestBasic(rgb.red, rgb.green, rgb.blue));
+    const TrueColorValue trueColor = toTrueColor(color);
+    return Color::FromBasic(rgbToNearestBasic(trueColor.red, trueColor.green, trueColor.blue));
 }
 
 Color StylePolicy::downgradeToIndexed256(const Color& color) const
@@ -369,20 +379,20 @@ Color StylePolicy::downgradeToIndexed256(const Color& color) const
         }
     }
 
-    const RgbColor rgb = toRgb(color);
-    return Color::FromIndexed256(rgbToNearestIndexed256(rgb.red, rgb.green, rgb.blue));
+    const TrueColorValue trueColor = toTrueColor(color);
+    return Color::FromIndexed256(rgbToNearestIndexed256(trueColor.red, trueColor.green, trueColor.blue));
 }
 
-StylePolicy::RgbColor StylePolicy::toRgb(const Color& color) const
+StylePolicy::TrueColorValue StylePolicy::toTrueColor(const Color& color) const
 {
-    if (color.isRgb())
+    if (color.isTrueColor())
     {
         return { color.red(), color.green(), color.blue() };
     }
 
     if (color.isBasic())
     {
-        return basicToRgb(color.basic());
+        return basicToTrueColor(color.basic());
     }
 
     if (color.isIndexed256())
@@ -393,22 +403,22 @@ StylePolicy::RgbColor StylePolicy::toRgb(const Color& color) const
         {
             switch (index)
             {
-            case 0:  return basicToRgb(Color::Basic::Black);
-            case 1:  return basicToRgb(Color::Basic::Red);
-            case 2:  return basicToRgb(Color::Basic::Green);
-            case 3:  return basicToRgb(Color::Basic::Yellow);
-            case 4:  return basicToRgb(Color::Basic::Blue);
-            case 5:  return basicToRgb(Color::Basic::Magenta);
-            case 6:  return basicToRgb(Color::Basic::Cyan);
-            case 7:  return basicToRgb(Color::Basic::White);
-            case 8:  return basicToRgb(Color::Basic::BrightBlack);
-            case 9:  return basicToRgb(Color::Basic::BrightRed);
-            case 10: return basicToRgb(Color::Basic::BrightGreen);
-            case 11: return basicToRgb(Color::Basic::BrightYellow);
-            case 12: return basicToRgb(Color::Basic::BrightBlue);
-            case 13: return basicToRgb(Color::Basic::BrightMagenta);
-            case 14: return basicToRgb(Color::Basic::BrightCyan);
-            case 15: return basicToRgb(Color::Basic::BrightWhite);
+            case 0:  return basicToTrueColor(Color::Basic::Black);
+            case 1:  return basicToTrueColor(Color::Basic::Red);
+            case 2:  return basicToTrueColor(Color::Basic::Green);
+            case 3:  return basicToTrueColor(Color::Basic::Yellow);
+            case 4:  return basicToTrueColor(Color::Basic::Blue);
+            case 5:  return basicToTrueColor(Color::Basic::Magenta);
+            case 6:  return basicToTrueColor(Color::Basic::Cyan);
+            case 7:  return basicToTrueColor(Color::Basic::White);
+            case 8:  return basicToTrueColor(Color::Basic::BrightBlack);
+            case 9:  return basicToTrueColor(Color::Basic::BrightRed);
+            case 10: return basicToTrueColor(Color::Basic::BrightGreen);
+            case 11: return basicToTrueColor(Color::Basic::BrightYellow);
+            case 12: return basicToTrueColor(Color::Basic::BrightBlue);
+            case 13: return basicToTrueColor(Color::Basic::BrightMagenta);
+            case 14: return basicToTrueColor(Color::Basic::BrightCyan);
+            case 15: return basicToTrueColor(Color::Basic::BrightWhite);
             default: break;
             }
         }
@@ -437,7 +447,7 @@ StylePolicy::RgbColor StylePolicy::toRgb(const Color& color) const
     return { 0, 0, 0 };
 }
 
-StylePolicy::RgbColor StylePolicy::basicToRgb(Color::Basic color)
+StylePolicy::TrueColorValue StylePolicy::basicToTrueColor(Color::Basic color)
 {
     switch (color)
     {
@@ -470,27 +480,27 @@ Color::Basic StylePolicy::rgbToNearestBasic(
     struct Candidate
     {
         Color::Basic basic;
-        RgbColor rgb;
+        TrueColorValue trueColor;
     };
 
     static const Candidate candidates[] =
     {
-        { Color::Basic::Black,         basicToRgb(Color::Basic::Black) },
-        { Color::Basic::Red,           basicToRgb(Color::Basic::Red) },
-        { Color::Basic::Green,         basicToRgb(Color::Basic::Green) },
-        { Color::Basic::Yellow,        basicToRgb(Color::Basic::Yellow) },
-        { Color::Basic::Blue,          basicToRgb(Color::Basic::Blue) },
-        { Color::Basic::Magenta,       basicToRgb(Color::Basic::Magenta) },
-        { Color::Basic::Cyan,          basicToRgb(Color::Basic::Cyan) },
-        { Color::Basic::White,         basicToRgb(Color::Basic::White) },
-        { Color::Basic::BrightBlack,   basicToRgb(Color::Basic::BrightBlack) },
-        { Color::Basic::BrightRed,     basicToRgb(Color::Basic::BrightRed) },
-        { Color::Basic::BrightGreen,   basicToRgb(Color::Basic::BrightGreen) },
-        { Color::Basic::BrightYellow,  basicToRgb(Color::Basic::BrightYellow) },
-        { Color::Basic::BrightBlue,    basicToRgb(Color::Basic::BrightBlue) },
-        { Color::Basic::BrightMagenta, basicToRgb(Color::Basic::BrightMagenta) },
-        { Color::Basic::BrightCyan,    basicToRgb(Color::Basic::BrightCyan) },
-        { Color::Basic::BrightWhite,   basicToRgb(Color::Basic::BrightWhite) }
+        { Color::Basic::Black,         basicToTrueColor(Color::Basic::Black) },
+        { Color::Basic::Red,           basicToTrueColor(Color::Basic::Red) },
+        { Color::Basic::Green,         basicToTrueColor(Color::Basic::Green) },
+        { Color::Basic::Yellow,        basicToTrueColor(Color::Basic::Yellow) },
+        { Color::Basic::Blue,          basicToTrueColor(Color::Basic::Blue) },
+        { Color::Basic::Magenta,       basicToTrueColor(Color::Basic::Magenta) },
+        { Color::Basic::Cyan,          basicToTrueColor(Color::Basic::Cyan) },
+        { Color::Basic::White,         basicToTrueColor(Color::Basic::White) },
+        { Color::Basic::BrightBlack,   basicToTrueColor(Color::Basic::BrightBlack) },
+        { Color::Basic::BrightRed,     basicToTrueColor(Color::Basic::BrightRed) },
+        { Color::Basic::BrightGreen,   basicToTrueColor(Color::Basic::BrightGreen) },
+        { Color::Basic::BrightYellow,  basicToTrueColor(Color::Basic::BrightYellow) },
+        { Color::Basic::BrightBlue,    basicToTrueColor(Color::Basic::BrightBlue) },
+        { Color::Basic::BrightMagenta, basicToTrueColor(Color::Basic::BrightMagenta) },
+        { Color::Basic::BrightCyan,    basicToTrueColor(Color::Basic::BrightCyan) },
+        { Color::Basic::BrightWhite,   basicToTrueColor(Color::Basic::BrightWhite) }
     };
 
     int bestDistance = -1;
@@ -500,7 +510,7 @@ Color::Basic StylePolicy::rgbToNearestBasic(
     {
         const int distance = squareDistance(
             red, green, blue,
-            candidate.rgb.red, candidate.rgb.green, candidate.rgb.blue);
+            candidate.trueColor.red, candidate.trueColor.green, candidate.trueColor.blue);
 
         if (bestDistance < 0 || distance < bestDistance)
         {
@@ -524,11 +534,11 @@ std::uint8_t StylePolicy::rgbToNearestIndexed256(
     {
         const Color indexedColor = Color::FromIndexed256(static_cast<std::uint8_t>(i));
         const StylePolicy policy;
-        const RgbColor rgb = policy.toRgb(indexedColor);
+        const TrueColorValue trueColor = policy.toTrueColor(indexedColor);
 
         const int distance = squareDistance(
             red, green, blue,
-            rgb.red, rgb.green, rgb.blue);
+            trueColor.red, trueColor.green, trueColor.blue);
 
         if (bestDistance < 0 || distance < bestDistance)
         {

@@ -10,7 +10,7 @@ public:
         Default,
         Basic,
         Indexed256,
-        Rgb
+        TrueColor
     };
 
     enum class Basic
@@ -40,16 +40,20 @@ public:
     static Color Default();
     static Color FromBasic(Basic basic);
     static Color FromIndexed256(std::uint8_t index);
-    static Color FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
     static Color FromTrueColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
+
+    // Compatibility helper for older call sites that still use RGB naming.
+    static Color FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
     Kind kind() const;
 
     bool isDefault() const;
     bool isBasic() const;
     bool isIndexed256() const;
-    bool isRgb() const;
     bool isTrueColor() const;
+
+    // Compatibility helper for older call sites that still use RGB naming.
+    bool isRgb() const;
 
     Basic basic() const;
     std::uint8_t index256() const;
@@ -66,7 +70,7 @@ private:
     explicit Color(Kind kind);
     explicit Color(Basic basic);
     explicit Color(std::uint8_t index256);
-    Color(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
+    Color(Kind kind, std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
 private:
     Kind m_kind = Kind::Default;

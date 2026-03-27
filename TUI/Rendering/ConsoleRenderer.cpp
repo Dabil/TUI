@@ -212,7 +212,7 @@ namespace
                 ? ColorRenderMode::DowngradeToBasic
                 : ColorRenderMode::Omit));
 
-        policy = policy.withRgbColorMode(
+        policy = policy.withTrueColorColorMode(
             capabilities.supportsTrueColor()
             ? ColorRenderMode::Direct
             : (capabilities.supportsIndexed256Colors()
@@ -397,10 +397,10 @@ namespace
             return stream.str();
         }
 
-        if (color->isRgb())
+        if (color->isTrueColor())
         {
             stream
-                << "Rgb("
+                << "TrueColor("
                 << static_cast<int>(color->red()) << ","
                 << static_cast<int>(color->green()) << ","
                 << static_cast<int>(color->blue()) << ")";
@@ -446,8 +446,7 @@ namespace
 }
 
 ConsoleRenderer::ConsoleRenderer()
-    : m_rendererIdentity("WindowsConsoleRenderer")
-    , m_blinkEpoch(std::chrono::steady_clock::now())
+    : m_blinkEpoch(std::chrono::steady_clock::now())
 {
 }
 
@@ -964,14 +963,6 @@ bool ConsoleRenderer::queryVisibleConsoleSize(int& width, int& height) const
 
 bool ConsoleRenderer::configureConsole()
 {
-    m_virtualTerminalEnabled = false;
-    m_virtualTerminalEnableAttempted = false;
-    m_virtualTerminalEnableSucceeded = false;
-    m_configuredOutputMode = 0;
-    m_configuredInputMode = 0;
-    m_haveConfiguredOutputMode = false;
-    m_haveConfiguredInputMode = false;
-
     if (!SetConsoleOutputCP(CP_UTF8))
     {
         return false;
@@ -1003,12 +994,6 @@ bool ConsoleRenderer::configureConsole()
 
     m_capabilities = detection.capabilities;
     m_virtualTerminalEnabled = detection.virtualTerminalWasEnabled;
-    m_virtualTerminalEnableAttempted = detection.virtualTerminalEnableAttempted;
-    m_virtualTerminalEnableSucceeded = detection.virtualTerminalEnableSucceeded;
-    m_configuredOutputMode = detection.configuredOutputMode;
-    m_configuredInputMode = detection.configuredInputMode;
-    m_haveConfiguredOutputMode = detection.hasConfiguredOutputMode;
-    m_haveConfiguredInputMode = detection.hasConfiguredInputMode;
 
     CONSOLE_CURSOR_INFO cursorInfo{};
     if (GetConsoleCursorInfo(m_hOut, &cursorInfo))
@@ -1065,17 +1050,6 @@ void ConsoleRenderer::initializeDiagnosticsState()
     CapabilityReport& report = m_renderDiagnostics.report();
     report.setCapabilities(m_capabilities);
     report.setPolicy(m_stylePolicy);
-
-    BackendStateSnapshot backendState;
-    backendState.rendererIdentity = m_rendererIdentity;
-    backendState.virtualTerminalEnableAttempted = m_virtualTerminalEnableAttempted;
-    backendState.virtualTerminalEnableSucceeded = m_virtualTerminalEnableSucceeded;
-    backendState.configuredOutputMode = static_cast<std::uint32_t>(m_configuredOutputMode);
-    backendState.configuredInputMode = static_cast<std::uint32_t>(m_configuredInputMode);
-    backendState.hasConfiguredOutputMode = m_haveConfiguredOutputMode;
-    backendState.hasConfiguredInputMode = m_haveConfiguredInputMode;
-
-    report.setBackendState(backendState);
 }
 
 void ConsoleRenderer::flushDiagnosticsReport() const

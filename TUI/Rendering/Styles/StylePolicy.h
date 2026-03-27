@@ -47,6 +47,7 @@ public:
 
     ColorRenderMode basicColorMode() const;
     ColorRenderMode indexed256ColorMode() const;
+    ColorRenderMode trueColorColorMode() const;
     ColorRenderMode rgbColorMode() const;
 
     TextAttributeRenderMode boldMode() const;
@@ -61,6 +62,7 @@ public:
 
     StylePolicy withBasicColorMode(ColorRenderMode mode) const;
     StylePolicy withIndexed256ColorMode(ColorRenderMode mode) const;
+    StylePolicy withTrueColorColorMode(ColorRenderMode mode) const;
     StylePolicy withRgbColorMode(ColorRenderMode mode) const;
 
     StylePolicy withBoldMode(TextAttributeRenderMode mode) const;
@@ -74,7 +76,7 @@ public:
     StylePolicy withFastBlinkMode(BlinkRenderMode mode) const;
 
 private:
-    struct RgbColor
+    struct TrueColorValue
     {
         std::uint8_t red = 0;
         std::uint8_t green = 0;
@@ -88,16 +90,16 @@ private:
     Color downgradeToBasic(const Color& color) const;
     Color downgradeToIndexed256(const Color& color) const;
 
-    RgbColor toRgb(const Color& color) const;
+    TrueColorValue toTrueColor(const Color& color) const;
 
-    static RgbColor basicToRgb(Color::Basic color);
+    static TrueColorValue basicToTrueColor(Color::Basic color);
     static Color::Basic rgbToNearestBasic(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
     static std::uint8_t rgbToNearestIndexed256(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
 private:
     ColorRenderMode m_basicColorMode = ColorRenderMode::Direct;
     ColorRenderMode m_indexed256ColorMode = ColorRenderMode::Direct;
-    ColorRenderMode m_rgbColorMode = ColorRenderMode::Direct;
+    ColorRenderMode m_trueColorColorMode = ColorRenderMode::Direct;
 
     TextAttributeRenderMode m_boldMode = TextAttributeRenderMode::Direct;
     TextAttributeRenderMode m_dimMode = TextAttributeRenderMode::Direct;

@@ -140,7 +140,7 @@ namespace
         else if (capabilities.colorTier == ConsoleColorTier::Indexed256)
         {
             hints.push_back(
-                "The active backend supports Indexed256 color. Full RGB-authored colors may still be approximated or reduced to the nearest indexed entry.");
+                "The active backend supports Indexed256 color. Full TrueColor-authored colors may still be approximated or reduced to the nearest indexed entry.");
         }
 
         if (!capabilities.virtualTerminalProcessing)

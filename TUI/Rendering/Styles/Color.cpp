@@ -20,14 +20,14 @@ Color Color::FromIndexed256(std::uint8_t index)
     return Color(index);
 }
 
-Color Color::FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
-{
-    return Color(red, green, blue);
-}
-
 Color Color::FromTrueColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
 {
-    return Color(red, green, blue);
+    return Color(Kind::TrueColor, red, green, blue);
+}
+
+Color Color::FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
+{
+    return FromTrueColor(red, green, blue);
 }
 
 Color::Kind Color::kind() const
@@ -50,14 +50,14 @@ bool Color::isIndexed256() const
     return m_kind == Kind::Indexed256;
 }
 
-bool Color::isRgb() const
-{
-    return m_kind == Kind::Rgb;
-}
-
 bool Color::isTrueColor() const
 {
-    return isRgb();
+    return m_kind == Kind::TrueColor;
+}
+
+bool Color::isRgb() const
+{
+    return isTrueColor();
 }
 
 Color::Basic Color::basic() const
@@ -149,8 +149,8 @@ Color::Color(std::uint8_t index256)
 {
 }
 
-Color::Color(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
-    : m_kind(Kind::Rgb)
+Color::Color(Kind kind, std::uint8_t red, std::uint8_t green, std::uint8_t blue)
+    : m_kind(kind)
     , m_red(red)
     , m_green(green)
     , m_blue(blue)
