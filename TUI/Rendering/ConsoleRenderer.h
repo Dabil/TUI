@@ -141,7 +141,16 @@ private:
     bool m_haveOriginalOutputMode = false;
     bool m_haveOriginalInputMode = false;
     bool m_cursorWasVisible = true;
+
+    std::string m_rendererIdentity = "WindowsConsoleRenderer";
     bool m_virtualTerminalEnabled = false;
+    bool m_virtualTerminalEnableAttempted = false;
+    bool m_virtualTerminalEnableSucceeded = false;
+
+    DWORD m_configuredOutputMode = 0;
+    DWORD m_configuredInputMode = 0;
+    bool m_haveConfiguredOutputMode = false;
+    bool m_haveConfiguredInputMode = false;
 
     std::chrono::steady_clock::time_point m_blinkEpoch{};
     bool m_lastSlowBlinkVisibilityState = true;
