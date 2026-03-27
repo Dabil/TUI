@@ -1,4 +1,3 @@
-// App/Application.h
 #pragma once
 
 #include <memory>
@@ -20,6 +19,7 @@ public:
 private:
     enum class ScreenType
     {
+        DigitalRain,
         WaterEffect,
         Donut3D,
         Fire
@@ -44,7 +44,7 @@ private:
     int m_width = 0;
     int m_height = 0;
 
-    ScreenType m_currentScreenType = ScreenType::WaterEffect;
+    ScreenType m_currentScreenType = ScreenType::DigitalRain;
     double m_screenCycleElapsedSeconds = 0.0;
     double m_screenCycleIntervalSeconds = 60.0;
 };

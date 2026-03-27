@@ -1,4 +1,3 @@
-// App/Application.cpp
 #include "App/Application.h"
 #include "App/ScreenManager.h"
 
@@ -10,6 +9,7 @@
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/Themes.h"
 
+#include "Screens/DigitalRainScreen.h"
 #include "Screens/Donut3DScreen.h"
 #include "Screens/FireScreen.h"
 #include "Screens/WaterEffectScreen.h"
@@ -73,7 +73,7 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
-    m_currentScreenType = ScreenType::WaterEffect;
+    m_currentScreenType = ScreenType::DigitalRain;
     m_screenCycleElapsedSeconds = 0.0;
 
     switchToScreen(m_currentScreenType);
@@ -153,6 +153,10 @@ void Application::switchToScreen(ScreenType screenType)
 
     switch (screenType)
     {
+    case ScreenType::DigitalRain:
+        m_screenManager->pushScreen(std::make_unique<DigitalRainScreen>());
+        break;
+
     case ScreenType::WaterEffect:
         m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
         break;
@@ -173,6 +177,10 @@ void Application::advanceScreen()
 {
     switch (m_currentScreenType)
     {
+    case ScreenType::DigitalRain:
+        switchToScreen(ScreenType::WaterEffect);
+        break;
+
     case ScreenType::WaterEffect:
         switchToScreen(ScreenType::Donut3D);
         break;
@@ -182,7 +190,7 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::Fire:
-        switchToScreen(ScreenType::WaterEffect);
+        switchToScreen(ScreenType::DigitalRain);
         break;
     }
 }
