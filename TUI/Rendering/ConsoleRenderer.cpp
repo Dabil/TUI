@@ -1001,7 +1001,15 @@ bool ConsoleRenderer::configureConsole()
     }
 
     m_capabilities = detection.capabilities;
+
     m_virtualTerminalEnabled = detection.virtualTerminalWasEnabled;
+    m_virtualTerminalEnableAttempted = detection.virtualTerminalEnableAttempted;
+    m_virtualTerminalEnableSucceeded = detection.virtualTerminalEnableSucceeded;
+
+    m_configuredOutputMode = detection.configuredOutputMode;
+    m_configuredInputMode = detection.configuredInputMode;
+    m_haveConfiguredOutputMode = detection.hasConfiguredOutputMode;
+    m_haveConfiguredInputMode = detection.hasConfiguredInputMode;
 
     CONSOLE_CURSOR_INFO cursorInfo{};
     if (GetConsoleCursorInfo(m_hOut, &cursorInfo))
@@ -1055,9 +1063,19 @@ void ConsoleRenderer::initializeDiagnosticsState()
 {
     m_renderDiagnostics.resetRuntimeData();
 
+    BackendStateSnapshot backendState;
+    backendState.rendererIdentity = m_rendererIdentity;
+    backendState.virtualTerminalEnableAttempted = m_virtualTerminalEnableAttempted;
+    backendState.virtualTerminalEnableSucceeded = m_virtualTerminalEnableSucceeded;
+    backendState.configuredOutputMode = static_cast<std::uint32_t>(m_configuredOutputMode);
+    backendState.configuredInputMode = static_cast<std::uint32_t>(m_configuredInputMode);
+    backendState.hasConfiguredOutputMode = m_haveConfiguredOutputMode;
+    backendState.hasConfiguredInputMode = m_haveConfiguredInputMode;
+
     CapabilityReport& report = m_renderDiagnostics.report();
     report.setCapabilities(m_capabilities);
     report.setPolicy(m_stylePolicy);
+    report.setBackendState(backendState);
 }
 
 void ConsoleRenderer::flushDiagnosticsReport() const
