@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -61,6 +62,20 @@ struct StyleAdaptationExample
     std::string detail;
 };
 
+struct BackendStateSnapshot
+{
+    std::string rendererIdentity = "Unknown";
+
+    bool virtualTerminalEnableAttempted = false;
+    bool virtualTerminalEnableSucceeded = false;
+
+    std::uint32_t configuredOutputMode = 0;
+    std::uint32_t configuredInputMode = 0;
+
+    bool hasConfiguredOutputMode = false;
+    bool hasConfiguredInputMode = false;
+};
+
 class CapabilityReport
 {
 public:
@@ -68,9 +83,11 @@ public:
 
     void setCapabilities(const ConsoleCapabilities& capabilities);
     void setPolicy(const StylePolicy& policy);
+    void setBackendState(const BackendStateSnapshot& backendState);
 
     const ConsoleCapabilities& capabilities() const;
     const StylePolicy& policy() const;
+    const BackendStateSnapshot& backendState() const;
 
     void recordDirect(StyleFeature feature);
     void recordDowngraded(StyleFeature feature);
@@ -106,6 +123,7 @@ private:
 private:
     ConsoleCapabilities m_capabilities{};
     StylePolicy m_policy{};
+    BackendStateSnapshot m_backendState{};
 
     std::vector<StyleAdaptationCounter> m_counters;
     std::vector<StyleAdaptationExample> m_examples;

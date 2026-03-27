@@ -49,6 +49,11 @@ void CapabilityReport::setPolicy(const StylePolicy& policy)
     m_policy = policy;
 }
 
+void CapabilityReport::setBackendState(const BackendStateSnapshot& backendState)
+{
+    m_backendState = backendState;
+}
+
 const ConsoleCapabilities& CapabilityReport::capabilities() const
 {
     return m_capabilities;
@@ -57,6 +62,11 @@ const ConsoleCapabilities& CapabilityReport::capabilities() const
 const StylePolicy& CapabilityReport::policy() const
 {
     return m_policy;
+}
+
+const BackendStateSnapshot& CapabilityReport::backendState() const
+{
+    return m_backendState;
 }
 
 void CapabilityReport::recordDirect(StyleFeature feature)
