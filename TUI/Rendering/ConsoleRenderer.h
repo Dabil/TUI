@@ -99,7 +99,8 @@ private:
         StyleFeature feature,
         bool authoredEnabled,
         bool presentedEnabled,
-        bool physicallyRendered);
+        bool physicallyRendered,
+        TextAttributeRenderMode renderMode);
     void recordBlinkFeature(
         StyleFeature feature,
         bool authoredEnabled,

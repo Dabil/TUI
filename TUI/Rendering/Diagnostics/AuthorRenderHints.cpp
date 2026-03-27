@@ -201,37 +201,44 @@ namespace
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
+        const std::size_t underlineApproximated =
+            countOne(report, StyleFeature::Underline, StyleAdaptationKind::Approximated);
         const std::size_t underlineOmitted =
             countOne(report, StyleFeature::Underline, StyleAdaptationKind::Omitted);
         const std::size_t underlineLogicalOnly =
             countOne(report, StyleFeature::Underline, StyleAdaptationKind::LogicalOnly);
 
+        const std::size_t strikeApproximated =
+            countOne(report, StyleFeature::Strike, StyleAdaptationKind::Approximated);
         const std::size_t strikeOmitted =
             countOne(report, StyleFeature::Strike, StyleAdaptationKind::Omitted);
         const std::size_t strikeLogicalOnly =
             countOne(report, StyleFeature::Strike, StyleAdaptationKind::LogicalOnly);
 
-        if ((underlineOmitted + underlineLogicalOnly + strikeOmitted + strikeLogicalOnly) == 0)
+        if ((underlineApproximated + underlineOmitted + underlineLogicalOnly +
+            strikeApproximated + strikeOmitted + strikeLogicalOnly) == 0)
         {
             return;
         }
 
-        if ((underlineOmitted + underlineLogicalOnly) > 0)
+        if ((underlineApproximated + underlineOmitted + underlineLogicalOnly) > 0)
         {
             std::ostringstream stream;
             stream
                 << "Underline requests encountered runtime adaptation: "
-                << underlineOmitted << " omitted and "
+                << underlineApproximated << " approximated, "
+                << underlineOmitted << " omitted, and "
                 << underlineLogicalOnly << " logical-only case(s).";
             hints.push_back(stream.str());
         }
 
-        if ((strikeOmitted + strikeLogicalOnly) > 0)
+        if ((strikeApproximated + strikeOmitted + strikeLogicalOnly) > 0)
         {
             std::ostringstream stream;
             stream
                 << "Strike requests encountered runtime adaptation: "
-                << strikeOmitted << " omitted and "
+                << strikeApproximated << " approximated, "
+                << strikeOmitted << " omitted, and "
                 << strikeLogicalOnly << " logical-only case(s).";
             hints.push_back(stream.str());
         }
@@ -277,17 +284,22 @@ namespace
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
+        const std::size_t reverseApproximated =
+            countOne(report, StyleFeature::Reverse, StyleAdaptationKind::Approximated);
         const std::size_t reverseOmitted =
             countOne(report, StyleFeature::Reverse, StyleAdaptationKind::Omitted);
         const std::size_t reverseLogicalOnly =
             countOne(report, StyleFeature::Reverse, StyleAdaptationKind::LogicalOnly);
 
+        const std::size_t invisibleApproximated =
+            countOne(report, StyleFeature::Invisible, StyleAdaptationKind::Approximated);
         const std::size_t invisibleOmitted =
             countOne(report, StyleFeature::Invisible, StyleAdaptationKind::Omitted);
         const std::size_t invisibleLogicalOnly =
             countOne(report, StyleFeature::Invisible, StyleAdaptationKind::LogicalOnly);
 
-        if ((reverseOmitted + reverseLogicalOnly + invisibleOmitted + invisibleLogicalOnly) == 0)
+        if ((reverseApproximated + reverseOmitted + reverseLogicalOnly +
+            invisibleApproximated + invisibleOmitted + invisibleLogicalOnly) == 0)
         {
             return;
         }
@@ -295,8 +307,10 @@ namespace
         std::ostringstream stream;
         stream
             << "Visibility-related styling encountered runtime adaptation: reverse("
+            << reverseApproximated << " approximated, "
             << reverseOmitted << " omitted, "
             << reverseLogicalOnly << " logical-only), invisible("
+            << invisibleApproximated << " approximated, "
             << invisibleOmitted << " omitted, "
             << invisibleLogicalOnly << " logical-only).";
         hints.push_back(stream.str());

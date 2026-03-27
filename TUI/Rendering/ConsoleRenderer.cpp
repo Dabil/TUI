@@ -196,6 +196,23 @@ namespace
         return fg;
     }
 
+    TextAttributeRenderMode textAttributeModeFromSupport(ConsoleFeatureSupport support)
+    {
+        switch (support)
+        {
+        case ConsoleFeatureSupport::Supported:
+            return TextAttributeRenderMode::Direct;
+
+        case ConsoleFeatureSupport::Unknown:
+            return TextAttributeRenderMode::Approximate;
+
+        case ConsoleFeatureSupport::Emulated:
+        case ConsoleFeatureSupport::Unsupported:
+        default:
+            return TextAttributeRenderMode::Omit;
+        }
+    }
+
     StylePolicy buildStylePolicyFromCapabilities(const ConsoleCapabilities& capabilities)
     {
         StylePolicy policy = StylePolicy::PreserveIntent();
@@ -221,35 +238,12 @@ namespace
                     ? ColorRenderMode::DowngradeToBasic
                     : ColorRenderMode::Omit)));
 
-        policy = policy.withBoldMode(
-            capabilities.supportsBoldDirect()
-            ? TextAttributeRenderMode::Direct
-            : TextAttributeRenderMode::Omit);
-
-        policy = policy.withDimMode(
-            capabilities.supportsDimDirect()
-            ? TextAttributeRenderMode::Direct
-            : TextAttributeRenderMode::Omit);
-
-        policy = policy.withUnderlineMode(
-            capabilities.supportsUnderlineDirect()
-            ? TextAttributeRenderMode::Direct
-            : TextAttributeRenderMode::Omit);
-
-        policy = policy.withReverseMode(
-            capabilities.supportsReverseDirect()
-            ? TextAttributeRenderMode::Direct
-            : TextAttributeRenderMode::Omit);
-
-        policy = policy.withInvisibleMode(
-            capabilities.supportsInvisibleDirect()
-            ? TextAttributeRenderMode::Direct
-            : TextAttributeRenderMode::Omit);
-
-        policy = policy.withStrikeMode(
-            capabilities.supportsStrikeDirect()
-            ? TextAttributeRenderMode::Direct
-            : TextAttributeRenderMode::Omit);
+        policy = policy.withBoldMode(textAttributeModeFromSupport(capabilities.bold));
+        policy = policy.withDimMode(textAttributeModeFromSupport(capabilities.dim));
+        policy = policy.withUnderlineMode(textAttributeModeFromSupport(capabilities.underline));
+        policy = policy.withReverseMode(textAttributeModeFromSupport(capabilities.reverse));
+        policy = policy.withInvisibleMode(textAttributeModeFromSupport(capabilities.invisible));
+        policy = policy.withStrikeMode(textAttributeModeFromSupport(capabilities.strike));
 
         const bool allowSafeFallback = capabilities.usesPreserveStyleSafeFallback();
 
@@ -1115,19 +1109,22 @@ void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const Resolve
         StyleFeature::Bold,
         authoredStyle.bold(),
         presentedStyle.bold(),
-        presentedStyle.bold());
+        presentedStyle.bold(),
+        m_stylePolicy.boldMode());
 
     recordTextFeature(
         StyleFeature::Dim,
         authoredStyle.dim(),
         presentedStyle.dim(),
-        presentedStyle.dim());
+        presentedStyle.dim(),
+        m_stylePolicy.dimMode());
 
     recordTextFeature(
         StyleFeature::Underline,
         authoredStyle.underline(),
         presentedStyle.underline(),
-        presentedStyle.underline());
+        presentedStyle.underline(),
+        m_stylePolicy.underlineMode());
 
     recordBlinkFeature(
         StyleFeature::SlowBlink,
@@ -1147,19 +1144,22 @@ void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const Resolve
         StyleFeature::Reverse,
         authoredStyle.reverse(),
         presentedStyle.reverse(),
-        presentedStyle.reverse());
+        presentedStyle.reverse(),
+        m_stylePolicy.reverseMode());
 
     recordTextFeature(
         StyleFeature::Invisible,
         authoredStyle.invisible(),
         presentedStyle.invisible(),
-        presentedStyle.invisible());
+        presentedStyle.invisible(),
+        m_stylePolicy.invisibleMode());
 
     recordTextFeature(
         StyleFeature::Strike,
         authoredStyle.strike(),
         presentedStyle.strike(),
-        false);
+        false,
+        m_stylePolicy.strikeMode());
 }
 
 void ConsoleRenderer::recordColorFeature(
@@ -1256,7 +1256,8 @@ void ConsoleRenderer::recordTextFeature(
     StyleFeature feature,
     bool authoredEnabled,
     bool presentedEnabled,
-    bool physicallyRendered)
+    bool physicallyRendered,
+    TextAttributeRenderMode renderMode)
 {
     if (!authoredEnabled)
     {
@@ -1290,6 +1291,21 @@ void ConsoleRenderer::recordTextFeature(
                 feature,
                 StyleAdaptationKind::LogicalOnly,
                 buildTextExampleDetail("Style preserved logically but not emitted by the Win32 attribute path", authoredEnabled, presentedEnabled));
+        }
+
+        return;
+    }
+
+    if (renderMode == TextAttributeRenderMode::Approximate)
+    {
+        report.recordApproximated(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Approximated))
+        {
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Approximated,
+                buildTextExampleDetail("Style approximated through the current Win32 attribute path", authoredEnabled, presentedEnabled));
         }
 
         return;

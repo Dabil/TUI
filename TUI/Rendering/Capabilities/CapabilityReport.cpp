@@ -227,6 +227,9 @@ const char* CapabilityReport::toString(TextAttributeRenderMode mode)
     case TextAttributeRenderMode::Direct:
         return "Direct";
 
+    case TextAttributeRenderMode::Approximate:
+        return "Approximate";
+
     case TextAttributeRenderMode::Omit:
         return "Omit";
 

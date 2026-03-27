@@ -17,6 +17,7 @@ enum class ColorRenderMode
 enum class TextAttributeRenderMode
 {
     Direct,
+    Approximate,
     Omit
 };
 

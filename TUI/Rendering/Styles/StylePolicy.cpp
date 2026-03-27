@@ -33,11 +33,11 @@ StylePolicy StylePolicy::BasicConsole()
     policy.m_indexed256ColorMode = ColorRenderMode::DowngradeToBasic;
     policy.m_trueColorColorMode = ColorRenderMode::DowngradeToBasic;
 
-    policy.m_boldMode = TextAttributeRenderMode::Direct;
-    policy.m_dimMode = TextAttributeRenderMode::Direct;
-    policy.m_underlineMode = TextAttributeRenderMode::Omit;
-    policy.m_reverseMode = TextAttributeRenderMode::Direct;
-    policy.m_invisibleMode = TextAttributeRenderMode::Direct;
+    policy.m_boldMode = TextAttributeRenderMode::Approximate;
+    policy.m_dimMode = TextAttributeRenderMode::Approximate;
+    policy.m_underlineMode = TextAttributeRenderMode::Approximate;
+    policy.m_reverseMode = TextAttributeRenderMode::Approximate;
+    policy.m_invisibleMode = TextAttributeRenderMode::Approximate;
     policy.m_strikeMode = TextAttributeRenderMode::Omit;
 
     policy.m_slowBlinkMode = BlinkRenderMode::Omit;
