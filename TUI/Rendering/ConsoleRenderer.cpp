@@ -212,7 +212,7 @@ namespace
                 ? ColorRenderMode::DowngradeToBasic
                 : ColorRenderMode::Omit));
 
-        policy = policy.withTrueColorColorMode(
+        policy = policy.withRgbColorMode(
             capabilities.supportsTrueColor()
             ? ColorRenderMode::Direct
             : (capabilities.supportsIndexed256Colors()
@@ -251,18 +251,26 @@ namespace
             ? TextAttributeRenderMode::Direct
             : TextAttributeRenderMode::Omit);
 
+        const bool allowSafeFallback = capabilities.usesPreserveStyleSafeFallback();
+
         policy = policy.withSlowBlinkMode(
             capabilities.supportsSlowBlinkDirect()
             ? BlinkRenderMode::Direct
-            : BlinkRenderMode::Emulate);
+            : ((allowSafeFallback && capabilities.mayEmulateSlowBlink())
+                ? BlinkRenderMode::Emulate
+                : BlinkRenderMode::Omit));
 
         policy = policy.withFastBlinkMode(
             capabilities.supportsFastBlinkDirect()
             ? BlinkRenderMode::Direct
-            : BlinkRenderMode::Emulate);
+            : ((allowSafeFallback && capabilities.mayEmulateFastBlink())
+                ? BlinkRenderMode::Emulate
+                : BlinkRenderMode::Omit));
 
         return policy;
     }
+
+
 
     WORD resolvedStyleToAttributes(const Style& style, WORD defaultAttributes)
     {

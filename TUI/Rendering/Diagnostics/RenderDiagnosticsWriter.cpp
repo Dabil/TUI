@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <ios>
+#include <sstream>
 
 #include "Rendering/Diagnostics/AuthorRenderHints.h"
 
@@ -17,6 +18,18 @@ namespace
         }
 
         out << "\n\n";
+    }
+
+    std::string formatOptionalBackendFlags(std::uint32_t flags)
+    {
+        if (flags == 0)
+        {
+            return "None";
+        }
+
+        std::ostringstream stream;
+        stream << "0x" << std::hex << std::uppercase << flags;
+        return stream.str();
     }
 }
 
@@ -55,6 +68,10 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
         << (capabilities.virtualTerminalProcessing ? "true" : "false") << "\n";
     out << "Unicode output: "
         << (capabilities.unicodeOutput ? "true" : "false") << "\n";
+    out << "Preserve-style-safe fallback: "
+        << (capabilities.usesPreserveStyleSafeFallback() ? "true" : "false") << "\n";
+    out << "Optional backend flags: "
+        << formatOptionalBackendFlags(capabilities.optionalBackendFlags) << "\n";
     out << "Color tier: "
         << CapabilityReport::toString(capabilities.colorTier) << "\n";
     out << "Bold: "
@@ -80,8 +97,8 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
         << CapabilityReport::toString(policy.basicColorMode()) << "\n";
     out << "Indexed256 colors: "
         << CapabilityReport::toString(policy.indexed256ColorMode()) << "\n";
-    out << "TrueColor colors: "
-        << CapabilityReport::toString(policy.trueColorColorMode()) << "\n";
+    out << "RGB colors: "
+        << CapabilityReport::toString(policy.rgbColorMode()) << "\n";
     out << "Bold: "
         << CapabilityReport::toString(policy.boldMode()) << "\n";
     out << "Dim: "

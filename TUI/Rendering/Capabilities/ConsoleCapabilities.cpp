@@ -29,11 +29,19 @@ style mapping code should query helpers like:
 supportsTrueColor()
 supportsIndexed256Colors()
 supportsUnderlineDirect()
+usesPreserveStyleSafeFallback()
+mayEmulateSlowBlink()
+
+optionalBackendFlags is intentionally a simple reserved extension point.
+The current code should not invent behavior from unknown flag bits.
+It should only surface them for diagnostics until future backends define them.
 
 diagnostics screens should report both the raw flags and the resulting
 renderer behavior:
 VT enabled or not
 color tier
+preserve-style-safe fallback behavior
+optional backend flags
 direct support vs unsupported vs emulated vs unknown
 
 For the current backend, BasicWin32 must stay conservative:
@@ -41,6 +49,8 @@ For the current backend, BasicWin32 must stay conservative:
 - Basic16 color support is real and directly usable
 - decorative/style semantics such as bold, dim, underline, reverse, and
   invisible are not safe to promise as direct support across hosts
+- blink is not directly provided by the Win32 attribute path, but the current
+  renderer may intentionally emulate it
 - if the renderer later chooses to approximate a visual effect, that should
   be reflected in runtime adaptation data rather than overstated here
 
@@ -57,6 +67,8 @@ ConsoleCapabilities ConsoleCapabilities::Conservative()
 
     capabilities.virtualTerminalProcessing = false;
     capabilities.unicodeOutput = true;
+    capabilities.preserveStyleSafeFallback = true;
+    capabilities.optionalBackendFlags = 0;
     capabilities.colorTier = ConsoleColorTier::Basic16;
 
     capabilities.bold = ConsoleFeatureSupport::Unknown;
@@ -65,8 +77,8 @@ ConsoleCapabilities ConsoleCapabilities::Conservative()
     capabilities.reverse = ConsoleFeatureSupport::Unknown;
     capabilities.invisible = ConsoleFeatureSupport::Unknown;
     capabilities.strike = ConsoleFeatureSupport::Unsupported;
-    capabilities.slowBlink = ConsoleFeatureSupport::Unsupported;
-    capabilities.fastBlink = ConsoleFeatureSupport::Unsupported;
+    capabilities.slowBlink = ConsoleFeatureSupport::Emulated;
+    capabilities.fastBlink = ConsoleFeatureSupport::Emulated;
 
     return capabilities;
 }
@@ -76,6 +88,8 @@ ConsoleCapabilities ConsoleCapabilities::BasicWin32()
     ConsoleCapabilities capabilities = Conservative();
 
     capabilities.virtualTerminalProcessing = false;
+    capabilities.preserveStyleSafeFallback = true;
+    capabilities.optionalBackendFlags = 0;
     capabilities.colorTier = ConsoleColorTier::Basic16;
 
     /*
@@ -93,7 +107,11 @@ ConsoleCapabilities ConsoleCapabilities::BasicWin32()
         - invisible can be approximated visually, but true invisibility is not
           something this path should promise
 
-        So these remain Unknown to force conservative renderer policy.
+        These remain Unknown to force conservative renderer policy.
+
+        Blink is modeled as Emulated rather than Unsupported because the active
+        renderer/backend path can intentionally simulate blink timing without
+        mutating authored logical style data.
     */
     capabilities.bold = ConsoleFeatureSupport::Unknown;
     capabilities.dim = ConsoleFeatureSupport::Unknown;
@@ -101,8 +119,8 @@ ConsoleCapabilities ConsoleCapabilities::BasicWin32()
     capabilities.reverse = ConsoleFeatureSupport::Unknown;
     capabilities.invisible = ConsoleFeatureSupport::Unknown;
     capabilities.strike = ConsoleFeatureSupport::Unsupported;
-    capabilities.slowBlink = ConsoleFeatureSupport::Unsupported;
-    capabilities.fastBlink = ConsoleFeatureSupport::Unsupported;
+    capabilities.slowBlink = ConsoleFeatureSupport::Emulated;
+    capabilities.fastBlink = ConsoleFeatureSupport::Emulated;
 
     return capabilities;
 }
@@ -112,6 +130,8 @@ ConsoleCapabilities ConsoleCapabilities::VirtualTerminal()
     ConsoleCapabilities capabilities = Conservative();
 
     capabilities.virtualTerminalProcessing = true;
+    capabilities.preserveStyleSafeFallback = true;
+    capabilities.optionalBackendFlags = 0;
     capabilities.colorTier = ConsoleColorTier::TrueColor;
 
     /*
@@ -197,4 +217,20 @@ bool ConsoleCapabilities::mayEmulateSlowBlink() const
 bool ConsoleCapabilities::mayEmulateFastBlink() const
 {
     return fastBlink == ConsoleFeatureSupport::Emulated;
+}
+
+bool ConsoleCapabilities::usesPreserveStyleSafeFallback() const
+{
+    return preserveStyleSafeFallback;
+}
+
+bool ConsoleCapabilities::hasOptionalBackendFlags() const
+{
+    return optionalBackendFlags != 0;
+}
+
+bool ConsoleCapabilities::hasOptionalBackendFlag(ConsoleBackendExtensionFlag flag) const
+{
+    const std::uint32_t mask = static_cast<std::uint32_t>(flag);
+    return (optionalBackendFlags & mask) != 0;
 }

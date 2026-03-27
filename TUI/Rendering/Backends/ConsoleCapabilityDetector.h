@@ -20,11 +20,15 @@
         This detector reports what the active backend path can safely support.
         Since the current renderer still uses Win32 attribute presentation,
         capability reporting remains conservative even if VT mode can be enabled.
+
+        The detector should also make explicit whether the active backend path
+        expects preserve-style-safe fallback behavior and expose any currently
+        advertised backend extension flags for diagnostics/future use.
 */
 
 struct ConsoleCapabilityDetectionResult
 {
-    ConsoleCapabilities capabilities;
+    ConsoleCapabilities capabilities = ConsoleCapabilities::Conservative();
 
     bool virtualTerminalWasEnabled = false;
     bool virtualTerminalEnableAttempted = false;
