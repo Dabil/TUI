@@ -485,8 +485,7 @@ Support:
 - standard colors
 - bright colors
 - 256 color representation
-- RGB representation
-- future-capable 24-bit true color representation
+- future-capable RGB 24-bit true color representation
 
 Requirements:
 - color model must be backend-independent
