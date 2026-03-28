@@ -78,12 +78,9 @@ namespace Themes
         + style::Fg(Color::FromBasic(Color::Basic::BrightGreen))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
-    inline Style PanelTitle()
-    {
-        return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
-    }
-
+    inline const Style PanelTitle = 
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
 
     // =========================================================
     // Neutral UI text styles

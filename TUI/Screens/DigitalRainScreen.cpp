@@ -12,8 +12,13 @@
 #include "Rendering/Styles/Themes.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
+// TODO:
+//  Add Shedding Glyphs
+//  have dead glyphs change color or shape rarely
+//  add BrightBlack digital drops
+
 namespace
-{   // add shedding
+{   
     constexpr int MinimumScreenWidth = 48;
     constexpr int MinimumScreenHeight = 14;
     constexpr int FooterRows = 2;
@@ -40,27 +45,29 @@ namespace
         WhiteOnly,          // 25%
         GreenOnly           // 50%
     };
-
-    // use this pool for console
+    // characters that don't display:
+    // △▽◆◇◢◣◤◥
+    // use this poo for console
+    /*
     std::u32string buildGlyphPool()
     {
         return std::u32string(
-            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+            U"0123456789A₿CDEFGHIJKLMNOPQRSTUVWXYZ"
             U"@#$%&*+=<>"
             U"[]{}()"
             U"█▓▒░"
             U"■□▪▫"
-            U"▲△▼▽"
-            U"◆◇○●"
-            U"◢◣◤◥"
+            U"▲▼"
+            U"○●"
+            U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"
             U"┌┐└┘├┤┬┴┼"
             U"╔╗╚╝╠╣╦╩╬"
             U"│┃─━"
             U"←↑→↓");
     }
-
+    */
     // use this pool for terminal
-   /*
+   
     constexpr char32_t RabbitGlyph = U'\U0001F407';
 
     std::u32string buildGlyphPool()
@@ -75,7 +82,7 @@ namespace
             U"♔♕♖♗♘♙♚♛♜♝♞♟"
             U"♪♫")
             + std::u32string(1, RabbitGlyph);
-    }*/
+    }
 }
 
 DigitalRainScreen::DigitalRainScreen()
@@ -478,10 +485,10 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
 
     const int footerLabelY = m_screenHeight - 3;
     const int footerPreviewY = m_screenHeight - 2;
-
+    
     buffer.writeString(2, footerLabelY, "Pool:", m_labelStyle);
     drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
-
+    
     // Use this footer for console
     buffer.writeString(2, footerPreviewY, "Sample:", m_labelStyle);
 
@@ -492,7 +499,7 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
     buffer.writeCodePoint(18, footerPreviewY, U'△', m_previewStyle);
 
     buffer.writeString(21, footerPreviewY, "Console-safe fallback glyphs active", m_labelStyle);
-
+    
     // Use this footer for Terminal
     /*
     buffer.writeCodePoint(10, footerPreviewY, U'ア', m_previewStyle);

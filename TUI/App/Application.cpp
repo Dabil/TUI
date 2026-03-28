@@ -1,5 +1,6 @@
 #include "App/Application.h"
 #include "App/ScreenManager.h"
+#include "App/TerminalLauncher.h"
 
 #include <chrono>
 #include <thread>
@@ -8,13 +9,13 @@
 #include "Rendering/ConsoleRenderer.h"
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/Themes.h"
+#include "Rendering/TerminalRenderer.h"
 
 #include "Screens/DigitalRainScreen.h"
 #include "Screens/Donut3DScreen.h"
 #include "Screens/FireScreen.h"
 #include "Screens/WaterEffectScreen.h"
 
-// Global pointer used by console control handler
 static Application* g_appInstance = nullptr;
 
 Application::Application() = default;
@@ -37,7 +38,6 @@ BOOL WINAPI ConsoleCtrlHandler(DWORD ctrlType)
             g_appInstance->shutdown();
         }
 
-        // Give Windows permission to close
         return TRUE;
     }
     default:
@@ -47,25 +47,36 @@ BOOL WINAPI ConsoleCtrlHandler(DWORD ctrlType)
 
 bool Application::initialize()
 {
-    // Register global instance BEFORE anything else
     g_appInstance = this;
-
-    // Register console control handler
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
-    auto renderer = std::make_unique<ConsoleRenderer>();
-
-    // Enable diagnostics
-    renderer->setDiagnosticsEnabled(true);
-    renderer->setDiagnosticsAppendMode(false);
-    renderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
-
-    if (!renderer->initialize())
+    if (TerminalLauncher::shouldPreferTerminalRenderer())
     {
-        return false;
+        auto terminalRenderer = std::make_unique<TerminalRenderer>();
+        terminalRenderer->setDiagnosticsEnabled(true);
+        terminalRenderer->setDiagnosticsAppendMode(false);
+        terminalRenderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+
+        if (terminalRenderer->initialize())
+        {
+            m_renderer = std::move(terminalRenderer);
+        }
     }
 
-    m_renderer = std::move(renderer);
+    if (!m_renderer)
+    {
+        auto consoleRenderer = std::make_unique<ConsoleRenderer>();
+        consoleRenderer->setDiagnosticsEnabled(true);
+        consoleRenderer->setDiagnosticsAppendMode(false);
+        consoleRenderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+
+        if (!consoleRenderer->initialize())
+        {
+            return false;
+        }
+
+        m_renderer = std::move(consoleRenderer);
+    }
 
     m_width = m_renderer->getConsoleWidth();
     m_height = m_renderer->getConsoleHeight();
@@ -112,7 +123,6 @@ void Application::shutdown()
 
     m_running = false;
 
-    // No shutdown() on ScreenManager in current design
     m_screenManager.reset();
 
     if (m_renderer)
@@ -140,7 +150,7 @@ void Application::update(double deltaTime)
 
 void Application::render()
 {
-    m_surface->clear(Themes::AccentSurface);
+    m_surface->clear(Themes::Disabled);
 
     m_screenManager->drawCurrentScreen(*m_surface);
 
