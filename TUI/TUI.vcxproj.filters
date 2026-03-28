@@ -129,6 +129,15 @@
     <ClInclude Include="Screens\DigitalRainScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rendering\Backends\TerminalCapabilityDetector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\TerminalRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="App\TerminalLauncher.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -207,6 +216,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\Backends\TerminalCapabilityDetector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\TerminalRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="App\TerminalLauncher.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

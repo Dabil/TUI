@@ -131,11 +131,16 @@
   <ItemGroup>
     <ClInclude Include="App\Application.h" />
     <ClInclude Include="App\ScreenManager.h" />
+    <ClInclude Include="App\TerminalLauncher.h" />
     <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
     <ClInclude Include="Rendering\Backends\ConsoleCapabilityDetector.h" />
+    <ClInclude Include="Rendering\Backends\TerminalCapabilityDetector.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
@@ -155,6 +160,10 @@
     <ClInclude Include="Rendering\Styles\StylePolicy.h" />
     <ClInclude Include="Rendering\Styles\UIThemes.h" />
     <ClInclude Include="Rendering\Surface.h" />
+    <ClInclude Include="Rendering\TerminalRenderer.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
     <ClInclude Include="Rendering\Styles\Themes.h" />
@@ -171,8 +180,13 @@
   <ItemGroup>
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
+    <ClCompile Include="App\TerminalLauncher.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\Backends\ConsoleCapabilityDetector.cpp" />
+    <ClCompile Include="Rendering\Backends\TerminalCapabilityDetector.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
@@ -187,6 +201,10 @@
     <ClCompile Include="Rendering\Styles\StyleMerge.cpp" />
     <ClCompile Include="Rendering\Styles\StylePolicy.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
+    <ClCompile Include="Rendering\TerminalRenderer.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
