@@ -8,6 +8,7 @@
 
 #include "Rendering/Diagnostics/RenderDiagnosticsWriter.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
+#include "Utilities/Unicode/UnicodeWidth.h"
 
 /*
     ConsoleRenderer is now a backend/output layer.
@@ -211,7 +212,7 @@ namespace
         default:
             return TextAttributeRenderMode::Omit;
         }
-    }
+    } 
 
     StylePolicy buildStylePolicyFromCapabilities(const ConsoleCapabilities& capabilities)
     {
@@ -338,7 +339,7 @@ namespace
     {
         if (isContinuationCell(cell))
         {
-            return U' ';
+            return U'\0';
         }
 
         if (cell.kind == CellKind::Glyph)
@@ -805,11 +806,20 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
     while (x <= xEnd)
     {
         const ScreenCell& firstCell = frame.getCell(x, y);
+        if (isContinuationCell(firstCell))
+        {
+            ++x;
+            continue;
+        }
+
         const Style runStyle = firstCell.style;
         const int runStart = x;
 
         std::u32string runText;
+        std::vector<CellWidth> runGlyphWidths;
+
         runText.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
+        runGlyphWidths.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
 
         while (x <= xEnd)
         {
@@ -819,20 +829,47 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
                 break;
             }
 
-            runText.push_back(cellToPresentedGlyph(cell));
+            if (!isContinuationCell(cell))
+            {
+                const char32_t glyph = cellToPresentedGlyph(cell);
+                if (glyph != U'\0')
+                {
+                    runText.push_back(glyph);
+                    runGlyphWidths.push_back(UnicodeWidth::measureCodePointWidth(glyph));
+                }
+            }
+
             ++x;
         }
 
         const ResolvedStyle resolvedRunStyle = m_stylePolicy.resolve(runStyle);
         if (!isBlinkVisibleForResolvedStyle(resolvedRunStyle))
         {
-            for (char32_t& glyph : runText)
+            std::u32string maskedText;
+            maskedText.reserve(runText.size() * 2);
+
+            for (std::size_t i = 0; i < runText.size(); ++i)
             {
-                if (glyph != U' ')
+                const char32_t glyph = runText[i];
+                const CellWidth width = runGlyphWidths[i];
+
+                if (glyph == U' ')
                 {
-                    glyph = U' ';
+                    maskedText.push_back(U' ');
+                    continue;
                 }
+
+                if (width == CellWidth::Two)
+                {
+                    maskedText.push_back(U' ');
+                    maskedText.push_back(U' ');
+                    continue;
+                }
+
+                maskedText.push_back(U' ');
             }
+
+            runText = std::move(maskedText);
         }
 
         moveCursor(runStart, y);
@@ -855,8 +892,6 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
         }
     }
 }
-
-
 
 bool ConsoleRenderer::shouldForceFullPresentForBlink(const ScreenBuffer& frame)
 {
