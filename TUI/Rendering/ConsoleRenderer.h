@@ -7,6 +7,7 @@
 #include "Rendering/Backends/ConsoleCapabilityDetector.h"
 #include "Rendering/Capabilities/ConsoleCapabilities.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
+#include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
@@ -17,30 +18,6 @@
 
 #define NOMINMAX
 #include <windows.h>
-
-/*
-    Purpose:
-
-    ConsoleRenderer is the Windows console backend/output layer.
-
-    For Phase 1 Unicode readiness:
-        - ScreenBuffer owns logical Unicode placement
-        - Unicode conversion is centralized outside the renderer
-        - the renderer writes visible runs only
-        - continuation cells are skipped during presentation
-        - backend capability reporting is exposed through IRenderer
-
-    For Phase 2 style adaptation:
-        - logical Style stays unchanged in ScreenBuffer
-        - capability detection populates ConsoleCapabilities
-        - StylePolicy resolves unsupported features at presentation time
-        - backend mapping uses resolved presentation style only
-
-    For Phase 2 structured diagnostics:
-        - diagnostics are optional and renderer-owned
-        - runtime adaptation decisions are recorded at the real style resolution point
-        - author-facing hints are built from collected report data, not renderer internals
-*/
 
 class ConsoleRenderer : public IRenderer
 {
@@ -70,6 +47,8 @@ public:
 
     void setDiagnosticsAppendMode(bool appendMode);
     bool diagnosticsAppendMode() const;
+
+    void setStartupDiagnosticsContext(const StartupDiagnosticsContext& startupDiagnostics);
 
     RenderDiagnostics& diagnostics();
     const RenderDiagnostics& diagnostics() const;
@@ -131,6 +110,7 @@ private:
     StylePolicy m_stylePolicy{};
     ConsoleCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};
+    StartupDiagnosticsContext m_startupDiagnostics{};
     WORD m_defaultAttributes = 0;
 
     UINT m_originalOutputCodePage = 0;

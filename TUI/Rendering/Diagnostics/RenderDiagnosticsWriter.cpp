@@ -183,6 +183,22 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "Append mode: " << (diagnostics.appendMode() ? "true" : "false") << "\n";
     out << "Diagnostics enabled: " << (diagnostics.isEnabled() ? "true" : "false") << "\n\n";
 
+    out << "Startup Host / Renderer Selection\n";
+    out << "---------------------------------\n";
+    out << "Startup config source: " << backendState.startupConfigSource << "\n";
+    out << "Startup config file found: " << (backendState.startupConfigFileFound ? "true" : "false") << "\n";
+    out << "Configured host preference: " << backendState.configuredHostPreference << "\n";
+    out << "Configured renderer preference: " << backendState.configuredRendererPreference << "\n";
+    out << "Requested host: " << backendState.requestedHostKind << "\n";
+    out << "Actual host: " << backendState.actualHostKind << "\n";
+    out << "Requested renderer: " << backendState.requestedRendererIdentity << "\n";
+    out << "Actual renderer: " << backendState.rendererIdentity << "\n";
+    out << "Active render path: " << backendState.activeRenderPath << "\n";
+    out << "Launcher relaunch attempted: " << (backendState.relaunchAttempted ? "true" : "false") << "\n";
+    out << "Launcher relaunch performed: " << (backendState.relaunchPerformed ? "true" : "false") << "\n";
+    out << "Launched-by-WT flag present: " << (backendState.launchedByWindowsTerminalFlag ? "true" : "false") << "\n";
+    out << "WT_SESSION hint present: " << (backendState.windowsTerminalSessionHint ? "true" : "false") << "\n\n";
+
     out << "Backend Activation State\n";
     out << "------------------------\n";
     out << "Renderer identity: " << backendState.rendererIdentity << "\n";
@@ -372,9 +388,17 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "----------------------------\n";
 
     const std::vector<std::string> hints = AuthorRenderHints::buildHints(diagnostics);
-    for (const std::string& hint : hints)
+
+    if (hints.empty())
     {
-        out << "- " << hint << "\n";
+        out << "No author-facing hints.\n";
+    }
+    else
+    {
+        for (const std::string& hint : hints)
+        {
+            out << "- " << hint << "\n";
+        }
     }
 
     out << "\n";
@@ -384,6 +408,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "- Diagnostics describe renderer behavior only.\n";
     out << "- Logical Style data stored in ScreenBuffer is not mutated by diagnostics or adaptation.\n";
     out << "- Tri-state logical reporting exists to distinguish absent fields from explicit enable/disable intent.\n";
+    out << "- Host selection and renderer selection are reported separately on purpose.\n";
     out << "- VT enablement/availability and active renderer path are reported separately on purpose.\n";
     out << "- Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.\n";
     out << "- Direct rendering can now increase when the backend capability/policy pair safely permits maximal feature use.\n";

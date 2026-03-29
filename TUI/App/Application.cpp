@@ -1,6 +1,5 @@
 #include "App/Application.h"
 #include "App/ScreenManager.h"
-#include "App/TerminalLauncher.h"
 
 #include <chrono>
 #include <thread>
@@ -18,7 +17,13 @@
 
 static Application* g_appInstance = nullptr;
 
-Application::Application() = default;
+Application::Application(
+    StartupRendererSelection rendererSelection,
+    const StartupDiagnosticsContext& startupDiagnostics)
+    : m_rendererSelection(rendererSelection)
+    , m_startupDiagnostics(startupDiagnostics)
+{
+}
 
 Application::~Application()
 {
@@ -50,12 +55,13 @@ bool Application::initialize()
     g_appInstance = this;
     SetConsoleCtrlHandler(ConsoleCtrlHandler, TRUE);
 
-    if (TerminalLauncher::shouldPreferTerminalRenderer())
+    if (m_rendererSelection == StartupRendererSelection::Terminal)
     {
         auto terminalRenderer = std::make_unique<TerminalRenderer>();
         terminalRenderer->setDiagnosticsEnabled(true);
         terminalRenderer->setDiagnosticsAppendMode(false);
         terminalRenderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+        terminalRenderer->setStartupDiagnosticsContext(m_startupDiagnostics);
 
         if (terminalRenderer->initialize())
         {
@@ -69,6 +75,7 @@ bool Application::initialize()
         consoleRenderer->setDiagnosticsEnabled(true);
         consoleRenderer->setDiagnosticsAppendMode(false);
         consoleRenderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
+        consoleRenderer->setStartupDiagnosticsContext(m_startupDiagnostics);
 
         if (!consoleRenderer->initialize())
         {

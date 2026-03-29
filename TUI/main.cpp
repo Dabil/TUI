@@ -1,4 +1,5 @@
 #include "App/Application.h"
+#include "App/StartupConfig.h"
 #include "App/TerminalLauncher.h"
 
 /*
@@ -14,12 +15,17 @@ If the window is larger than the buffer, Windows will fail.
 
 int main()
 {
-    if (TerminalLauncher::tryRelaunchInWindowsTerminal())
+    const StartupConfig startupConfig = StartupConfigLoader::loadFromStartupIni();
+    const StartupLaunchDecision launchDecision = TerminalLauncher::prepareStartup(startupConfig);
+
+    if (launchDecision.relaunchPerformed)
     {
         return 0;
     }
 
-    Application app;
+    Application app(
+        launchDecision.rendererSelection,
+        launchDecision.diagnosticsContext);
 
     if (!app.initialize())
     {

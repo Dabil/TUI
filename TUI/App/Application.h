@@ -2,6 +2,9 @@
 
 #include <memory>
 
+#include "App/TerminalLauncher.h"
+#include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
+
 class ScreenManager;
 class IRenderer;
 class Surface;
@@ -9,7 +12,9 @@ class Surface;
 class Application
 {
 public:
-    Application();
+    explicit Application(
+        StartupRendererSelection rendererSelection,
+        const StartupDiagnosticsContext& startupDiagnostics);
     ~Application();
 
     bool initialize();
@@ -35,6 +40,9 @@ private:
     void updateScreenCycle(double deltaTime);
 
 private:
+    StartupRendererSelection m_rendererSelection = StartupRendererSelection::Console;
+    StartupDiagnosticsContext m_startupDiagnostics{};
+
     std::unique_ptr<ScreenManager> m_screenManager;
     std::unique_ptr<IRenderer> m_renderer;
     std::unique_ptr<Surface> m_surface;

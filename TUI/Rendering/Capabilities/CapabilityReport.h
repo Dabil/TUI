@@ -19,6 +19,7 @@
         - detected backend capabilities
         - selected renderer adaptation policy
         - backend activation/runtime-path state
+        - startup host/renderer selection state
         - summary counts of adaptation outcomes
         - optional representative examples
         - optional tri-state logical style examples
@@ -81,8 +82,25 @@ struct StyleLogicalStateExample
 
 struct BackendStateSnapshot
 {
+    std::string startupConfigSource = "startup.ini";
+    bool startupConfigFileFound = false;
+
+    std::string configuredHostPreference = "Auto";
+    std::string configuredRendererPreference = "Auto";
+
+    std::string requestedHostKind = "Unknown";
+    std::string actualHostKind = "Unknown";
+
+    std::string requestedRendererIdentity = "Unknown";
     std::string rendererIdentity = "Unknown";
+
     std::string activeRenderPath = "Unknown";
+
+    bool relaunchAttempted = false;
+    bool relaunchPerformed = false;
+
+    bool launchedByWindowsTerminalFlag = false;
+    bool windowsTerminalSessionHint = false;
 
     bool virtualTerminalEnableAttempted = false;
     bool virtualTerminalEnableSucceeded = false;

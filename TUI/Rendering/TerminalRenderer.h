@@ -6,6 +6,7 @@
 #include "Rendering/Backends/TerminalCapabilityDetector.h"
 #include "Rendering/Capabilities/ConsoleCapabilities.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
+#include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
@@ -16,24 +17,6 @@
 
 #define NOMINMAX
 #include <windows.h>
-
-/*
-    Purpose:
-
-    TerminalRenderer is the terminal-sequence backend/output layer.
-
-    Architectural role:
-        - sibling backend to ConsoleRenderer
-        - preserves authored logical style in ScreenBuffer
-        - resolves/adapts style only at presentation time
-        - emits terminal control sequences instead of Win32 attributes
-        - keeps diagnostics optional and renderer-owned
-
-    First-pass scope:
-        - requires VT-capable terminal output on Windows
-        - uses FrameDiff and the existing style/capability/diagnostics pipeline
-        - keeps terminal-specific activation and capability probing in backend code
-*/
 
 class TerminalRenderer : public IRenderer
 {
@@ -61,6 +44,8 @@ public:
 
     void setDiagnosticsAppendMode(bool appendMode);
     bool diagnosticsAppendMode() const;
+
+    void setStartupDiagnosticsContext(const StartupDiagnosticsContext& startupDiagnostics);
 
     RenderDiagnostics& diagnostics();
     const RenderDiagnostics& diagnostics() const;
@@ -117,6 +102,7 @@ private:
     StylePolicy m_stylePolicy{};
     ConsoleCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};
+    StartupDiagnosticsContext m_startupDiagnostics{};
 
     UINT m_originalOutputCodePage = 0;
     UINT m_originalInputCodePage = 0;

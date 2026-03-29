@@ -1,5 +1,7 @@
 #include "App/TerminalLauncher.h"
 
+#include "Rendering/Backends/TerminalHostClassifier.h"
+
 #define NOMINMAX
 #include <windows.h>
 #include <shellapi.h>
@@ -176,6 +178,22 @@ namespace
 
         return commandLine;
     }
+
+    TerminalHostKind toRequestedHost(StartupHostPreference preference)
+    {
+        switch (preference)
+        {
+        case StartupHostPreference::Console:
+            return TerminalHostKind::ClassicConsoleWindow;
+
+        case StartupHostPreference::Terminal:
+            return TerminalHostKind::WindowsTerminal;
+
+        case StartupHostPreference::Auto:
+        default:
+            return TerminalHostKind::WindowsTerminal;
+        }
+    }
 }
 
 bool TerminalLauncher::tryRelaunchInWindowsTerminal()
@@ -233,17 +251,109 @@ bool TerminalLauncher::tryRelaunchInWindowsTerminal()
     return true;
 }
 
-bool TerminalLauncher::shouldPreferTerminalRenderer()
+StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& config)
 {
+    StartupLaunchDecision decision{};
+
     int argc = 0;
     wchar_t** argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-    if (argv == nullptr)
+
+    const bool launchedByWtFlag =
+        (argv != nullptr) &&
+        hasArgument(argc, argv, kLaunchedByWtFlag);
+
+    if (argv != nullptr)
     {
-        return hasWindowsTerminalSessionHint();
+        LocalFree(argv);
     }
 
-    const bool launchedByWt = hasArgument(argc, argv, kLaunchedByWtFlag);
-    LocalFree(argv);
+    const bool windowsTerminalSessionHint = hasWindowsTerminalSessionHint();
+    const TerminalHostKind actualHost = TerminalHostClassifier::classifyCurrentHost();
 
-    return launchedByWt || hasWindowsTerminalSessionHint();
+    StartupDiagnosticsContext diagnosticsContext;
+    diagnosticsContext.configuredHostPreference = config.hostPreference;
+    diagnosticsContext.configuredRendererPreference = config.rendererPreference;
+    diagnosticsContext.startupConfigFileFound = config.configFileFound;
+    diagnosticsContext.startupConfigSource = "startup.ini";
+    diagnosticsContext.requestedHost = toRequestedHost(config.hostPreference);
+    diagnosticsContext.actualHost = actualHost;
+    diagnosticsContext.launchedByWindowsTerminalFlag = launchedByWtFlag;
+    diagnosticsContext.windowsTerminalSessionHint = windowsTerminalSessionHint;
+
+    bool shouldAttemptTerminalHost = false;
+
+    switch (config.hostPreference)
+    {
+    case StartupHostPreference::Console:
+        shouldAttemptTerminalHost = false;
+        diagnosticsContext.requestedHost = TerminalHostKind::ClassicConsoleWindow;
+        break;
+
+    case StartupHostPreference::Terminal:
+        shouldAttemptTerminalHost = true;
+        diagnosticsContext.requestedHost = TerminalHostKind::WindowsTerminal;
+        break;
+
+    case StartupHostPreference::Auto:
+    default:
+        shouldAttemptTerminalHost = true;
+        diagnosticsContext.requestedHost = TerminalHostKind::WindowsTerminal;
+        break;
+    }
+
+    const bool alreadyInsideRequestedTerminalHost =
+        launchedByWtFlag ||
+        windowsTerminalSessionHint ||
+        actualHost == TerminalHostKind::WindowsTerminal;
+
+    if (shouldAttemptTerminalHost && !alreadyInsideRequestedTerminalHost)
+    {
+        diagnosticsContext.relaunchAttempted = true;
+
+        if (tryRelaunchInWindowsTerminal())
+        {
+            diagnosticsContext.relaunchPerformed = true;
+            decision.relaunchPerformed = true;
+            decision.diagnosticsContext = diagnosticsContext;
+            return decision;
+        }
+    }
+
+    switch (config.rendererPreference)
+    {
+    case StartupRendererPreference::Console:
+        decision.rendererSelection = StartupRendererSelection::Console;
+        diagnosticsContext.requestedRenderer = RendererKind::ConsoleRenderer;
+        break;
+
+    case StartupRendererPreference::Terminal:
+        decision.rendererSelection = StartupRendererSelection::Terminal;
+        diagnosticsContext.requestedRenderer = RendererKind::TerminalRenderer;
+        break;
+
+    case StartupRendererPreference::Auto:
+    default:
+    {
+        const bool preferTerminalRenderer =
+            launchedByWtFlag ||
+            windowsTerminalSessionHint ||
+            TerminalHostClassifier::shouldPreferTerminalRenderer(actualHost);
+
+        if (preferTerminalRenderer)
+        {
+            decision.rendererSelection = StartupRendererSelection::Terminal;
+            diagnosticsContext.requestedRenderer = RendererKind::TerminalRenderer;
+        }
+        else
+        {
+            decision.rendererSelection = StartupRendererSelection::Console;
+            diagnosticsContext.requestedRenderer = RendererKind::ConsoleRenderer;
+        }
+
+        break;
+    }
+    }
+
+    decision.diagnosticsContext = diagnosticsContext;
+    return decision;
 }

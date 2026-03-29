@@ -623,6 +623,11 @@ void TerminalRenderer::setDiagnosticsAppendMode(bool appendMode)
     m_renderDiagnostics.setAppendMode(appendMode);
 }
 
+void TerminalRenderer::setStartupDiagnosticsContext(const StartupDiagnosticsContext& startupDiagnostics)
+{
+    m_startupDiagnostics = startupDiagnostics;
+}
+
 bool TerminalRenderer::diagnosticsAppendMode() const
 {
     return m_renderDiagnostics.appendMode();
@@ -852,8 +857,23 @@ void TerminalRenderer::initializeDiagnosticsState()
     m_renderDiagnostics.resetRuntimeData();
 
     BackendStateSnapshot backendState;
+    backendState.startupConfigSource = m_startupDiagnostics.startupConfigSource;
+    backendState.startupConfigFileFound = m_startupDiagnostics.startupConfigFileFound;
+    backendState.configuredHostPreference = toString(m_startupDiagnostics.configuredHostPreference);
+    backendState.configuredRendererPreference = toString(m_startupDiagnostics.configuredRendererPreference);
+
+    backendState.requestedHostKind = toString(m_startupDiagnostics.requestedHost);
+    backendState.actualHostKind = toString(m_startupDiagnostics.actualHost);
+    backendState.requestedRendererIdentity = toString(m_startupDiagnostics.requestedRenderer);
+
     backendState.rendererIdentity = m_rendererIdentity;
     backendState.activeRenderPath = "VirtualTerminalSequencePath";
+
+    backendState.relaunchAttempted = m_startupDiagnostics.relaunchAttempted;
+    backendState.relaunchPerformed = m_startupDiagnostics.relaunchPerformed;
+    backendState.launchedByWindowsTerminalFlag = m_startupDiagnostics.launchedByWindowsTerminalFlag;
+    backendState.windowsTerminalSessionHint = m_startupDiagnostics.windowsTerminalSessionHint;
+
     backendState.virtualTerminalEnableAttempted = m_virtualTerminalEnableAttempted;
     backendState.virtualTerminalEnableSucceeded = m_virtualTerminalEnableSucceeded;
     backendState.virtualTerminalProcessingActive = m_capabilities.virtualTerminalProcessing;
