@@ -131,6 +131,7 @@
   <ItemGroup>
     <ClInclude Include="App\Application.h" />
     <ClInclude Include="App\ScreenManager.h" />
+    <ClInclude Include="App\StartupConfig.h" />
     <ClInclude Include="App\TerminalLauncher.h" />
     <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
@@ -141,12 +142,17 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="Rendering\Backends\TerminalHostClassifier.h" />
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnosticsWriter.h" />
+    <ClInclude Include="Rendering\Diagnostics\StartupDiagnosticsContext.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
@@ -180,6 +186,7 @@
   <ItemGroup>
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
+    <ClCompile Include="App\StartupConfig.cpp" />
     <ClCompile Include="App\TerminalLauncher.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\Backends\ConsoleCapabilityDetector.cpp" />
@@ -187,6 +194,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Rendering\Backends\TerminalHostClassifier.cpp" />
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
@@ -216,6 +224,9 @@
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeWidth.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="startup.ini" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
