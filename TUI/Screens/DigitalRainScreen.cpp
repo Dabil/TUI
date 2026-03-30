@@ -78,9 +78,10 @@ namespace
             U"ウゥクスツヌフムユュルグズブヅプ"
             U"エェケセテネヘメレヱゲゼデベペ"
             U"オォコソトノホモヨョロヲゴゾドボポヴッン"
-            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-            U"♔♕♖♗♘♙♚♛♜♝♞♟"
-            U"♪♫")
+            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
+            U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           //  greek alphabet 
+            U"♔♕♖♗♘♙♚♛♜♝♞♟"                // chess pieces
+            U"♪♫⌘₿äü∄∃ƒ±£µℇ")
             + std::u32string(1, RabbitGlyph);
     }
 }
@@ -128,6 +129,10 @@ DigitalRainScreen::DigitalRainScreen()
     m_previewStyle =
         style::Fg(Color::FromBasic(Color::Basic::BrightGreen))
         + style::Bg(black);
+
+    m_borderStyle =
+        style::Fg(Color::FromBasic(Color::Basic::Green))
+        + style::Bg(black);
 }
 
 void DigitalRainScreen::onEnter()
@@ -167,8 +172,9 @@ void DigitalRainScreen::draw(Surface& surface)
             m_backgroundStyle);
 
         buffer.drawFrame(
-            Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-            Themes::Frame);
+            Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } }, 
+            m_borderStyle,
+            U'╔', U'╗', U'╚', U'╝', U'═', U'║');
 
         buffer.writeString(2, 1, "Digital Rain needs a larger console window.", Themes::Warning);
         buffer.writeString(2, 3, "Recommended: at least 48 x 14.", Themes::Subtitle);
@@ -186,7 +192,8 @@ void DigitalRainScreen::draw(Surface& surface)
 
     buffer.drawFrame(
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Frame);
+        m_borderStyle,
+        U'╔', U'╗', U'╚', U'╝', U'═', U'║');
 
 
     drawOverlay(buffer);
@@ -490,6 +497,7 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
     drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
     
     // Use this footer for console
+    /*
     buffer.writeString(2, footerPreviewY, "Sample:", m_labelStyle);
 
     buffer.writeCodePoint(10, footerPreviewY, U'█', m_previewStyle);
@@ -499,17 +507,16 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
     buffer.writeCodePoint(18, footerPreviewY, U'△', m_previewStyle);
 
     buffer.writeString(21, footerPreviewY, "Console-safe fallback glyphs active", m_labelStyle);
-    
+    */
     // Use this footer for Terminal
-    /*
+    
     buffer.writeCodePoint(10, footerPreviewY, U'ア', m_previewStyle);
     buffer.writeCodePoint(12, footerPreviewY, U'♔', m_previewStyle);
-    buffer.writeCodePoint(14, footerPreviewY, U'☀', m_previewStyle);
+    buffer.writeCodePoint(14, footerPreviewY, U'₿', m_previewStyle);
     buffer.writeCodePoint(16, footerPreviewY, U'♪', m_previewStyle);
     buffer.writeCodePoint(18, footerPreviewY, RabbitGlyph, m_previewStyle);
 
-    buffer.writeString(21, footerPreviewY, "Katakana + chess + weather + music + rabbit", m_labelStyle);
-    */
+    buffer.writeString(21, footerPreviewY, "Katakana + chess + music + rabbit + math", m_labelStyle);
 }
 
 void DigitalRainScreen::drawPreviewLine(ScreenBuffer& buffer, int x, int y, int availableWidth, int startIndex) const

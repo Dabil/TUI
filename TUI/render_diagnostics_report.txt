@@ -7,6 +7,22 @@ Output path: render_diagnostics_report.txt
 Append mode: false
 Diagnostics enabled: true
 
+Startup Host / Renderer Selection
+---------------------------------
+Startup config source: startup.ini
+Startup config file found: true
+Configured host preference: Terminal
+Configured renderer preference: Terminal
+Requested host: WindowsTerminal
+Actual host: WindowsTerminal
+Requested renderer: TerminalRenderer
+Actual renderer: TerminalRenderer
+Active render path: VirtualTerminalSequencePath
+Launcher relaunch attempted: false
+Launcher relaunch performed: false
+Launched-by-WT flag present: true
+WT_SESSION hint present: true
+
 Backend Activation State
 ------------------------
 Renderer identity: TerminalRenderer
@@ -67,10 +83,9 @@ Strike: capability=Supported, policy=Direct
 
 Adaptation Summary Counts
 -------------------------
-ForegroundColor / Direct: 540095
-BackgroundColor / Direct: 600139
-Bold / Direct: 222979
-SlowBlink / Omitted: 1
+ForegroundColor / Direct: 635722
+BackgroundColor / Direct: 790954
+Bold / Direct: 226161
 
 Tri-State Logical Style Examples
 --------------------------------
@@ -84,31 +99,27 @@ Legend: Unspecified = field absent in authored style, ExplicitlyEnabled = field 
 [Invisible / logical=Unspecified] Logical field observed with state=Unspecified, presented=false
 [Strike / logical=Unspecified] Logical field observed with state=Unspecified, presented=false
 [Bold / logical=ExplicitlyEnabled] Logical field observed with state=ExplicitlyEnabled, presented=true
-[SlowBlink / logical=ExplicitlyEnabled] Logical field observed with state=ExplicitlyEnabled, presented=false
 
 Representative Examples
 -----------------------
 [Bold / Direct / logical=ExplicitlyEnabled] capability=Supported, policy=Direct, detail=Style rendered directly logicalState=ExplicitlyEnabled, presented=true
 [Bold / Direct / logical=ExplicitlyEnabled] capability=Supported, policy=Direct, detail=Style rendered directly logicalState=ExplicitlyEnabled, presented=true
 [Bold / Direct / logical=ExplicitlyEnabled] capability=Supported, policy=Direct, detail=Style rendered directly logicalState=ExplicitlyEnabled, presented=true
-[SlowBlink / Omitted / logical=ExplicitlyEnabled] capability=Unknown, policy=Omit, detail=Blink omitted logicalState=ExplicitlyEnabled, presented=false
 
 Author-Facing Rendering Hints
 ----------------------------
 - Diagnostics separate authored logical style, backend capability, renderer policy, and final backend realization so authors can see where a visual difference was introduced.
 - Tri-state logical fields now matter in diagnostics: unspecified means the field was absent, explicitly enabled means the author requested it on, and explicitly disabled means the author intentionally forced it off.
-- Runtime diagnostics recorded 1 non-direct adaptation event.
+- Runtime diagnostics recorded only direct realizations for the style features encountered during this session.
 - Some authored style features were realized directly rather than conservatively omitted, which reflects the renderer's shift toward maximal safe feature use when the capability/policy pair allows it.
-- Blink styling encountered runtime adaptation: 1 omitted, 0 emulated.
-- Portable authoring suggestion: do not rely on blink as the only urgency signal. Pair it with wording, framing, reverse video, or stronger contrast.
 - Unspecified fields remain important because they preserve inheritance/merge behavior; diagnostics now call that out separately instead of collapsing it into false.
-- Observed during rendering: Blink omitted logicalState=ExplicitlyEnabled, presented=false
 
 Notes
 -----
 - Diagnostics describe renderer behavior only.
 - Logical Style data stored in ScreenBuffer is not mutated by diagnostics or adaptation.
 - Tri-state logical reporting exists to distinguish absent fields from explicit enable/disable intent.
+- Host selection and renderer selection are reported separately on purpose.
 - VT enablement/availability and active renderer path are reported separately on purpose.
 - Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.
 - Direct rendering can now increase when the backend capability/policy pair safely permits maximal feature use.

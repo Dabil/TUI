@@ -85,6 +85,7 @@ private:
     Style m_titleStyle;
     Style m_labelStyle;
     Style m_previewStyle;
+    Style m_borderStyle;
 
     std::mt19937 m_rng;
 };
