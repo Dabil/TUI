@@ -30,6 +30,21 @@ Application::~Application()
     shutdown();
 }
 
+#define NOMINMAX
+#include <windows.h>
+
+namespace
+{
+    void maximizeHostWindow()
+    {
+        HWND hwnd = GetConsoleWindow();
+        if (hwnd != nullptr)
+        {
+            ShowWindow(hwnd, SW_MAXIMIZE);
+        }
+    }
+}
+
 BOOL WINAPI ConsoleCtrlHandler(DWORD ctrlType)
 {
     switch (ctrlType)
@@ -61,10 +76,14 @@ bool Application::initialize()
         terminalRenderer->setDiagnosticsEnabled(true);
         terminalRenderer->setDiagnosticsAppendMode(false);
         terminalRenderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
-        terminalRenderer->setStartupDiagnosticsContext(m_startupDiagnostics);
+
+        StartupDiagnosticsContext terminalDiagnostics = m_startupDiagnostics;
+        terminalDiagnostics.actualRenderer = RendererKind::TerminalRenderer;
+        terminalRenderer->setStartupDiagnosticsContext(terminalDiagnostics);
 
         if (terminalRenderer->initialize())
         {
+            m_startupDiagnostics = terminalDiagnostics;
             m_renderer = std::move(terminalRenderer);
         }
     }
@@ -75,14 +94,23 @@ bool Application::initialize()
         consoleRenderer->setDiagnosticsEnabled(true);
         consoleRenderer->setDiagnosticsAppendMode(false);
         consoleRenderer->setDiagnosticsOutputPath("render_diagnostics_report.txt");
-        consoleRenderer->setStartupDiagnosticsContext(m_startupDiagnostics);
+
+        StartupDiagnosticsContext consoleDiagnostics = m_startupDiagnostics;
+        consoleDiagnostics.actualRenderer = RendererKind::ConsoleRenderer;
+        consoleRenderer->setStartupDiagnosticsContext(consoleDiagnostics);
 
         if (!consoleRenderer->initialize())
         {
             return false;
         }
 
+        m_startupDiagnostics = consoleDiagnostics;
         m_renderer = std::move(consoleRenderer);
+    }
+
+    if (m_startupDiagnostics.actualHost == TerminalHostKind::ClassicConsoleWindow)
+    {
+        maximizeHostWindow();
     }
 
     m_width = m_renderer->getConsoleWidth();
