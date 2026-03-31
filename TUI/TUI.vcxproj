@@ -143,6 +143,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="Rendering\Backends\TerminalHostClassifier.h" />
+    <ClInclude Include="Rendering\Backends\TerminalHostInfo.h" />
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
@@ -173,6 +174,9 @@
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
     <ClInclude Include="Rendering\Styles\Themes.h" />
+    <ClInclude Include="Rendering\VtFrameEmitter.h" />
+    <ClInclude Include="Rendering\VTRun.h" />
+    <ClInclude Include="Rendering\VtStyleState.h" />
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
@@ -195,6 +199,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Rendering\Backends\TerminalHostClassifier.cpp" />
+    <ClCompile Include="Rendering\Backends\TerminalHostInfo.cpp" />
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
@@ -213,6 +218,8 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Rendering\VtFrameEmitter.cpp" />
+    <ClCompile Include="Rendering\VtStyleState.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
