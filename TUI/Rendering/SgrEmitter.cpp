@@ -1,8 +1,38 @@
-#include "Rendering/VtStyleState.h"
+﻿#include "Rendering/SgrEmitter.h"
 
 #include <string>
 
 #include "Rendering/Styles/Color.h"
+
+/*
+    SgrEmitter design
+
+    SgrEmitter is a VT-only low-level emitter that:
+        - tracks the current presented Style
+        - computes a diff from current style to target style
+        - emits a single minimal SGR sequence only when something changed
+        - never looks at ThemeColor, authored semantics, or downgrade policy
+        - assumes incoming Style is already fully resolved
+
+    Its responsibilities are intentionally narrow:
+        - reset()
+        - currentStyle()
+        - appendTransitionTo(out, targetStyle)
+        - appendReset(out)
+
+    The main improvement is that style removal no longer forces ESC[0m + full rebuild. 
+    Instead, it emits only the needed reset codes:
+        - foreground off - 39
+        - background off - 49
+        - underline off - 24
+        - blink off - 25
+        - reverse off - 27
+        - invisible off - 28
+        - strike off - 29
+        - bold/dim changes - 22 plus re-enable whichever of bold/dim should remain on
+
+    Real delta batching instead of reset-per-run behavior
+*/
 
 namespace
 {
@@ -91,6 +121,7 @@ namespace
             appendCode(out, static_cast<int>(color.red()));
             appendCode(out, static_cast<int>(color.green()));
             appendCode(out, static_cast<int>(color.blue()));
+            return;
         }
     }
 
@@ -123,31 +154,30 @@ namespace
             appendCode(out, static_cast<int>(color.red()));
             appendCode(out, static_cast<int>(color.green()));
             appendCode(out, static_cast<int>(color.blue()));
+            return;
         }
+    }
+
+    bool boolStateChanged(bool currentValue, bool targetValue)
+    {
+        return currentValue != targetValue;
     }
 }
 
-void VtStyleState::reset()
+void SgrEmitter::reset()
 {
     m_currentStyle = Style{};
 }
 
-const Style& VtStyleState::currentStyle() const
+const Style& SgrEmitter::currentStyle() const
 {
     return m_currentStyle;
 }
 
-void VtStyleState::appendTransitionTo(std::string& out, const Style& targetStyle)
+void SgrEmitter::appendTransitionTo(std::string& out, const Style& targetStyle)
 {
     if (targetStyle == m_currentStyle)
     {
-        return;
-    }
-
-    if (requiresFullReset(targetStyle))
-    {
-        appendFullStyle(out, targetStyle);
-        m_currentStyle = targetStyle;
         return;
     }
 
@@ -155,57 +185,13 @@ void VtStyleState::appendTransitionTo(std::string& out, const Style& targetStyle
     m_currentStyle = targetStyle;
 }
 
-void VtStyleState::appendReset(std::string& out)
+void SgrEmitter::appendReset(std::string& out)
 {
     out += "\x1b[0m";
     m_currentStyle = Style{};
 }
 
-bool VtStyleState::requiresFullReset(const Style& targetStyle) const
-{
-    const bool foregroundRemoved =
-        m_currentStyle.hasForeground() && !targetStyle.hasForeground();
-
-    const bool backgroundRemoved =
-        m_currentStyle.hasBackground() && !targetStyle.hasBackground();
-
-    const bool boldRemoved =
-        m_currentStyle.bold() && !targetStyle.bold();
-
-    const bool dimRemoved =
-        m_currentStyle.dim() && !targetStyle.dim();
-
-    const bool underlineRemoved =
-        m_currentStyle.underline() && !targetStyle.underline();
-
-    const bool slowBlinkRemoved =
-        m_currentStyle.slowBlink() && !targetStyle.slowBlink();
-
-    const bool fastBlinkRemoved =
-        m_currentStyle.fastBlink() && !targetStyle.fastBlink();
-
-    const bool reverseRemoved =
-        m_currentStyle.reverse() && !targetStyle.reverse();
-
-    const bool invisibleRemoved =
-        m_currentStyle.invisible() && !targetStyle.invisible();
-
-    const bool strikeRemoved =
-        m_currentStyle.strike() && !targetStyle.strike();
-
-    return foregroundRemoved ||
-        backgroundRemoved ||
-        boldRemoved ||
-        dimRemoved ||
-        underlineRemoved ||
-        slowBlinkRemoved ||
-        fastBlinkRemoved ||
-        reverseRemoved ||
-        invisibleRemoved ||
-        strikeRemoved;
-}
-
-void VtStyleState::appendFullStyle(std::string& out, const Style& style) const
+void SgrEmitter::appendFullStyle(std::string& out, const Style& style) const
 {
     std::string sgr = "\x1b[0";
 
@@ -232,10 +218,9 @@ void VtStyleState::appendFullStyle(std::string& out, const Style& style) const
     out += sgr;
 }
 
-void VtStyleState::appendDeltaStyle(std::string& out, const Style& targetStyle) const
+void SgrEmitter::appendDeltaStyle(std::string& out, const Style& targetStyle) const
 {
     std::string sgr = "\x1b[";
-
     bool changed = false;
 
     if (m_currentStyle.foreground() != targetStyle.foreground())
@@ -248,6 +233,7 @@ void VtStyleState::appendDeltaStyle(std::string& out, const Style& targetStyle) 
         {
             appendCode(sgr, 39);
         }
+
         changed = true;
     }
 
@@ -261,17 +247,79 @@ void VtStyleState::appendDeltaStyle(std::string& out, const Style& targetStyle) 
         {
             appendCode(sgr, 49);
         }
+
         changed = true;
     }
 
-    if (!m_currentStyle.bold() && targetStyle.bold()) { appendCode(sgr, 1); changed = true; }
-    if (!m_currentStyle.dim() && targetStyle.dim()) { appendCode(sgr, 2); changed = true; }
-    if (!m_currentStyle.underline() && targetStyle.underline()) { appendCode(sgr, 4); changed = true; }
-    if (!m_currentStyle.slowBlink() && targetStyle.slowBlink()) { appendCode(sgr, 5); changed = true; }
-    if (!m_currentStyle.fastBlink() && targetStyle.fastBlink()) { appendCode(sgr, 6); changed = true; }
-    if (!m_currentStyle.reverse() && targetStyle.reverse()) { appendCode(sgr, 7); changed = true; }
-    if (!m_currentStyle.invisible() && targetStyle.invisible()) { appendCode(sgr, 8); changed = true; }
-    if (!m_currentStyle.strike() && targetStyle.strike()) { appendCode(sgr, 9); changed = true; }
+    const bool currentBold = m_currentStyle.bold();
+    const bool targetBold = targetStyle.bold();
+    const bool currentDim = m_currentStyle.dim();
+    const bool targetDim = targetStyle.dim();
+
+    if (currentBold != targetBold || currentDim != targetDim)
+    {
+        if (currentBold || currentDim)
+        {
+            appendCode(sgr, 22);
+            changed = true;
+        }
+
+        if (targetBold)
+        {
+            appendCode(sgr, 1);
+            changed = true;
+        }
+
+        if (targetDim)
+        {
+            appendCode(sgr, 2);
+            changed = true;
+        }
+    }
+
+    if (boolStateChanged(m_currentStyle.underline(), targetStyle.underline()))
+    {
+        appendCode(sgr, targetStyle.underline() ? 4 : 24);
+        changed = true;
+    }
+
+    const bool currentBlink = m_currentStyle.slowBlink() || m_currentStyle.fastBlink();
+    const bool targetBlink = targetStyle.slowBlink() || targetStyle.fastBlink();
+
+    if (currentBlink != targetBlink)
+    {
+        appendCode(sgr, targetBlink
+            ? (targetStyle.fastBlink() ? 6 : 5)
+            : 25);
+        changed = true;
+    }
+    else if (targetBlink)
+    {
+        if (m_currentStyle.slowBlink() != targetStyle.slowBlink() ||
+            m_currentStyle.fastBlink() != targetStyle.fastBlink())
+        {
+            appendCode(sgr, targetStyle.fastBlink() ? 6 : 5);
+            changed = true;
+        }
+    }
+
+    if (boolStateChanged(m_currentStyle.reverse(), targetStyle.reverse()))
+    {
+        appendCode(sgr, targetStyle.reverse() ? 7 : 27);
+        changed = true;
+    }
+
+    if (boolStateChanged(m_currentStyle.invisible(), targetStyle.invisible()))
+    {
+        appendCode(sgr, targetStyle.invisible() ? 8 : 28);
+        changed = true;
+    }
+
+    if (boolStateChanged(m_currentStyle.strike(), targetStyle.strike()))
+    {
+        appendCode(sgr, targetStyle.strike() ? 9 : 29);
+        changed = true;
+    }
 
     if (!changed)
     {

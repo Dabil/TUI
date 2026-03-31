@@ -153,10 +153,10 @@
     <ClInclude Include="Rendering\VTRun.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\VtStyleState.h">
+    <ClInclude Include="Rendering\VtFrameEmitter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\VtFrameEmitter.h">
+    <ClInclude Include="Rendering\SgrEmitter.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -257,10 +257,10 @@
     <ClCompile Include="Rendering\Backends\TerminalHostInfo.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Rendering\VtStyleState.cpp">
+    <ClCompile Include="Rendering\VtFrameEmitter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Rendering\VtFrameEmitter.cpp">
+    <ClCompile Include="Rendering\SgrEmitter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

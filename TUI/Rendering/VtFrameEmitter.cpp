@@ -2,8 +2,8 @@
 
 #include <utility>
 
-VtFrameEmitter::VtFrameEmitter(VtStyleState& styleState)
-    : m_styleState(styleState)
+VtFrameEmitter::VtFrameEmitter(SgrEmitter& sgrEmitter)
+    : m_sgrEmitter(sgrEmitter)
 {
 }
 
@@ -17,7 +17,7 @@ void VtFrameEmitter::beginFrame(bool clearScreenFirst)
         m_cursorX = 0;
         m_cursorY = 0;
         m_cursorKnown = true;
-        m_styleState.reset();
+        m_sgrEmitter.reset();
     }
     else
     {
@@ -37,7 +37,7 @@ void VtFrameEmitter::appendRun(const VtRun& run)
         appendCursorMove(run.xStart, run.y);
     }
 
-    m_styleState.appendTransitionTo(m_buffer, run.presentedStyle);
+    m_sgrEmitter.appendTransitionTo(m_buffer, run.presentedStyle);
     m_buffer += run.utf8Text;
 
     m_cursorX = run.xStart + run.cellWidth;
@@ -49,7 +49,7 @@ std::string VtFrameEmitter::finishFrame(bool resetStyleAtEnd)
 {
     if (resetStyleAtEnd)
     {
-        m_styleState.appendReset(m_buffer);
+        m_sgrEmitter.appendReset(m_buffer);
     }
 
     return std::move(m_buffer);
