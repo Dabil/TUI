@@ -146,6 +146,81 @@ const ScreenCell& ScreenBuffer::getCell(int x, int y)
     return m_cells[static_cast<std::size_t>(index(x, y))];
 }
 
+const ScreenCell* ScreenBuffer::tryGetRowData(int y) const
+{
+    if (y < 0 || y >= m_height || m_width <= 0)
+    {
+        return nullptr;
+    }
+
+    return &m_cells[static_cast<std::size_t>(index(0, y))];
+}
+
+void ScreenBuffer::expandSpanToGlyphBoundaries(int y, int& xStart, int& xEnd) const
+{
+    if (m_width <= 0 || y < 0 || y >= m_height)
+    {
+        xStart = 0;
+        xEnd = -1;
+        return;
+    }
+
+    if (xStart < 0)
+    {
+        xStart = 0;
+    }
+
+    if (xEnd >= m_width)
+    {
+        xEnd = m_width - 1;
+    }
+
+    if (xStart > xEnd)
+    {
+        return;
+    }
+
+    while (xStart > 0)
+    {
+        const ScreenCell& cell = getCell(xStart, y);
+        if (!cell.isContinuation())
+        {
+            break;
+        }
+
+        --xStart;
+    }
+
+    if (xStart > 0)
+    {
+        const ScreenCell& left = getCell(xStart - 1, y);
+        if (left.isDoubleWidthLeading())
+        {
+            --xStart;
+        }
+    }
+
+    while (xEnd + 1 < m_width)
+    {
+        const ScreenCell& cell = getCell(xEnd, y);
+
+        if (cell.isDoubleWidthLeading())
+        {
+            ++xEnd;
+            continue;
+        }
+
+        const ScreenCell& next = getCell(xEnd + 1, y);
+        if (next.isContinuation())
+        {
+            ++xEnd;
+            continue;
+        }
+
+        break;
+    }
+}
+
 void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 {
     if (!inBounds(x, y))

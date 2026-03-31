@@ -14,6 +14,9 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
+#include "Rendering/VtFrameEmitter.h"
+#include "Rendering/VtRun.h"
+#include "Rendering/VtStyleState.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -53,10 +56,21 @@ public:
 private:
     void writeFullFrame(const ScreenBuffer& frame);
     void writeDirtySpans(const ScreenBuffer& frame);
-    void writeSpan(const ScreenBuffer& frame, int y, int xStart, int xEnd);
 
-    void moveCursor(int x, int y);
-    void setStyle(const Style& style);
+    void appendSpanRuns(
+        VtFrameEmitter& emitter,
+        const ScreenBuffer& frame,
+        int y,
+        int xStart,
+        int xEnd);
+
+    VtRun buildRun(
+        const ScreenBuffer& frame,
+        int y,
+        int xStart,
+        int xEnd,
+        int& nextX);
+
     void resetStyle();
 
     bool queryVisibleConsoleSize(int& width, int& height) const;
@@ -98,7 +112,7 @@ private:
     bool m_initialized = false;
     bool m_firstPresent = true;
 
-    Style m_currentStyle{};
+    VtStyleState m_vtStyleState{};
     StylePolicy m_stylePolicy{};
     ConsoleCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};

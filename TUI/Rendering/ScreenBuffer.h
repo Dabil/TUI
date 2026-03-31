@@ -9,23 +9,6 @@
 #include "Rendering/ScreenCell.h"
 #include "Rendering/Styles/Style.h"
 
-/*
-    Purpose:
-
-    ScreenBuffer is the logical cell grid and text placement layer.
-
-    For Phase 1 Unicode readiness:
-        - Unicode APIs are the primary public contract
-        - narrow string APIs remain as convenience wrappers only
-        - width-aware write helpers stay private
-        - renderer behavior remains outside this class
-
-    For Phase 2 preserve-style semantics:
-        - explicit Style arguments still mean "apply this logical style"
-        - std::optional<Style> overloads allow "preserve destination style"
-        - renderer downgrade never mutates stored logical styles
-*/
-
 class ScreenBuffer
 {
 public:
@@ -43,10 +26,12 @@ public:
     const ScreenCell& getCell(int x, int y) const;
     const ScreenCell& getCell(int x, int y);
 
+    const ScreenCell* tryGetRowData(int y) const;
+    void expandSpanToGlyphBoundaries(int y, int& xStart, int& xEnd) const;
+
     void setCell(int x, int y, const ScreenCell& cell);
     void setCellStyle(int x, int y, const Style& style);
 
-    // Primary Unicode API
     void writeCodePoint(int x, int y, char32_t glyph, const Style& style);
     void writeCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
 
@@ -79,20 +64,12 @@ public:
     std::u32string renderToU32String() const;
     std::string renderToUtf8String() const;
 
-    /*
-        Single-glyph convenience APIs
-
-        writeChar(char32_t, ...) is the real Unicode single-glyph helper.
-        writeUtf8Char(...) is a convenience seam for UTF-8 source text.
-        writeChar(char, ...) is legacy compatibility only.
-    */
     void writeChar(int x, int y, char32_t glyph, const Style& style);
     void writeChar(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
 
     void writeUtf8Char(int x, int y, std::string_view utf8Glyph, const Style& style);
     void writeUtf8Char(int x, int y, std::string_view utf8Glyph, const std::optional<Style>& styleOverride);
 
-    // Legacy convenience wrappers
     void writeChar(int x, int y, char glyph, const Style& style);
     void writeChar(int x, int y, char glyph, const std::optional<Style>& styleOverride);
 

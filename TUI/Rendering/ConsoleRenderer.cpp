@@ -1143,7 +1143,15 @@ void ConsoleRenderer::initializeDiagnosticsState()
     backendState.actualHostKind = toString(m_startupDiagnostics.actualHost);
     backendState.requestedRendererIdentity = toString(m_startupDiagnostics.requestedRenderer);
 
-    backendState.rendererIdentity = m_rendererIdentity;
+    if (m_startupDiagnostics.actualRenderer != RendererKind::Unknown)
+    {
+        backendState.rendererIdentity = toString(m_startupDiagnostics.actualRenderer);
+    }
+    else
+    {
+        backendState.rendererIdentity = m_rendererIdentity;
+    }
+
     backendState.activeRenderPath = "BasicWin32AttributePath";
 
     backendState.relaunchAttempted = m_startupDiagnostics.relaunchAttempted;
@@ -1153,12 +1161,13 @@ void ConsoleRenderer::initializeDiagnosticsState()
 
     backendState.virtualTerminalEnableAttempted = m_virtualTerminalEnableAttempted;
     backendState.virtualTerminalEnableSucceeded = m_virtualTerminalEnableSucceeded;
-    backendState.virtualTerminalProcessingActive = m_capabilities.virtualTerminalProcessing;
+    backendState.virtualTerminalProcessingActive = m_virtualTerminalEnableSucceeded;
     backendState.activeRenderPathUsesVirtualTerminalOutput = false;
-    backendState.configuredOutputMode = static_cast<std::uint32_t>(m_configuredOutputMode);
-    backendState.configuredInputMode = static_cast<std::uint32_t>(m_configuredInputMode);
-    backendState.hasConfiguredOutputMode = m_haveConfiguredOutputMode;
-    backendState.hasConfiguredInputMode = m_haveConfiguredInputMode;
+
+    backendState.configuredOutputMode = 0;
+    backendState.configuredInputMode = 0;
+    backendState.hasConfiguredOutputMode = false;
+    backendState.hasConfiguredInputMode = false;
 
     CapabilityReport& report = m_renderDiagnostics.report();
     report.setCapabilities(m_capabilities);
