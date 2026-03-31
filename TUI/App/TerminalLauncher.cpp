@@ -1,6 +1,6 @@
 #include "App/TerminalLauncher.h"
 
-#include "Rendering/Backends/TerminalHostClassifier.h"
+#include "Rendering/Backends/TerminalHostInfo.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -34,12 +34,6 @@ namespace
         }
 
         return false;
-    }
-
-    bool hasWindowsTerminalSessionHint()
-    {
-        const DWORD required = GetEnvironmentVariableW(L"WT_SESSION", nullptr, 0);
-        return required > 0;
     }
 
     std::wstring getModulePath()
@@ -206,9 +200,9 @@ bool TerminalLauncher::tryRelaunchInWindowsTerminal()
     }
 
     const bool alreadyRelaunched = hasArgument(argc, argv, kLaunchedByWtFlag);
-    const bool alreadyInsideWindowsTerminal = hasWindowsTerminalSessionHint();
+    const TerminalHostInfo hostInfo = TerminalHostInfoDetector::detectCurrentHostInfo();
 
-    if (alreadyRelaunched || alreadyInsideWindowsTerminal)
+    if (alreadyRelaunched || hostInfo.windowsTerminalSessionHint)
     {
         LocalFree(argv);
         return false;
@@ -267,8 +261,7 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
         LocalFree(argv);
     }
 
-    const bool windowsTerminalSessionHint = hasWindowsTerminalSessionHint();
-    const TerminalHostKind actualHost = TerminalHostClassifier::classifyCurrentHost();
+    const TerminalHostInfo hostInfo = TerminalHostInfoDetector::detectCurrentHostInfo();
 
     StartupDiagnosticsContext diagnosticsContext;
     diagnosticsContext.configuredHostPreference = config.hostPreference;
@@ -276,9 +269,9 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     diagnosticsContext.startupConfigFileFound = config.configFileFound;
     diagnosticsContext.startupConfigSource = "startup.ini";
     diagnosticsContext.requestedHost = toRequestedHost(config.hostPreference);
-    diagnosticsContext.actualHost = actualHost;
+    diagnosticsContext.actualHost = hostInfo.hostKind;
     diagnosticsContext.launchedByWindowsTerminalFlag = launchedByWtFlag;
-    diagnosticsContext.windowsTerminalSessionHint = windowsTerminalSessionHint;
+    diagnosticsContext.windowsTerminalSessionHint = hostInfo.windowsTerminalSessionHint;
 
     bool shouldAttemptTerminalHost = false;
 
@@ -303,8 +296,8 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
 
     const bool alreadyInsideRequestedTerminalHost =
         launchedByWtFlag ||
-        windowsTerminalSessionHint ||
-        actualHost == TerminalHostKind::WindowsTerminal;
+        hostInfo.windowsTerminalSessionHint ||
+        hostInfo.hostKind == TerminalHostKind::WindowsTerminal;
 
     if (shouldAttemptTerminalHost && !alreadyInsideRequestedTerminalHost)
     {
@@ -324,34 +317,31 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     case StartupRendererPreference::Console:
         decision.rendererSelection = StartupRendererSelection::Console;
         diagnosticsContext.requestedRenderer = RendererKind::ConsoleRenderer;
+        diagnosticsContext.actualRenderer = RendererKind::ConsoleRenderer;
         break;
 
     case StartupRendererPreference::Terminal:
         decision.rendererSelection = StartupRendererSelection::Terminal;
         diagnosticsContext.requestedRenderer = RendererKind::TerminalRenderer;
+        diagnosticsContext.actualRenderer = RendererKind::TerminalRenderer;
         break;
 
     case StartupRendererPreference::Auto:
     default:
-    {
-        const bool preferTerminalRenderer =
-            launchedByWtFlag ||
-            windowsTerminalSessionHint ||
-            TerminalHostClassifier::shouldPreferTerminalRenderer(actualHost);
-
-        if (preferTerminalRenderer)
+        if (hostInfo.prefersTerminalRenderer)
         {
             decision.rendererSelection = StartupRendererSelection::Terminal;
             diagnosticsContext.requestedRenderer = RendererKind::TerminalRenderer;
+            diagnosticsContext.actualRenderer = RendererKind::TerminalRenderer;
         }
         else
         {
             decision.rendererSelection = StartupRendererSelection::Console;
             diagnosticsContext.requestedRenderer = RendererKind::ConsoleRenderer;
+            diagnosticsContext.actualRenderer = RendererKind::ConsoleRenderer;
         }
 
         break;
-    }
     }
 
     decision.diagnosticsContext = diagnosticsContext;

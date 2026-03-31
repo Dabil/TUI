@@ -35,6 +35,7 @@ struct StartupDiagnosticsContext
     TerminalHostKind actualHost = TerminalHostKind::Unknown;
 
     RendererKind requestedRenderer = RendererKind::Unknown;
+    RendererKind actualRenderer = RendererKind::Unknown;
 
     bool relaunchAttempted = false;
     bool relaunchPerformed = false;
