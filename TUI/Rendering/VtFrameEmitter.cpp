@@ -1,0 +1,65 @@
+#include "Rendering/VtFrameEmitter.h"
+
+#include <utility>
+
+VtFrameEmitter::VtFrameEmitter(VtStyleState& styleState)
+    : m_styleState(styleState)
+{
+}
+
+void VtFrameEmitter::beginFrame(bool clearScreenFirst)
+{
+    m_buffer.clear();
+
+    if (clearScreenFirst)
+    {
+        m_buffer += "\x1b[2J\x1b[H";
+        m_cursorX = 0;
+        m_cursorY = 0;
+        m_cursorKnown = true;
+        m_styleState.reset();
+    }
+    else
+    {
+        m_cursorKnown = false;
+    }
+}
+
+void VtFrameEmitter::appendRun(const VtRun& run)
+{
+    if (run.empty())
+    {
+        return;
+    }
+
+    if (!m_cursorKnown || m_cursorX != run.xStart || m_cursorY != run.y)
+    {
+        appendCursorMove(run.xStart, run.y);
+    }
+
+    m_styleState.appendTransitionTo(m_buffer, run.presentedStyle);
+    m_buffer += run.utf8Text;
+
+    m_cursorX = run.xStart + run.cellWidth;
+    m_cursorY = run.y;
+    m_cursorKnown = true;
+}
+
+std::string VtFrameEmitter::finishFrame(bool resetStyleAtEnd)
+{
+    if (resetStyleAtEnd)
+    {
+        m_styleState.appendReset(m_buffer);
+    }
+
+    return std::move(m_buffer);
+}
+
+void VtFrameEmitter::appendCursorMove(int x, int y)
+{
+    m_buffer += "\x1b[";
+    m_buffer += std::to_string(y + 1);
+    m_buffer += ';';
+    m_buffer += std::to_string(x + 1);
+    m_buffer += 'H';
+}

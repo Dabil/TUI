@@ -9,6 +9,29 @@
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
+#include "Rendering/VtFrameEmitter.h"
+#include "Rendering/VtRun.h"
+#include "Rendering/VtStyleState.h"
+
+/*
+* New Frame emission flow
+* 
+ScreenBuffer
+  -> FrameDiff::diffRows(previous, current)
+  -> dirty spans per row
+  -> ScreenBuffer::expandSpanToGlyphBoundaries(...)
+  -> TerminalRenderer::buildRun(...)
+       - skip continuation cells
+       - group contiguous cells by authored style
+       - resolve style once per run
+       - convert run glyphs to UTF-8
+  -> VtFrameEmitter::appendRun(...)
+       - move cursor only when needed
+       - transition VT style only when needed
+       - append UTF-8 payload into one buffer
+  -> TerminalRenderer::writeRaw(one buffered VT string)
+*/
+
 namespace
 {
     constexpr std::size_t kMaxRecordedExamples = 24;
@@ -116,6 +139,21 @@ namespace
         }
 
         return U' ';
+    }
+
+    int glyphCellAdvance(const ScreenCell& cell)
+    {
+        if (cell.kind == CellKind::Glyph && cell.width == CellWidth::Two)
+        {
+            return 2;
+        }
+
+        if (isContinuationCell(cell))
+        {
+            return 0;
+        }
+
+        return 1;
     }
 
     void appendSgrCode(std::string& sequence, int code)
@@ -492,7 +530,7 @@ bool TerminalRenderer::initialize()
     m_stylePolicy = buildStylePolicyFromCapabilities(m_capabilities);
     initializeDiagnosticsState();
 
-    m_currentStyle = Style{};
+    m_vtStyleState.reset();
     m_firstPresent = true;
     m_initialized = true;
 
@@ -518,7 +556,7 @@ void TerminalRenderer::shutdown()
 
     m_initialized = false;
     m_firstPresent = true;
-    m_currentStyle = Style{};
+    m_vtStyleState.reset();
 }
 
 void TerminalRenderer::present(const ScreenBuffer& frame)
@@ -555,7 +593,7 @@ void TerminalRenderer::resize(int width, int height)
     m_previousFrame.clear();
 
     m_firstPresent = true;
-    m_currentStyle = Style{};
+    m_vtStyleState.reset();
 }
 
 bool TerminalRenderer::pollResize()
@@ -645,25 +683,43 @@ const RenderDiagnostics& TerminalRenderer::diagnostics() const
 
 void TerminalRenderer::writeFullFrame(const ScreenBuffer& frame)
 {
-    clearScreen();
+    VtFrameEmitter emitter(m_vtStyleState);
+    emitter.beginFrame(true);
 
     for (int y = 0; y < frame.getHeight(); ++y)
     {
-        writeSpan(frame, y, 0, frame.getWidth() - 1);
+        appendSpanRuns(emitter, frame, y, 0, frame.getWidth() - 1);
     }
+
+    writeRaw(emitter.finishFrame(false));
 }
 
 void TerminalRenderer::writeDirtySpans(const ScreenBuffer& frame)
 {
     const std::vector<DirtySpan> spans = FrameDiff::diffRows(m_previousFrame, frame);
 
+    if (spans.empty())
+    {
+        return;
+    }
+
+    VtFrameEmitter emitter(m_vtStyleState);
+    emitter.beginFrame(false);
+
     for (const DirtySpan& span : spans)
     {
-        writeSpan(frame, span.y, span.xStart, span.xEnd);
+        appendSpanRuns(emitter, frame, span.y, span.xStart, span.xEnd);
     }
+
+    writeRaw(emitter.finishFrame(false));
 }
 
-void TerminalRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, int xEnd)
+void TerminalRenderer::appendSpanRuns(
+    VtFrameEmitter& emitter,
+    const ScreenBuffer& frame,
+    int y,
+    int xStart,
+    int xEnd)
 {
     if (y < 0 || y >= frame.getHeight())
     {
@@ -675,103 +731,99 @@ void TerminalRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, i
         return;
     }
 
-    if (xStart < 0)
-    {
-        xStart = 0;
-    }
-
-    if (xEnd >= frame.getWidth())
-    {
-        xEnd = frame.getWidth() - 1;
-    }
+    frame.expandSpanToGlyphBoundaries(y, xStart, xEnd);
 
     if (xStart > xEnd)
     {
         return;
     }
 
-    int x = xStart;
+    int nextX = xStart;
 
+    while (nextX <= xEnd)
+    {
+        VtRun run = buildRun(frame, y, nextX, xEnd, nextX);
+        if (!run.empty())
+        {
+            emitter.appendRun(run);
+        }
+    }
+}
+
+VtRun TerminalRenderer::buildRun(
+    const ScreenBuffer& frame,
+    int y,
+    int xStart,
+    int xEnd,
+    int& nextX)
+{
+    while (xStart <= xEnd && isContinuationCell(frame.getCell(xStart, y)))
+    {
+        ++xStart;
+    }
+
+    nextX = xStart;
+
+    if (xStart > xEnd)
+    {
+        return VtRun{};
+    }
+
+    const ScreenCell& firstCell = frame.getCell(xStart, y);
+    const Style authoredStyle = firstCell.style;
+    const ResolvedStyle resolved = m_stylePolicy.resolve(authoredStyle);
+
+    recordStyleUsage(authoredStyle, resolved);
+
+    VtRun run;
+    run.y = y;
+    run.xStart = xStart;
+    run.authoredStyle = authoredStyle;
+    run.presentedStyle = resolved.presentedStyle;
+
+    std::u32string runText;
+
+    int x = xStart;
     while (x <= xEnd)
     {
-        const ScreenCell& firstCell = frame.getCell(x, y);
-        if (isContinuationCell(firstCell))
+        const ScreenCell& cell = frame.getCell(x, y);
+
+        if (isContinuationCell(cell))
         {
             ++x;
             continue;
         }
 
-        const Style runStyle = firstCell.style;
-        const int runStart = x;
-
-        std::u32string runText;
-        std::vector<CellWidth> runGlyphWidths;
-
-        runText.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
-        runGlyphWidths.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
-
-        while (x <= xEnd)
+        if (cell.style != authoredStyle)
         {
-            const ScreenCell& cell = frame.getCell(x, y);
-            if (cell.style != runStyle)
-            {
-                break;
-            }
+            break;
+        }
 
-            if (!isContinuationCell(cell))
-            {
-                const char32_t glyph = cellToPresentedGlyph(cell);
-                if (glyph != U'\0')
-                {
-                    runText.push_back(glyph);
-                    runGlyphWidths.push_back(presentedGlyphWidth(glyph));
-                }
-            }
+        const char32_t glyph = cellToPresentedGlyph(cell);
+        if (glyph != U'\0')
+        {
+            runText.push_back(glyph);
+            run.cellWidth += glyphCellAdvance(cell);
+        }
 
+        x += glyphCellAdvance(cell);
+        if (x <= xStart)
+        {
             ++x;
         }
-
-        moveCursor(runStart, y);
-        setStyle(runStyle);
-
-        if (!runText.empty())
-        {
-            writeRaw(UnicodeConversion::u32ToUtf8(runText));
-        }
-    }
-}
-
-
-void TerminalRenderer::moveCursor(int x, int y)
-{
-    std::string sequence = "\x1b[";
-    sequence += std::to_string(y + 1);
-    sequence += ';';
-    sequence += std::to_string(x + 1);
-    sequence += 'H';
-    writeRaw(sequence);
-}
-
-void TerminalRenderer::setStyle(const Style& style)
-{
-    const ResolvedStyle resolved = m_stylePolicy.resolve(style);
-    const Style& presentedStyle = resolved.presentedStyle;
-
-    recordStyleUsage(style, resolved);
-
-    if (presentedStyle == m_currentStyle)
-    {
-        return;
     }
 
-    writeRaw(styleToAnsiSequence(presentedStyle));
-    m_currentStyle = presentedStyle;
+    run.utf8Text = UnicodeConversion::u32ToUtf8(runText);
+    nextX = x;
+
+    return run;
 }
 
 void TerminalRenderer::resetStyle()
 {
-    writeRaw("\x1b[0m");
-    m_currentStyle = Style{};
+    std::string out;
+    m_vtStyleState.appendReset(out);
+    writeRaw(out);
 }
 
 bool TerminalRenderer::queryVisibleConsoleSize(int& width, int& height) const
@@ -866,7 +918,15 @@ void TerminalRenderer::initializeDiagnosticsState()
     backendState.actualHostKind = toString(m_startupDiagnostics.actualHost);
     backendState.requestedRendererIdentity = toString(m_startupDiagnostics.requestedRenderer);
 
-    backendState.rendererIdentity = m_rendererIdentity;
+    if (m_startupDiagnostics.actualRenderer != RendererKind::Unknown)
+    {
+        backendState.rendererIdentity = toString(m_startupDiagnostics.actualRenderer);
+    }
+    else
+    {
+        backendState.rendererIdentity = m_rendererIdentity;
+    }
+
     backendState.activeRenderPath = "VirtualTerminalSequencePath";
 
     backendState.relaunchAttempted = m_startupDiagnostics.relaunchAttempted;
@@ -876,12 +936,13 @@ void TerminalRenderer::initializeDiagnosticsState()
 
     backendState.virtualTerminalEnableAttempted = m_virtualTerminalEnableAttempted;
     backendState.virtualTerminalEnableSucceeded = m_virtualTerminalEnableSucceeded;
-    backendState.virtualTerminalProcessingActive = m_capabilities.virtualTerminalProcessing;
+    backendState.virtualTerminalProcessingActive = m_virtualTerminalEnableSucceeded;
     backendState.activeRenderPathUsesVirtualTerminalOutput = true;
-    backendState.configuredOutputMode = static_cast<std::uint32_t>(m_configuredOutputMode);
-    backendState.configuredInputMode = static_cast<std::uint32_t>(m_configuredInputMode);
-    backendState.hasConfiguredOutputMode = m_haveConfiguredOutputMode;
-    backendState.hasConfiguredInputMode = m_haveConfiguredInputMode;
+
+    backendState.configuredOutputMode = 0;
+    backendState.configuredInputMode = 0;
+    backendState.hasConfiguredOutputMode = false;
+    backendState.hasConfiguredInputMode = false;
 
     CapabilityReport& report = m_renderDiagnostics.report();
     report.setCapabilities(m_capabilities);
@@ -919,7 +980,7 @@ void TerminalRenderer::writeRaw(std::string_view text)
 void TerminalRenderer::clearScreen()
 {
     writeRaw("\x1b[2J\x1b[H");
-    m_currentStyle = Style{};
+    m_vtStyleState.reset();
 }
 
 void TerminalRenderer::recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle)

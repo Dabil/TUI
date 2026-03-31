@@ -1,53 +1,31 @@
 #include "Rendering/FrameDiff.h"
 #include "Rendering/ScreenBuffer.h"
 
+#include <algorithm>
 #include <stdexcept>
+#include <vector>
 
-/*
-    * This is what makes the console renderer fast and efficient *
-     
-    It figures out what changed between the last frame and this frame
-    Instead of redrawing the entire screen every time, it only 
-    redraws the cells that changed.
-
-    FrameDiff compares previousFrame and currentFrame and finds differences
-
-    The result is a list of "dirty spans":
-
-    struct DirtySpan
+namespace
+{
+    void mergeBackIfNeeded(std::vector<DirtySpan>& spans, const DirtySpan& next)
     {
-        int y;
-        int xStart;
-        int xEnd;
+        if (spans.empty())
+        {
+            spans.push_back(next);
+            return;
+        }
+
+        DirtySpan& back = spans.back();
+
+        if (back.y == next.y && next.xStart <= back.xEnd + 1)
+        {
+            back.xEnd = std::max(back.xEnd, next.xEnd);
+            return;
+        }
+
+        spans.push_back(next);
     }
-
-    Meaning: Row y, from xStart to xEnd needs to be redrawn.
-
-    Then we group changes into horizontal spans and have the 
-    renderer update only what's necessary. 
-
-    This results in a massive speed increase and reduction in 
-    screen flicker. This matches how terminals work best.
-*/
-
-/*
-* Update: 03/18/26
-* 
-
-FrameDiff compares the previous frame to the current frame and returns
-only the exact horizontal spans that changed.
-
-Example:
-previous: ....XXX....YY....
-current : ....AAA....ZZ....
-
-Result :
-    span 1 = [4..6]
-    span 2 = [11..12]
-
-    This is more efficient than returning one large span from first dirty
-    cell to last dirty cell, because unchanged gaps are not redrawn.
-*/
+}
 
 std::vector<DirtySpan> FrameDiff::diffRows(const ScreenBuffer& previous, const ScreenBuffer& current)
 {
@@ -68,7 +46,6 @@ std::vector<DirtySpan> FrameDiff::diffRows(const ScreenBuffer& previous, const S
 
         while (x < width)
         {
-            // Skip unchanged cells until we find the start of a dirty run.
             while (x < width && previous.getCell(x, y) == current.getCell(x, y))
             {
                 ++x;
@@ -79,17 +56,28 @@ std::vector<DirtySpan> FrameDiff::diffRows(const ScreenBuffer& previous, const S
                 break;
             }
 
-            const int spanStart = x;
+            int spanStart = x;
 
-            // Advance until the dirty run ends.
             while (x < width && previous.getCell(x, y) != current.getCell(x, y))
             {
                 ++x;
             }
 
-            const int spanEnd = x - 1;
+            int spanEnd = x - 1;
 
-            dirtySpans.push_back(DirtySpan{ y, spanStart, spanEnd });
+            int expandedStart = spanStart;
+            int expandedEnd = spanEnd;
+
+            previous.expandSpanToGlyphBoundaries(y, expandedStart, expandedEnd);
+
+            int currentStart = spanStart;
+            int currentEnd = spanEnd;
+            current.expandSpanToGlyphBoundaries(y, currentStart, currentEnd);
+
+            expandedStart = std::min(expandedStart, currentStart);
+            expandedEnd = std::max(expandedEnd, currentEnd);
+
+            mergeBackIfNeeded(dirtySpans, DirtySpan{ y, expandedStart, expandedEnd });
         }
     }
 
