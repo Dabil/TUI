@@ -158,6 +158,7 @@
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
+    <ClInclude Include="Rendering\SgrEmitter.h" />
     <ClInclude Include="Rendering\Styles\AppThemes.h" />
     <ClInclude Include="Rendering\Styles\BannerThemes.h" />
     <ClInclude Include="Rendering\Styles\Color.h" />
@@ -176,7 +177,6 @@
     <ClInclude Include="Rendering\Styles\Themes.h" />
     <ClInclude Include="Rendering\VtFrameEmitter.h" />
     <ClInclude Include="Rendering\VTRun.h" />
-    <ClInclude Include="Rendering\VtStyleState.h" />
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
@@ -208,6 +208,7 @@
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
+    <ClCompile Include="Rendering\SgrEmitter.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />
     <ClCompile Include="Rendering\Styles\Style.cpp" />
     <ClCompile Include="Rendering\Styles\StyleBuilder.cpp" />
@@ -219,7 +220,6 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Rendering\VtFrameEmitter.cpp" />
-    <ClCompile Include="Rendering\VtStyleState.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
