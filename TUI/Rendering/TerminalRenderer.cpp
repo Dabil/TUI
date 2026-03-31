@@ -9,9 +9,9 @@
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
+#include "Rendering/SgrEmitter.h"
 #include "Rendering/VtFrameEmitter.h"
 #include "Rendering/VtRun.h"
-#include "Rendering/VtStyleState.h"
 
 /*
 * New Frame emission flow
@@ -530,7 +530,7 @@ bool TerminalRenderer::initialize()
     m_stylePolicy = buildStylePolicyFromCapabilities(m_capabilities);
     initializeDiagnosticsState();
 
-    m_vtStyleState.reset();
+    m_sgrEmitter.reset();
     m_firstPresent = true;
     m_initialized = true;
 
@@ -556,7 +556,7 @@ void TerminalRenderer::shutdown()
 
     m_initialized = false;
     m_firstPresent = true;
-    m_vtStyleState.reset();
+    m_sgrEmitter.reset();
 }
 
 void TerminalRenderer::present(const ScreenBuffer& frame)
@@ -593,7 +593,7 @@ void TerminalRenderer::resize(int width, int height)
     m_previousFrame.clear();
 
     m_firstPresent = true;
-    m_vtStyleState.reset();
+    m_sgrEmitter.reset();
 }
 
 bool TerminalRenderer::pollResize()
@@ -683,7 +683,7 @@ const RenderDiagnostics& TerminalRenderer::diagnostics() const
 
 void TerminalRenderer::writeFullFrame(const ScreenBuffer& frame)
 {
-    VtFrameEmitter emitter(m_vtStyleState);
+    VtFrameEmitter emitter(m_sgrEmitter);
     emitter.beginFrame(true);
 
     for (int y = 0; y < frame.getHeight(); ++y)
@@ -703,7 +703,7 @@ void TerminalRenderer::writeDirtySpans(const ScreenBuffer& frame)
         return;
     }
 
-    VtFrameEmitter emitter(m_vtStyleState);
+    VtFrameEmitter emitter(m_sgrEmitter);
     emitter.beginFrame(false);
 
     for (const DirtySpan& span : spans)
@@ -822,7 +822,7 @@ VtRun TerminalRenderer::buildRun(
 void TerminalRenderer::resetStyle()
 {
     std::string out;
-    m_vtStyleState.appendReset(out);
+    m_sgrEmitter.appendReset(out);
     writeRaw(out);
 }
 
@@ -980,7 +980,7 @@ void TerminalRenderer::writeRaw(std::string_view text)
 void TerminalRenderer::clearScreen()
 {
     writeRaw("\x1b[2J\x1b[H");
-    m_vtStyleState.reset();
+    m_sgrEmitter.reset();
 }
 
 void TerminalRenderer::recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle)

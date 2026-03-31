@@ -10,13 +10,13 @@
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
+#include "Rendering/SgrEmitter.h"
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
 #include "Rendering/VtFrameEmitter.h"
 #include "Rendering/VtRun.h"
-#include "Rendering/VtStyleState.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -112,7 +112,7 @@ private:
     bool m_initialized = false;
     bool m_firstPresent = true;
 
-    VtStyleState m_vtStyleState{};
+    SgrEmitter m_sgrEmitter{};
     StylePolicy m_stylePolicy{};
     ConsoleCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};

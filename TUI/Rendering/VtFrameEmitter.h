@@ -2,13 +2,13 @@
 
 #include <string>
 
+#include "Rendering/SgrEmitter.h"
 #include "Rendering/VtRun.h"
-#include "Rendering/VtStyleState.h"
 
 class VtFrameEmitter
 {
 public:
-    explicit VtFrameEmitter(VtStyleState& styleState);
+    explicit VtFrameEmitter(SgrEmitter& sgrEmitter);
 
     void beginFrame(bool clearScreenFirst);
     void appendRun(const VtRun& run);
@@ -18,7 +18,7 @@ private:
     void appendCursorMove(int x, int y);
 
 private:
-    VtStyleState& m_styleState;
+    SgrEmitter& m_sgrEmitter;
     std::string m_buffer;
 
     int m_cursorX = 0;

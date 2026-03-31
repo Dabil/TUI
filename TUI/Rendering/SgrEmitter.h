@@ -4,10 +4,10 @@
 
 #include "Rendering/Styles/Style.h"
 
-class VtStyleState
+class SgrEmitter
 {
 public:
-    VtStyleState() = default;
+    SgrEmitter() = default;
 
     void reset();
     const Style& currentStyle() const;
@@ -16,8 +16,6 @@ public:
     void appendReset(std::string& out);
 
 private:
-    bool requiresFullReset(const Style& targetStyle) const;
-
     void appendFullStyle(std::string& out, const Style& style) const;
     void appendDeltaStyle(std::string& out, const Style& targetStyle) const;
 
