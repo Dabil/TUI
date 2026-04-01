@@ -56,9 +56,25 @@ namespace Themes
     // Base surfaces / page backgrounds
     // =========================================================
 
+    
     inline const Style Background =
         style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
+    
+
+    // examples of how to declare colors in the new color system
+    // won't be active till phase 4
+    /*
+    inline const Style Background =
+          style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Black),
+            Color::FromIndexed(0),
+            Color::FromRgb(0, 0, 0)));
+    */
 
     inline const Style Window =
         style::Bold
@@ -92,9 +108,17 @@ namespace Themes
     inline const Style MutedText =
         style::Dim
         + style::Fg(Color::FromBasic(Color::Basic::White));
-
+ 
     inline const Style Frame =
         style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
+ 
+    /*
+    inline const Style Frame =
+        style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(7),
+            Color::FromRgb(192, 192, 192)));
+    */
 
     inline const Style Focused =
         style::Bold
@@ -121,10 +145,19 @@ namespace Themes
     inline const Style TitleShadow =
         style::Bold
         + style::Fg(Color::FromBasic(Color::Basic::BrightBlack));
-
+    
     inline const Style Subtitle =
         style::Bold
         + style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
+    
+    /*
+    inline const Style Subtitle =
+        style::Bold
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)));
+    */
 
     inline const Style SectionHeader =
         style::Bold
@@ -150,8 +183,14 @@ namespace Themes
 
     inline const Style Warning =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightYellow))
-        + style::Bg(Color::FromBasic(Color::Basic::Red));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightYellow),
+            Color::FromIndexed(11),
+            Color::FromRgb(255, 255, 0)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Red),
+            Color::FromIndexed(1),
+            Color::FromRgb(128, 0, 0)));
 
     inline const Style Danger =
         style::Bold

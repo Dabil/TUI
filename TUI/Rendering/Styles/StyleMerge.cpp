@@ -50,16 +50,30 @@ namespace
     {
         if (foreground)
         {
-            if (source.hasForeground())
+            if (source.hasForegroundColorValue())
             {
-                result = result.withForeground(*source.foreground());
+                if (source.hasForeground())
+                {
+                    result = result.withForeground(*source.foreground());
+                }
+                else if (source.hasForegroundThemeColor())
+                {
+                    result = result.withForeground(*source.foregroundThemeColor());
+                }
             }
         }
         else
         {
-            if (source.hasBackground())
+            if (source.hasBackgroundColorValue())
             {
-                result = result.withBackground(*source.background());
+                if (source.hasBackground())
+                {
+                    result = result.withBackground(*source.background());
+                }
+                else if (source.hasBackgroundThemeColor())
+                {
+                    result = result.withBackground(*source.backgroundThemeColor());
+                }
             }
         }
     }

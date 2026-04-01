@@ -5,6 +5,7 @@
 
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Styles/ThemeColor.h"
 
 enum class ColorRenderMode
 {
@@ -86,6 +87,8 @@ private:
 
 private:
     std::optional<Color> resolveColor(const std::optional<Color>& color) const;
+    std::optional<Color> resolveThemeColorToBasic(const ThemeColor& themeColor) const;
+    std::optional<Color> resolveBasicAuthoredColor(const std::optional<Color>& color) const;
     std::optional<Color> applyColorMode(const Color& color, ColorRenderMode mode) const;
 
     Color downgradeToBasic(const Color& color) const;

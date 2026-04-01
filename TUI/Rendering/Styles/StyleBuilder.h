@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Styles/ThemeColor.h"
 
 namespace style
 {
@@ -118,7 +119,10 @@ namespace style
     inline constexpr StrikeAtom Strike{};
 
     Style Fg(const Color& color);
+    Style Fg(const ThemeColor& color);
+
     Style Bg(const Color& color);
+    Style Bg(const ThemeColor& color);
 }
 
 // NOTE:
