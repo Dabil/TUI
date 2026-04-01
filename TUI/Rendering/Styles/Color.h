@@ -5,15 +5,16 @@
 class Color
 {
 public:
-    enum class Kind
+    enum class Kind : std::uint8_t
     {
         Default,
-        Basic,
+        Basic16,
         Indexed256,
-        TrueColor
+        Rgb
     };
 
-    enum class Basic
+    // Backward-compatibility alias for older code that still refers to Basic.
+    enum class Basic : std::uint8_t
     {
         Black,
         Red,
@@ -34,29 +35,61 @@ public:
         BrightWhite
     };
 
+    struct RgbValue
+    {
+        std::uint8_t red = 0;
+        std::uint8_t green = 0;
+        std::uint8_t blue = 0;
+
+        bool operator==(const RgbValue& other) const;
+        bool operator!=(const RgbValue& other) const;
+    };
+
+private:
+    struct IndexedValue
+    {
+        std::uint8_t index = 0;
+
+        bool operator==(const IndexedValue& other) const;
+        bool operator!=(const IndexedValue& other) const;
+    };
+
+    union Storage
+    {
+        Basic basic;
+        IndexedValue indexed;
+        RgbValue rgb;
+
+        Storage();
+        explicit Storage(Basic value);
+        explicit Storage(IndexedValue value);
+        explicit Storage(RgbValue value);
+    };
+
 public:
     Color();
 
     static Color Default();
-    static Color FromBasic(Basic basic);
-    static Color FromIndexed256(std::uint8_t index);
-    static Color FromTrueColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
-    // Compatibility helper for older call sites that still use RGB naming.
+    static Color FromBasic(Basic basic);
+    static Color FromIndexed(std::uint8_t index);
     static Color FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
 
     Kind kind() const;
 
     bool isDefault() const;
     bool isBasic() const;
+    bool isBasic16() const;
+    bool isIndexed() const;
     bool isIndexed256() const;
+    bool isRgb() const;
     bool isTrueColor() const;
 
-    // Compatibility helper for older call sites that still use RGB naming.
-    bool isRgb() const;
-
     Basic basic() const;
+    std::uint8_t index() const;
     std::uint8_t index256() const;
+
+    const RgbValue& rgb() const;
     std::uint8_t red() const;
     std::uint8_t green() const;
     std::uint8_t blue() const;
@@ -68,15 +101,11 @@ public:
 
 private:
     explicit Color(Kind kind);
-    explicit Color(Basic basic);
-    explicit Color(std::uint8_t index256);
-    Color(Kind kind, std::uint8_t red, std::uint8_t green, std::uint8_t blue);
+    Color(Kind kind, Basic basic);
+    Color(Kind kind, IndexedValue indexed);
+    Color(Kind kind, RgbValue rgb);
 
 private:
     Kind m_kind = Kind::Default;
-    Basic m_basic = Basic::White;
-    std::uint8_t m_index256 = 0;
-    std::uint8_t m_red = 0;
-    std::uint8_t m_green = 0;
-    std::uint8_t m_blue = 0;
+    Storage m_storage;
 };

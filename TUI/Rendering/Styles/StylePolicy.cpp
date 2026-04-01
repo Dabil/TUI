@@ -359,28 +359,28 @@ Color StylePolicy::downgradeToIndexed256(const Color& color) const
     {
         switch (color.basic())
         {
-        case Color::Basic::Black:         return Color::FromIndexed256(0);
-        case Color::Basic::Red:           return Color::FromIndexed256(1);
-        case Color::Basic::Green:         return Color::FromIndexed256(2);
-        case Color::Basic::Yellow:        return Color::FromIndexed256(3);
-        case Color::Basic::Blue:          return Color::FromIndexed256(4);
-        case Color::Basic::Magenta:       return Color::FromIndexed256(5);
-        case Color::Basic::Cyan:          return Color::FromIndexed256(6);
-        case Color::Basic::White:         return Color::FromIndexed256(7);
-        case Color::Basic::BrightBlack:   return Color::FromIndexed256(8);
-        case Color::Basic::BrightRed:     return Color::FromIndexed256(9);
-        case Color::Basic::BrightGreen:   return Color::FromIndexed256(10);
-        case Color::Basic::BrightYellow:  return Color::FromIndexed256(11);
-        case Color::Basic::BrightBlue:    return Color::FromIndexed256(12);
-        case Color::Basic::BrightMagenta: return Color::FromIndexed256(13);
-        case Color::Basic::BrightCyan:    return Color::FromIndexed256(14);
-        case Color::Basic::BrightWhite:   return Color::FromIndexed256(15);
-        default:                          return Color::FromIndexed256(7);
+        case Color::Basic::Black:         return Color::FromIndexed(0);
+        case Color::Basic::Red:           return Color::FromIndexed(1);
+        case Color::Basic::Green:         return Color::FromIndexed(2);
+        case Color::Basic::Yellow:        return Color::FromIndexed(3);
+        case Color::Basic::Blue:          return Color::FromIndexed(4);
+        case Color::Basic::Magenta:       return Color::FromIndexed(5);
+        case Color::Basic::Cyan:          return Color::FromIndexed(6);
+        case Color::Basic::White:         return Color::FromIndexed(7);
+        case Color::Basic::BrightBlack:   return Color::FromIndexed(8);
+        case Color::Basic::BrightRed:     return Color::FromIndexed(9);
+        case Color::Basic::BrightGreen:   return Color::FromIndexed(10);
+        case Color::Basic::BrightYellow:  return Color::FromIndexed(11);
+        case Color::Basic::BrightBlue:    return Color::FromIndexed(12);
+        case Color::Basic::BrightMagenta: return Color::FromIndexed(13);
+        case Color::Basic::BrightCyan:    return Color::FromIndexed(14);
+        case Color::Basic::BrightWhite:   return Color::FromIndexed(15);
+        default:                          return Color::FromIndexed(7);
         }
     }
 
     const TrueColorValue trueColor = toTrueColor(color);
-    return Color::FromIndexed256(rgbToNearestIndexed256(trueColor.red, trueColor.green, trueColor.blue));
+    return Color::FromIndexed(rgbToNearestIndexed256(trueColor.red, trueColor.green, trueColor.blue));
 }
 
 StylePolicy::TrueColorValue StylePolicy::toTrueColor(const Color& color) const
@@ -532,7 +532,7 @@ std::uint8_t StylePolicy::rgbToNearestIndexed256(
 
     for (int i = 0; i < 256; ++i)
     {
-        const Color indexedColor = Color::FromIndexed256(static_cast<std::uint8_t>(i));
+        const Color indexedColor = Color::FromIndexed(static_cast<std::uint8_t>(i));
         const StylePolicy policy;
         const TrueColorValue trueColor = policy.toTrueColor(indexedColor);
 
