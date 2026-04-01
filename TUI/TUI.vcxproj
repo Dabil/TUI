@@ -138,6 +138,7 @@
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
     <ClInclude Include="Rendering\Backends\ConsoleCapabilityDetector.h" />
+    <ClInclude Include="Rendering\Backends\RendererCapabilityDetector.h" />
     <ClInclude Include="Rendering\Backends\TerminalCapabilityDetector.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
@@ -145,7 +146,7 @@
     <ClInclude Include="Rendering\Backends\TerminalHostClassifier.h" />
     <ClInclude Include="Rendering\Backends\TerminalHostInfo.h" />
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
-    <ClInclude Include="Rendering\Capabilities\ConsoleCapabilities.h" />
+    <ClInclude Include="Rendering\Capabilities\RendererCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
@@ -195,6 +196,7 @@
     <ClCompile Include="App\TerminalLauncher.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\Backends\ConsoleCapabilityDetector.cpp" />
+    <ClCompile Include="Rendering\Backends\RendererCapabiltiyDetector.cpp" />
     <ClCompile Include="Rendering\Backends\TerminalCapabilityDetector.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
@@ -202,7 +204,7 @@
     <ClCompile Include="Rendering\Backends\TerminalHostClassifier.cpp" />
     <ClCompile Include="Rendering\Backends\TerminalHostInfo.cpp" />
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
-    <ClCompile Include="Rendering\Capabilities\ConsoleCapabilities.cpp" />
+    <ClCompile Include="Rendering\Capabilities\RendererCapabilities.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
