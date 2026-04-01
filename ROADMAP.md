@@ -1,5 +1,6 @@
 TUI MASTER ROADMAP
-REVISED: 03-17-26 DETAILED ROADMAP
+REVISED: 03-31-26 COMPOSITING POLICY REFACTOR
+REVISED: 03-31-26 COLOR + COMPOSITING INTEGRATION
 ========================================
 
 PROJECT GOAL
@@ -7,8 +8,8 @@ Build a clean, extensible Text UI engine that:
 
 1. feels natural to author in C++
 2. supports page-building without Visual Studio later
-3. preserves the best ideas from the old TUI "Rogue-Like" Engine
-4. avoids baking old API mistakes into the new architecture
+3. preserves the best ideas from the old TUI engine
+4. avoids baking legacy API mistakes into the new architecture
 5. supports future windows, widgets, menus, panels, popups, and alternate renderers
 
 The engine should be built in layers so that later features are built on stable foundations instead of temporary solutions.
@@ -19,160 +20,61 @@ The engine should be built in layers so that later features are built on stable 
 0. CORE DESIGN PRINCIPLES
 ============================================================
 
-These principles govern the whole roadmap.
+0.1 Renderer is a PURE EMISSION LAYER
 
-0.1 Keep the renderer core low-level and Unicode-native
-- ScreenBuffer must remain a logical cell grid (not a text engine)
-- Internal text representation must use:
-  - char32_t
-  - std::u32string
-- The renderer operates on display cells, not bytes or UTF-8 strings
-- Rendering/presentation must stay separate from composition and layout
-- Platform-specific code belongs strictly in backend implementations
+* Renderer consumes fully-resolved cells
+* Renderer MUST NOT:
 
-----------------------------------------
+  * resolve ThemeColor
+  * downgrade color
+  * apply style logic
+* Renderer ONLY:
 
-0.2 Separate text model, layout, and encoding layers
-- The system must clearly separate:
-  1) Internal text model (U32 code points)
-  2) Text layout (width, grapheme segmentation, wrapping)
-  3) Backend encoding (UTF-8, UTF-16, etc.)
-- Encoding conversion must be centralized in a dedicated UnicodeConversion layer
-- No UTF-8/UTF-16 logic should exist inside:
-  - ScreenBuffer
-  - widgets
-  - layout/composition systems
-- Backends consume already-laid-out cells and handle only transport encoding
-
-----------------------------------------
-
-0.3 Treat text as display cells, not characters or bytes
-- The engine must be cell-aware, not byte-aware
-- One code point does not always equal one cell
-- The system must support:
-  - width 0 (combining marks)
-  - width 1 (standard characters)
-  - width 2 (CJK, emoji by policy)
-- ScreenBuffer stores final placed cells only
-- Text layout systems determine how code points map to cells
-
-----------------------------------------
-
-0.4 Keep ScreenBuffer simple, but correct
-- ScreenBuffer is responsible for:
-  - storing cells
-  - bounds safety
-  - overwrite behavior
-  - placement of text runs
-- ScreenBuffer is NOT responsible for:
-  - grapheme segmentation
-  - encoding conversion
-  - font capability decisions
-- Cells may include lightweight metadata (e.g., continuation / wide trailing)
-- The buffer must preserve visual correctness for wide and combining characters
-
-----------------------------------------
-
-0.5 Build authoring API on top of the rendering core
-- Do not force page-building behavior into ScreenBuffer
-- Build a PageComposer / PageBuffer layer on top
-- That layer is responsible for:
-  - layout
-  - alignment
-  - wrapping
-  - higher-level text behavior
-- This keeps the core reusable and predictable
-
-----------------------------------------
-
-0.6 Build interpreter on top of the same API
-- The interpreter must not be a separate rendering engine
-- It must call the same PageComposer and text APIs as C++
-- This guarantees consistent behavior between:
-  - programmatic UI
-  - interpreted UI
-- Unicode behavior must be identical across both paths
-
-----------------------------------------
-
-0.7 Preserve intent, not implementation quirks
-- Legacy APIs (ANSI-style, ASCII assumptions) are references only
-- Preserve:
-  - authoring ergonomics
-  - semantic meaning
-- Redesign:
-  - ASCII-only assumptions
-  - byte-oriented APIs
-  - renderer-driven text decisions
-- Unicode correctness takes priority over backward quirks
-
-----------------------------------------
-
-0.8 Use explicit compositing semantics
-- Avoid unclear naming like:
-  - writeTransparentObject
-  - writeFullyTransparentObject
-- Use clear compositing policies:
-  - overwrite
-  - merge
-  - preserve
-- Compositing must operate on fully-formed cells, not raw text
-
-----------------------------------------
-
-0.9 Keep backend renderers pure and dumb
-- Backends (e.g., ConsoleRenderer) must:
-  - render already-laid-out cells
-  - map styles to platform output
-  - handle encoding conversion (e.g., UTF-16 for Win32)
-  - skip continuation cells
-- Backends must NOT:
-  - determine character width
-  - perform grapheme segmentation
-  - decide layout or wrapping
-- Backend limitations must be exposed via capability reporting
-
-----------------------------------------
-
-0.10 Design for real-world terminal limitations
-- Unicode correctness in the engine does not guarantee correct display
-- Rendering depends on:
-  - terminal host (conhost, Windows Terminal, etc.)
-  - font support
-  - fallback behavior
-- The system must expose backend capabilities (e.g., emoji support, combining marks)
-- Higher-level systems may adapt behavior based on these capabilities
-
-----------------------------------------
-
-0.11 Build foundations in the correct order
-- rendering (cell grid + Unicode correctness)
-- style system
-- text layout (width + grapheme awareness)
-- object model
-- compositing
-- page API (PageComposer)
-- interpreter
-- input/events/focus
-- panels/windows
-- widgets
-- polish/backends
+  * encodes final values to output
 
 
+---
 
-These principles align with the original roadmap emphasis on foundational layers first, clean separation of screen composition from output, and building reusable systems before higher-level UI features. 
+0.2 Single Source of Truth Systems
+Each domain owns its logic:
+
+| Domain            | Owner        |
+| ----------------- | ------------ |
+| Color resolution  | Color system |
+| Style semantics   | Style system |
+| Composition rules | WritePolicy  |
+| Output encoding   | Renderer     |
+
+NO cross-ownership allowed.
+
+---
+
+0.3 Explicit Data-Driven Behavior
+No hidden state anywhere:
+
+* WritePolicy = explicit compositing
+* ColorResolver = explicit color decisions
+* Style = explicit intent
+
+---
+
+0.4 Unicode-Correct Core
+
+* Internal text = UTF-32
+* ScreenBuffer = cell grid
+* Layout handles graphemes + width
+
+---
 
 ============================================================
 UPDATED GLOBAL RULE (CRITICAL)
-============================================================
+==============================
 
-The engine must follow this invariant:
+Pipeline MUST be:
 
-- Input boundary: UTF-8
-- Internal model: UTF-32 (char32_t / std::u32string)
-- Layout: grapheme + width aware
-- Storage: ScreenCell grid
-- Output: backend-specific encoding (UTF-16 for Win32)
+UTF-8 → UTF-32 → Layout → ScreenCell →
+Style (logical) → ColorResolver →
+Resolved Color → Renderer
 
 NO EXCEPTIONS.
 
@@ -217,37 +119,41 @@ This is the actual dependency order for implementation.
    ↓
 2. Rendering core
    ↓
-3. Style system
+3. Style system (logical only)
    ↓
 4. Object/asset system
    ↓
-5. Compositing / WritePolicy system
+5. Color system (NEW CORE LAYER)
    ↓
-6. PageComposer API 1.0
+6. Object/asset system
    ↓
-7. Screen templates + regions + alignment
+7. Compositing / WritePolicy system
    ↓
-8. Page interpreter
+8. PageComposer API 1.0
    ↓
-9. Application input/event system
+9. Screen templates + regions + alignment
    ↓
-10. Focus system
+10. Page interpreter
    ↓
-11. Layering / surfaces / compositor
+11. Application input/event system
    ↓
-12. Panels / popups / windows
+12. Focus system
    ↓
-13. Menu system
+13. Layering / surfaces / compositor
    ↓
-14. Widget system
+14. Panels / popups / windows
    ↓
-15. Scrolling / viewports
+15. Menu system
    ↓
-16. Animation / timers
+16. Widget system
    ↓
-17. Alternate render backends
+17. Scrolling / viewports
    ↓
-18. Tooling / page editor / advanced scripting
+18. Animation / timers
+   ↓
+19. Alternate render backends
+   ↓
+20. Tooling / page editor / advanced scripting
 
 The roadmap below follows this order intentionally.
 
@@ -453,11 +359,21 @@ main.cpp
 
 
 ============================================================
-3. PHASE 2 — STYLE SYSTEM (ANSI-LIKE AUTHORING MODEL)
+3. PHASE 2 — STYLE + COLOR SYSTEM (INTEGRATED ANSI-LIKE AUTHORING MODEL)
 ============================================================
 
 PURPOSE
-Create a real style system that preserves the authoring feel of ansi graphics with Themes.h, without tying the engine to raw ANSI transport strings.
+Create a backend-agnostic style system with a **fully decoupled multi-fidelity color system** that preserves the authoring feel of ansi graphics with Themes.h, without tying the engine to raw ANSI transport strings.
+
+---
+
+CRITICAL RULE
+
+Style defines **intent only**.
+Color system resolves **actual output values**.
+Renderer emits **final values only**.
+
+---
 
 WHY THIS PHASE COMES EARLY
 Page composition depends on style semantics. The user should be able to think in “console styling” terms while the backend stays abstract. This directly preserves the semantic theme-building pattern from Themes and the composable styling vocabulary of ansi graphics.
@@ -1086,99 +1002,322 @@ Data/Assets/
 
 
 ============================================================
-5. PHASE 4 — COMPOSITING / WRITE POLICY SYSTEM
-============================================================
+5. PHASE 4 — COMPOSITING / WRITE POLICY SYSTEM (REFACTORED)
+===========================================================
 
 PURPOSE
-Replace the old confusing write mode names with a clear and scalable compositing model.
+Replace ambiguous write modes with a unified, explicit, and extensible compositing policy system that:
+
+* preserves ANSI-style authoring ergonomics
+* eliminates naming ambiguity (transparent vs fully transparent)
+* supports future compositing features (depth, masking, layering)
+* keeps renderer and style systems fully decoupled
+
+---
 
 WHY THIS PHASE IS FOUNDATIONAL
-The page API should not be built on ambiguous concepts like “transparent” and “fully transparent.” The writing/compositing model must be correct first so page-authoring functions stay intuitive. This directly addresses the weakness discovered in the old API and preserves the old functionality without the naming confusion. The old docs clearly show that multiple write modes were essential, but the names were not ideal. 
 
-UPDATE NOTES:
+The page API must sit on top of a correct compositing model.
 
-- All compositing operates on fully-resolved ScreenCell objects
-- Must respect:
-  - continuation cells
-  - wide glyph boundaries
-- Must NOT split wide glyphs
+The previous API:
 
-NEW RULE:
-- compositing must treat a wide glyph as an atomic visual unit
+* mixed intent and behavior
+* used unclear terminology
+* duplicated functionality across multiple functions
 
-DEFINE IN THIS PHASE
+This phase introduces:
+
+* a **single compositing engine**
+* driven by an explicit **WritePolicy**
+* with **named presets layered on top**
+
+This ensures:
+
+* no behavioral duplication
+* no API explosion
+* maximum flexibility for future features
+
+---
+
+CRITICAL DESIGN RULE
+
+There are TWO layers:
+
+1. AUTHOR-FACING API (semantic, simple)
+
+   * writeSolidObject(...)
+   * writeVisibleObject(...)
+   * etc.
+
+2. ENGINE POLICY LAYER (explicit, extensible)
+
+   * writeObject(object, WritePolicy)
+
+ALL behavior must resolve through WritePolicy.
+
+---
 
 5.1 Source cell parts
+
 Each source cell can contribute:
-- Glyph
-- Space
-- Style
 
-5.2 Source mask
-- AllCells
-- GlyphCellsOnly
-- SpaceCellsOnly
+* Glyph (non-space character)
+* Space (U+0020 or equivalent blank cell)
+* Style
 
-5.3 Overwrite rules
-For glyph:
-- Always
-- IfDestinationEmpty
-- Never
+NOTE:
+Glyph vs Space is a rendering distinction, not a Unicode distinction.
 
-For style:
-- Always
-- IfDestinationUnstyled
-- Never
+---
 
-5.4 WritePolicy struct
-Should support:
-- writeGlyph
-- writeStyle
-- writeSpaces
-- sourceMask
-- glyphOverwrite
-- styleOverwrite
+5.2 Glyph policy (REPLACES glyph/space booleans)
 
-5.5 Core compositing function
-General form:
-- writeObject(..., WritePolicy)
+Define:
 
-5.6 Named convenience presets
-These are the API names authors should actually use most often:
-- writeSolidObject
-- writeVisibleObject
-- writeGlyphsOnly
-- writeStyleMask
-- writeStyleBlock
+enum class GlyphPolicy
+{
+None,           // do not write glyphs
+NonSpaceOnly,   // skip spaces
+All             // write all glyphs including spaces
+};
 
-5.7 Optional depth-aware convenience helpers
-- writeVisibleObjectBehind
-- writeGlyphsOnlyBehind
-- writeStyleMaskBehind
+This replaces:
 
-5.8 Placement variants
-All preset functions should eventually support:
-- exact coordinates
-- region + alignment
-- full-screen alignment
+* writeGlyph
+* writeSpaces
+
+This avoids invalid combinations and simplifies reasoning.
+
+---
+
+5.3 Style policy
+
+enum class StylePolicy
+{
+None,       // do not write style
+Apply       // apply style based on overwrite rules
+};
+
+---
+
+5.4 Source mask (optional filtering layer)
+
+enum class SourceMask
+{
+AllCells,
+GlyphCellsOnly,
+SpaceCellsOnly
+};
+
+Purpose:
+
+* filter source before compositing
+* useful for advanced masking behavior
+
+---
+
+5.5 Overwrite rules (expanded)
+
+Glyph overwrite:
+
+enum class GlyphOverwrite
+{
+Always,
+IfDestinationEmpty,
+Never
+};
+
+Style overwrite:
+
+enum class StyleOverwrite
+{
+Always,
+IfDestinationUnstyled,
+Never
+};
+
+---
+
+5.6 Depth / layering policy (NEW)
+
+Prepare for Phase 8 integration.
+
+enum class DepthPolicy
+{
+Ignore,         // overwrite regardless of depth
+Respect,        // only overwrite if passes depth test
+BehindOnly      // only write if behind existing content
+};
+
+NOTE:
+Depth is logical (composition order), not renderer-specific.
+
+---
+
+5.7 WritePolicy struct (CORE ENGINE TYPE)
+
+struct WritePolicy
+{
+GlyphPolicy glyphPolicy = GlyphPolicy::All;
+StylePolicy stylePolicy = StylePolicy::Apply;
+
+```
+SourceMask sourceMask = SourceMask::AllCells;
+
+GlyphOverwrite glyphOverwrite = GlyphOverwrite::Always;
+StyleOverwrite styleOverwrite = StyleOverwrite::Always;
+
+DepthPolicy depthPolicy = DepthPolicy::Ignore;
+```
+
+};
+
+RULES:
+
+* MUST be immutable during a write call
+* MUST fully define behavior (no hidden state)
+* MUST be backend-agnostic
+* MUST NOT depend on renderer
+
+---
+
+5.8 Core compositing function
+
+Single entry point:
+
+writeObject(const TextObject&, const WritePolicy&)
+
+Responsibilities:
+
+* iterate source cells
+* apply sourceMask
+* respect wide glyph atomicity
+* evaluate overwrite rules
+* apply glyph/style according to policy
+
+CRITICAL RULE:
+Wide glyphs must be treated as atomic units.
+
+---
+
+5.9 Named convenience presets (PRIMARY AUTHOR API)
+
+These map directly to WritePolicy.
+
+inline constexpr WritePolicy SolidObject =
+{
+GlyphPolicy::All,
+StylePolicy::Apply
+};
+
+inline constexpr WritePolicy VisibleObject =
+{
+GlyphPolicy::NonSpaceOnly,
+StylePolicy::Apply
+};
+
+inline constexpr WritePolicy GlyphsOnly =
+{
+GlyphPolicy::NonSpaceOnly,
+StylePolicy::None
+};
+
+inline constexpr WritePolicy StyleMask =
+{
+GlyphPolicy::None,
+StylePolicy::Apply
+};
+
+inline constexpr WritePolicy StyleBlock =
+{
+GlyphPolicy::None,
+StylePolicy::Apply,
+SourceMask::AllCells
+};
+
+---
+
+5.10 Depth-aware presets (NO NEW ENGINE PATHS)
+
+These are wrappers ONLY.
+
+Examples:
+
+writeVisibleObjectBehind(...)
+→ WritePolicy with:
+depthPolicy = DepthPolicy::BehindOnly
+
+NO separate compositing logic allowed.
+
+---
+
+5.11 Advanced author usage (OPTIONAL)
+
+Authors may directly use WritePolicy:
+
+writeObject(object, customPolicy);
+
+This is intended for:
+
+* special masking behavior
+* conditional overwrites
+* advanced layering logic
+
+---
+
+5.12 Explicit non-goal: NO mutable state machine
+
+The system MUST NOT support:
+
+writer.setMode(...)
+writer.write(...)
+
+Reason:
+
+* hidden state causes bugs
+* order-dependent behavior
+* difficult debugging
+
+ALL writes must be explicit and self-contained.
+
+---
+
+5.13 Future extension hooks
+
+This design allows future additions WITHOUT API break:
+
+* blend modes (additive, xor, etc.)
+* alpha-style logical blending
+* stencil/mask buffers
+* per-layer compositing rules
+
+---
 
 OUTPUT OF PHASE 4
-A complete and understandable object writing/compositing vocabulary.
+
+A unified compositing system that:
+
+* replaces ambiguous legacy write modes
+* eliminates duplicate logic
+* supports future layering systems
+* provides both simple API and advanced control
+
+---
 
 FILES / FOLDERS NEEDED
 
 Rendering/Composition/
-  WritePolicy.h
-  WritePolicy.cpp
-  SourceMask.h
-  OverwriteRule.h
-  ObjectWriter.h
-  ObjectWriter.cpp
-
-Optional:
-Rendering/Composition/
-  WritePresets.h
-  WritePresets.cpp
+WritePolicy.h
+WritePolicy.cpp
+GlyphPolicy.h
+StylePolicy.h
+SourceMask.h
+OverwriteRule.h
+DepthPolicy.h
+ObjectWriter.h
+ObjectWriter.cpp
+WritePresets.h
+WritePresets.cpp
 
 
 
