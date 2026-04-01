@@ -3,17 +3,45 @@
 #include <optional>
 
 #include "Rendering/Styles/Color.h"
+#include "Rendering/Styles/ThemeColor.h"
 
 class Style
 {
 public:
     using AttributeState = std::optional<bool>;
 
+    class StyleColorValue
+    {
+    public:
+        StyleColorValue() = default;
+        StyleColorValue(const Color& color);
+        StyleColorValue(const ThemeColor& themeColor);
+
+        bool hasConcreteColor() const;
+        bool hasThemeColor() const;
+
+        const std::optional<Color>& concreteColor() const;
+        const std::optional<ThemeColor>& themeColor() const;
+
+        bool operator==(const StyleColorValue& other) const;
+        bool operator!=(const StyleColorValue& other) const;
+
+    private:
+        std::optional<Color> m_concreteColor;
+        std::optional<ThemeColor> m_themeColor;
+    };
+
 public:
     Style();
 
     const std::optional<Color>& foreground() const;
     const std::optional<Color>& background() const;
+
+    const std::optional<ThemeColor>& foregroundThemeColor() const;
+    const std::optional<ThemeColor>& backgroundThemeColor() const;
+
+    const std::optional<StyleColorValue>& foregroundColorValue() const;
+    const std::optional<StyleColorValue>& backgroundColorValue() const;
 
     bool bold() const;
     bool dim() const;
@@ -36,6 +64,12 @@ public:
     bool hasForeground() const;
     bool hasBackground() const;
 
+    bool hasForegroundThemeColor() const;
+    bool hasBackgroundThemeColor() const;
+
+    bool hasForegroundColorValue() const;
+    bool hasBackgroundColorValue() const;
+
     bool hasBold() const;
     bool hasDim() const;
     bool hasUnderline() const;
@@ -48,7 +82,10 @@ public:
     bool isEmpty() const;
 
     Style withForeground(const Color& color) const;
+    Style withForeground(const ThemeColor& themeColor) const;
+
     Style withBackground(const Color& color) const;
+    Style withBackground(const ThemeColor& themeColor) const;
 
     Style withoutForeground() const;
     Style withoutBackground() const;
@@ -77,6 +114,12 @@ public:
 private:
     std::optional<Color> m_foreground;
     std::optional<Color> m_background;
+
+    std::optional<ThemeColor> m_foregroundThemeColor;
+    std::optional<ThemeColor> m_backgroundThemeColor;
+
+    std::optional<StyleColorValue> m_foregroundColorValue;
+    std::optional<StyleColorValue> m_backgroundColorValue;
 
     AttributeState m_bold;
     AttributeState m_dim;

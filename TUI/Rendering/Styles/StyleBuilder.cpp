@@ -22,7 +22,17 @@ namespace style
         return Style().withForeground(color);
     }
 
+    Style Fg(const ThemeColor& color)
+    {
+        return Style().withForeground(color);
+    }
+
     Style Bg(const Color& color)
+    {
+        return Style().withBackground(color);
+    }
+
+    Style Bg(const ThemeColor& color)
     {
         return Style().withBackground(color);
     }

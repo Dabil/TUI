@@ -71,10 +71,36 @@ ResolvedStyle StylePolicy::resolve(const Style& style) const
             result.presentedStyle = result.presentedStyle.withoutForeground();
         }
     }
+    else if (result.presentedStyle.hasForegroundThemeColor())
+    {
+        const std::optional<Color> authoredBasic = resolveThemeColorToBasic(*result.presentedStyle.foregroundThemeColor());
+        const std::optional<Color> resolved = resolveBasicAuthoredColor(authoredBasic);
+        if (resolved.has_value())
+        {
+            result.presentedStyle = result.presentedStyle.withForeground(*resolved);
+        }
+        else
+        {
+            result.presentedStyle = result.presentedStyle.withoutForeground();
+        }
+    }
 
     if (result.presentedStyle.hasBackground())
     {
         const std::optional<Color> resolved = resolveColor(result.presentedStyle.background());
+        if (resolved.has_value())
+        {
+            result.presentedStyle = result.presentedStyle.withBackground(*resolved);
+        }
+        else
+        {
+            result.presentedStyle = result.presentedStyle.withoutBackground();
+        }
+    }
+    else if (result.presentedStyle.hasBackgroundThemeColor())
+    {
+        const std::optional<Color> authoredBasic = resolveThemeColorToBasic(*result.presentedStyle.backgroundThemeColor());
+        const std::optional<Color> resolved = resolveBasicAuthoredColor(authoredBasic);
         if (resolved.has_value())
         {
             result.presentedStyle = result.presentedStyle.withBackground(*resolved);
@@ -314,6 +340,26 @@ std::optional<Color> StylePolicy::resolveColor(const std::optional<Color>& color
     }
 
     return *color;
+}
+
+std::optional<Color> StylePolicy::resolveThemeColorToBasic(const ThemeColor& themeColor) const
+{
+    if (themeColor.hasBasic())
+    {
+        return themeColor.basic();
+    }
+
+    return std::nullopt;
+}
+
+std::optional<Color> StylePolicy::resolveBasicAuthoredColor(const std::optional<Color>& color) const
+{
+    if (!color.has_value())
+    {
+        return std::nullopt;
+    }
+
+    return applyColorMode(*color, m_basicColorMode);
 }
 
 std::optional<Color> StylePolicy::applyColorMode(const Color& color, ColorRenderMode mode) const
