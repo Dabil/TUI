@@ -1,7 +1,51 @@
+// Rendering/Styles/Color.cpp
 #include "Rendering/Styles/Color.h"
+
+Color::Storage::Storage()
+    : basic(Basic::White)
+{
+}
+
+Color::Storage::Storage(Basic value)
+    : basic(value)
+{
+}
+
+Color::Storage::Storage(IndexedValue value)
+    : indexed(value)
+{
+}
+
+Color::Storage::Storage(RgbValue value)
+    : rgb(value)
+{
+}
+
+bool Color::RgbValue::operator==(const RgbValue& other) const
+{
+    return red == other.red
+        && green == other.green
+        && blue == other.blue;
+}
+
+bool Color::RgbValue::operator!=(const RgbValue& other) const
+{
+    return !(*this == other);
+}
+
+bool Color::IndexedValue::operator==(const IndexedValue& other) const
+{
+    return index == other.index;
+}
+
+bool Color::IndexedValue::operator!=(const IndexedValue& other) const
+{
+    return !(*this == other);
+}
 
 Color::Color()
     : m_kind(Kind::Default)
+    , m_storage()
 {
 }
 
@@ -10,24 +54,21 @@ Color Color::Default()
     return Color(Kind::Default);
 }
 
+// Next 3 methods are the Main factories
+
 Color Color::FromBasic(Basic basic)
 {
-    return Color(basic);
+    return Color(Kind::Basic16, basic);
 }
 
-Color Color::FromIndexed256(std::uint8_t index)
+Color Color::FromIndexed(std::uint8_t index)
 {
-    return Color(index);
-}
-
-Color Color::FromTrueColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
-{
-    return Color(Kind::TrueColor, red, green, blue);
+    return Color(Kind::Indexed256, IndexedValue{ index });
 }
 
 Color Color::FromRgb(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
 {
-    return FromTrueColor(red, green, blue);
+    return Color(Kind::Rgb, RgbValue{ red, green, blue });
 }
 
 Color::Kind Color::kind() const
@@ -42,7 +83,17 @@ bool Color::isDefault() const
 
 bool Color::isBasic() const
 {
-    return m_kind == Kind::Basic;
+    return m_kind == Kind::Basic16;
+}
+
+bool Color::isBasic16() const
+{
+    return m_kind == Kind::Basic16;
+}
+
+bool Color::isIndexed() const
+{
+    return m_kind == Kind::Indexed256;
 }
 
 bool Color::isIndexed256() const
@@ -50,49 +101,59 @@ bool Color::isIndexed256() const
     return m_kind == Kind::Indexed256;
 }
 
-bool Color::isTrueColor() const
-{
-    return m_kind == Kind::TrueColor;
-}
-
 bool Color::isRgb() const
 {
-    return isTrueColor();
+    return m_kind == Kind::Rgb;
+}
+
+bool Color::isTrueColor() const
+{
+    return m_kind == Kind::Rgb;
 }
 
 Color::Basic Color::basic() const
 {
-    return m_basic;
+    return m_storage.basic;
+}
+
+std::uint8_t Color::index() const
+{
+    return m_storage.indexed.index;
 }
 
 std::uint8_t Color::index256() const
 {
-    return m_index256;
+    return m_storage.indexed.index;
+}
+
+const Color::RgbValue& Color::rgb() const
+{
+    return m_storage.rgb;
 }
 
 std::uint8_t Color::red() const
 {
-    return m_red;
+    return m_storage.rgb.red;
 }
 
 std::uint8_t Color::green() const
 {
-    return m_green;
+    return m_storage.rgb.green;
 }
 
 std::uint8_t Color::blue() const
 {
-    return m_blue;
+    return m_storage.rgb.blue;
 }
 
 bool Color::isBrightBasic() const
 {
-    if (m_kind != Kind::Basic)
+    if (!isBasic16())
     {
         return false;
     }
 
-    switch (m_basic)
+    switch (basic())
     {
     case Basic::BrightBlack:
     case Basic::BrightRed:
@@ -119,12 +180,28 @@ bool Color::isBrightBasic() const
 
 bool Color::operator==(const Color& other) const
 {
-    return m_kind == other.m_kind
-        && m_basic == other.m_basic
-        && m_index256 == other.m_index256
-        && m_red == other.m_red
-        && m_green == other.m_green
-        && m_blue == other.m_blue;
+    if (m_kind != other.m_kind)
+    {
+        return false;
+    }
+
+    switch (m_kind)
+    {
+    case Kind::Default:
+        return true;
+
+    case Kind::Basic16:
+        return m_storage.basic == other.m_storage.basic;
+
+    case Kind::Indexed256:
+        return m_storage.indexed == other.m_storage.indexed;
+
+    case Kind::Rgb:
+        return m_storage.rgb == other.m_storage.rgb;
+
+    default:
+        return false;
+    }
 }
 
 bool Color::operator!=(const Color& other) const
@@ -134,25 +211,24 @@ bool Color::operator!=(const Color& other) const
 
 Color::Color(Kind kind)
     : m_kind(kind)
+    , m_storage()
 {
 }
 
-Color::Color(Basic basic)
-    : m_kind(Kind::Basic)
-    , m_basic(basic)
-{
-}
-
-Color::Color(std::uint8_t index256)
-    : m_kind(Kind::Indexed256)
-    , m_index256(index256)
-{
-}
-
-Color::Color(Kind kind, std::uint8_t red, std::uint8_t green, std::uint8_t blue)
+Color::Color(Kind kind, Basic basic)
     : m_kind(kind)
-    , m_red(red)
-    , m_green(green)
-    , m_blue(blue)
+    , m_storage(basic)
+{
+}
+
+Color::Color(Kind kind, IndexedValue indexed)
+    : m_kind(kind)
+    , m_storage(indexed)
+{
+}
+
+Color::Color(Kind kind, RgbValue rgb)
+    : m_kind(kind)
+    , m_storage(rgb)
 {
 }
