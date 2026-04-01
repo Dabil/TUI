@@ -67,10 +67,10 @@ void FireScreen::draw(Surface& surface)
         return;
     }
 
-    m_fireLeft = 1;
-    m_fireTop = 1;
+    m_fireLeft = 2;
+    m_fireTop = 3;
 
-    const int visibleWidth = std::max(0, screenWidth - 2);
+    const int visibleWidth = std::max(0, screenWidth - 4);
     const int visibleHeight = std::max(0, screenHeight - 2);
 
     ensureSimulationSize(visibleWidth, visibleHeight);
