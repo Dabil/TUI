@@ -1,6 +1,7 @@
 #include "Rendering/TerminalRenderer.h"
 
 #include <sstream>
+#include <cmath>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -88,17 +89,25 @@ namespace
 
         const bool allowSafeFallback = capabilities.usesPreserveStyleSafeFallback();
 
+        const bool maySafelyEmulateSlowBlink =
+            capabilities.mayEmulateSlowBlink() ||
+            capabilities.slowBlink == RendererFeatureSupport::Unknown;
+
+        const bool maySafelyEmulateFastBlink =
+            capabilities.mayEmulateFastBlink() ||
+            capabilities.fastBlink == RendererFeatureSupport::Unknown;
+
         policy = policy.withSlowBlinkMode(
             capabilities.supportsSlowBlinkDirect()
             ? BlinkRenderMode::Direct
-            : ((allowSafeFallback && capabilities.mayEmulateSlowBlink())
+            : ((allowSafeFallback && maySafelyEmulateSlowBlink)
                 ? BlinkRenderMode::Emulate
                 : BlinkRenderMode::Omit));
 
         policy = policy.withFastBlinkMode(
             capabilities.supportsFastBlinkDirect()
             ? BlinkRenderMode::Direct
-            : ((allowSafeFallback && capabilities.mayEmulateFastBlink())
+            : ((allowSafeFallback && maySafelyEmulateFastBlink)
                 ? BlinkRenderMode::Emulate
                 : BlinkRenderMode::Omit));
 
@@ -471,11 +480,6 @@ TerminalRenderer::~TerminalRenderer()
 
 bool TerminalRenderer::initialize()
 {
-    if (m_initialized)
-    {
-        return true;
-    }
-
     m_hOut = GetStdHandle(STD_OUTPUT_HANDLE);
     m_hIn = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -534,6 +538,11 @@ bool TerminalRenderer::initialize()
     m_firstPresent = true;
     m_initialized = true;
 
+    m_blinkEpoch = std::chrono::steady_clock::now();
+    m_lastSlowBlinkVisibilityState = true;
+    m_lastFastBlinkVisibilityState = true;
+    m_lastFrameUsedBlinkEmulation = false;
+
     clearScreen();
     writeRaw("\x1b[?25l");
 
@@ -557,6 +566,10 @@ void TerminalRenderer::shutdown()
     m_initialized = false;
     m_firstPresent = true;
     m_sgrEmitter.reset();
+
+    m_lastSlowBlinkVisibilityState = true;
+    m_lastFastBlinkVisibilityState = true;
+    m_lastFrameUsedBlinkEmulation = false;
 }
 
 void TerminalRenderer::present(const ScreenBuffer& frame)
@@ -566,7 +579,10 @@ void TerminalRenderer::present(const ScreenBuffer& frame)
         throw std::runtime_error("TerminalRenderer::present called before initialize().");
     }
 
+    const bool forceFullPresentForBlink = shouldForceFullPresentForBlink(frame);
+
     if (m_firstPresent ||
+        forceFullPresentForBlink ||
         m_previousFrame.getWidth() != frame.getWidth() ||
         m_previousFrame.getHeight() != frame.getHeight())
     {
@@ -594,6 +610,10 @@ void TerminalRenderer::resize(int width, int height)
 
     m_firstPresent = true;
     m_sgrEmitter.reset();
+
+    m_lastSlowBlinkVisibilityState = true;
+    m_lastFastBlinkVisibilityState = true;
+    m_lastFrameUsedBlinkEmulation = false;
 }
 
 bool TerminalRenderer::pollResize()
@@ -782,6 +802,7 @@ VtRun TerminalRenderer::buildRun(
     run.presentedStyle = resolved.presentedStyle;
 
     std::u32string runText;
+    std::vector<CellWidth> runGlyphWidths;
 
     int x = xStart;
     while (x <= xEnd)
@@ -803,6 +824,7 @@ VtRun TerminalRenderer::buildRun(
         if (glyph != U'\0')
         {
             runText.push_back(glyph);
+            runGlyphWidths.push_back(presentedGlyphWidth(glyph));
             run.cellWidth += glyphCellAdvance(cell);
         }
 
@@ -811,6 +833,35 @@ VtRun TerminalRenderer::buildRun(
         {
             ++x;
         }
+    }
+
+    if (!isBlinkVisibleForResolvedStyle(resolved))
+    {
+        std::u32string maskedText;
+        maskedText.reserve(runText.size() * 2);
+
+        for (std::size_t i = 0; i < runText.size(); ++i)
+        {
+            const char32_t glyph = runText[i];
+            const CellWidth width = runGlyphWidths[i];
+
+            if (glyph == U' ')
+            {
+                maskedText.push_back(U' ');
+                continue;
+            }
+
+            if (width == CellWidth::Two)
+            {
+                maskedText.push_back(U' ');
+                maskedText.push_back(U' ');
+                continue;
+            }
+
+            maskedText.push_back(U' ');
+        }
+
+        runText = std::move(maskedText);
     }
 
     run.utf8Text = UnicodeConversion::u32ToUtf8(runText);
@@ -1332,4 +1383,98 @@ void TerminalRenderer::recordBlinkFeature(
             buildTextExampleDetail("Blink rendered directly", logicalState, presentedEnabled),
             logicalState);
     }
+}
+
+bool TerminalRenderer::shouldForceFullPresentForBlink(const ScreenBuffer& frame)
+{
+    bool usesSlowBlinkEmulation = false;
+    bool usesFastBlinkEmulation = false;
+    collectBlinkEmulationUsage(frame, usesSlowBlinkEmulation, usesFastBlinkEmulation);
+
+    const bool usesBlinkEmulation = usesSlowBlinkEmulation || usesFastBlinkEmulation;
+    const bool currentSlowBlinkVisibilityState = usesSlowBlinkEmulation
+        ? isBlinkCurrentlyVisible(false)
+        : true;
+    const bool currentFastBlinkVisibilityState = usesFastBlinkEmulation
+        ? isBlinkCurrentlyVisible(true)
+        : true;
+
+    if (!usesBlinkEmulation)
+    {
+        m_lastFrameUsedBlinkEmulation = false;
+        m_lastSlowBlinkVisibilityState = true;
+        m_lastFastBlinkVisibilityState = true;
+        return false;
+    }
+
+    const bool slowBlinkChanged =
+        usesSlowBlinkEmulation &&
+        currentSlowBlinkVisibilityState != m_lastSlowBlinkVisibilityState;
+
+    const bool fastBlinkChanged =
+        usesFastBlinkEmulation &&
+        currentFastBlinkVisibilityState != m_lastFastBlinkVisibilityState;
+
+    const bool shouldForce =
+        !m_firstPresent &&
+        m_lastFrameUsedBlinkEmulation &&
+        (slowBlinkChanged || fastBlinkChanged);
+
+    m_lastFrameUsedBlinkEmulation = true;
+    m_lastSlowBlinkVisibilityState = currentSlowBlinkVisibilityState;
+    m_lastFastBlinkVisibilityState = currentFastBlinkVisibilityState;
+
+    return shouldForce;
+}
+
+void TerminalRenderer::collectBlinkEmulationUsage(
+    const ScreenBuffer& frame,
+    bool& usesSlowBlinkEmulation,
+    bool& usesFastBlinkEmulation) const
+{
+    usesSlowBlinkEmulation = false;
+    usesFastBlinkEmulation = false;
+
+    for (int y = 0; y < frame.getHeight(); ++y)
+    {
+        for (int x = 0; x < frame.getWidth(); ++x)
+        {
+            const ScreenCell& cell = frame.getCell(x, y);
+            const ResolvedStyle resolved = m_stylePolicy.resolve(cell.style);
+
+            usesSlowBlinkEmulation = usesSlowBlinkEmulation || resolved.emulateSlowBlink;
+            usesFastBlinkEmulation = usesFastBlinkEmulation || resolved.emulateFastBlink;
+
+            if (usesSlowBlinkEmulation && usesFastBlinkEmulation)
+            {
+                return;
+            }
+        }
+    }
+}
+
+bool TerminalRenderer::isBlinkVisibleForResolvedStyle(const ResolvedStyle& resolvedStyle) const
+{
+    if (resolvedStyle.emulateFastBlink && !isBlinkCurrentlyVisible(true))
+    {
+        return false;
+    }
+
+    if (resolvedStyle.emulateSlowBlink && !isBlinkCurrentlyVisible(false))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool TerminalRenderer::isBlinkCurrentlyVisible(bool fastBlink) const
+{
+    const auto now = std::chrono::steady_clock::now();
+    const std::chrono::duration<double> elapsed = now - m_blinkEpoch;
+
+    const double cycleSeconds = fastBlink ? 0.5 : 1.0;
+    const double phase = std::fmod(elapsed.count(), cycleSeconds);
+
+    return phase < (cycleSeconds * 0.5);
 }

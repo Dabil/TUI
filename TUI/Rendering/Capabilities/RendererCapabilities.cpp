@@ -162,8 +162,8 @@ RendererCapabilities RendererCapabilities::VirtualTerminal()
     capabilities.reverse   = RendererFeatureSupport::Supported;
     capabilities.invisible = RendererFeatureSupport::Supported;
     capabilities.strike    = RendererFeatureSupport::Supported;
-    capabilities.slowBlink = RendererFeatureSupport::Unknown;
-    capabilities.fastBlink = RendererFeatureSupport::Unknown;
+    capabilities.slowBlink = RendererFeatureSupport::Emulated;
+    capabilities.fastBlink = RendererFeatureSupport::Emulated;
 
     return capabilities;
 }
