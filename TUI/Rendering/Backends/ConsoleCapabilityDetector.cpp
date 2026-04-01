@@ -1,5 +1,7 @@
 #include "Rendering/Backends/ConsoleCapabilityDetector.h"
 
+#include "Rendering/Backends/RendererCapabilityDetector.h"
+
 namespace
 {
     RendererCapabilities buildConservativeCapabilities(bool virtualTerminalEnabled)
@@ -35,58 +37,25 @@ ConsoleCapabilityDetectionResult ConsoleCapabilityDetector::detectAndConfigure(
 {
     ConsoleCapabilityDetectionResult result;
 
-    bool virtualTerminalEnabled = false;
+    const RendererCapabilityProbeResult probe =
+        RendererCapabilityDetector::detectAndConfigure(
+            hOut,
+            hIn,
+            originalOutputMode,
+            originalInputMode,
+            haveOriginalOutputMode,
+            haveOriginalInputMode,
+            false,
+            false);
 
-    if (haveOriginalOutputMode)
-    {
-        DWORD outMode = originalOutputMode;
-        outMode |= ENABLE_PROCESSED_OUTPUT;
-        outMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
-        outMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+    result.virtualTerminalWasEnabled = probe.virtualTerminalWasEnabled;
+    result.virtualTerminalEnableAttempted = probe.virtualTerminalEnableAttempted;
+    result.virtualTerminalEnableSucceeded = probe.virtualTerminalEnableSucceeded;
+    result.configuredOutputMode = probe.configuredOutputMode;
+    result.configuredInputMode = probe.configuredInputMode;
+    result.hasConfiguredOutputMode = probe.hasConfiguredOutputMode;
+    result.hasConfiguredInputMode = probe.hasConfiguredInputMode;
 
-        result.virtualTerminalEnableAttempted = true;
-
-        if (SetConsoleMode(hOut, outMode))
-        {
-            virtualTerminalEnabled = true;
-            result.virtualTerminalEnableSucceeded = true;
-            result.virtualTerminalWasEnabled = true;
-            result.configuredOutputMode = outMode;
-            result.hasConfiguredOutputMode = true;
-        }
-        else
-        {
-            DWORD fallbackMode = originalOutputMode;
-            fallbackMode |= ENABLE_PROCESSED_OUTPUT;
-            fallbackMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
-
-            if (!SetConsoleMode(hOut, fallbackMode))
-            {
-                return result;
-            }
-
-            result.configuredOutputMode = fallbackMode;
-            result.hasConfiguredOutputMode = true;
-        }
-    }
-
-    if (haveOriginalInputMode)
-    {
-        DWORD inMode = originalInputMode;
-        inMode |= ENABLE_PROCESSED_INPUT;
-        inMode |= ENABLE_WINDOW_INPUT;
-        inMode |= ENABLE_EXTENDED_FLAGS;
-        inMode &= ~ENABLE_QUICK_EDIT_MODE;
-
-        if (!SetConsoleMode(hIn, inMode))
-        {
-            return result;
-        }
-
-        result.configuredInputMode = inMode;
-        result.hasConfiguredInputMode = true;
-    }
-
-    result.capabilities = buildConservativeCapabilities(virtualTerminalEnabled);
+    result.capabilities = buildConservativeCapabilities(probe.virtualTerminalWasEnabled);
     return result;
 }

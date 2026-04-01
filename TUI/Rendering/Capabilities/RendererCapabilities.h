@@ -43,6 +43,25 @@
     resembles the authored semantic intent.
 */
 
+/*
+    Model we are building toward:
+
+    Renderer
+        declares what it knows how to do
+
+    CapabilityDetector
+        probes host/backend facts
+
+    RendererCapabilityBuilder
+        combines both into effective RendererCapabilities
+
+    StylePolicy / ColorResolver
+        make decisions from that profile
+
+    Renderer
+        executes resolved output only
+*/
+
 enum class RendererColorTier
 {
     None = 0,

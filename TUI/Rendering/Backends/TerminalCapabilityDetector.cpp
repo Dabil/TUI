@@ -1,5 +1,7 @@
 #include "Rendering/Backends/TerminalCapabilityDetector.h"
 
+#include "Rendering/Backends/RendererCapabilityDetector.h"
+
 TerminalCapabilityDetectionResult TerminalCapabilityDetector::detectAndConfigure(
     HANDLE hOut,
     HANDLE hIn,
@@ -10,44 +12,28 @@ TerminalCapabilityDetectionResult TerminalCapabilityDetector::detectAndConfigure
 {
     TerminalCapabilityDetectionResult result;
 
-    if (!haveOriginalOutputMode)
+    const RendererCapabilityProbeResult probe =
+        RendererCapabilityDetector::detectAndConfigure(
+            hOut,
+            hIn,
+            originalOutputMode,
+            originalInputMode,
+            haveOriginalOutputMode,
+            haveOriginalInputMode,
+            true,
+            true);
+
+    result.virtualTerminalWasEnabled = probe.virtualTerminalWasEnabled;
+    result.virtualTerminalEnableAttempted = probe.virtualTerminalEnableAttempted;
+    result.virtualTerminalEnableSucceeded = probe.virtualTerminalEnableSucceeded;
+    result.configuredOutputMode = probe.configuredOutputMode;
+    result.configuredInputMode = probe.configuredInputMode;
+    result.hasConfiguredOutputMode = probe.hasConfiguredOutputMode;
+    result.hasConfiguredInputMode = probe.hasConfiguredInputMode;
+
+    if (!probe.virtualTerminalWasEnabled)
     {
         return result;
-    }
-
-    DWORD outMode = originalOutputMode;
-    outMode |= ENABLE_PROCESSED_OUTPUT;
-    outMode |= ENABLE_WRAP_AT_EOL_OUTPUT;
-    outMode |= ENABLE_VIRTUAL_TERMINAL_PROCESSING;
-
-    result.virtualTerminalEnableAttempted = true;
-
-    if (!SetConsoleMode(hOut, outMode))
-    {
-        return result;
-    }
-
-    result.virtualTerminalEnableSucceeded = true;
-    result.virtualTerminalWasEnabled = true;
-    result.configuredOutputMode = outMode;
-    result.hasConfiguredOutputMode = true;
-
-    if (haveOriginalInputMode)
-    {
-        DWORD inMode = originalInputMode;
-        inMode |= ENABLE_PROCESSED_INPUT;
-        inMode |= ENABLE_WINDOW_INPUT;
-        inMode |= ENABLE_EXTENDED_FLAGS;
-        inMode &= ~ENABLE_QUICK_EDIT_MODE;
-        inMode |= ENABLE_VIRTUAL_TERMINAL_INPUT;
-
-        if (!SetConsoleMode(hIn, inMode))
-        {
-            return result;
-        }
-
-        result.configuredInputMode = inMode;
-        result.hasConfiguredInputMode = true;
     }
 
     result.capabilities = RendererCapabilities::VirtualTerminal();
