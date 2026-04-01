@@ -2,7 +2,7 @@
 
 namespace
 {
-    ConsoleCapabilities buildConservativeCapabilities(bool virtualTerminalEnabled)
+    RendererCapabilities buildConservativeCapabilities(bool virtualTerminalEnabled)
     {
         /*
             Important architectural choice:
@@ -19,7 +19,7 @@ namespace
             semantics. The capability object should describe the active render
             path, not the broadest mode bit that happened to be enabled.
         */
-        ConsoleCapabilities capabilities = ConsoleCapabilities::BasicWin32();
+        RendererCapabilities capabilities = RendererCapabilities::BasicWin32();
         capabilities.virtualTerminalProcessing = virtualTerminalEnabled;
         return capabilities;
     }

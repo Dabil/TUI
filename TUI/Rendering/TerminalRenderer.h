@@ -4,7 +4,7 @@
 #include <string_view>
 
 #include "Rendering/Backends/TerminalCapabilityDetector.h"
-#include "Rendering/Capabilities/ConsoleCapabilities.h"
+#include "Rendering/Capabilities/RendererCapabilities.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 #include "Rendering/FrameDiff.h"
@@ -114,7 +114,7 @@ private:
 
     SgrEmitter m_sgrEmitter{};
     StylePolicy m_stylePolicy{};
-    ConsoleCapabilities m_capabilities{};
+    RendererCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};
     StartupDiagnosticsContext m_startupDiagnostics{};
 

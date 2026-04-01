@@ -71,15 +71,15 @@ namespace
         const CapabilityReport& report,
         std::vector<std::string>& hints)
     {
-        const ConsoleCapabilities& capabilities = report.capabilities();
+        const RendererCapabilities& capabilities = report.capabilities();
         const BackendStateSnapshot& backendState = report.backendState();
 
-        if (capabilities.colorTier == ConsoleColorTier::Basic16)
+        if (capabilities.colorTier == RendererColorTier::Basic16)
         {
             hints.push_back(
                 "The active backend is operating in Basic16 color mode, so richer authored colors may still be downgraded before final presentation.");
         }
-        else if (capabilities.colorTier == ConsoleColorTier::Indexed256)
+        else if (capabilities.colorTier == RendererColorTier::Indexed256)
         {
             hints.push_back(
                 "The active backend supports Indexed256 color, but TrueColor-authored values may still be approximated to indexed entries.");

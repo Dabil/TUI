@@ -65,7 +65,7 @@ namespace
 
     const char* featureCapabilityText(const CapabilityReport& report, StyleFeature feature)
     {
-        const ConsoleCapabilities& capabilities = report.capabilities();
+        const RendererCapabilities& capabilities = report.capabilities();
 
         switch (feature)
         {
@@ -171,7 +171,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     }
 
     const CapabilityReport& report = diagnostics.report();
-    const ConsoleCapabilities& capabilities = report.capabilities();
+    const RendererCapabilities& capabilities = report.capabilities();
     const StylePolicy& policy = report.policy();
     const BackendStateSnapshot& backendState = report.backendState();
 

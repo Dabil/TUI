@@ -5,7 +5,7 @@
 #include <string>
 
 #include "Rendering/Backends/ConsoleCapabilityDetector.h"
-#include "Rendering/Capabilities/ConsoleCapabilities.h"
+#include "Rendering/Capabilities/RendererCapabilities.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 #include "Rendering/FrameDiff.h"
@@ -108,7 +108,7 @@ private:
 
     Style m_currentStyle{};
     StylePolicy m_stylePolicy{};
-    ConsoleCapabilities m_capabilities{};
+    RendererCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};
     StartupDiagnosticsContext m_startupDiagnostics{};
     WORD m_defaultAttributes = 0;

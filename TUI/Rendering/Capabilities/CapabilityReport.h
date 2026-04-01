@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-#include "Rendering/Capabilities/ConsoleCapabilities.h"
+#include "Rendering/Capabilities/RendererCapabilities.h"
 #include "Rendering/Styles/StylePolicy.h"
 
 /*
@@ -119,11 +119,11 @@ class CapabilityReport
 public:
     CapabilityReport();
 
-    void setCapabilities(const ConsoleCapabilities& capabilities);
+    void setCapabilities(const RendererCapabilities& capabilities);
     void setPolicy(const StylePolicy& policy);
     void setBackendState(const BackendStateSnapshot& backendState);
 
-    const ConsoleCapabilities& capabilities() const;
+    const RendererCapabilities& capabilities() const;
     const StylePolicy& policy() const;
     const BackendStateSnapshot& backendState() const;
 
@@ -154,8 +154,8 @@ public:
     void clearRuntimeData();
     bool hasRuntimeData() const;
 
-    static const char* toString(ConsoleColorTier tier);
-    static const char* toString(ConsoleFeatureSupport support);
+    static const char* toString(RendererColorTier tier);
+    static const char* toString(RendererFeatureSupport support);
     static const char* toString(ColorRenderMode mode);
     static const char* toString(TextAttributeRenderMode mode);
     static const char* toString(BlinkRenderMode mode);
@@ -167,7 +167,7 @@ private:
     void increment(StyleFeature feature, StyleAdaptationKind kind);
 
 private:
-    ConsoleCapabilities m_capabilities{};
+    RendererCapabilities m_capabilities{};
     StylePolicy m_policy{};
     BackendStateSnapshot m_backendState{};
 

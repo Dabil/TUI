@@ -37,24 +37,24 @@ namespace
     constexpr std::size_t kMaxRecordedExamples = 24;
     constexpr std::size_t kMaxExamplesPerFeatureKind = 3;
 
-    TextAttributeRenderMode textAttributeModeFromSupport(ConsoleFeatureSupport support)
+    TextAttributeRenderMode textAttributeModeFromSupport(RendererFeatureSupport support)
     {
         switch (support)
         {
-        case ConsoleFeatureSupport::Supported:
+        case RendererFeatureSupport::Supported:
             return TextAttributeRenderMode::Direct;
 
-        case ConsoleFeatureSupport::Unknown:
+        case RendererFeatureSupport::Unknown:
             return TextAttributeRenderMode::Approximate;
 
-        case ConsoleFeatureSupport::Emulated:
-        case ConsoleFeatureSupport::Unsupported:
+        case RendererFeatureSupport::Emulated:
+        case RendererFeatureSupport::Unsupported:
         default:
             return TextAttributeRenderMode::Omit;
         }
     }
 
-    StylePolicy buildStylePolicyFromCapabilities(const ConsoleCapabilities& capabilities)
+    StylePolicy buildStylePolicyFromCapabilities(const RendererCapabilities& capabilities)
     {
         StylePolicy policy = StylePolicy::PreserveIntent();
 

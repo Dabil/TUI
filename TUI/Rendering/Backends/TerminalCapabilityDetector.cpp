@@ -50,7 +50,7 @@ TerminalCapabilityDetectionResult TerminalCapabilityDetector::detectAndConfigure
         result.hasConfiguredInputMode = true;
     }
 
-    result.capabilities = ConsoleCapabilities::VirtualTerminal();
+    result.capabilities = RendererCapabilities::VirtualTerminal();
     result.terminalOutputReady = true;
     return result;
 }

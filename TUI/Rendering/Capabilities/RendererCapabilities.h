@@ -5,8 +5,8 @@
 /*
     Purpose:
 
-    ConsoleCapabilities is a backend capability description for the active
-    console/output path.
+    RendererCapabilities is a backend capability description for the active
+    renderer/output path.
 
     It is not an authoring limit and it does not change logical Style or Color.
     It only describes what the backend can likely present directly or through
@@ -43,7 +43,7 @@
     resembles the authored semantic intent.
 */
 
-enum class ConsoleColorTier
+enum class RendererColorTier
 {
     None = 0,
     Basic16,
@@ -51,7 +51,7 @@ enum class ConsoleColorTier
     TrueColor
 };
 
-enum class ConsoleFeatureSupport
+enum class RendererFeatureSupport
 {
     Unsupported = 0,
     Supported,
@@ -59,12 +59,12 @@ enum class ConsoleFeatureSupport
     Unknown
 };
 
-enum class ConsoleBackendExtensionFlag : std::uint32_t
+enum class RendererBackendExtensionFlag : std::uint32_t
 {
     None = 0
 };
 
-struct ConsoleCapabilities
+struct RendererCapabilities
 {
     bool virtualTerminalProcessing = false;
     bool unicodeOutput = true;
@@ -72,7 +72,7 @@ struct ConsoleCapabilities
 
     std::uint32_t optionalBackendFlags = 0;
 
-    ConsoleColorTier colorTier = ConsoleColorTier::Basic16;
+    RendererColorTier colorTier = RendererColorTier::Basic16;
 
     /*
         Explicit support for authored bright basic colors such as
@@ -82,20 +82,20 @@ struct ConsoleCapabilities
         Bright basic colors describe palette/intensity color presentation,
         not text weight.
     */
-    ConsoleFeatureSupport brightBasicColors = ConsoleFeatureSupport::Supported;
+    RendererFeatureSupport brightBasicColors = RendererFeatureSupport::Supported;
 
-    ConsoleFeatureSupport bold = ConsoleFeatureSupport::Unknown;
-    ConsoleFeatureSupport dim = ConsoleFeatureSupport::Unknown;
-    ConsoleFeatureSupport underline = ConsoleFeatureSupport::Unknown;
-    ConsoleFeatureSupport reverse = ConsoleFeatureSupport::Unknown;
-    ConsoleFeatureSupport invisible = ConsoleFeatureSupport::Unknown;
-    ConsoleFeatureSupport strike = ConsoleFeatureSupport::Unsupported;
-    ConsoleFeatureSupport slowBlink = ConsoleFeatureSupport::Emulated;
-    ConsoleFeatureSupport fastBlink = ConsoleFeatureSupport::Emulated;
+    RendererFeatureSupport bold = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport dim = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport underline = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport reverse = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport invisible = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport strike = RendererFeatureSupport::Unsupported;
+    RendererFeatureSupport slowBlink = RendererFeatureSupport::Emulated;
+    RendererFeatureSupport fastBlink = RendererFeatureSupport::Emulated;
 
-    static ConsoleCapabilities Conservative();
-    static ConsoleCapabilities BasicWin32();
-    static ConsoleCapabilities VirtualTerminal();
+    static RendererCapabilities Conservative();
+    static RendererCapabilities BasicWin32();
+    static RendererCapabilities VirtualTerminal();
 
     bool supportsBasicColors() const;
     bool supportsBrightBasicColors() const;
@@ -118,5 +118,5 @@ struct ConsoleCapabilities
 
     bool usesPreserveStyleSafeFallback() const;
     bool hasOptionalBackendFlags() const;
-    bool hasOptionalBackendFlag(ConsoleBackendExtensionFlag flag) const;
+    bool hasOptionalBackendFlag(RendererBackendExtensionFlag flag) const;
 };

@@ -39,7 +39,7 @@ CapabilityReport::CapabilityReport()
     }
 }
 
-void CapabilityReport::setCapabilities(const ConsoleCapabilities& capabilities)
+void CapabilityReport::setCapabilities(const RendererCapabilities& capabilities)
 {
     m_capabilities = capabilities;
 }
@@ -54,7 +54,7 @@ void CapabilityReport::setBackendState(const BackendStateSnapshot& backendState)
     m_backendState = backendState;
 }
 
-const ConsoleCapabilities& CapabilityReport::capabilities() const
+const RendererCapabilities& CapabilityReport::capabilities() const
 {
     return m_capabilities;
 }
@@ -177,20 +177,20 @@ bool CapabilityReport::hasRuntimeData() const
     return !m_examples.empty() || !m_logicalStateExamples.empty();
 }
 
-const char* CapabilityReport::toString(ConsoleColorTier tier)
+const char* CapabilityReport::toString(RendererColorTier tier)
 {
     switch (tier)
     {
-    case ConsoleColorTier::None:
+    case RendererColorTier::None:
         return "None";
 
-    case ConsoleColorTier::Basic16:
+    case RendererColorTier::Basic16:
         return "Basic16";
 
-    case ConsoleColorTier::Indexed256:
+    case RendererColorTier::Indexed256:
         return "Indexed256";
 
-    case ConsoleColorTier::TrueColor:
+    case RendererColorTier::TrueColor:
         return "TrueColor";
 
     default:
@@ -198,20 +198,20 @@ const char* CapabilityReport::toString(ConsoleColorTier tier)
     }
 }
 
-const char* CapabilityReport::toString(ConsoleFeatureSupport support)
+const char* CapabilityReport::toString(RendererFeatureSupport support)
 {
     switch (support)
     {
-    case ConsoleFeatureSupport::Unsupported:
+    case RendererFeatureSupport::Unsupported:
         return "Unsupported";
 
-    case ConsoleFeatureSupport::Supported:
+    case RendererFeatureSupport::Supported:
         return "Supported";
 
-    case ConsoleFeatureSupport::Emulated:
+    case RendererFeatureSupport::Emulated:
         return "Emulated";
 
-    case ConsoleFeatureSupport::Unknown:
+    case RendererFeatureSupport::Unknown:
         return "Unknown";
 
     default:

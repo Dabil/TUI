@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Rendering/Capabilities/ConsoleCapabilities.h"
+#include "Rendering/Capabilities/RendererCapabilities.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -26,7 +26,7 @@
 
 struct TerminalCapabilityDetectionResult
 {
-    ConsoleCapabilities capabilities = ConsoleCapabilities::Conservative();
+    RendererCapabilities capabilities = RendererCapabilities::Conservative();
 
     bool terminalOutputReady = false;
 
