@@ -1,5 +1,4 @@
-// Screens/FireScreen.cpp
-#include "Screens/FireScreen.h"
+﻿#include "Screens/FireScreen.h"
 
 #include <algorithm>
 #include <cstdlib>
@@ -94,12 +93,26 @@ void FireScreen::draw(Surface& surface)
         }
     }
 
+    const Style frameStyle = style::Fg(Color::FromBasic(Color::Basic::Red))
+                           + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    const Style borderText = style::Fg(Color::FromBasic(Color::Basic::Yellow))
+                           + style::Bg(Color::FromBasic(Color::Basic::Black));
+
     buffer.drawFrame(
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Frame);
+        frameStyle,
+        U'╔', U'╗', U'╚', U'╝', U'═', U'║');
 
-    buffer.writeString(4, 0, "[ Fire Simulation ]", Themes::Subtitle);
-    buffer.writeString(4, screenHeight - 1, "[ Buffered Flames ]", Themes::Subtitle);
+    buffer.drawFrame(
+        Rect{ Point{ 2, 1 }, Size{ screenWidth - 4, screenHeight - 2 } },
+        borderText,
+        U'┌', U'┐', U'└', U'┘', U'─', U'│');
+
+    buffer.writeString(4, 0, "[                 ]", frameStyle);
+    buffer.writeString(5, 0, " Fire Simulation ", borderText);
+    buffer.writeString(4, screenHeight - 1, "[                 ]", frameStyle);
+    buffer.writeString(5, screenHeight - 1, " Buffered Flames ", borderText);
 }
 
 void FireScreen::ensureSimulationSize(int width, int height)

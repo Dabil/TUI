@@ -1,4 +1,3 @@
-// Screens/FireScreen.h
 #pragma once
 
 #include <vector>
