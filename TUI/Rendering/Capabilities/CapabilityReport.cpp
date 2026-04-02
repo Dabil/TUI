@@ -108,6 +108,16 @@ const RendererSelectionTrace& CapabilityReport::rendererSelectionTrace() const
     return m_rendererSelectionTrace;
 }
 
+void CapabilityReport::setTerminalPresentPerformance(const TerminalPresentPerformanceSnapshot& performance)
+{
+    m_terminalPresentPerformance = performance;
+}
+
+const TerminalPresentPerformanceSnapshot& CapabilityReport::terminalPresentPerformance() const
+{
+    return m_terminalPresentPerformance;
+}
+
 void CapabilityReport::recordDirect(StyleFeature feature)
 {
     increment(feature, StyleAdaptationKind::Direct);
@@ -237,6 +247,7 @@ void CapabilityReport::clearRuntimeData()
     m_examples.clear();
     m_logicalStateExamples.clear();
     m_colorAdaptationExamples.clear();
+    m_terminalPresentPerformance = TerminalPresentPerformanceSnapshot{};
 }
 
 bool CapabilityReport::hasRuntimeData() const

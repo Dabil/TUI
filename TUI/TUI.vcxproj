@@ -178,6 +178,7 @@
     <ClInclude Include="Rendering\Styles\ThemeColor.h" />
     <ClInclude Include="Rendering\Styles\UIThemes.h" />
     <ClInclude Include="Rendering\Surface.h" />
+    <ClInclude Include="Rendering\TerminalPresentPolicy.h" />
     <ClInclude Include="Rendering\TerminalRenderer.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
@@ -234,6 +235,7 @@
     <ClCompile Include="Rendering\Styles\StylePolicy.cpp" />
     <ClCompile Include="Rendering\Styles\ThemeColor.cpp" />
     <ClCompile Include="Rendering\Surface.cpp" />
+    <ClCompile Include="Rendering\TerminalPresentPolicy.cpp" />
     <ClCompile Include="Rendering\TerminalRenderer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>

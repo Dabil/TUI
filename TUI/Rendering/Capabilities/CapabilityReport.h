@@ -73,6 +73,29 @@ struct ColorAdaptationExample
     std::optional<Color> resolvedColor;
 };
 
+
+struct TerminalPresentPerformanceSnapshot
+{
+    std::size_t presentCallCount = 0;
+    std::size_t skippedPresentCount = 0;
+    std::size_t fullRedrawCount = 0;
+    std::size_t diffPresentCount = 0;
+    std::size_t forcedFullRedrawCount = 0;
+
+    std::size_t changedCellCount = 0;
+    std::size_t dirtySpanCount = 0;
+    std::size_t cursorMoveCount = 0;
+    std::size_t emittedRunCount = 0;
+
+    std::size_t emittedTextBytes = 0;
+    std::size_t emittedSgrBytes = 0;
+    std::size_t emittedControlBytes = 0;
+    std::size_t emittedTotalBytes = 0;
+
+    std::string lastPresentStrategy = "Unknown";
+    std::string lastPresentReason;
+};
+
 struct BackendStateSnapshot
 {
     std::string startupConfigSource = "startup.ini";
@@ -121,6 +144,9 @@ public:
     const StylePolicy& policy() const;
     const BackendStateSnapshot& backendState() const;
     const RendererSelectionTrace& rendererSelectionTrace() const;
+
+    void setTerminalPresentPerformance(const TerminalPresentPerformanceSnapshot& performance);
+    const TerminalPresentPerformanceSnapshot& terminalPresentPerformance() const;
 
     void recordDirect(StyleFeature feature);
     void recordDowngraded(StyleFeature feature);
@@ -177,6 +203,7 @@ private:
     StylePolicy m_policy{};
     BackendStateSnapshot m_backendState{};
     RendererSelectionTrace m_rendererSelectionTrace{};
+    TerminalPresentPerformanceSnapshot m_terminalPresentPerformance{};
 
     std::vector<StyleAdaptationCounter> m_counters;
     std::vector<StyleAdaptationExample> m_examples;

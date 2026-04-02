@@ -521,5 +521,29 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "- Bright basic color capability describes palette/intensity color presentation, not bold or dim text semantics.\n";
     out << "- Author-facing hints are advisory only and do not change rendering behavior.\n";
 
+    out << "VT Present Performance\n";
+    out << "----------------------\n";
+
+    const auto& vt = report.terminalPresentPerformance();
+
+    out << "Present calls: " << vt.presentCallCount << "\n";
+    out << "Skipped presents: " << vt.skippedPresentCount << "\n";
+    out << "Full redraw presents: " << vt.fullRedrawCount << "\n";
+    out << "Diff presents: " << vt.diffPresentCount << "\n";
+
+    out << "Changed cells: " << vt.changedCellCount << "\n";
+    out << "Dirty spans: " << vt.dirtySpanCount << "\n";
+
+    out << "Cursor moves: " << vt.cursorMoveCount << "\n";
+    out << "Runs: " << vt.emittedRunCount << "\n";
+
+    out << "Text bytes: " << vt.emittedTextBytes << "\n";
+    out << "SGR bytes: " << vt.emittedSgrBytes << "\n";
+    out << "Control bytes: " << vt.emittedControlBytes << "\n";
+    out << "Total bytes: " << vt.emittedTotalBytes << "\n";
+
+    out << "Last present strategy: " << vt.lastPresentStrategy << "\n";
+    out << "Last present reason: " << vt.lastPresentReason << "\n\n";
+
     return true;
 }
