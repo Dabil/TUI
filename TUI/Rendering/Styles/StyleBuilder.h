@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/ThemeColor.h"
 

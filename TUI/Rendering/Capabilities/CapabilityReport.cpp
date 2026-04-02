@@ -177,21 +177,21 @@ bool CapabilityReport::hasRuntimeData() const
     return !m_examples.empty() || !m_logicalStateExamples.empty();
 }
 
-const char* CapabilityReport::toString(RendererColorTier tier)
+const char* CapabilityReport::toString(ColorSupport support)
 {
-    switch (tier)
+    switch (support)
     {
-    case RendererColorTier::None:
+    case ColorSupport::None:
         return "None";
 
-    case RendererColorTier::Basic16:
+    case ColorSupport::Basic16:
         return "Basic16";
 
-    case RendererColorTier::Indexed256:
+    case ColorSupport::Indexed256:
         return "Indexed256";
 
-    case RendererColorTier::TrueColor:
-        return "TrueColor";
+    case ColorSupport::Rgb24:
+        return "Rgb24";
 
     default:
         return "Unknown";
@@ -265,11 +265,11 @@ const char* CapabilityReport::toString(BlinkRenderMode mode)
     case BlinkRenderMode::Direct:
         return "Direct";
 
-    case BlinkRenderMode::Omit:
-        return "Omit";
-
     case BlinkRenderMode::Emulate:
         return "Emulate";
+
+    case BlinkRenderMode::Omit:
+        return "Omit";
 
     default:
         return "Unknown";
@@ -370,10 +370,4 @@ void CapabilityReport::increment(StyleFeature feature, StyleAdaptationKind kind)
             return;
         }
     }
-
-    StyleAdaptationCounter counter;
-    counter.feature = feature;
-    counter.kind = kind;
-    counter.count = 1;
-    m_counters.push_back(counter);
 }

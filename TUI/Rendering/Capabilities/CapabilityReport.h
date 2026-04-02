@@ -1,31 +1,11 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "Rendering/Capabilities/RendererCapabilities.h"
 #include "Rendering/Styles/StylePolicy.h"
-
-/*
-    Purpose:
-
-    CapabilityReport is a structured diagnostics model for renderer capability
-    reporting and style adaptation reporting.
-
-    It does not make rendering decisions.
-    It only records:
-        - detected backend capabilities
-        - selected renderer adaptation policy
-        - backend activation/runtime-path state
-        - startup host/renderer selection state
-        - summary counts of adaptation outcomes
-        - optional representative examples
-        - optional tri-state logical style examples
-
-    This model is intended to be optional and non-invasive.
-*/
 
 enum class StyleAdaptationKind
 {
@@ -154,7 +134,7 @@ public:
     void clearRuntimeData();
     bool hasRuntimeData() const;
 
-    static const char* toString(RendererColorTier tier);
+    static const char* toString(ColorSupport support);
     static const char* toString(RendererFeatureSupport support);
     static const char* toString(ColorRenderMode mode);
     static const char* toString(TextAttributeRenderMode mode);
