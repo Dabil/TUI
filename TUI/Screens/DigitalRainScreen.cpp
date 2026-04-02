@@ -195,16 +195,20 @@ void DigitalRainScreen::draw(Surface& surface)
         m_borderStyle,
         U'╔', U'╗', U'╚', U'╝', U'═', U'║');
 
+    buffer.drawFrame(
+        Rect{ Point{ 2, 1 }, Size{ screenWidth - 4, screenHeight - 2 - FooterRows} },
+        m_tailStyle,
+        U'┌', U'┐', U'└', U'┘', U'─', U'│');
 
     drawOverlay(buffer);
 }
 
 void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
 {
-    const int newRainLeft = 2;
+    const int newRainLeft = 3;
     const int newRainTop = 2;
-    const int newRainWidth = std::max(0, screenWidth - 2);
-    const int newRainHeight = std::max(0, screenHeight - 2 - FooterRows);
+    const int newRainWidth = std::max(0, screenWidth - 6);
+    const int newRainHeight = std::max(0, screenHeight - 4 - FooterRows);
 
     if (screenWidth == m_screenWidth &&
         screenHeight == m_screenHeight &&

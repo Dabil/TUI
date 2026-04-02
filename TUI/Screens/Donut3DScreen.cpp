@@ -102,7 +102,7 @@ void Donut3DScreen::draw(Surface& surface)
 
     buffer.drawFrame(
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Frame);
+        Themes::Background);
 
     buffer.writeString(4, 0, "[ 3D ASCII Donut ]", Themes::Subtitle);
     buffer.writeString(4, screenHeight - 1, "[ Hue Cycle + Depth Shading + Floor Shadow ]", Themes::Subtitle);

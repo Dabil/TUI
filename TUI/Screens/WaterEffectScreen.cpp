@@ -62,9 +62,9 @@ namespace
 
 WaterEffectScreen::WaterEffectScreen()
 {
-    m_modeColor[0] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Green));
-    m_modeColor[1] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Blue));
-    m_modeColor[2] = style::SlowBlink + style::Fg(Color::FromBasic(Color::Basic::Red));
+    m_modeColor[0] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Green)) + style::Bg(Color::FromBasic(Color::Basic::Black));
+    m_modeColor[1] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Blue)) + style::Bg(Color::FromBasic(Color::Basic::Black));
+    m_modeColor[2] = style::SlowBlink + style::Fg(Color::FromBasic(Color::Basic::Red)) + style::Bg(Color::FromBasic(Color::Basic::Black));
 }
 
 void WaterEffectScreen::onEnter()
@@ -113,7 +113,7 @@ void WaterEffectScreen::draw(Surface& surface)
 
     buffer.drawFrame(
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Frame);
+        style::Fg(Color::FromBasic(Color::Basic::White)) + style::Bg(Color::FromBasic(Color::Basic::Black)));
 
     buffer.writeString(4, 0, "[ Rain Drops Water Effect ]", Themes::Subtitle);
 
