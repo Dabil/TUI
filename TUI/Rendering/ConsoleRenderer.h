@@ -60,6 +60,7 @@ private:
 
     void moveCursor(int x, int y);
     void setStyle(const Style& style);
+    void setResolvedStyle(const Style& authoredStyle, const ResolvedStyle& resolvedStyle);
     void resetStyle();
 
     bool queryVisibleConsoleSize(int& width, int& height) const;
