@@ -7,6 +7,8 @@
 #include <vector>
 
 #include "Rendering/Diagnostics/RenderDiagnosticsWriter.h"
+#include "Rendering/Capabilities/ColorSupport.h"
+#include "Rendering/Styles/ColorResolver.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
@@ -212,7 +214,7 @@ namespace
         default:
             return TextAttributeRenderMode::Omit;
         }
-    } 
+    }
 
     StylePolicy buildStylePolicyFromCapabilities(const RendererCapabilities& capabilities)
     {
@@ -878,7 +880,7 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
         }
 
         moveCursor(runStart, y);
-        setStyle(runStyle);
+        setResolvedStyle(runStyle, resolvedRunStyle);
 
         if (!runText.empty())
         {
@@ -1003,10 +1005,14 @@ void ConsoleRenderer::moveCursor(int x, int y)
 
 void ConsoleRenderer::setStyle(const Style& style)
 {
-    const ResolvedStyle resolved = m_stylePolicy.resolve(style);
-    const Style& presentedStyle = resolved.presentedStyle;
+    setResolvedStyle(style, m_stylePolicy.resolve(style));
+}
 
-    recordStyleUsage(style, resolved);
+void ConsoleRenderer::setResolvedStyle(const Style& authoredStyle, const ResolvedStyle& resolvedStyle)
+{
+    const Style& presentedStyle = resolvedStyle.presentedStyle;
+
+    recordStyleUsage(authoredStyle, resolvedStyle);
 
     if (presentedStyle == m_currentStyle)
     {
@@ -1195,14 +1201,20 @@ void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const Resolve
 
     const Style& presentedStyle = resolvedStyle.presentedStyle;
 
+    const std::optional<Color> authoredForeground =
+        ColorResolver::resolve(authoredStyle.foregroundColorValue(), ColorSupport::Rgb24);
+
+    const std::optional<Color> authoredBackground =
+        ColorResolver::resolve(authoredStyle.backgroundColorValue(), ColorSupport::Rgb24);
+
     recordColorFeature(
         StyleFeature::ForegroundColor,
-        authoredStyle.foreground(),
+        authoredForeground,
         presentedStyle.foreground());
 
     recordColorFeature(
         StyleFeature::BackgroundColor,
-        authoredStyle.background(),
+        authoredBackground,
         presentedStyle.background());
 
     recordTextFeature(
@@ -1549,3 +1561,4 @@ void ConsoleRenderer::recordBlinkFeature(
             logicalState);
     }
 }
+
