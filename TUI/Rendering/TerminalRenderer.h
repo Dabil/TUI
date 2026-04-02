@@ -3,6 +3,7 @@
 #include <string>
 #include <string_view>
 #include <chrono>
+#include <vector>
 
 #include "Rendering/Backends/TerminalCapabilityDetector.h"
 #include "Rendering/Capabilities/RendererCapabilities.h"
@@ -16,6 +17,7 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
 #include "Rendering/Text/TextTypes.h"
+#include "Rendering/TerminalPresentPolicy.h"
 #include "Rendering/VtFrameEmitter.h"
 #include "Rendering/VtRun.h"
 
@@ -55,8 +57,8 @@ public:
     const RenderDiagnostics& diagnostics() const;
 
 private:
-    void writeFullFrame(const ScreenBuffer& frame);
-    void writeDirtySpans(const ScreenBuffer& frame);
+    VtFrameEmitterStats writeFullFrame(const ScreenBuffer& frame, bool clearScreenFirst);
+    VtFrameEmitterStats writeDirtySpans(const ScreenBuffer& frame, const std::vector<DirtySpan>& spans);
 
     void appendSpanRuns(
         VtFrameEmitter& emitter,
@@ -103,6 +105,11 @@ private:
         bool physicallyRendered);
 
     bool shouldForceFullPresentForBlink(const ScreenBuffer& frame);
+    void recordPresentPerformance(
+        const TerminalPresentDecision& decision,
+        const TerminalPresentMetrics& metrics,
+        const VtFrameEmitterStats& emitterStats,
+        bool skippedPresent);
     void collectBlinkEmulationUsage(
         const ScreenBuffer& frame,
         bool& usesSlowBlinkEmulation,
@@ -125,6 +132,7 @@ private:
     StylePolicy m_stylePolicy{};
     RendererCapabilities m_capabilities{};
     RenderDiagnostics m_renderDiagnostics{};
+    TerminalPresentPolicy m_presentPolicy{};
     StartupDiagnosticsContext m_startupDiagnostics{};
 
     UINT m_originalOutputCodePage = 0;

@@ -12,6 +12,7 @@
 
 #include "Rendering/SgrEmitter.h"
 #include "Rendering/VtFrameEmitter.h"
+#include "Rendering/TerminalPresentPolicy.h"
 #include "Rendering/VtRun.h"
 
 /*
@@ -575,25 +576,71 @@ void TerminalRenderer::present(const ScreenBuffer& frame)
         throw std::runtime_error("TerminalRenderer::present called before initialize().");
     }
 
-    const bool forceFullPresentForBlink = shouldForceFullPresentForBlink(frame);
-
-    if (m_firstPresent ||
-        forceFullPresentForBlink ||
+    TerminalPresentMetrics metrics;
+    metrics.frameWidth = frame.getWidth();
+    metrics.frameHeight = frame.getHeight();
+    metrics.totalCells =
+        static_cast<std::size_t>(frame.getWidth()) *
+        static_cast<std::size_t>(frame.getHeight());
+    metrics.firstPresent = m_firstPresent;
+    metrics.sizeMismatch =
         m_previousFrame.getWidth() != frame.getWidth() ||
-        m_previousFrame.getHeight() != frame.getHeight())
+        m_previousFrame.getHeight() != frame.getHeight();
+    metrics.blinkForcedFullPresent = shouldForceFullPresentForBlink(frame);
+
+    std::vector<DirtySpan> spans;
+    if (!metrics.firstPresent && !metrics.sizeMismatch && !metrics.blinkForcedFullPresent)
     {
-        m_previousFrame.resize(frame.getWidth(), frame.getHeight());
-        m_previousFrame.clear();
+        spans = FrameDiff::diffRows(m_previousFrame, frame);
 
-        writeFullFrame(frame);
+        std::vector<bool> dirtyRows(static_cast<std::size_t>(frame.getHeight()), false);
+        for (const DirtySpan& span : spans)
+        {
+            metrics.changedCells += static_cast<std::size_t>(span.xEnd - span.xStart + 1);
+            metrics.dirtySpanCount += 1;
 
+            if (span.y >= 0 && span.y < frame.getHeight() && !dirtyRows[static_cast<std::size_t>(span.y)])
+            {
+                dirtyRows[static_cast<std::size_t>(span.y)] = true;
+                metrics.dirtyRowCount += 1;
+            }
+        }
+    }
+
+    const TerminalPresentDecision decision = m_presentPolicy.decide(metrics);
+
+    if (decision.strategy == TerminalPresentStrategy::DiffBased &&
+        !metrics.firstPresent &&
+        !metrics.sizeMismatch &&
+        !metrics.blinkForcedFullPresent &&
+        spans.empty())
+    {
+        recordPresentPerformance(decision, metrics, VtFrameEmitterStats{}, true);
         m_previousFrame = frame;
         m_firstPresent = false;
         return;
     }
 
-    writeDirtySpans(frame);
+    if (metrics.firstPresent || metrics.sizeMismatch)
+    {
+        m_previousFrame.resize(frame.getWidth(), frame.getHeight());
+        m_previousFrame.clear();
+    }
+
+    VtFrameEmitterStats emitterStats{};
+    if (decision.strategy == TerminalPresentStrategy::FullRedraw)
+    {
+        emitterStats = writeFullFrame(frame, decision.clearScreenFirst);
+    }
+    else
+    {
+        emitterStats = writeDirtySpans(frame, spans);
+    }
+
+    recordPresentPerformance(decision, metrics, emitterStats, false);
+
     m_previousFrame = frame;
+    m_firstPresent = false;
 }
 
 void TerminalRenderer::resize(int width, int height)
@@ -697,10 +744,10 @@ const RenderDiagnostics& TerminalRenderer::diagnostics() const
     return m_renderDiagnostics;
 }
 
-void TerminalRenderer::writeFullFrame(const ScreenBuffer& frame)
+VtFrameEmitterStats TerminalRenderer::writeFullFrame(const ScreenBuffer& frame, bool clearScreenFirst)
 {
     VtFrameEmitter emitter(m_sgrEmitter);
-    emitter.beginFrame(true);
+    emitter.beginFrame(clearScreenFirst);
 
     for (int y = 0; y < frame.getHeight(); ++y)
     {
@@ -708,15 +755,14 @@ void TerminalRenderer::writeFullFrame(const ScreenBuffer& frame)
     }
 
     writeRaw(emitter.finishFrame(false));
+    return emitter.stats();
 }
 
-void TerminalRenderer::writeDirtySpans(const ScreenBuffer& frame)
+VtFrameEmitterStats TerminalRenderer::writeDirtySpans(const ScreenBuffer& frame, const std::vector<DirtySpan>& spans)
 {
-    const std::vector<DirtySpan> spans = FrameDiff::diffRows(m_previousFrame, frame);
-
     if (spans.empty())
     {
-        return;
+        return VtFrameEmitterStats{};
     }
 
     VtFrameEmitter emitter(m_sgrEmitter);
@@ -728,6 +774,7 @@ void TerminalRenderer::writeDirtySpans(const ScreenBuffer& frame)
     }
 
     writeRaw(emitter.finishFrame(false));
+    return emitter.stats();
 }
 
 void TerminalRenderer::appendSpanRuns(
@@ -997,6 +1044,7 @@ void TerminalRenderer::initializeDiagnosticsState()
     report.setPolicy(m_stylePolicy);
     report.setBackendState(backendState);
     report.setRendererSelectionTrace(m_startupDiagnostics.selectionTrace);
+    report.setTerminalPresentPerformance(TerminalPresentPerformanceSnapshot{});
 }
 
 void TerminalRenderer::flushDiagnosticsReport() const
@@ -1381,6 +1429,67 @@ void TerminalRenderer::recordBlinkFeature(
             buildTextExampleDetail("Blink rendered directly", logicalState, presentedEnabled),
             logicalState);
     }
+}
+
+
+void TerminalRenderer::recordPresentPerformance(
+    const TerminalPresentDecision& decision,
+    const TerminalPresentMetrics& metrics,
+    const VtFrameEmitterStats& emitterStats,
+    bool skippedPresent)
+{
+    if (!m_renderDiagnostics.isEnabled())
+    {
+        return;
+    }
+
+    CapabilityReport& report = m_renderDiagnostics.report();
+    TerminalPresentPerformanceSnapshot performance = report.terminalPresentPerformance();
+
+    performance.presentCallCount += 1;
+
+    const std::size_t recordedChangedCells =
+        (decision.strategy == TerminalPresentStrategy::FullRedraw && !skippedPresent && metrics.changedCells == 0)
+        ? metrics.totalCells
+        : metrics.changedCells;
+
+    const std::size_t recordedDirtySpans =
+        (decision.strategy == TerminalPresentStrategy::FullRedraw && !skippedPresent && metrics.dirtySpanCount == 0)
+        ? static_cast<std::size_t>(metrics.frameHeight > 0 ? metrics.frameHeight : 0)
+        : metrics.dirtySpanCount;
+
+    performance.changedCellCount += recordedChangedCells;
+    performance.dirtySpanCount += recordedDirtySpans;
+
+    if (skippedPresent)
+    {
+        performance.skippedPresentCount += 1;
+    }
+    else if (decision.strategy == TerminalPresentStrategy::FullRedraw)
+    {
+        performance.fullRedrawCount += 1;
+    }
+    else
+    {
+        performance.diffPresentCount += 1;
+    }
+
+    if (metrics.blinkForcedFullPresent && decision.strategy == TerminalPresentStrategy::FullRedraw)
+    {
+        performance.forcedFullRedrawCount += 1;
+    }
+
+    performance.cursorMoveCount += emitterStats.cursorMoveCount;
+    performance.emittedRunCount += emitterStats.runCount;
+    performance.emittedTextBytes += emitterStats.emittedTextBytes;
+    performance.emittedSgrBytes += emitterStats.emittedSgrBytes;
+    performance.emittedControlBytes += emitterStats.emittedControlBytes;
+    performance.emittedTotalBytes += emitterStats.emittedTotalBytes;
+
+    performance.lastPresentStrategy = TerminalPresentPolicy::toString(decision.strategy);
+    performance.lastPresentReason = decision.reason;
+
+    report.setTerminalPresentPerformance(performance);
 }
 
 bool TerminalRenderer::shouldForceFullPresentForBlink(const ScreenBuffer& frame)
