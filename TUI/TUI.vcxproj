@@ -165,6 +165,10 @@
     <ClInclude Include="Rendering\Styles\BannerThemes.h" />
     <ClInclude Include="Rendering\Styles\Color.h" />
     <ClInclude Include="Rendering\Styles\ColorMapping.h" />
+    <ClInclude Include="Rendering\Styles\ColorResolutionDiagnostics.h">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClInclude>
     <ClInclude Include="Rendering\Styles\ColorResolver.h" />
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Styles\StyleBuilder.h" />
@@ -217,6 +221,10 @@
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />
     <ClCompile Include="Rendering\Styles\ColorMapping.cpp" />
+    <ClCompile Include="Rendering\Styles\ColorResolutionDiagnostics.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="Rendering\Styles\ColorResolver.cpp" />
     <ClCompile Include="Rendering\Styles\Style.cpp" />
     <ClCompile Include="Rendering\Styles\StyleBuilder.cpp" />
