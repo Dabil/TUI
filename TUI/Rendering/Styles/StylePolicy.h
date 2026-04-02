@@ -1,11 +1,10 @@
 #pragma once
 
-#include <cstdint>
 #include <optional>
 
+#include "Rendering/Capabilities/ColorSupport.h"
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
-#include "Rendering/Styles/ThemeColor.h"
 
 enum class ColorRenderMode
 {
@@ -78,27 +77,21 @@ public:
     StylePolicy withFastBlinkMode(BlinkRenderMode mode) const;
 
 private:
-    struct TrueColorValue
-    {
-        std::uint8_t red = 0;
-        std::uint8_t green = 0;
-        std::uint8_t blue = 0;
-    };
+    std::optional<Color> resolveAuthoredColor(
+        const std::optional<Style::StyleColorValue>& authoredColor) const;
 
-private:
-    std::optional<Color> resolveColor(const std::optional<Color>& color) const;
-    std::optional<Color> resolveThemeColorToBasic(const ThemeColor& themeColor) const;
-    std::optional<Color> resolveBasicAuthoredColor(const std::optional<Color>& color) const;
-    std::optional<Color> applyColorMode(const Color& color, ColorRenderMode mode) const;
+    std::optional<ColorSupport> selectColorSupportForAuthoredColor(
+        const Style::StyleColorValue& authoredColor) const;
 
-    Color downgradeToBasic(const Color& color) const;
-    Color downgradeToIndexed256(const Color& color) const;
+    std::optional<ColorSupport> selectColorSupportForConcreteColor(
+        const Color& color) const;
 
-    TrueColorValue toTrueColor(const Color& color) const;
+    std::optional<ColorSupport> selectColorSupportForThemeColor(
+        const ThemeColor& themeColor) const;
 
-    static TrueColorValue basicToTrueColor(Color::Basic color);
-    static Color::Basic rgbToNearestBasic(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
-    static std::uint8_t rgbToNearestIndexed256(std::uint8_t red, std::uint8_t green, std::uint8_t blue);
+    std::optional<ColorSupport> supportFromMode(
+        ColorRenderMode mode,
+        ColorSupport directSupport) const;
 
 private:
     ColorRenderMode m_basicColorMode = ColorRenderMode::Direct;

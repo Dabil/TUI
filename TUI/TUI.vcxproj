@@ -164,6 +164,8 @@
     <ClInclude Include="Rendering\Styles\AppThemes.h" />
     <ClInclude Include="Rendering\Styles\BannerThemes.h" />
     <ClInclude Include="Rendering\Styles\Color.h" />
+    <ClInclude Include="Rendering\Styles\ColorMapping.h" />
+    <ClInclude Include="Rendering\Styles\ColorResolver.h" />
     <ClInclude Include="Rendering\Styles\Style.h" />
     <ClInclude Include="Rendering\Styles\StyleBuilder.h" />
     <ClInclude Include="Rendering\Styles\StyleMerge.h" />
@@ -214,6 +216,8 @@
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />
+    <ClCompile Include="Rendering\Styles\ColorMapping.cpp" />
+    <ClCompile Include="Rendering\Styles\ColorResolver.cpp" />
     <ClCompile Include="Rendering\Styles\Style.cpp" />
     <ClCompile Include="Rendering\Styles\StyleBuilder.cpp" />
     <ClCompile Include="Rendering\Styles\StyleMerge.cpp" />
