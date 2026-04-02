@@ -2,42 +2,22 @@
 
 /*
 
-Short integration note explaining how replace,
-preserve, and merge should be used by callers
+Logical style merge rules:
 
-Use the modes like this:
+Replace:
+    source completely replaces destination
 
-Style result = StyleMerge::merge(existingStyle,
-incomingStyle, StyleMergeMode::Replace);
+PreserveDestination:
+    destination completely wins
 
-Use Replace when:
+MergePreserveDestination:
+    destination is the base
+    source overlays only the fields it explicitly authored
 
-an object or theme wants to fully define the
-final style previous logical styling should be
-discarded
-
-Style result = StyleMerge::merge(existingStyle, incomingStyle, StyleMergeMode::PreserveDestination);
-
-Use PreserveDestination when:
-
-existing cell/style data must win completely
-the incoming style is only conditional or fallback
-Style result = StyleMerge::merge(existingStyle, incomingStyle, StyleMergeMode::MergePreserveDestination);
-
-Use MergePreserveDestination when:
-
-you want "apply this style on top"
-color fields from the incoming style should
-override only when present
-boolean style fields should override only when
-present so they can explicitly enable or disable
-without erasing unspecified destination fields
-
-This is the right logical merge behavior for
-ScreenCell, ScreenBuffer, page composition, and
-theme layering. Renderer downgrade or capability
-handling should still happen later through
-StylePolicy, not here.
+Important:
+    color merge here is purely logical authored-intent merge
+    ThemeColor is not resolved here
+    renderer capability or downgrade logic does not belong here
 
 */
 
@@ -50,30 +30,38 @@ namespace
     {
         if (foreground)
         {
-            if (source.hasForegroundColorValue())
+            if (!source.hasForegroundColorValue())
             {
-                if (source.hasForeground())
-                {
-                    result = result.withForeground(*source.foreground());
-                }
-                else if (source.hasForegroundThemeColor())
-                {
-                    result = result.withForeground(*source.foregroundThemeColor());
-                }
+                return;
+            }
+
+            const Style::StyleColorValue& value = *source.foregroundColorValue();
+
+            if (value.hasConcreteColor())
+            {
+                result = result.withForeground(*value.concreteColor());
+            }
+            else if (value.hasThemeColor())
+            {
+                result = result.withForeground(*value.themeColor());
             }
         }
         else
         {
-            if (source.hasBackgroundColorValue())
+            if (!source.hasBackgroundColorValue())
             {
-                if (source.hasBackground())
-                {
-                    result = result.withBackground(*source.background());
-                }
-                else if (source.hasBackgroundThemeColor())
-                {
-                    result = result.withBackground(*source.backgroundThemeColor());
-                }
+                return;
+            }
+
+            const Style::StyleColorValue& value = *source.backgroundColorValue();
+
+            if (value.hasConcreteColor())
+            {
+                result = result.withBackground(*value.concreteColor());
+            }
+            else if (value.hasThemeColor())
+            {
+                result = result.withBackground(*value.themeColor());
             }
         }
     }

@@ -112,12 +112,15 @@ public:
     bool operator!=(const Style& other) const;
 
 private:
+    // Compatibility storage for existing code that still expects
+    // direct concrete/theme accessors.
     std::optional<Color> m_foreground;
     std::optional<Color> m_background;
 
     std::optional<ThemeColor> m_foregroundThemeColor;
     std::optional<ThemeColor> m_backgroundThemeColor;
 
+    // Authoritative authored-intent storage.
     std::optional<StyleColorValue> m_foregroundColorValue;
     std::optional<StyleColorValue> m_backgroundColorValue;
 
