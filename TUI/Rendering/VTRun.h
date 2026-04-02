@@ -10,7 +10,6 @@ struct VtRun
     int xStart = 0;
     int cellWidth = 0;
 
-    Style authoredStyle{};
     Style presentedStyle{};
 
     std::string utf8Text;
