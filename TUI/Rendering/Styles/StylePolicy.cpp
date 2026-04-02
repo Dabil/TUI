@@ -1,23 +1,6 @@
 #include "Rendering/Styles/StylePolicy.h"
 
-namespace
-{
-    int squareDistance(
-        std::uint8_t r1, std::uint8_t g1, std::uint8_t b1,
-        std::uint8_t r2, std::uint8_t g2, std::uint8_t b2)
-    {
-        const int dr = static_cast<int>(r1) - static_cast<int>(r2);
-        const int dg = static_cast<int>(g1) - static_cast<int>(g2);
-        const int db = static_cast<int>(b1) - static_cast<int>(b2);
-        return dr * dr + dg * dg + db * db;
-    }
-
-    std::uint8_t cubeValue(int component)
-    {
-        static const std::uint8_t values[6] = { 0, 95, 135, 175, 215, 255 };
-        return values[component];
-    }
-}
+#include "Rendering/Styles/ColorResolver.h"
 
 StylePolicy::StylePolicy() = default;
 
@@ -59,22 +42,11 @@ ResolvedStyle StylePolicy::resolve(const Style& style) const
     ResolvedStyle result;
     result.presentedStyle = style;
 
-    if (result.presentedStyle.hasForeground())
+    if (result.presentedStyle.hasForegroundColorValue())
     {
-        const std::optional<Color> resolved = resolveColor(result.presentedStyle.foreground());
-        if (resolved.has_value())
-        {
-            result.presentedStyle = result.presentedStyle.withForeground(*resolved);
-        }
-        else
-        {
-            result.presentedStyle = result.presentedStyle.withoutForeground();
-        }
-    }
-    else if (result.presentedStyle.hasForegroundThemeColor())
-    {
-        const std::optional<Color> authoredBasic = resolveThemeColorToBasic(*result.presentedStyle.foregroundThemeColor());
-        const std::optional<Color> resolved = resolveBasicAuthoredColor(authoredBasic);
+        const std::optional<Color> resolved =
+            resolveAuthoredColor(result.presentedStyle.foregroundColorValue());
+
         if (resolved.has_value())
         {
             result.presentedStyle = result.presentedStyle.withForeground(*resolved);
@@ -85,22 +57,11 @@ ResolvedStyle StylePolicy::resolve(const Style& style) const
         }
     }
 
-    if (result.presentedStyle.hasBackground())
+    if (result.presentedStyle.hasBackgroundColorValue())
     {
-        const std::optional<Color> resolved = resolveColor(result.presentedStyle.background());
-        if (resolved.has_value())
-        {
-            result.presentedStyle = result.presentedStyle.withBackground(*resolved);
-        }
-        else
-        {
-            result.presentedStyle = result.presentedStyle.withoutBackground();
-        }
-    }
-    else if (result.presentedStyle.hasBackgroundThemeColor())
-    {
-        const std::optional<Color> authoredBasic = resolveThemeColorToBasic(*result.presentedStyle.backgroundThemeColor());
-        const std::optional<Color> resolved = resolveBasicAuthoredColor(authoredBasic);
+        const std::optional<Color> resolved =
+            resolveAuthoredColor(result.presentedStyle.backgroundColorValue());
+
         if (resolved.has_value())
         {
             result.presentedStyle = result.presentedStyle.withBackground(*resolved);
@@ -312,286 +273,114 @@ StylePolicy StylePolicy::withFastBlinkMode(BlinkRenderMode mode) const
     return copy;
 }
 
-std::optional<Color> StylePolicy::resolveColor(const std::optional<Color>& color) const
+std::optional<Color> StylePolicy::resolveAuthoredColor(
+    const std::optional<Style::StyleColorValue>& authoredColor) const
 {
-    if (!color.has_value())
+    if (!authoredColor.has_value())
     {
         return std::nullopt;
     }
 
-    if (color->isDefault())
+    const std::optional<ColorSupport> support =
+        selectColorSupportForAuthoredColor(*authoredColor);
+
+    if (!support.has_value())
     {
-        return *color;
+        return std::nullopt;
     }
 
-    if (color->isBasic())
-    {
-        return applyColorMode(*color, m_basicColorMode);
-    }
-
-    if (color->isIndexed256())
-    {
-        return applyColorMode(*color, m_indexed256ColorMode);
-    }
-
-    if (color->isTrueColor())
-    {
-        return applyColorMode(*color, m_trueColorColorMode);
-    }
-
-    return *color;
+    return ColorResolver::resolve(*authoredColor, *support);
 }
 
-std::optional<Color> StylePolicy::resolveThemeColorToBasic(const ThemeColor& themeColor) const
+std::optional<ColorSupport> StylePolicy::selectColorSupportForAuthoredColor(
+    const Style::StyleColorValue& authoredColor) const
 {
-    if (themeColor.hasBasic())
+    if (authoredColor.hasConcreteColor())
     {
-        return themeColor.basic();
+        return selectColorSupportForConcreteColor(*authoredColor.concreteColor());
+    }
+
+    if (authoredColor.hasThemeColor())
+    {
+        return selectColorSupportForThemeColor(*authoredColor.themeColor());
     }
 
     return std::nullopt;
 }
 
-std::optional<Color> StylePolicy::resolveBasicAuthoredColor(const std::optional<Color>& color) const
+std::optional<ColorSupport> StylePolicy::selectColorSupportForConcreteColor(
+    const Color& color) const
 {
-    if (!color.has_value())
+    if (color.isDefault())
     {
-        return std::nullopt;
+        return ColorSupport::Basic16;
     }
 
-    return applyColorMode(*color, m_basicColorMode);
+    if (color.isBasic() || color.isBasic16())
+    {
+        return supportFromMode(m_basicColorMode, ColorSupport::Basic16);
+    }
+
+    if (color.isIndexed() || color.isIndexed256())
+    {
+        return supportFromMode(m_indexed256ColorMode, ColorSupport::Indexed256);
+    }
+
+    if (color.isRgb() || color.isTrueColor())
+    {
+        return supportFromMode(m_trueColorColorMode, ColorSupport::Rgb24);
+    }
+
+    return std::nullopt;
 }
 
-std::optional<Color> StylePolicy::applyColorMode(const Color& color, ColorRenderMode mode) const
+std::optional<ColorSupport> StylePolicy::selectColorSupportForThemeColor(
+    const ThemeColor& themeColor) const
+{
+    /*
+        ThemeColor resolution priority must remain:
+            RGB -> Indexed -> Basic
+
+        Policy selection follows that same authored-preference order.
+    */
+
+    if (themeColor.hasRgb())
+    {
+        return supportFromMode(m_trueColorColorMode, ColorSupport::Rgb24);
+    }
+
+    if (themeColor.hasIndexed())
+    {
+        return supportFromMode(m_indexed256ColorMode, ColorSupport::Indexed256);
+    }
+
+    if (themeColor.hasBasic())
+    {
+        return supportFromMode(m_basicColorMode, ColorSupport::Basic16);
+    }
+
+    return std::nullopt;
+}
+
+std::optional<ColorSupport> StylePolicy::supportFromMode(
+    ColorRenderMode mode,
+    ColorSupport directSupport) const
 {
     switch (mode)
     {
     case ColorRenderMode::Direct:
-        return color;
+        return directSupport;
 
     case ColorRenderMode::DowngradeToBasic:
-        return downgradeToBasic(color);
+        return ColorSupport::Basic16;
 
     case ColorRenderMode::DowngradeToIndexed256:
-        return downgradeToIndexed256(color);
+        return ColorSupport::Indexed256;
 
     case ColorRenderMode::Omit:
         return std::nullopt;
 
     default:
-        return color;
+        return directSupport;
     }
-}
-
-Color StylePolicy::downgradeToBasic(const Color& color) const
-{
-    if (color.isDefault() || color.isBasic())
-    {
-        return color;
-    }
-
-    const TrueColorValue trueColor = toTrueColor(color);
-    return Color::FromBasic(rgbToNearestBasic(trueColor.red, trueColor.green, trueColor.blue));
-}
-
-Color StylePolicy::downgradeToIndexed256(const Color& color) const
-{
-    if (color.isDefault() || color.isIndexed256())
-    {
-        return color;
-    }
-
-    if (color.isBasic())
-    {
-        switch (color.basic())
-        {
-        case Color::Basic::Black:         return Color::FromIndexed(0);
-        case Color::Basic::Red:           return Color::FromIndexed(1);
-        case Color::Basic::Green:         return Color::FromIndexed(2);
-        case Color::Basic::Yellow:        return Color::FromIndexed(3);
-        case Color::Basic::Blue:          return Color::FromIndexed(4);
-        case Color::Basic::Magenta:       return Color::FromIndexed(5);
-        case Color::Basic::Cyan:          return Color::FromIndexed(6);
-        case Color::Basic::White:         return Color::FromIndexed(7);
-        case Color::Basic::BrightBlack:   return Color::FromIndexed(8);
-        case Color::Basic::BrightRed:     return Color::FromIndexed(9);
-        case Color::Basic::BrightGreen:   return Color::FromIndexed(10);
-        case Color::Basic::BrightYellow:  return Color::FromIndexed(11);
-        case Color::Basic::BrightBlue:    return Color::FromIndexed(12);
-        case Color::Basic::BrightMagenta: return Color::FromIndexed(13);
-        case Color::Basic::BrightCyan:    return Color::FromIndexed(14);
-        case Color::Basic::BrightWhite:   return Color::FromIndexed(15);
-        default:                          return Color::FromIndexed(7);
-        }
-    }
-
-    const TrueColorValue trueColor = toTrueColor(color);
-    return Color::FromIndexed(rgbToNearestIndexed256(trueColor.red, trueColor.green, trueColor.blue));
-}
-
-StylePolicy::TrueColorValue StylePolicy::toTrueColor(const Color& color) const
-{
-    if (color.isTrueColor())
-    {
-        return { color.red(), color.green(), color.blue() };
-    }
-
-    if (color.isBasic())
-    {
-        return basicToTrueColor(color.basic());
-    }
-
-    if (color.isIndexed256())
-    {
-        const std::uint8_t index = color.index256();
-
-        if (index < 16)
-        {
-            switch (index)
-            {
-            case 0:  return basicToTrueColor(Color::Basic::Black);
-            case 1:  return basicToTrueColor(Color::Basic::Red);
-            case 2:  return basicToTrueColor(Color::Basic::Green);
-            case 3:  return basicToTrueColor(Color::Basic::Yellow);
-            case 4:  return basicToTrueColor(Color::Basic::Blue);
-            case 5:  return basicToTrueColor(Color::Basic::Magenta);
-            case 6:  return basicToTrueColor(Color::Basic::Cyan);
-            case 7:  return basicToTrueColor(Color::Basic::White);
-            case 8:  return basicToTrueColor(Color::Basic::BrightBlack);
-            case 9:  return basicToTrueColor(Color::Basic::BrightRed);
-            case 10: return basicToTrueColor(Color::Basic::BrightGreen);
-            case 11: return basicToTrueColor(Color::Basic::BrightYellow);
-            case 12: return basicToTrueColor(Color::Basic::BrightBlue);
-            case 13: return basicToTrueColor(Color::Basic::BrightMagenta);
-            case 14: return basicToTrueColor(Color::Basic::BrightCyan);
-            case 15: return basicToTrueColor(Color::Basic::BrightWhite);
-            default: break;
-            }
-        }
-
-        if (index >= 16 && index <= 231)
-        {
-            const int adjusted = static_cast<int>(index) - 16;
-            const int r = adjusted / 36;
-            const int g = (adjusted / 6) % 6;
-            const int b = adjusted % 6;
-
-            return {
-                cubeValue(r),
-                cubeValue(g),
-                cubeValue(b)
-            };
-        }
-
-        if (index >= 232)
-        {
-            const std::uint8_t gray = static_cast<std::uint8_t>(8 + (index - 232) * 10);
-            return { gray, gray, gray };
-        }
-    }
-
-    return { 0, 0, 0 };
-}
-
-StylePolicy::TrueColorValue StylePolicy::basicToTrueColor(Color::Basic color)
-{
-    switch (color)
-    {
-    case Color::Basic::Black:         return { 0, 0, 0 };
-    case Color::Basic::Red:           return { 128, 0, 0 };
-    case Color::Basic::Green:         return { 0, 128, 0 };
-    case Color::Basic::Yellow:        return { 128, 128, 0 };
-    case Color::Basic::Blue:          return { 0, 0, 128 };
-    case Color::Basic::Magenta:       return { 128, 0, 128 };
-    case Color::Basic::Cyan:          return { 0, 128, 128 };
-    case Color::Basic::White:         return { 192, 192, 192 };
-
-    case Color::Basic::BrightBlack:   return { 128, 128, 128 };
-    case Color::Basic::BrightRed:     return { 255, 0, 0 };
-    case Color::Basic::BrightGreen:   return { 0, 255, 0 };
-    case Color::Basic::BrightYellow:  return { 255, 255, 0 };
-    case Color::Basic::BrightBlue:    return { 0, 0, 255 };
-    case Color::Basic::BrightMagenta: return { 255, 0, 255 };
-    case Color::Basic::BrightCyan:    return { 0, 255, 255 };
-    case Color::Basic::BrightWhite:   return { 255, 255, 255 };
-    default:                          return { 192, 192, 192 };
-    }
-}
-
-Color::Basic StylePolicy::rgbToNearestBasic(
-    std::uint8_t red,
-    std::uint8_t green,
-    std::uint8_t blue)
-{
-    struct Candidate
-    {
-        Color::Basic basic;
-        TrueColorValue trueColor;
-    };
-
-    static const Candidate candidates[] =
-    {
-        { Color::Basic::Black,         basicToTrueColor(Color::Basic::Black) },
-        { Color::Basic::Red,           basicToTrueColor(Color::Basic::Red) },
-        { Color::Basic::Green,         basicToTrueColor(Color::Basic::Green) },
-        { Color::Basic::Yellow,        basicToTrueColor(Color::Basic::Yellow) },
-        { Color::Basic::Blue,          basicToTrueColor(Color::Basic::Blue) },
-        { Color::Basic::Magenta,       basicToTrueColor(Color::Basic::Magenta) },
-        { Color::Basic::Cyan,          basicToTrueColor(Color::Basic::Cyan) },
-        { Color::Basic::White,         basicToTrueColor(Color::Basic::White) },
-        { Color::Basic::BrightBlack,   basicToTrueColor(Color::Basic::BrightBlack) },
-        { Color::Basic::BrightRed,     basicToTrueColor(Color::Basic::BrightRed) },
-        { Color::Basic::BrightGreen,   basicToTrueColor(Color::Basic::BrightGreen) },
-        { Color::Basic::BrightYellow,  basicToTrueColor(Color::Basic::BrightYellow) },
-        { Color::Basic::BrightBlue,    basicToTrueColor(Color::Basic::BrightBlue) },
-        { Color::Basic::BrightMagenta, basicToTrueColor(Color::Basic::BrightMagenta) },
-        { Color::Basic::BrightCyan,    basicToTrueColor(Color::Basic::BrightCyan) },
-        { Color::Basic::BrightWhite,   basicToTrueColor(Color::Basic::BrightWhite) }
-    };
-
-    int bestDistance = -1;
-    Color::Basic bestColor = Color::Basic::White;
-
-    for (const Candidate& candidate : candidates)
-    {
-        const int distance = squareDistance(
-            red, green, blue,
-            candidate.trueColor.red, candidate.trueColor.green, candidate.trueColor.blue);
-
-        if (bestDistance < 0 || distance < bestDistance)
-        {
-            bestDistance = distance;
-            bestColor = candidate.basic;
-        }
-    }
-
-    return bestColor;
-}
-
-std::uint8_t StylePolicy::rgbToNearestIndexed256(
-    std::uint8_t red,
-    std::uint8_t green,
-    std::uint8_t blue)
-{
-    int bestDistance = -1;
-    std::uint8_t bestIndex = 0;
-
-    for (int i = 0; i < 256; ++i)
-    {
-        const Color indexedColor = Color::FromIndexed(static_cast<std::uint8_t>(i));
-        const StylePolicy policy;
-        const TrueColorValue trueColor = policy.toTrueColor(indexedColor);
-
-        const int distance = squareDistance(
-            red, green, blue,
-            trueColor.red, trueColor.green, trueColor.blue);
-
-        if (bestDistance < 0 || distance < bestDistance)
-        {
-            bestDistance = distance;
-            bestIndex = static_cast<std::uint8_t>(i);
-        }
-    }
-
-    return bestIndex;
 }
