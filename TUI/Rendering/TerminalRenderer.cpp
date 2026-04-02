@@ -45,10 +45,8 @@ namespace
         case RendererFeatureSupport::Supported:
             return TextAttributeRenderMode::Direct;
 
-        case RendererFeatureSupport::Unknown:
-            return TextAttributeRenderMode::Approximate;
-
         case RendererFeatureSupport::Emulated:
+        case RendererFeatureSupport::Unknown:
         case RendererFeatureSupport::Unsupported:
         default:
             return TextAttributeRenderMode::Omit;
@@ -90,12 +88,10 @@ namespace
         const bool allowSafeFallback = capabilities.usesPreserveStyleSafeFallback();
 
         const bool maySafelyEmulateSlowBlink =
-            capabilities.mayEmulateSlowBlink() ||
-            capabilities.slowBlink == RendererFeatureSupport::Unknown;
+            capabilities.mayEmulateSlowBlink();
 
         const bool maySafelyEmulateFastBlink =
-            capabilities.mayEmulateFastBlink() ||
-            capabilities.fastBlink == RendererFeatureSupport::Unknown;
+            capabilities.mayEmulateFastBlink();
 
         policy = policy.withSlowBlinkMode(
             capabilities.supportsSlowBlinkDirect()

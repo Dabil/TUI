@@ -254,6 +254,46 @@ Style SgrEmitter::sanitizeForEmission(const Style& style) const
         sanitized = sanitized.withoutBackground();
     }
 
+    if (sanitized.bold() && !m_capabilities.supportsBoldDirect())
+    {
+        sanitized = sanitized.withBold(false);
+    }
+
+    if (sanitized.dim() && !m_capabilities.supportsDimDirect())
+    {
+        sanitized = sanitized.withDim(false);
+    }
+
+    if (sanitized.underline() && !m_capabilities.supportsUnderlineDirect())
+    {
+        sanitized = sanitized.withUnderline(false);
+    }
+
+    if (sanitized.reverse() && !m_capabilities.supportsReverseDirect())
+    {
+        sanitized = sanitized.withReverse(false);
+    }
+
+    if (sanitized.invisible() && !m_capabilities.supportsInvisibleDirect())
+    {
+        sanitized = sanitized.withInvisible(false);
+    }
+
+    if (sanitized.strike() && !m_capabilities.supportsStrikeDirect())
+    {
+        sanitized = sanitized.withStrike(false);
+    }
+
+    if (sanitized.slowBlink() && !m_capabilities.supportsSlowBlinkDirect())
+    {
+        sanitized = sanitized.withSlowBlink(false);
+    }
+
+    if (sanitized.fastBlink() && !m_capabilities.supportsFastBlinkDirect())
+    {
+        sanitized = sanitized.withFastBlink(false);
+    }
+
     return sanitized;
 }
 

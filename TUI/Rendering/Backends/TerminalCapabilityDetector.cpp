@@ -70,6 +70,22 @@ namespace
         return loweredHaystack.find(loweredNeedle) != std::wstring::npos;
     }
 
+    bool isWindowsTerminalEnvironment()
+    {
+        return hasEnvironmentVariable(L"WT_SESSION");
+    }
+
+    bool isVsCodeTerminalEnvironment()
+    {
+        const std::wstring termProgram = getEnvironmentVariableString(L"TERM_PROGRAM");
+        return equalsIgnoreCase(termProgram, L"vscode");
+    }
+
+    bool isConEmuEnvironment()
+    {
+        return hasEnvironmentVariable(L"ConEmuPID") || hasEnvironmentVariable(L"ConEmuANSI");
+    }
+
     bool isTrueColorEnvironment()
     {
         const std::wstring colorTerm = getEnvironmentVariableString(L"COLORTERM");
@@ -80,13 +96,12 @@ namespace
             return true;
         }
 
-        if (hasEnvironmentVariable(L"WT_SESSION"))
+        if (isWindowsTerminalEnvironment())
         {
             return true;
         }
 
-        const std::wstring termProgram = getEnvironmentVariableString(L"TERM_PROGRAM");
-        if (equalsIgnoreCase(termProgram, L"vscode"))
+        if (isVsCodeTerminalEnvironment())
         {
             return true;
         }
@@ -102,12 +117,24 @@ namespace
             return true;
         }
 
-        if (hasEnvironmentVariable(L"ConEmuPID") || hasEnvironmentVariable(L"ConEmuANSI"))
+        if (isConEmuEnvironment())
         {
             return true;
         }
 
         return false;
+    }
+
+    bool isXtermLikeEnvironment()
+    {
+        const std::wstring term = getEnvironmentVariableString(L"TERM");
+
+        return containsIgnoreCase(term, L"xterm") ||
+            containsIgnoreCase(term, L"screen") ||
+            containsIgnoreCase(term, L"tmux") ||
+            containsIgnoreCase(term, L"rxvt") ||
+            containsIgnoreCase(term, L"vt100") ||
+            containsIgnoreCase(term, L"vt220");
     }
 
     ColorSupport detectTerminalColorTier()
@@ -125,10 +152,45 @@ namespace
         return ColorSupport::Basic16;
     }
 
+    RendererFeatureSupport detectNativeStrikeSupport()
+    {
+        if (isWindowsTerminalEnvironment() || isVsCodeTerminalEnvironment())
+        {
+            return RendererFeatureSupport::Supported;
+        }
+
+        if (isXtermLikeEnvironment())
+        {
+            return RendererFeatureSupport::Supported;
+        }
+
+        return RendererFeatureSupport::Unsupported;
+    }
+
+    RendererFeatureSupport detectBlinkSupport()
+    {
+        if (isXtermLikeEnvironment())
+        {
+            return RendererFeatureSupport::Supported;
+        }
+
+        return RendererFeatureSupport::Emulated;
+    }
+
     RendererCapabilities buildTerminalCapabilities()
     {
         RendererCapabilities capabilities = RendererCapabilities::VirtualTerminal();
         capabilities.colorTier = detectTerminalColorTier();
+
+        capabilities.bold = RendererFeatureSupport::Supported;
+        capabilities.dim = RendererFeatureSupport::Supported;
+        capabilities.underline = RendererFeatureSupport::Supported;
+        capabilities.reverse = RendererFeatureSupport::Supported;
+        capabilities.invisible = RendererFeatureSupport::Supported;
+        capabilities.strike = detectNativeStrikeSupport();
+        capabilities.slowBlink = detectBlinkSupport();
+        capabilities.fastBlink = detectBlinkSupport();
+
         return capabilities;
     }
 }
@@ -171,4 +233,3 @@ TerminalCapabilityDetectionResult TerminalCapabilityDetector::detectAndConfigure
     result.terminalOutputReady = true;
     return result;
 }
-

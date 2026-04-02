@@ -122,7 +122,7 @@ DigitalRainScreen::DigitalRainScreen()
         + style::Bg(black);
 
     m_labelStyle =
-        style::Bold
+        style::Underline
         + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
         + style::Bg(black);
 
@@ -497,7 +497,8 @@ void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
     const int footerLabelY = m_screenHeight - 3;
     const int footerPreviewY = m_screenHeight - 2;
     
-    buffer.writeString(2, footerLabelY, "Pool:", m_labelStyle);
+    buffer.writeString(2, footerLabelY, "Pool", m_labelStyle);
+    buffer.writeChar(6, footerLabelY, ':', m_headStyle);
     drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
     
     // Use this footer for console
