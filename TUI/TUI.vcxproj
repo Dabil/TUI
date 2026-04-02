@@ -146,6 +146,7 @@
     <ClInclude Include="Rendering\Backends\TerminalHostClassifier.h" />
     <ClInclude Include="Rendering\Backends\TerminalHostInfo.h" />
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
+    <ClInclude Include="Rendering\Capabilities\ColorSupport.h" />
     <ClInclude Include="Rendering\Capabilities\RendererCapabilities.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />

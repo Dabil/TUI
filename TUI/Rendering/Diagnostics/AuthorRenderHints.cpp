@@ -74,15 +74,15 @@ namespace
         const RendererCapabilities& capabilities = report.capabilities();
         const BackendStateSnapshot& backendState = report.backendState();
 
-        if (capabilities.colorTier == RendererColorTier::Basic16)
+        if (capabilities.colorTier == ColorSupport::Basic16)
         {
             hints.push_back(
                 "The active backend is operating in Basic16 color mode, so richer authored colors may still be downgraded before final presentation.");
         }
-        else if (capabilities.colorTier == RendererColorTier::Indexed256)
+        else if (capabilities.colorTier == ColorSupport::Indexed256)
         {
             hints.push_back(
-                "The active backend supports Indexed256 color, but TrueColor-authored values may still be approximated to indexed entries.");
+                "The active backend supports Indexed256 color, but Rgb24-authored values may still be approximated to indexed entries.");
         }
 
         if (!capabilities.virtualTerminalProcessing)
@@ -182,71 +182,16 @@ namespace
             return;
         }
 
-        std::ostringstream stream;
-        stream
-            << "Blink styling encountered runtime adaptation: "
-            << omitted << " omitted, "
-            << emulated << " emulated.";
-        hints.push_back(stream.str());
-
-        hints.push_back(
-            "Portable authoring suggestion: do not rely on blink as the only urgency signal. Pair it with wording, framing, reverse video, or stronger contrast.");
-    }
-
-    void addLogicalStateHints(
-        const CapabilityReport& report,
-        std::vector<std::string>& hints)
-    {
-        bool sawExplicitDisable = false;
-        bool sawUnspecified = false;
-
-        for (const StyleLogicalStateExample& example : report.logicalStateExamples())
-        {
-            if (example.logicalState == LogicalStyleValueState::ExplicitlyDisabled)
-            {
-                sawExplicitDisable = true;
-            }
-            else if (example.logicalState == LogicalStyleValueState::Unspecified)
-            {
-                sawUnspecified = true;
-            }
-        }
-
-        if (sawExplicitDisable)
+        if (emulated > 0)
         {
             hints.push_back(
-                "Explicitly disabled style fields are now visible in diagnostics, which helps distinguish an author's deliberate 'off' decision from a field that was never authored at all.");
+                "Blink was emulated for at least some rendered content, which means the visible result depends on renderer timing behavior rather than direct backend support.");
         }
 
-        if (sawUnspecified)
+        if (omitted > 0)
         {
             hints.push_back(
-                "Unspecified fields remain important because they preserve inheritance/merge behavior; diagnostics now call that out separately instead of collapsing it into false.");
-        }
-    }
-
-    void addExampleDrivenHints(
-        const CapabilityReport& report,
-        std::vector<std::string>& hints)
-    {
-        int added = 0;
-
-        for (const StyleAdaptationExample& example : report.examples())
-        {
-            if (example.kind == StyleAdaptationKind::Direct)
-            {
-                continue;
-            }
-
-            std::string hint = "Observed during rendering: ";
-            hint += example.detail;
-            hints.push_back(hint);
-
-            ++added;
-            if (added >= 4)
-            {
-                break;
-            }
+                "Some authored blink requests were omitted by policy because the current backend/capability combination could not present them safely.");
         }
     }
 }
@@ -254,11 +199,6 @@ namespace
 std::vector<std::string> AuthorRenderHints::buildHints(const RenderDiagnostics& diagnostics)
 {
     std::vector<std::string> hints;
-
-    if (!diagnostics.isEnabled())
-    {
-        return hints;
-    }
 
     const CapabilityReport& report = diagnostics.report();
 
@@ -268,8 +208,6 @@ std::vector<std::string> AuthorRenderHints::buildHints(const RenderDiagnostics& 
     addMaximalFeatureUseHints(report, hints);
     addColorHints(report, hints);
     addBlinkHints(report, hints);
-    addLogicalStateHints(report, hints);
-    addExampleDrivenHints(report, hints);
 
     return hints;
 }

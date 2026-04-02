@@ -2,7 +2,7 @@
 
 /*
 
-how Renderer's and diagnostics should consume this data
+how renderers and diagnostics should consume this data
 
 Renderer should use this type in two steps:
 
@@ -24,9 +24,9 @@ RendererCapabilities
 
 Recommended usage patterns:
 
-Renderer's should store one RendererCapabilities m_capabilities;
+renderers should store one RendererCapabilities m_capabilities;
 style mapping code should query helpers like:
-supportsTrueColor()
+supportsRgb24()
 supportsIndexed256Colors()
 supportsBrightBasicColorsDirect()
 supportsUnderlineDirect()
@@ -58,7 +58,7 @@ For the current backend, BasicWin32 must stay conservative:
 - blink is not directly provided by the Win32 attribute path, but the current
   renderer may intentionally emulate it
 - if the renderer later chooses to approximate a visual effect, that should
-    be reflected in runtime adaptation data rather than overstated here
+  be reflected in runtime adaptation data rather than overstated here
 
 Only use VirtualTerminal() once you truly add a VT output path rather than
 merely enabling the mode flag.
@@ -75,7 +75,7 @@ RendererCapabilities RendererCapabilities::Conservative()
     capabilities.unicodeOutput = true;
     capabilities.preserveStyleSafeFallback = true;
     capabilities.optionalBackendFlags = 0;
-    capabilities.colorTier = RendererColorTier::Basic16;
+    capabilities.colorTier = ColorSupport::Basic16;
 
     /*
         The existing model already treated Basic16 as available.
@@ -84,12 +84,12 @@ RendererCapabilities RendererCapabilities::Conservative()
     */
     capabilities.brightBasicColors = RendererFeatureSupport::Supported;
 
-    capabilities.bold      = RendererFeatureSupport::Unknown;
-    capabilities.dim       = RendererFeatureSupport::Unknown;
+    capabilities.bold = RendererFeatureSupport::Unknown;
+    capabilities.dim = RendererFeatureSupport::Unknown;
     capabilities.underline = RendererFeatureSupport::Unknown;
-    capabilities.reverse   = RendererFeatureSupport::Unknown;
+    capabilities.reverse = RendererFeatureSupport::Unknown;
     capabilities.invisible = RendererFeatureSupport::Unknown;
-    capabilities.strike    = RendererFeatureSupport::Unsupported;
+    capabilities.strike = RendererFeatureSupport::Unsupported;
     capabilities.slowBlink = RendererFeatureSupport::Emulated;
     capabilities.fastBlink = RendererFeatureSupport::Emulated;
 
@@ -103,7 +103,7 @@ RendererCapabilities RendererCapabilities::BasicWin32()
     capabilities.virtualTerminalProcessing = false;
     capabilities.preserveStyleSafeFallback = true;
     capabilities.optionalBackendFlags = 0;
-    capabilities.colorTier = RendererColorTier::Basic16;
+    capabilities.colorTier = ColorSupport::Basic16;
 
     /*
         Several richer style semantics are not reliable enough to advertise as
@@ -125,12 +125,12 @@ RendererCapabilities RendererCapabilities::BasicWin32()
     */
 
     capabilities.brightBasicColors = RendererFeatureSupport::Supported;
-    capabilities.bold      = RendererFeatureSupport::Unknown;
-    capabilities.dim       = RendererFeatureSupport::Unknown;
+    capabilities.bold = RendererFeatureSupport::Unknown;
+    capabilities.dim = RendererFeatureSupport::Unknown;
     capabilities.underline = RendererFeatureSupport::Unknown;
-    capabilities.reverse   = RendererFeatureSupport::Unknown;
+    capabilities.reverse = RendererFeatureSupport::Unknown;
     capabilities.invisible = RendererFeatureSupport::Unknown;
-    capabilities.strike    = RendererFeatureSupport::Unsupported;
+    capabilities.strike = RendererFeatureSupport::Unsupported;
     capabilities.slowBlink = RendererFeatureSupport::Emulated;
     capabilities.fastBlink = RendererFeatureSupport::Emulated;
 
@@ -144,7 +144,7 @@ RendererCapabilities RendererCapabilities::VirtualTerminal()
     capabilities.virtualTerminalProcessing = true;
     capabilities.preserveStyleSafeFallback = true;
     capabilities.optionalBackendFlags = 0;
-    capabilities.colorTier = RendererColorTier::TrueColor;
+    capabilities.colorTier = ColorSupport::Rgb24;
 
     /*
         Even when VT processing is enabled, exact behavior can still vary by
@@ -156,12 +156,12 @@ RendererCapabilities RendererCapabilities::VirtualTerminal()
     */
 
     capabilities.brightBasicColors = RendererFeatureSupport::Supported;
-    capabilities.bold      = RendererFeatureSupport::Supported;
-    capabilities.dim       = RendererFeatureSupport::Supported;
+    capabilities.bold = RendererFeatureSupport::Supported;
+    capabilities.dim = RendererFeatureSupport::Supported;
     capabilities.underline = RendererFeatureSupport::Supported;
-    capabilities.reverse   = RendererFeatureSupport::Supported;
+    capabilities.reverse = RendererFeatureSupport::Supported;
     capabilities.invisible = RendererFeatureSupport::Supported;
-    capabilities.strike    = RendererFeatureSupport::Supported;
+    capabilities.strike = RendererFeatureSupport::Supported;
     capabilities.slowBlink = RendererFeatureSupport::Emulated;
     capabilities.fastBlink = RendererFeatureSupport::Emulated;
 
@@ -170,7 +170,7 @@ RendererCapabilities RendererCapabilities::VirtualTerminal()
 
 bool RendererCapabilities::supportsBasicColors() const
 {
-    return colorTier >= RendererColorTier::Basic16;
+    return colorTier >= ColorSupport::Basic16;
 }
 
 bool RendererCapabilities::supportsBrightBasicColors() const
@@ -180,12 +180,17 @@ bool RendererCapabilities::supportsBrightBasicColors() const
 
 bool RendererCapabilities::supportsIndexed256Colors() const
 {
-    return colorTier >= RendererColorTier::Indexed256;
+    return colorTier >= ColorSupport::Indexed256;
+}
+
+bool RendererCapabilities::supportsRgb24() const
+{
+    return colorTier >= ColorSupport::Rgb24;
 }
 
 bool RendererCapabilities::supportsTrueColor() const
 {
-    return colorTier >= RendererColorTier::TrueColor;
+    return supportsRgb24();
 }
 
 bool RendererCapabilities::supportsBrightBasicColorsDirect() const

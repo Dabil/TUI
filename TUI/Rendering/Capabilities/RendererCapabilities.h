@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "Rendering/Capabilities/ColorSupport.h"
+
 /*
     Purpose:
 
@@ -34,6 +36,12 @@
     are currently advertised.
 
     colorTier remains the broad color-family tier for the backend path.
+    It now uses ColorSupport so the renderer reports color capability using:
+        None
+        Basic16
+        Indexed256
+        Rgb24
+
     brightBasicColors makes the bright subset of authored basic colors explicit
     rather than leaving that distinction only implied by Basic16 handling or
     by Color::Basic enum values.
@@ -44,31 +52,13 @@
 */
 
 /*
-    Model we are building toward:
+    Compatibility note:
 
-    Renderer
-        declares what it knows how to do
-
-    CapabilityDetector
-        probes host/backend facts
-
-    RendererCapabilityBuilder
-        combines both into effective RendererCapabilities
-
-    StylePolicy / ColorResolver
-        make decisions from that profile
-
-    Renderer
-        executes resolved output only
+    Older code in this project already refers to RendererColorTier.
+    Keep that name as an alias so the rest of the codebase does not need
+    a large mechanical rename all at once.
 */
-
-enum class RendererColorTier
-{
-    None = 0,
-    Basic16,
-    Indexed256,
-    TrueColor
-};
+using RendererColorTier = ColorSupport;
 
 enum class RendererFeatureSupport
 {
@@ -91,7 +81,7 @@ struct RendererCapabilities
 
     std::uint32_t optionalBackendFlags = 0;
 
-    RendererColorTier colorTier = RendererColorTier::Basic16;
+    ColorSupport colorTier = ColorSupport::Basic16;
 
     /*
         Explicit support for authored bright basic colors such as
@@ -119,6 +109,12 @@ struct RendererCapabilities
     bool supportsBasicColors() const;
     bool supportsBrightBasicColors() const;
     bool supportsIndexed256Colors() const;
+    bool supportsRgb24() const;
+
+    /*
+        Compatibility helper retained so existing renderer code can keep using
+        the old terminology until ColorResolver / policy code is updated.
+    */
     bool supportsTrueColor() const;
 
     bool supportsBrightBasicColorsDirect() const;
