@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <chrono>
@@ -16,10 +17,11 @@
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StylePolicy.h"
-#include "Rendering/Text/TextTypes.h"
 #include "Rendering/TerminalPresentPolicy.h"
+#include "Rendering/TerminalSessionOptions.h"
+#include "Rendering/Text/TextTypes.h"
 #include "Rendering/VtFrameEmitter.h"
-#include "Rendering/VtRun.h"
+#include "Rendering/VTRun.h"
 
 #define NOMINMAX
 #include <windows.h>
@@ -53,6 +55,9 @@ public:
 
     void setStartupDiagnosticsContext(const StartupDiagnosticsContext& startupDiagnostics);
 
+    void setSessionOptions(const TerminalSessionOptions& options);
+    const TerminalSessionOptions& sessionOptions() const;
+
     RenderDiagnostics& diagnostics();
     const RenderDiagnostics& diagnostics() const;
 
@@ -79,6 +84,9 @@ private:
     bool queryVisibleConsoleSize(int& width, int& height) const;
     bool configureTerminal();
     void restoreTerminalState();
+
+    bool enterTerminalSession();
+    void leaveTerminalSession();
 
     void initializeDiagnosticsState();
     void flushDiagnosticsReport() const;
@@ -134,6 +142,7 @@ private:
     RenderDiagnostics m_renderDiagnostics{};
     TerminalPresentPolicy m_presentPolicy{};
     StartupDiagnosticsContext m_startupDiagnostics{};
+    TerminalSessionOptions m_sessionOptions = TerminalSessionOptions::FullScreenDefaults();
 
     UINT m_originalOutputCodePage = 0;
     UINT m_originalInputCodePage = 0;
@@ -154,6 +163,10 @@ private:
     DWORD m_configuredInputMode = 0;
     bool m_haveConfiguredOutputMode = false;
     bool m_haveConfiguredInputMode = false;
+
+    bool m_terminalSessionActive = false;
+    bool m_alternateScreenActive = false;
+    bool m_cursorHiddenBySession = false;
 
     std::chrono::steady_clock::time_point m_blinkEpoch{};
     bool m_lastSlowBlinkVisibilityState = true;

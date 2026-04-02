@@ -183,6 +183,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="Rendering\TerminalSessionOptions.h" />
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
     <ClInclude Include="Rendering\Styles\Themes.h" />
@@ -240,6 +241,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="Rendering\TerminalSessionOptions.cpp" />
     <ClCompile Include="Rendering\VtFrameEmitter.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
