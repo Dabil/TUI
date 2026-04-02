@@ -83,6 +83,11 @@ void CapabilityReport::setBackendState(const BackendStateSnapshot& backendState)
     m_backendState = backendState;
 }
 
+void CapabilityReport::setRendererSelectionTrace(const RendererSelectionTrace& selectionTrace)
+{
+    m_rendererSelectionTrace = selectionTrace;
+}
+
 const RendererCapabilities& CapabilityReport::capabilities() const
 {
     return m_capabilities;
@@ -96,6 +101,11 @@ const StylePolicy& CapabilityReport::policy() const
 const BackendStateSnapshot& CapabilityReport::backendState() const
 {
     return m_backendState;
+}
+
+const RendererSelectionTrace& CapabilityReport::rendererSelectionTrace() const
+{
+    return m_rendererSelectionTrace;
 }
 
 void CapabilityReport::recordDirect(StyleFeature feature)
@@ -180,6 +190,21 @@ std::size_t CapabilityReport::getCount(StyleFeature feature, StyleAdaptationKind
     }
 
     return 0;
+}
+
+std::size_t CapabilityReport::getTotalCount(StyleAdaptationKind kind) const
+{
+    std::size_t total = 0;
+
+    for (const StyleAdaptationCounter& counter : m_counters)
+    {
+        if (counter.kind == kind)
+        {
+            total += counter.count;
+        }
+    }
+
+    return total;
 }
 
 const std::vector<StyleAdaptationCounter>& CapabilityReport::counters() const

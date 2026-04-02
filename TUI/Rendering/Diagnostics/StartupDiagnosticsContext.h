@@ -3,6 +3,7 @@
 #include <string>
 
 #include "App/StartupConfig.h"
+#include "Rendering/Diagnostics/RendererSelectionTrace.h"
 
 enum class TerminalHostKind
 {
@@ -42,6 +43,8 @@ struct StartupDiagnosticsContext
 
     bool launchedByWindowsTerminalFlag = false;
     bool windowsTerminalSessionHint = false;
+
+    RendererSelectionTrace selectionTrace{};
 };
 
 inline const char* toString(TerminalHostKind hostKind)

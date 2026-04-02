@@ -152,6 +152,7 @@
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnosticsWriter.h" />
+    <ClInclude Include="Rendering\Diagnostics\RendererSelectionTrace.h" />
     <ClInclude Include="Rendering\Diagnostics\StartupDiagnosticsContext.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
@@ -216,6 +217,7 @@
     <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
+    <ClCompile Include="Rendering\Diagnostics\RendererSelectionTrace.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />

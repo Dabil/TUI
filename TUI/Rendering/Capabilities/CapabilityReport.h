@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Rendering/Capabilities/RendererCapabilities.h"
+#include "Rendering/Diagnostics/RendererSelectionTrace.h"
 #include "Rendering/Styles/ColorResolutionDiagnostics.h"
 #include "Rendering/Styles/StylePolicy.h"
 
@@ -114,10 +115,12 @@ public:
     void setCapabilities(const RendererCapabilities& capabilities);
     void setPolicy(const StylePolicy& policy);
     void setBackendState(const BackendStateSnapshot& backendState);
+    void setRendererSelectionTrace(const RendererSelectionTrace& selectionTrace);
 
     const RendererCapabilities& capabilities() const;
     const StylePolicy& policy() const;
     const BackendStateSnapshot& backendState() const;
+    const RendererSelectionTrace& rendererSelectionTrace() const;
 
     void recordDirect(StyleFeature feature);
     void recordDowngraded(StyleFeature feature);
@@ -143,6 +146,7 @@ public:
         const ColorResolutionDiagnostics& diagnostics);
 
     std::size_t getCount(StyleFeature feature, StyleAdaptationKind kind) const;
+    std::size_t getTotalCount(StyleAdaptationKind kind) const;
 
     const std::vector<StyleAdaptationCounter>& counters() const;
     const std::vector<StyleAdaptationExample>& examples() const;
@@ -172,6 +176,7 @@ private:
     RendererCapabilities m_capabilities{};
     StylePolicy m_policy{};
     BackendStateSnapshot m_backendState{};
+    RendererSelectionTrace m_rendererSelectionTrace{};
 
     std::vector<StyleAdaptationCounter> m_counters;
     std::vector<StyleAdaptationExample> m_examples;

@@ -188,6 +188,15 @@ namespace
             return TerminalHostKind::WindowsTerminal;
         }
     }
+
+    void addTraceEntry(
+        StartupDiagnosticsContext& diagnosticsContext,
+        RendererSelectionStage stage,
+        const std::string& decision,
+        const std::string& detail)
+    {
+        diagnosticsContext.selectionTrace.addEntry(stage, decision, detail);
+    }
 }
 
 bool TerminalLauncher::tryRelaunchInWindowsTerminal()
@@ -273,6 +282,14 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     diagnosticsContext.launchedByWindowsTerminalFlag = launchedByWtFlag;
     diagnosticsContext.windowsTerminalSessionHint = hostInfo.windowsTerminalSessionHint;
 
+    addTraceEntry(
+        diagnosticsContext,
+        RendererSelectionStage::StartupConfiguration,
+        "Captured startup configuration",
+        std::string("configFileFound=") + (config.configFileFound ? "true" : "false") +
+        ", configuredHostPreference=" + toString(config.hostPreference) +
+        ", configuredRendererPreference=" + toString(config.rendererPreference));
+
     bool shouldAttemptTerminalHost = false;
 
     switch (config.hostPreference)
@@ -294,6 +311,15 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
         break;
     }
 
+    addTraceEntry(
+        diagnosticsContext,
+        RendererSelectionStage::HostPreferenceEvaluation,
+        "Inspected requested host vs detected host",
+        std::string("requestedHost=") + toString(diagnosticsContext.requestedHost) +
+        ", actualHost=" + toString(diagnosticsContext.actualHost) +
+        ", launchedByWtFlag=" + (launchedByWtFlag ? "true" : "false") +
+        ", wtSessionHint=" + (hostInfo.windowsTerminalSessionHint ? "true" : "false"));
+
     const bool alreadyInsideRequestedTerminalHost =
         launchedByWtFlag ||
         hostInfo.windowsTerminalSessionHint ||
@@ -303,13 +329,49 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     {
         diagnosticsContext.relaunchAttempted = true;
 
+        addTraceEntry(
+            diagnosticsContext,
+            RendererSelectionStage::RelaunchDecision,
+            "Attempting relaunch into Windows Terminal",
+            std::string("requestedHost=") + toString(diagnosticsContext.requestedHost));
+
         if (tryRelaunchInWindowsTerminal())
         {
             diagnosticsContext.relaunchPerformed = true;
             decision.relaunchPerformed = true;
+
+            addTraceEntry(
+                diagnosticsContext,
+                RendererSelectionStage::RelaunchDecision,
+                "Relaunch into Windows Terminal succeeded",
+                "Startup will exit so the relaunched process can continue.");
+
+            addTraceEntry(
+                diagnosticsContext,
+                RendererSelectionStage::FinalSelection,
+                "Startup selection finalized",
+                std::string("host=") + toString(TerminalHostKind::WindowsTerminal) +
+                ", renderer=" + toString(RendererKind::Unknown) +
+                ", relaunchPerformed=true");
+
             decision.diagnosticsContext = diagnosticsContext;
             return decision;
         }
+
+        addTraceEntry(
+            diagnosticsContext,
+            RendererSelectionStage::RelaunchDecision,
+            "Relaunch attempt failed or was declined by the environment",
+            "Startup continues in the current host because the Windows Terminal relaunch did not complete.");
+    }
+    else
+    {
+        addTraceEntry(
+            diagnosticsContext,
+            RendererSelectionStage::RelaunchDecision,
+            "No relaunch was needed",
+            std::string("shouldAttemptTerminalHost=") + (shouldAttemptTerminalHost ? "true" : "false") +
+            ", alreadyInsideRequestedTerminalHost=" + (alreadyInsideRequestedTerminalHost ? "true" : "false"));
     }
 
     switch (config.rendererPreference)
@@ -318,12 +380,26 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
         decision.rendererSelection = StartupRendererSelection::Console;
         diagnosticsContext.requestedRenderer = RendererKind::ConsoleRenderer;
         diagnosticsContext.actualRenderer = RendererKind::ConsoleRenderer;
+
+        addTraceEntry(
+            diagnosticsContext,
+            RendererSelectionStage::RendererPreferenceEvaluation,
+            "Renderer preference resolved to Console",
+            std::string("requestedRenderer=") + toString(diagnosticsContext.requestedRenderer) +
+            ", actualRenderer=" + toString(diagnosticsContext.actualRenderer));
         break;
 
     case StartupRendererPreference::Terminal:
         decision.rendererSelection = StartupRendererSelection::Terminal;
         diagnosticsContext.requestedRenderer = RendererKind::TerminalRenderer;
         diagnosticsContext.actualRenderer = RendererKind::TerminalRenderer;
+
+        addTraceEntry(
+            diagnosticsContext,
+            RendererSelectionStage::RendererPreferenceEvaluation,
+            "Renderer preference resolved to Terminal",
+            std::string("requestedRenderer=") + toString(diagnosticsContext.requestedRenderer) +
+            ", actualRenderer=" + toString(diagnosticsContext.actualRenderer));
         break;
 
     case StartupRendererPreference::Auto:
@@ -333,16 +409,40 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
             decision.rendererSelection = StartupRendererSelection::Terminal;
             diagnosticsContext.requestedRenderer = RendererKind::TerminalRenderer;
             diagnosticsContext.actualRenderer = RendererKind::TerminalRenderer;
+
+            addTraceEntry(
+                diagnosticsContext,
+                RendererSelectionStage::RendererPreferenceEvaluation,
+                "Renderer preference resolved to Terminal",
+                std::string("requestedRenderer=") + toString(diagnosticsContext.requestedRenderer) +
+                ", actualRenderer=" + toString(diagnosticsContext.actualRenderer) +
+                ", prefersTerminalRenderer=true");
         }
         else
         {
             decision.rendererSelection = StartupRendererSelection::Console;
             diagnosticsContext.requestedRenderer = RendererKind::ConsoleRenderer;
             diagnosticsContext.actualRenderer = RendererKind::ConsoleRenderer;
+
+            addTraceEntry(
+                diagnosticsContext,
+                RendererSelectionStage::RendererPreferenceEvaluation,
+                "Renderer preference resolved to Console",
+                std::string("requestedRenderer=") + toString(diagnosticsContext.requestedRenderer) +
+                ", actualRenderer=" + toString(diagnosticsContext.actualRenderer) +
+                ", prefersTerminalRenderer=false");
         }
 
         break;
     }
+
+    addTraceEntry(
+        diagnosticsContext,
+        RendererSelectionStage::FinalSelection,
+        "Startup selection finalized",
+        std::string("host=") + toString(diagnosticsContext.actualHost) +
+        ", renderer=" + toString(diagnosticsContext.actualRenderer) +
+        ", relaunchPerformed=" + (diagnosticsContext.relaunchPerformed ? "true" : "false"));
 
     decision.diagnosticsContext = diagnosticsContext;
     return decision;

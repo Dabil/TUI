@@ -49,3 +49,8 @@ void RenderDiagnostics::resetRuntimeData()
 {
     m_report.clearRuntimeData();
 }
+
+bool RenderDiagnostics::hasRecordedData() const
+{
+    return m_report.hasRuntimeData() || m_report.rendererSelectionTrace().hasEntries();
+}

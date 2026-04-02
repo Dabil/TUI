@@ -38,6 +38,7 @@ public:
     const CapabilityReport& report() const;
 
     void resetRuntimeData();
+    bool hasRecordedData() const;
 
 private:
     bool m_enabled = false;

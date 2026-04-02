@@ -151,6 +151,46 @@ namespace
             << ", policy=" << featurePolicyText(report, feature)
             << "\n";
     }
+
+    void writeSelectionTrace(std::ofstream& out, const RendererSelectionTrace& trace)
+    {
+        if (!trace.hasEntries())
+        {
+            out << "No renderer selection trace was recorded.\n";
+            return;
+        }
+
+        for (const RendererSelectionTraceEntry& entry : trace.entries())
+        {
+            out
+                << "["
+                << RendererSelectionTrace::toString(entry.stage)
+                << "] decision=" << entry.decision
+                << ", detail=" << entry.detail
+                << "\n";
+        }
+    }
+
+    void writeFeatureOutcomeSummary(std::ofstream& out, const CapabilityReport& report, StyleFeature feature)
+    {
+        const std::size_t direct = report.getCount(feature, StyleAdaptationKind::Direct);
+        const std::size_t approximated = report.getCount(feature, StyleAdaptationKind::Approximated);
+        const std::size_t downgraded = report.getCount(feature, StyleAdaptationKind::Downgraded);
+        const std::size_t emulated = report.getCount(feature, StyleAdaptationKind::Emulated);
+        const std::size_t omitted = report.getCount(feature, StyleAdaptationKind::Omitted);
+        const std::size_t logicalOnly = report.getCount(feature, StyleAdaptationKind::LogicalOnly);
+
+        out
+            << CapabilityReport::toString(feature)
+            << ": emitted-direct=" << direct
+            << ", emitted-approximated=" << approximated
+            << ", emitted-downgraded=" << downgraded
+            << ", emulated=" << emulated
+            << ", omitted=" << omitted
+            << ", logical-only=" << logicalOnly
+            << "\n";
+    }
+
 }
 
 bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
@@ -198,6 +238,11 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "Launcher relaunch performed: " << (backendState.relaunchPerformed ? "true" : "false") << "\n";
     out << "Launched-by-WT flag present: " << (backendState.launchedByWindowsTerminalFlag ? "true" : "false") << "\n";
     out << "WT_SESSION hint present: " << (backendState.windowsTerminalSessionHint ? "true" : "false") << "\n\n";
+
+    out << "Renderer Selection Trace\n";
+    out << "------------------------\n";
+    writeSelectionTrace(out, report.rendererSelectionTrace());
+    out << "\n";
 
     out << "Backend Activation State\n";
     out << "------------------------\n";
@@ -330,6 +375,30 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
         out << "No runtime adaptation events were recorded.\n";
     }
 
+    out << "\n";
+
+    out << "Observed Output Feature Outcomes\n";
+    out << "--------------------------------\n";
+    writeFeatureOutcomeSummary(out, report, StyleFeature::ForegroundColor);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::BackgroundColor);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::Bold);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::Dim);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::Underline);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::SlowBlink);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::FastBlink);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::Reverse);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::Invisible);
+    writeFeatureOutcomeSummary(out, report, StyleFeature::Strike);
+    out << "\n";
+
+    out << "Totals By Outcome Kind\n";
+    out << "----------------------\n";
+    out << "Direct: " << report.getTotalCount(StyleAdaptationKind::Direct) << "\n";
+    out << "Downgraded: " << report.getTotalCount(StyleAdaptationKind::Downgraded) << "\n";
+    out << "Approximated: " << report.getTotalCount(StyleAdaptationKind::Approximated) << "\n";
+    out << "Emulated: " << report.getTotalCount(StyleAdaptationKind::Emulated) << "\n";
+    out << "Omitted: " << report.getTotalCount(StyleAdaptationKind::Omitted) << "\n";
+    out << "LogicalOnly: " << report.getTotalCount(StyleAdaptationKind::LogicalOnly) << "\n";
     out << "\n";
 
     out << "Color Adaptation Decisions\n";
