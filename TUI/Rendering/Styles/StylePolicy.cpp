@@ -42,14 +42,28 @@ ResolvedStyle StylePolicy::resolve(const Style& style) const
     ResolvedStyle result;
     result.presentedStyle = style;
 
-    if (result.presentedStyle.hasForegroundColorValue())
+    if (style.hasForegroundColorValue())
     {
-        const std::optional<Color> resolved =
-            resolveAuthoredColor(result.presentedStyle.foregroundColorValue());
+        const Style::StyleColorValue& authoredColor = *style.foregroundColorValue();
+        const std::optional<ColorSupport> support =
+            selectColorSupportForAuthoredColor(authoredColor);
 
-        if (resolved.has_value())
+        if (support.has_value())
         {
-            result.presentedStyle = result.presentedStyle.withForeground(*resolved);
+            result.foregroundColorDiagnostics =
+                ColorResolver::resolveWithDiagnostics(authoredColor, *support);
+        }
+        else
+        {
+            result.foregroundColorDiagnostics =
+                ColorResolver::omittedByPolicy(authoredColor);
+        }
+
+        if (result.foregroundColorDiagnostics->resolvedColor.has_value())
+        {
+            result.presentedStyle =
+                result.presentedStyle.withForeground(
+                    *result.foregroundColorDiagnostics->resolvedColor);
         }
         else
         {
@@ -57,14 +71,28 @@ ResolvedStyle StylePolicy::resolve(const Style& style) const
         }
     }
 
-    if (result.presentedStyle.hasBackgroundColorValue())
+    if (style.hasBackgroundColorValue())
     {
-        const std::optional<Color> resolved =
-            resolveAuthoredColor(result.presentedStyle.backgroundColorValue());
+        const Style::StyleColorValue& authoredColor = *style.backgroundColorValue();
+        const std::optional<ColorSupport> support =
+            selectColorSupportForAuthoredColor(authoredColor);
 
-        if (resolved.has_value())
+        if (support.has_value())
         {
-            result.presentedStyle = result.presentedStyle.withBackground(*resolved);
+            result.backgroundColorDiagnostics =
+                ColorResolver::resolveWithDiagnostics(authoredColor, *support);
+        }
+        else
+        {
+            result.backgroundColorDiagnostics =
+                ColorResolver::omittedByPolicy(authoredColor);
+        }
+
+        if (result.backgroundColorDiagnostics->resolvedColor.has_value())
+        {
+            result.presentedStyle =
+                result.presentedStyle.withBackground(
+                    *result.backgroundColorDiagnostics->resolvedColor);
         }
         else
         {
@@ -273,25 +301,6 @@ StylePolicy StylePolicy::withFastBlinkMode(BlinkRenderMode mode) const
     return copy;
 }
 
-std::optional<Color> StylePolicy::resolveAuthoredColor(
-    const std::optional<Style::StyleColorValue>& authoredColor) const
-{
-    if (!authoredColor.has_value())
-    {
-        return std::nullopt;
-    }
-
-    const std::optional<ColorSupport> support =
-        selectColorSupportForAuthoredColor(*authoredColor);
-
-    if (!support.has_value())
-    {
-        return std::nullopt;
-    }
-
-    return ColorResolver::resolve(*authoredColor, *support);
-}
-
 std::optional<ColorSupport> StylePolicy::selectColorSupportForAuthoredColor(
     const Style::StyleColorValue& authoredColor) const
 {
@@ -337,13 +346,6 @@ std::optional<ColorSupport> StylePolicy::selectColorSupportForConcreteColor(
 std::optional<ColorSupport> StylePolicy::selectColorSupportForThemeColor(
     const ThemeColor& themeColor) const
 {
-    /*
-        ThemeColor resolution priority must remain:
-            RGB -> Indexed -> Basic
-
-        Policy selection follows that same authored-preference order.
-    */
-
     if (themeColor.hasRgb())
     {
         return supportFromMode(m_trueColorColorMode, ColorSupport::Rgb24);

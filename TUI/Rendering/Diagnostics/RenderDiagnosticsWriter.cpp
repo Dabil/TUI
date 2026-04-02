@@ -332,6 +332,43 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
 
     out << "\n";
 
+    out << "Color Adaptation Decisions\n";
+    out << "--------------------------\n";
+
+    if (report.colorAdaptationExamples().empty())
+    {
+        out << "No color adaptation examples recorded.\n";
+    }
+    else
+    {
+        for (const ColorAdaptationExample& example : report.colorAdaptationExamples())
+        {
+            out
+                << "["
+                << CapabilityReport::toString(example.feature)
+                << " / "
+                << CapabilityReport::toString(example.kind)
+                << "] authored=" << CapabilityReport::formatAuthoredColor(example.authoredColor)
+                << ", supported tier=" << CapabilityReport::toString(example.supportedTier)
+                << ", resolved=";
+
+            if (example.resolvedColor.has_value())
+            {
+                out << CapabilityReport::formatColor(*example.resolvedColor);
+            }
+            else
+            {
+                out << "Omitted";
+            }
+
+            out
+                << ", reason=" << CapabilityReport::toString(example.reason)
+                << "\n";
+        }
+    }
+
+    out << "\n";
+
     out << "Tri-State Logical Style Examples\n";
     out << "--------------------------------\n";
     out << "Legend: Unspecified = field absent in authored style, ExplicitlyEnabled = field authored true, ExplicitlyDisabled = field authored false.\n";
@@ -411,7 +448,7 @@ bool RenderDiagnosticsWriter::write(const RenderDiagnostics& diagnostics)
     out << "- Host selection and renderer selection are reported separately on purpose.\n";
     out << "- VT enablement/availability and active renderer path are reported separately on purpose.\n";
     out << "- Output differences between authored style and visible result may be caused by downgrade, omission, approximation, or deferred emulation.\n";
-    out << "- Direct rendering can now increase when the backend capability/policy pair safely permits maximal feature use.\n";
+    out << "- Color adaptation reasons are reported from ColorResolver decisions rather than recreated in the renderer.\n";
     out << "- Bright basic color capability describes palette/intensity color presentation, not bold or dim text semantics.\n";
     out << "- Author-facing hints are advisory only and do not change rendering behavior.\n";
 

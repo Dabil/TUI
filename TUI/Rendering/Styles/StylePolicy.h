@@ -4,6 +4,7 @@
 
 #include "Rendering/Capabilities/ColorSupport.h"
 #include "Rendering/Styles/Color.h"
+#include "Rendering/Styles/ColorResolutionDiagnostics.h"
 #include "Rendering/Styles/Style.h"
 
 enum class ColorRenderMode
@@ -33,6 +34,9 @@ struct ResolvedStyle
     Style presentedStyle;
     bool emulateSlowBlink = false;
     bool emulateFastBlink = false;
+
+    std::optional<ColorResolutionDiagnostics> foregroundColorDiagnostics;
+    std::optional<ColorResolutionDiagnostics> backgroundColorDiagnostics;
 };
 
 class StylePolicy
@@ -77,9 +81,6 @@ public:
     StylePolicy withFastBlinkMode(BlinkRenderMode mode) const;
 
 private:
-    std::optional<Color> resolveAuthoredColor(
-        const std::optional<Style::StyleColorValue>& authoredColor) const;
-
     std::optional<ColorSupport> selectColorSupportForAuthoredColor(
         const Style::StyleColorValue& authoredColor) const;
 

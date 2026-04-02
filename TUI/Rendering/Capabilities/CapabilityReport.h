@@ -1,10 +1,12 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
 #include "Rendering/Capabilities/RendererCapabilities.h"
+#include "Rendering/Styles/ColorResolutionDiagnostics.h"
 #include "Rendering/Styles/StylePolicy.h"
 
 enum class StyleAdaptationKind
@@ -58,6 +60,16 @@ struct StyleLogicalStateExample
     StyleFeature feature = StyleFeature::ForegroundColor;
     LogicalStyleValueState logicalState = LogicalStyleValueState::Unspecified;
     std::string detail;
+};
+
+struct ColorAdaptationExample
+{
+    StyleFeature feature = StyleFeature::ForegroundColor;
+    StyleAdaptationKind kind = StyleAdaptationKind::Direct;
+    ColorSupport supportedTier = ColorSupport::None;
+    ColorAdaptationReason reason = ColorAdaptationReason::OmittedNoColorSupport;
+    Style::StyleColorValue authoredColor;
+    std::optional<Color> resolvedColor;
 };
 
 struct BackendStateSnapshot
@@ -125,11 +137,17 @@ public:
         LogicalStyleValueState logicalState,
         const std::string& detail);
 
+    void addColorAdaptationExample(
+        StyleFeature feature,
+        StyleAdaptationKind kind,
+        const ColorResolutionDiagnostics& diagnostics);
+
     std::size_t getCount(StyleFeature feature, StyleAdaptationKind kind) const;
 
     const std::vector<StyleAdaptationCounter>& counters() const;
     const std::vector<StyleAdaptationExample>& examples() const;
     const std::vector<StyleLogicalStateExample>& logicalStateExamples() const;
+    const std::vector<ColorAdaptationExample>& colorAdaptationExamples() const;
 
     void clearRuntimeData();
     bool hasRuntimeData() const;
@@ -142,6 +160,10 @@ public:
     static const char* toString(StyleFeature feature);
     static const char* toString(StyleAdaptationKind kind);
     static const char* toString(LogicalStyleValueState state);
+    static const char* toString(ColorAdaptationReason reason);
+
+    static std::string formatColor(const Color& color);
+    static std::string formatAuthoredColor(const Style::StyleColorValue& colorValue);
 
 private:
     void increment(StyleFeature feature, StyleAdaptationKind kind);
@@ -154,4 +176,5 @@ private:
     std::vector<StyleAdaptationCounter> m_counters;
     std::vector<StyleAdaptationExample> m_examples;
     std::vector<StyleLogicalStateExample> m_logicalStateExamples;
+    std::vector<ColorAdaptationExample> m_colorAdaptationExamples;
 };

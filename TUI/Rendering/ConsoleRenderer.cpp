@@ -1192,6 +1192,7 @@ void ConsoleRenderer::flushDiagnosticsReport() const
     (void)wroteSuccessfully;
 }
 
+
 void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle)
 {
     if (!m_renderDiagnostics.isEnabled())
@@ -1201,21 +1202,13 @@ void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const Resolve
 
     const Style& presentedStyle = resolvedStyle.presentedStyle;
 
-    const std::optional<Color> authoredForeground =
-        ColorResolver::resolve(authoredStyle.foregroundColorValue(), ColorSupport::Rgb24);
-
-    const std::optional<Color> authoredBackground =
-        ColorResolver::resolve(authoredStyle.backgroundColorValue(), ColorSupport::Rgb24);
-
     recordColorFeature(
         StyleFeature::ForegroundColor,
-        authoredForeground,
-        presentedStyle.foreground());
+        resolvedStyle.foregroundColorDiagnostics);
 
     recordColorFeature(
         StyleFeature::BackgroundColor,
-        authoredBackground,
-        presentedStyle.background());
+        resolvedStyle.backgroundColorDiagnostics);
 
     recordTextFeature(
         StyleFeature::Bold,
@@ -1276,32 +1269,54 @@ void ConsoleRenderer::recordStyleUsage(const Style& authoredStyle, const Resolve
 
 void ConsoleRenderer::recordColorFeature(
     StyleFeature feature,
-    const std::optional<Color>& authoredColor,
-    const std::optional<Color>& presentedColor)
+    const std::optional<ColorResolutionDiagnostics>& diagnostics)
 {
-    if (!authoredColor.has_value())
+    if (!diagnostics.has_value())
     {
         return;
     }
 
     CapabilityReport& report = m_renderDiagnostics.report();
+    const std::optional<Color>& presentedColor = diagnostics->resolvedColor;
 
-    if (!presentedColor.has_value())
+    if (diagnostics->wasOmitted())
     {
         report.recordOmitted(feature);
 
         if (shouldCaptureExample(report, feature, StyleAdaptationKind::Omitted))
         {
+            report.addColorAdaptationExample(
+                feature,
+                StyleAdaptationKind::Omitted,
+                *diagnostics);
+
             report.addExample(
                 feature,
                 StyleAdaptationKind::Omitted,
-                buildColorExampleDetail("Color omitted", authoredColor, presentedColor));
+                "Color omitted after resolver/policy adaptation.");
         }
 
         return;
     }
 
-    if (*presentedColor == *authoredColor)
+    if (diagnostics->wasDowngraded())
+    {
+        report.recordDowngraded(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Downgraded))
+        {
+            report.addColorAdaptationExample(
+                feature,
+                StyleAdaptationKind::Downgraded,
+                *diagnostics);
+
+            report.addExample(
+                feature,
+                StyleAdaptationKind::Downgraded,
+                "Color downgraded by resolver according to supported tier.");
+        }
+    }
+    else
     {
         if (!rendererPhysicallyRendersColor(presentedColor))
         {
@@ -1309,48 +1324,32 @@ void ConsoleRenderer::recordColorFeature(
 
             if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
             {
+                report.addColorAdaptationExample(
+                    feature,
+                    StyleAdaptationKind::LogicalOnly,
+                    *diagnostics);
+
                 report.addExample(
                     feature,
                     StyleAdaptationKind::LogicalOnly,
-                    buildColorExampleDetail("Color preserved logically but not mapped by Win32 attributes", authoredColor, presentedColor));
+                    "Resolved color remained logical-only on the active Win32 attribute path.");
             }
         }
         else
         {
             report.recordDirect(feature);
-        }
 
-        return;
-    }
-
-    const bool tierChanged = authoredColor->kind() != presentedColor->kind();
-
-    if (tierChanged)
-    {
-        report.recordDowngraded(feature);
-
-        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Downgraded))
-        {
-            report.addExample(
-                feature,
-                StyleAdaptationKind::Downgraded,
-                buildColorExampleDetail("Color downgraded", authoredColor, presentedColor));
-        }
-    }
-    else
-    {
-        report.recordApproximated(feature);
-
-        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Approximated))
-        {
-            report.addExample(
-                feature,
-                StyleAdaptationKind::Approximated,
-                buildColorExampleDetail("Color approximated", authoredColor, presentedColor));
+            if (shouldCaptureExample(report, feature, StyleAdaptationKind::Direct))
+            {
+                report.addColorAdaptationExample(
+                    feature,
+                    StyleAdaptationKind::Direct,
+                    *diagnostics);
+            }
         }
     }
 
-    if (!rendererPhysicallyRendersColor(presentedColor))
+    if (presentedColor.has_value() && !rendererPhysicallyRendersColor(presentedColor))
     {
         report.recordLogicalOnly(feature);
 
@@ -1359,7 +1358,7 @@ void ConsoleRenderer::recordColorFeature(
             report.addExample(
                 feature,
                 StyleAdaptationKind::LogicalOnly,
-                buildColorExampleDetail("Presented color remained non-basic and is not directly emitted by the Win32 attribute path", authoredColor, presentedColor));
+                "Presented color is resolved but not directly emitted by the Win32 attribute path.");
         }
     }
 }
