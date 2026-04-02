@@ -867,7 +867,6 @@ VtRun TerminalRenderer::buildRun(
     VtRun run;
     run.y = y;
     run.xStart = xStart;
-    run.authoredStyle = authoredStyle;
     run.presentedStyle = resolved.presentedStyle;
 
     std::u32string runText;
@@ -1203,13 +1202,11 @@ void TerminalRenderer::recordStyleUsage(const Style& authoredStyle, const Resolv
 
     recordColorFeature(
         StyleFeature::ForegroundColor,
-        authoredStyle.foreground(),
-        presentedStyle.foreground());
+        resolvedStyle.foregroundColorDiagnostics);
 
     recordColorFeature(
         StyleFeature::BackgroundColor,
-        authoredStyle.background(),
-        presentedStyle.background());
+        resolvedStyle.backgroundColorDiagnostics);
 
     recordTextFeature(
         StyleFeature::Bold,
@@ -1270,78 +1267,84 @@ void TerminalRenderer::recordStyleUsage(const Style& authoredStyle, const Resolv
 
 void TerminalRenderer::recordColorFeature(
     StyleFeature feature,
-    const std::optional<Color>& authoredColor,
-    const std::optional<Color>& presentedColor)
+    const std::optional<ColorResolutionDiagnostics>& diagnostics)
 {
-    if (!authoredColor.has_value())
+    if (!diagnostics.has_value())
     {
         return;
     }
 
     CapabilityReport& report = m_renderDiagnostics.report();
+    const std::optional<Color>& presentedColor = diagnostics->resolvedColor;
 
-    if (!presentedColor.has_value())
+    if (diagnostics->wasOmitted())
     {
         report.recordOmitted(feature);
 
         if (shouldCaptureExample(report, feature, StyleAdaptationKind::Omitted))
         {
+            report.addColorAdaptationExample(
+                feature,
+                StyleAdaptationKind::Omitted,
+                *diagnostics);
+
             report.addExample(
                 feature,
                 StyleAdaptationKind::Omitted,
-                buildColorExampleDetail("Color omitted", authoredColor, presentedColor));
+                "Color omitted after resolver/policy adaptation.");
         }
 
         return;
     }
 
-    if (*presentedColor == *authoredColor)
-    {
-        if (!rendererPhysicallyRendersColor(presentedColor))
-        {
-            report.recordLogicalOnly(feature);
-
-            if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
-            {
-                report.addExample(
-                    feature,
-                    StyleAdaptationKind::LogicalOnly,
-                    buildColorExampleDetail("Color preserved logically but not emitted by the terminal output path", authoredColor, presentedColor));
-            }
-        }
-        else
-        {
-            report.recordDirect(feature);
-        }
-
-        return;
-    }
-
-    const bool tierChanged = authoredColor->kind() != presentedColor->kind();
-
-    if (tierChanged)
+    if (diagnostics->wasDowngraded())
     {
         report.recordDowngraded(feature);
 
         if (shouldCaptureExample(report, feature, StyleAdaptationKind::Downgraded))
         {
+            report.addColorAdaptationExample(
+                feature,
+                StyleAdaptationKind::Downgraded,
+                *diagnostics);
+
             report.addExample(
                 feature,
                 StyleAdaptationKind::Downgraded,
-                buildColorExampleDetail("Color downgraded", authoredColor, presentedColor));
+                "Color downgraded by resolver according to supported tier.");
         }
-    }
-    else
-    {
-        report.recordApproximated(feature);
 
-        if (shouldCaptureExample(report, feature, StyleAdaptationKind::Approximated))
+        return;
+    }
+
+    if (!rendererPhysicallyRendersColor(presentedColor))
+    {
+        report.recordLogicalOnly(feature);
+
+        if (shouldCaptureExample(report, feature, StyleAdaptationKind::LogicalOnly))
         {
+            report.addColorAdaptationExample(
+                feature,
+                StyleAdaptationKind::LogicalOnly,
+                *diagnostics);
+
             report.addExample(
                 feature,
-                StyleAdaptationKind::Approximated,
-                buildColorExampleDetail("Color approximated", authoredColor, presentedColor));
+                StyleAdaptationKind::LogicalOnly,
+                "Resolved color remained logical-only on the active VT emission path.");
         }
+
+        return;
+    }
+
+    report.recordDirect(feature);
+
+    if (shouldCaptureExample(report, feature, StyleAdaptationKind::Direct))
+    {
+        report.addColorAdaptationExample(
+            feature,
+            StyleAdaptationKind::Direct,
+            *diagnostics);
     }
 }
 

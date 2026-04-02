@@ -97,8 +97,7 @@ private:
     void recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle);
     void recordColorFeature(
         StyleFeature feature,
-        const std::optional<Color>& authoredColor,
-        const std::optional<Color>& presentedColor);
+        const std::optional<ColorResolutionDiagnostics>& diagnostics);
     void recordTextFeature(
         StyleFeature feature,
         const Style::AttributeState& authoredState,
@@ -111,13 +110,13 @@ private:
         bool presentedEnabled,
         bool emulated,
         bool physicallyRendered);
-
-    bool shouldForceFullPresentForBlink(const ScreenBuffer& frame);
     void recordPresentPerformance(
         const TerminalPresentDecision& decision,
         const TerminalPresentMetrics& metrics,
         const VtFrameEmitterStats& emitterStats,
         bool skippedPresent);
+
+    bool shouldForceFullPresentForBlink(const ScreenBuffer& frame);
     void collectBlinkEmulationUsage(
         const ScreenBuffer& frame,
         bool& usesSlowBlinkEmulation,
