@@ -16,7 +16,7 @@
 
 /*
 * New Frame emission flow
-* 
+*
 ScreenBuffer
   -> FrameDiff::diffRows(previous, current)
   -> dirty spans per row
@@ -913,6 +913,7 @@ bool TerminalRenderer::configureTerminal()
             m_haveOriginalInputMode);
 
     m_capabilities = detection.capabilities;
+    m_sgrEmitter.setCapabilities(m_capabilities);
 
     m_virtualTerminalEnabled = detection.virtualTerminalWasEnabled;
     m_virtualTerminalEnableAttempted = detection.virtualTerminalEnableAttempted;

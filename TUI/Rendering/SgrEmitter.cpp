@@ -14,13 +14,20 @@
         - never looks at ThemeColor, authored semantics, or downgrade policy
         - assumes incoming Style is already fully resolved
 
-    Its responsibilities are intentionally narrow:
+    Additional Phase 3 responsibility:
+        - respect the already-detected backend color tier when physically
+          emitting VT color opcodes
+        - never invent a downgrade path
+        - simply omit unsupported richer color channels from physical emission
+
+    Its responsibilities remain intentionally narrow:
+        - setCapabilities(...)
         - reset()
         - currentStyle()
         - appendTransitionTo(out, targetStyle)
         - appendReset(out)
 
-    The main improvement is that style removal no longer forces ESC[0m + full rebuild. 
+    The main improvement is that style removal no longer forces ESC[0m + full rebuild.
     Instead, it emits only the needed reset codes:
         - foreground off - 39
         - background off - 49
@@ -92,6 +99,41 @@ namespace
         }
     }
 
+    bool supportsColor(const RendererCapabilities& capabilities, const Color& color)
+    {
+        if (color.isDefault())
+        {
+            return true;
+        }
+
+        if (color.isBasic16())
+        {
+            if (!capabilities.supportsBasicColors())
+            {
+                return false;
+            }
+
+            if (color.isBrightBasic() && !capabilities.supportsBrightBasicColors())
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (color.isIndexed256())
+        {
+            return capabilities.supportsIndexed256Colors();
+        }
+
+        if (color.isRgb())
+        {
+            return capabilities.supportsRgb24();
+        }
+
+        return false;
+    }
+
     void appendForeground(std::string& out, const Color& color)
     {
         if (color.isDefault())
@@ -100,7 +142,7 @@ namespace
             return;
         }
 
-        if (color.isBasic())
+        if (color.isBasic16())
         {
             appendBasicForeground(out, color.basic());
             return;
@@ -114,7 +156,7 @@ namespace
             return;
         }
 
-        if (color.isTrueColor())
+        if (color.isRgb())
         {
             appendCode(out, 38);
             appendCode(out, 2);
@@ -133,7 +175,7 @@ namespace
             return;
         }
 
-        if (color.isBasic())
+        if (color.isBasic16())
         {
             appendBasicBackground(out, color.basic());
             return;
@@ -147,7 +189,7 @@ namespace
             return;
         }
 
-        if (color.isTrueColor())
+        if (color.isRgb())
         {
             appendCode(out, 48);
             appendCode(out, 2);
@@ -164,6 +206,11 @@ namespace
     }
 }
 
+void SgrEmitter::setCapabilities(const RendererCapabilities& capabilities)
+{
+    m_capabilities = capabilities;
+}
+
 void SgrEmitter::reset()
 {
     m_currentStyle = Style{};
@@ -176,19 +223,38 @@ const Style& SgrEmitter::currentStyle() const
 
 void SgrEmitter::appendTransitionTo(std::string& out, const Style& targetStyle)
 {
-    if (targetStyle == m_currentStyle)
+    const Style sanitizedTargetStyle = sanitizeForEmission(targetStyle);
+
+    if (sanitizedTargetStyle == m_currentStyle)
     {
         return;
     }
 
-    appendDeltaStyle(out, targetStyle);
-    m_currentStyle = targetStyle;
+    appendDeltaStyle(out, sanitizedTargetStyle);
+    m_currentStyle = sanitizedTargetStyle;
 }
 
 void SgrEmitter::appendReset(std::string& out)
 {
     out += "\x1b[0m";
     m_currentStyle = Style{};
+}
+
+Style SgrEmitter::sanitizeForEmission(const Style& style) const
+{
+    Style sanitized = style;
+
+    if (sanitized.hasForeground() && !supportsColor(m_capabilities, *sanitized.foreground()))
+    {
+        sanitized = sanitized.withoutForeground();
+    }
+
+    if (sanitized.hasBackground() && !supportsColor(m_capabilities, *sanitized.background()))
+    {
+        sanitized = sanitized.withoutBackground();
+    }
+
+    return sanitized;
 }
 
 void SgrEmitter::appendFullStyle(std::string& out, const Style& style) const
