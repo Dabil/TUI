@@ -4,37 +4,6 @@
 #include "Rendering/Styles/StyleBuilder.h"
 
 /*
-
-keep theme files very simple:
-
-each theme namespace returns plain logical Style 
-values themes are semantic, not transport-specific
-page code asks for things like 
-
-UIThemes::DialogTitle()
-BannerThemes::WarningBanner() 
-
-instead of hardcoding color/attribute combinations 
-everywhere. renderer/backend limitations are 
-handled later by policy/capability code, not inside themes
-
-This preserves the older “named theme” authoring feel 
-while fitting the new backend-agnostic architecture cleanly.
-
-A good follow-up cleanup would be to either retire 
-Rendering/Styles/Themes.h entirely, or turn it into a 
-compatibility header that just includes these three 
-new headers 
-
-- AppThemes.h
-- UIThemes.h
-- BannerThemes.h
-
-so older call sites keep compiling.
-
-*/
-
-/*
     Can also create styles like this:
 
     inline Style PanelTitle()
@@ -56,17 +25,28 @@ namespace Themes
     // Base surfaces / page backgrounds
     // =========================================================
 
-    
-    inline const Style Background =
-        style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-        + style::Bg(Color::FromBasic(Color::Basic::Black));
-    
-
-    // examples of how to declare colors in the new color system
-    // won't be active till phase 4
-    /*
     inline const Style Background =
           style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Black),
+            Color::FromIndexed(0),
+            Color::FromRgb(0, 0, 0)));
+
+    inline const Style Window =
+        style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Blue),
+            Color::FromIndexed(4),
+            Color::FromRgb(0, 0, 128)));
+
+    inline const Style Panel =
+        style::Fg(ThemeColor::Basic256Rgb(
             Color::FromBasic(Color::Basic::BrightWhite),
             Color::FromIndexed(15),
             Color::FromRgb(255, 255, 255)))
@@ -74,65 +54,86 @@ namespace Themes
             Color::FromBasic(Color::Basic::Black),
             Color::FromIndexed(0),
             Color::FromRgb(0, 0, 0)));
-    */
-
-    inline const Style Window =
-        style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-        + style::Bg(Color::FromBasic(Color::Basic::Blue));
-
-    inline const Style Panel =
-        style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-        + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style AccentSurface =
-        style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+        style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Blue),
+            Color::FromIndexed(4),
+            Color::FromRgb(0, 0, 128)));
 
     inline const Style RetroTerminal =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightGreen))
-        + style::Bg(Color::FromBasic(Color::Basic::Black));
-
-    inline const Style PanelTitle = 
-          style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightGreen),
+            Color::FromIndexed(10),
+            Color::FromRgb(0, 255, 0)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Black),
+            Color::FromIndexed(0),
+            Color::FromRgb(0, 0, 0)));
 
     // =========================================================
     // Neutral UI text styles
     // =========================================================
+    // When using Foreground only styles, make sure you are 
+    // placing the glyphs on a cell where the background is 
+    // already owned. (ie a cell where the background has already
+    // been directly specified) 
+
+    inline const Style PanelTitle =
+        style::Bold
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)));
 
     inline const Style Text =
-        style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
+        style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)));
 
     inline const Style MutedText =
         style::Dim
-        + style::Fg(Color::FromBasic(Color::Basic::White));
- 
-    inline const Style Frame =
-        style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
- 
-    /*
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(7),
+            Color::FromRgb(192, 192, 192)));
+
     inline const Style Frame =
         style::Fg(ThemeColor::Basic256Rgb(
             Color::FromBasic(Color::Basic::White),
             Color::FromIndexed(7),
             Color::FromRgb(192, 192, 192)));
-    */
 
     inline const Style Focused =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightYellow));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightYellow),
+            Color::FromIndexed(11),
+            Color::FromRgb(255, 255, 0)));
 
     inline const Style Selected =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::Black))
-        + style::Bg(Color::FromBasic(Color::Basic::BrightWhite));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Black),
+            Color::FromIndexed(0),
+            Color::FromRgb(0, 0, 0)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)));
 
     inline const Style Disabled =
         style::Dim
-        + style::Fg(Color::FromBasic(Color::Basic::White));
-
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(7),
+            Color::FromRgb(192, 192, 192)));
 
     // =========================================================
     // Titles / headings / labels
@@ -140,34 +141,39 @@ namespace Themes
 
     inline const Style Title =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightCyan),
+            Color::FromIndexed(14),
+            Color::FromRgb(0, 255, 255)));
 
     inline const Style TitleShadow =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightBlack));
-    
-    inline const Style Subtitle =
-        style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite));
-    
-    /*
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightBlack),
+            Color::FromIndexed(8),
+            Color::FromRgb(128, 128, 128)));
+
     inline const Style Subtitle =
         style::Bold
         + style::Fg(ThemeColor::Basic256Rgb(
             Color::FromBasic(Color::Basic::BrightWhite),
             Color::FromIndexed(15),
             Color::FromRgb(255, 255, 255)));
-    */
 
     inline const Style SectionHeader =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightYellow));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightYellow),
+            Color::FromIndexed(11),
+            Color::FromRgb(255, 255, 0)));
 
     inline const Style Emphasis =
         style::Bold
         + style::Underline
-        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
-
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightCyan),
+            Color::FromIndexed(14),
+            Color::FromRgb(0, 255, 255)));
 
     // =========================================================
     // Informational / feedback / status styles
@@ -175,11 +181,17 @@ namespace Themes
 
     inline const Style Info =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightCyan),
+            Color::FromIndexed(14),
+            Color::FromRgb(0, 255, 255)));
 
     inline const Style Success =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightGreen));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightGreen),
+            Color::FromIndexed(10),
+            Color::FromRgb(0, 255, 0)));
 
     inline const Style Warning =
         style::Bold
@@ -195,25 +207,48 @@ namespace Themes
     inline const Style Danger =
         style::Bold
         + style::FastBlink
-        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
-        + style::Bg(Color::FromBasic(Color::Basic::Red));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightWhite),
+            Color::FromIndexed(15),
+            Color::FromRgb(255, 255, 255)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Red),
+            Color::FromIndexed(1),
+            Color::FromRgb(128, 0, 0)));
 
-    inline const Style Highlight =
+    inline const Style Hightlight =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::Black))
-        + style::Bg(Color::FromBasic(Color::Basic::BrightYellow));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::Black),
+            Color::FromIndexed(0),
+            Color::FromRgb(0, 0, 0)))
+        + style::Bg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightYellow),
+            Color::FromIndexed(11),
+            Color::FromRgb(255, 255, 0)));
+
 
     inline const Style Dimmed =
         style::Dim
-        + style::Fg(Color::FromBasic(Color::Basic::White));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(7),
+            Color::FromRgb(192, 192, 192)));
 
     inline const Style SlowBlink =
-          style::SlowBlink
-        + style::Fg(Color::FromBasic(Color::Basic::White));
+        style::SlowBlink
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(7),
+            Color::FromRgb(192, 192, 192)));
+
 
     inline const Style FastBlink =
         style::FastBlink
-        + style::Fg(Color::FromBasic(Color::Basic::White));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::White),
+            Color::FromIndexed(7),
+            Color::FromRgb(192, 192, 192)));
 
     // =========================================================
     // Generic framework demo / object styles
@@ -221,13 +256,22 @@ namespace Themes
 
     inline const Style Accent =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightMagenta));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightMagenta),
+            Color::FromIndexed(13),
+            Color::FromRgb(255, 0, 255)));
 
     inline const Style DemoObject =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightGreen));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightGreen),
+            Color::FromIndexed(10),
+            Color::FromRgb(0, 255, 0)));
 
     inline const Style DemoObjectAlt =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightCyan));
+        + style::Fg(ThemeColor::Basic256Rgb(
+            Color::FromBasic(Color::Basic::BrightCyan),
+            Color::FromIndexed(14),
+            Color::FromRgb(0, 255, 255)));
 }
