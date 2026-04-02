@@ -8,6 +8,7 @@
 #include "Rendering/Capabilities/RendererCapabilities.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
+#include "Rendering/Styles/ColorResolutionDiagnostics.h"
 #include "Rendering/FrameDiff.h"
 #include "Rendering/IRenderer.h"
 #include "Rendering/ScreenBuffer.h"
@@ -73,8 +74,7 @@ private:
     void recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle);
     void recordColorFeature(
         StyleFeature feature,
-        const std::optional<Color>& authoredColor,
-        const std::optional<Color>& presentedColor);
+        const std::optional<ColorResolutionDiagnostics>& diagnostics);
     void recordTextFeature(
         StyleFeature feature,
         const Style::AttributeState& authoredState,

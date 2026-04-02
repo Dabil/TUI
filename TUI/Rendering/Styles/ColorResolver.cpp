@@ -2,18 +2,46 @@
 
 #include "Rendering/Styles/ColorMapping.h"
 
+namespace
+{
+    ColorResolutionDiagnostics makeOmitted(
+        const Style::StyleColorValue& authoredColor,
+        ColorSupport support,
+        ColorAdaptationReason reason)
+    {
+        ColorResolutionDiagnostics diagnostics;
+        diagnostics.authoredColor = authoredColor;
+        diagnostics.supportedTier = support;
+        diagnostics.reason = reason;
+        diagnostics.resolvedColor.reset();
+        return diagnostics;
+    }
+
+    ColorResolutionDiagnostics makeResolved(
+        const Style::StyleColorValue& authoredColor,
+        ColorSupport support,
+        const Color& resolvedColor,
+        ColorAdaptationReason reason)
+    {
+        ColorResolutionDiagnostics diagnostics;
+        diagnostics.authoredColor = authoredColor;
+        diagnostics.supportedTier = support;
+        diagnostics.resolvedColor = resolvedColor;
+        diagnostics.reason = reason;
+        return diagnostics;
+    }
+}
+
 Color ColorResolver::resolve(
     const Style::StyleColorValue& authoredColor,
     ColorSupport support)
 {
-    if (authoredColor.hasConcreteColor())
-    {
-        return resolveConcreteColor(*authoredColor.concreteColor(), support);
-    }
+    const ColorResolutionDiagnostics diagnostics =
+        resolveWithDiagnostics(authoredColor, support);
 
-    if (authoredColor.hasThemeColor())
+    if (diagnostics.resolvedColor.has_value())
     {
-        return resolveThemeColor(*authoredColor.themeColor(), support);
+        return *diagnostics.resolvedColor;
     }
 
     return Color::Default();
@@ -28,7 +56,10 @@ std::optional<Color> ColorResolver::resolve(
         return std::nullopt;
     }
 
-    return resolve(*authoredColor, support);
+    const ColorResolutionDiagnostics diagnostics =
+        resolveWithDiagnostics(*authoredColor, support);
+
+    return diagnostics.resolvedColor;
 }
 
 Color ColorResolver::resolveConcreteColor(
@@ -61,28 +92,208 @@ Color ColorResolver::resolveThemeColor(
     }
 }
 
+ColorResolutionDiagnostics ColorResolver::resolveWithDiagnostics(
+    const Style::StyleColorValue& authoredColor,
+    ColorSupport support)
+{
+    if (support == ColorSupport::None)
+    {
+        return makeOmitted(
+            authoredColor,
+            support,
+            ColorAdaptationReason::OmittedNoColorSupport);
+    }
+
+    if (authoredColor.hasConcreteColor())
+    {
+        const Color& color = *authoredColor.concreteColor();
+
+        if (color.isBasic16())
+        {
+            return makeResolved(
+                authoredColor,
+                support,
+                ColorMapping::mapToSupport(color, support),
+                ColorAdaptationReason::ConcreteBasicUsedDirect);
+        }
+
+        if (color.isIndexed256())
+        {
+            if (support >= ColorSupport::Indexed256)
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    ColorMapping::mapToSupport(color, support),
+                    ColorAdaptationReason::ConcreteIndexedUsedDirect);
+            }
+
+            return makeResolved(
+                authoredColor,
+                support,
+                ColorMapping::indexedToBasic(color),
+                ColorAdaptationReason::ConcreteIndexedDowngradedToBasic16);
+        }
+
+        if (color.isRgb())
+        {
+            if (support >= ColorSupport::Rgb24)
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    color,
+                    ColorAdaptationReason::ConcreteRgbUsedDirect);
+            }
+
+            if (support >= ColorSupport::Indexed256)
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    ColorMapping::rgbToIndexed(color),
+                    ColorAdaptationReason::ConcreteRgbDowngradedToIndexed256);
+            }
+
+            return makeResolved(
+                authoredColor,
+                support,
+                ColorMapping::rgbToBasic(color),
+                ColorAdaptationReason::ConcreteRgbDowngradedToBasic16);
+        }
+
+        return makeResolved(
+            authoredColor,
+            support,
+            ColorMapping::mapToSupport(color, support),
+            ColorAdaptationReason::ConcreteBasicUsedDirect);
+    }
+
+    if (authoredColor.hasThemeColor())
+    {
+        const ThemeColor& themeColor = *authoredColor.themeColor();
+
+        switch (support)
+        {
+        case ColorSupport::Basic16:
+            if (themeColor.hasRgb())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    ColorMapping::rgbToBasic(*themeColor.rgb()),
+                    ColorAdaptationReason::ThemeRgbDowngradedToBasic16);
+            }
+
+            if (themeColor.hasIndexed())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    ColorMapping::indexedToBasic(*themeColor.indexed()),
+                    ColorAdaptationReason::ThemeIndexedDowngradedToBasic16);
+            }
+
+            if (themeColor.hasBasic())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    *themeColor.basic(),
+                    ColorAdaptationReason::ThemeBasicUsedDirect);
+            }
+
+            break;
+
+        case ColorSupport::Indexed256:
+            if (themeColor.hasRgb())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    ColorMapping::rgbToIndexed(*themeColor.rgb()),
+                    ColorAdaptationReason::ThemeRgbDowngradedToIndexed256);
+            }
+
+            if (themeColor.hasIndexed())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    *themeColor.indexed(),
+                    ColorAdaptationReason::ThemeIndexedUsedDirect);
+            }
+
+            if (themeColor.hasBasic())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    *themeColor.basic(),
+                    ColorAdaptationReason::ThemeBasicUsedDirect);
+            }
+
+            break;
+
+        case ColorSupport::Rgb24:
+            if (themeColor.hasRgb())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    *themeColor.rgb(),
+                    ColorAdaptationReason::ThemeRgbUsedDirect);
+            }
+
+            if (themeColor.hasIndexed())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    *themeColor.indexed(),
+                    ColorAdaptationReason::ThemeIndexedUsedDirect);
+            }
+
+            if (themeColor.hasBasic())
+            {
+                return makeResolved(
+                    authoredColor,
+                    support,
+                    *themeColor.basic(),
+                    ColorAdaptationReason::ThemeBasicUsedDirect);
+            }
+
+            break;
+
+        case ColorSupport::None:
+        default:
+            break;
+        }
+    }
+
+    return makeOmitted(
+        authoredColor,
+        support,
+        ColorAdaptationReason::OmittedNoColorSupport);
+}
+
+ColorResolutionDiagnostics ColorResolver::omittedByPolicy(
+    const Style::StyleColorValue& authoredColor)
+{
+    return makeOmitted(
+        authoredColor,
+        ColorSupport::None,
+        ColorAdaptationReason::OmittedByPolicy);
+}
+
 Color ColorResolver::resolveThemeColorForNone(const ThemeColor& themeColor)
 {
-    /*
-        No backend color support means authored color intent cannot be presented.
-        Returning Default keeps the result concrete while remaining policy-neutral.
-    */
     (void)themeColor;
     return Color::Default();
 }
 
 Color ColorResolver::resolveThemeColorForBasic16(const ThemeColor& themeColor)
 {
-    /*
-        Required resolution order:
-            RGB -> Indexed -> Basic
-
-        For a Basic16 backend:
-            RGB      -> downgrade to Basic16
-            Indexed  -> downgrade to Basic16
-            Basic    -> direct
-    */
-
     if (themeColor.hasRgb())
     {
         return ColorMapping::rgbToBasic(*themeColor.rgb());
@@ -103,16 +314,6 @@ Color ColorResolver::resolveThemeColorForBasic16(const ThemeColor& themeColor)
 
 Color ColorResolver::resolveThemeColorForIndexed256(const ThemeColor& themeColor)
 {
-    /*
-        Required resolution order:
-            RGB -> Indexed -> Basic
-
-        For an Indexed256 backend:
-            RGB      -> downgrade to Indexed256
-            Indexed  -> direct
-            Basic    -> direct
-    */
-
     if (themeColor.hasRgb())
     {
         return ColorMapping::rgbToIndexed(*themeColor.rgb());
@@ -133,19 +334,6 @@ Color ColorResolver::resolveThemeColorForIndexed256(const ThemeColor& themeColor
 
 Color ColorResolver::resolveThemeColorForRgb24(const ThemeColor& themeColor)
 {
-    /*
-        Required resolution order:
-            RGB -> Indexed -> Basic
-
-        For an Rgb24 backend:
-            RGB      -> direct
-            Indexed  -> direct
-            Basic    -> direct
-
-        Do not invent richer values here. Use the richest authored value that
-        actually exists, but do not up-convert Basic/Indexed into synthetic RGB.
-    */
-
     if (themeColor.hasRgb())
     {
         return *themeColor.rgb();

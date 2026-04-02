@@ -1,5 +1,34 @@
 #include "Rendering/Capabilities/CapabilityReport.h"
 
+#include <sstream>
+
+namespace
+{
+    const char* basicColorName(Color::Basic color)
+    {
+        switch (color)
+        {
+        case Color::Basic::Black:         return "Black";
+        case Color::Basic::Red:           return "Red";
+        case Color::Basic::Green:         return "Green";
+        case Color::Basic::Yellow:        return "Yellow";
+        case Color::Basic::Blue:          return "Blue";
+        case Color::Basic::Magenta:       return "Magenta";
+        case Color::Basic::Cyan:          return "Cyan";
+        case Color::Basic::White:         return "White";
+        case Color::Basic::BrightBlack:   return "BrightBlack";
+        case Color::Basic::BrightRed:     return "BrightRed";
+        case Color::Basic::BrightGreen:   return "BrightGreen";
+        case Color::Basic::BrightYellow:  return "BrightYellow";
+        case Color::Basic::BrightBlue:    return "BrightBlue";
+        case Color::Basic::BrightMagenta: return "BrightMagenta";
+        case Color::Basic::BrightCyan:    return "BrightCyan";
+        case Color::Basic::BrightWhite:   return "BrightWhite";
+        default:                          return "UnknownBasic";
+        }
+    }
+}
+
 CapabilityReport::CapabilityReport()
 {
     const StyleFeature features[] =
@@ -125,6 +154,21 @@ void CapabilityReport::addLogicalStateExample(
     m_logicalStateExamples.push_back(example);
 }
 
+void CapabilityReport::addColorAdaptationExample(
+    StyleFeature feature,
+    StyleAdaptationKind kind,
+    const ColorResolutionDiagnostics& diagnostics)
+{
+    ColorAdaptationExample example;
+    example.feature = feature;
+    example.kind = kind;
+    example.supportedTier = diagnostics.supportedTier;
+    example.reason = diagnostics.reason;
+    example.authoredColor = diagnostics.authoredColor;
+    example.resolvedColor = diagnostics.resolvedColor;
+    m_colorAdaptationExamples.push_back(example);
+}
+
 std::size_t CapabilityReport::getCount(StyleFeature feature, StyleAdaptationKind kind) const
 {
     for (const StyleAdaptationCounter& counter : m_counters)
@@ -153,6 +197,11 @@ const std::vector<StyleLogicalStateExample>& CapabilityReport::logicalStateExamp
     return m_logicalStateExamples;
 }
 
+const std::vector<ColorAdaptationExample>& CapabilityReport::colorAdaptationExamples() const
+{
+    return m_colorAdaptationExamples;
+}
+
 void CapabilityReport::clearRuntimeData()
 {
     for (StyleAdaptationCounter& counter : m_counters)
@@ -162,6 +211,7 @@ void CapabilityReport::clearRuntimeData()
 
     m_examples.clear();
     m_logicalStateExamples.clear();
+    m_colorAdaptationExamples.clear();
 }
 
 bool CapabilityReport::hasRuntimeData() const
@@ -174,7 +224,9 @@ bool CapabilityReport::hasRuntimeData() const
         }
     }
 
-    return !m_examples.empty() || !m_logicalStateExamples.empty();
+    return !m_examples.empty()
+        || !m_logicalStateExamples.empty()
+        || !m_colorAdaptationExamples.empty();
 }
 
 const char* CapabilityReport::toString(ColorSupport support)
@@ -358,6 +410,95 @@ const char* CapabilityReport::toString(LogicalStyleValueState state)
     default:
         return "Unknown";
     }
+}
+
+const char* CapabilityReport::toString(ColorAdaptationReason reason)
+{
+    return ColorResolutionDiagnostics::toString(reason);
+}
+
+std::string CapabilityReport::formatColor(const Color& color)
+{
+    std::ostringstream stream;
+
+    if (color.isDefault())
+    {
+        return "Default";
+    }
+
+    if (color.isBasic16())
+    {
+        stream << "Basic16(" << basicColorName(color.basic()) << ")";
+        return stream.str();
+    }
+
+    if (color.isIndexed256())
+    {
+        stream << "Indexed256(" << static_cast<int>(color.index256()) << ")";
+        return stream.str();
+    }
+
+    if (color.isRgb())
+    {
+        stream
+            << "Rgb24("
+            << static_cast<int>(color.red()) << ","
+            << static_cast<int>(color.green()) << ","
+            << static_cast<int>(color.blue()) << ")";
+        return stream.str();
+    }
+
+    return "UnknownColor";
+}
+
+std::string CapabilityReport::formatAuthoredColor(const Style::StyleColorValue& colorValue)
+{
+    if (colorValue.hasConcreteColor())
+    {
+        return std::string("Concrete ") + formatColor(*colorValue.concreteColor());
+    }
+
+    if (colorValue.hasThemeColor())
+    {
+        const ThemeColor& themeColor = *colorValue.themeColor();
+
+        std::ostringstream stream;
+        stream << "ThemeColor(";
+
+        bool wroteAny = false;
+
+        if (themeColor.hasBasic())
+        {
+            stream << "basic=" << formatColor(*themeColor.basic());
+            wroteAny = true;
+        }
+
+        if (themeColor.hasIndexed())
+        {
+            if (wroteAny)
+            {
+                stream << ", ";
+            }
+
+            stream << "indexed=" << formatColor(*themeColor.indexed());
+            wroteAny = true;
+        }
+
+        if (themeColor.hasRgb())
+        {
+            if (wroteAny)
+            {
+                stream << ", ";
+            }
+
+            stream << "rgb=" << formatColor(*themeColor.rgb());
+        }
+
+        stream << ")";
+        return stream.str();
+    }
+
+    return "Unspecified";
 }
 
 void CapabilityReport::increment(StyleFeature feature, StyleAdaptationKind kind)
