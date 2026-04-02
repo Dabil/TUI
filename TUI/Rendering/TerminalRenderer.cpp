@@ -533,7 +533,6 @@ bool TerminalRenderer::initialize()
 
     m_sgrEmitter.reset();
     m_firstPresent = true;
-    m_initialized = true;
 
     m_blinkEpoch = std::chrono::steady_clock::now();
     m_lastSlowBlinkVisibilityState = true;
@@ -542,6 +541,13 @@ bool TerminalRenderer::initialize()
 
     clearScreen();
     writeRaw("\x1b[?25l");
+    if (!enterTerminalSession())
+    {
+        restoreTerminalState();
+        return false;
+    }
+
+    m_initialized = true;
 
     flushDiagnosticsReport();
 
@@ -556,6 +562,7 @@ void TerminalRenderer::shutdown()
     }
 
     flushDiagnosticsReport();
+    leaveTerminalSession();
     resetStyle();
     writeRaw("\x1b[?25h");
     restoreTerminalState();
@@ -563,6 +570,10 @@ void TerminalRenderer::shutdown()
     m_initialized = false;
     m_firstPresent = true;
     m_sgrEmitter.reset();
+
+    m_terminalSessionActive = false;
+    m_alternateScreenActive = false;
+    m_cursorHiddenBySession = false;
 
     m_lastSlowBlinkVisibilityState = true;
     m_lastFastBlinkVisibilityState = true;
@@ -732,6 +743,21 @@ void TerminalRenderer::setStartupDiagnosticsContext(const StartupDiagnosticsCont
 bool TerminalRenderer::diagnosticsAppendMode() const
 {
     return m_renderDiagnostics.appendMode();
+}
+
+void TerminalRenderer::setSessionOptions(const TerminalSessionOptions& options)
+{
+    if (m_initialized)
+    {
+        return;
+    }
+
+    m_sessionOptions = options;
+}
+
+const TerminalSessionOptions& TerminalRenderer::sessionOptions() const
+{
+    return m_sessionOptions;
 }
 
 RenderDiagnostics& TerminalRenderer::diagnostics()
@@ -997,6 +1023,92 @@ void TerminalRenderer::restoreTerminalState()
     {
         SetConsoleCP(m_originalInputCodePage);
     }
+}
+
+bool TerminalRenderer::enterTerminalSession()
+{
+    if (m_terminalSessionActive)
+    {
+        return true;
+    }
+
+    std::string sequence;
+
+    if (m_sessionOptions.useAlternateScreen)
+    {
+        sequence += "\x1b[?1049h";
+        m_alternateScreenActive = true;
+    }
+
+    if (m_sessionOptions.clearScreenOnEnter)
+    {
+        sequence += "\x1b[2J";
+    }
+
+    if (m_sessionOptions.homeCursorOnEnter)
+    {
+        sequence += "\x1b[H";
+    }
+
+    if (m_sessionOptions.hideCursor)
+    {
+        sequence += "\x1b[?25l";
+        m_cursorHiddenBySession = true;
+    }
+
+    writeRaw(sequence);
+
+    m_sgrEmitter.reset();
+    m_terminalSessionActive = true;
+    m_firstPresent = true;
+
+    return true;
+}
+
+void TerminalRenderer::leaveTerminalSession()
+{
+    if (!m_terminalSessionActive)
+    {
+        return;
+    }
+
+    std::string sequence;
+
+    if (m_sessionOptions.resetStyleOnExit)
+    {
+        m_sgrEmitter.appendReset(sequence);
+    }
+
+    if (m_sessionOptions.restoreCursorVisibilityOnExit)
+    {
+        sequence += "\x1b[?25h";
+    }
+    else if (!m_cursorWasVisible && m_cursorHiddenBySession)
+    {
+        sequence += "\x1b[?25l";
+    }
+
+    if (m_sessionOptions.clearScreenOnExit)
+    {
+        sequence += "\x1b[2J";
+    }
+
+    if (m_sessionOptions.homeCursorOnExit)
+    {
+        sequence += "\x1b[H";
+    }
+
+    if (m_alternateScreenActive)
+    {
+        sequence += "\x1b[?1049l";
+    }
+
+    writeRaw(sequence);
+
+    m_terminalSessionActive = false;
+    m_alternateScreenActive = false;
+    m_cursorHiddenBySession = false;
+    m_sgrEmitter.reset();
 }
 
 void TerminalRenderer::initializeDiagnosticsState()
