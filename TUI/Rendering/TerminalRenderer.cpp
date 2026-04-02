@@ -987,15 +987,16 @@ void TerminalRenderer::initializeDiagnosticsState()
     backendState.virtualTerminalProcessingActive = m_virtualTerminalEnableSucceeded;
     backendState.activeRenderPathUsesVirtualTerminalOutput = true;
 
-    backendState.configuredOutputMode = 0;
-    backendState.configuredInputMode = 0;
-    backendState.hasConfiguredOutputMode = false;
-    backendState.hasConfiguredInputMode = false;
+    backendState.configuredOutputMode = m_configuredOutputMode;
+    backendState.configuredInputMode = m_configuredInputMode;
+    backendState.hasConfiguredOutputMode = m_haveConfiguredOutputMode;
+    backendState.hasConfiguredInputMode = m_haveConfiguredInputMode;
 
     CapabilityReport& report = m_renderDiagnostics.report();
     report.setCapabilities(m_capabilities);
     report.setPolicy(m_stylePolicy);
     report.setBackendState(backendState);
+    report.setRendererSelectionTrace(m_startupDiagnostics.selectionTrace);
 }
 
 void TerminalRenderer::flushDiagnosticsReport() const
