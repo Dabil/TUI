@@ -130,8 +130,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="App\Application.h" />
+    <ClInclude Include="App\CommandLineOptions.h" />
     <ClInclude Include="App\ScreenManager.h" />
     <ClInclude Include="App\StartupConfig.h" />
+    <ClInclude Include="App\StartupOptions.h" />
     <ClInclude Include="App\TerminalLauncher.h" />
     <ClInclude Include="Core\Enums.h" />
     <ClInclude Include="Core\Point.h" />
@@ -204,8 +206,10 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="App\Application.cpp" />
+    <ClCompile Include="App\CommandLineOptions.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
     <ClCompile Include="App\StartupConfig.cpp" />
+    <ClCompile Include="App\StartupOptions.cpp" />
     <ClCompile Include="App\TerminalLauncher.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\Backends\ConsoleCapabilityDetector.cpp" />

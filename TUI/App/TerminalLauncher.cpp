@@ -189,6 +189,19 @@ namespace
         }
     }
 
+    std::string narrowAscii(const std::wstring& value)
+    {
+        std::string result;
+        result.reserve(value.size());
+
+        for (wchar_t ch : value)
+        {
+            result.push_back(ch >= 0 && ch <= 0x7F ? static_cast<char>(ch) : '?');
+        }
+
+        return result;
+    }
+
     void addTraceEntry(
         StartupDiagnosticsContext& diagnosticsContext,
         RendererSelectionStage stage,
@@ -196,6 +209,19 @@ namespace
         const std::string& detail)
     {
         diagnosticsContext.selectionTrace.addEntry(stage, decision, detail);
+    }
+
+    std::string describeCommandLinePreference(
+        const CommandLineOptions& commandLineOptions,
+        bool hasPreference,
+        const char* valueText)
+    {
+        if (!hasPreference)
+        {
+            return "not provided";
+        }
+
+        return valueText;
     }
 }
 
@@ -254,7 +280,7 @@ bool TerminalLauncher::tryRelaunchInWindowsTerminal()
     return true;
 }
 
-StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& config)
+StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupOptions& options)
 {
     StartupLaunchDecision decision{};
 
@@ -273,11 +299,11 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     const TerminalHostInfo hostInfo = TerminalHostInfoDetector::detectCurrentHostInfo();
 
     StartupDiagnosticsContext diagnosticsContext;
-    diagnosticsContext.configuredHostPreference = config.hostPreference;
-    diagnosticsContext.configuredRendererPreference = config.rendererPreference;
-    diagnosticsContext.startupConfigFileFound = config.configFileFound;
+    diagnosticsContext.configuredHostPreference = options.configuredHostPreference;
+    diagnosticsContext.configuredRendererPreference = options.configuredRendererPreference;
+    diagnosticsContext.startupConfigFileFound = options.startupConfigFileFound;
     diagnosticsContext.startupConfigSource = "startup.config";
-    diagnosticsContext.requestedHost = toRequestedHost(config.hostPreference);
+    diagnosticsContext.requestedHost = toRequestedHost(options.hostPreference);
     diagnosticsContext.actualHost = hostInfo.hostKind;
     diagnosticsContext.launchedByWindowsTerminalFlag = launchedByWtFlag;
     diagnosticsContext.windowsTerminalSessionHint = hostInfo.windowsTerminalSessionHint;
@@ -285,14 +311,46 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     addTraceEntry(
         diagnosticsContext,
         RendererSelectionStage::StartupConfiguration,
-        "Captured startup configuration",
-        std::string("configFileFound=") + (config.configFileFound ? "true" : "false") +
-        ", configuredHostPreference=" + toString(config.hostPreference) +
-        ", configuredRendererPreference=" + toString(config.rendererPreference));
+        "Captured startup sources",
+        std::string("configFileFound=") + (options.startupConfigFileFound ? "true" : "false") +
+        ", configHost=" + toString(options.configuredHostPreference) +
+        ", configRenderer=" + toString(options.configuredRendererPreference) +
+        ", configValidation=" + toString(options.configuredValidationScreenPreference));
+
+    addTraceEntry(
+        diagnosticsContext,
+        RendererSelectionStage::StartupConfiguration,
+        "Applied startup precedence",
+        std::string("effectiveHost=") + toString(options.hostPreference) +
+        " (" + toString(options.hostPreferenceSource) + ")" +
+        ", effectiveRenderer=" + toString(options.rendererPreference) +
+        " (" + toString(options.rendererPreferenceSource) + ")" +
+        ", effectiveValidation=" + toString(options.validationScreenPreference) +
+        " (" + toString(options.validationScreenPreferenceSource) + ")");
+
+    if (!options.commandLineOptions.invalidArguments.empty())
+    {
+        std::string detail = "invalid=";
+        for (std::size_t i = 0; i < options.commandLineOptions.invalidArguments.size(); ++i)
+        {
+            if (i > 0)
+            {
+                detail += ", ";
+            }
+
+            detail += narrowAscii(options.commandLineOptions.invalidArguments[i]);
+        }
+
+        addTraceEntry(
+            diagnosticsContext,
+            RendererSelectionStage::StartupConfiguration,
+            "Ignored invalid command-line arguments",
+            detail);
+    }
 
     bool shouldAttemptTerminalHost = false;
 
-    switch (config.hostPreference)
+    switch (options.hostPreference)
     {
     case StartupHostPreference::Console:
         shouldAttemptTerminalHost = false;
@@ -374,7 +432,7 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
             ", alreadyInsideRequestedTerminalHost=" + (alreadyInsideRequestedTerminalHost ? "true" : "false"));
     }
 
-    switch (config.rendererPreference)
+    switch (options.rendererPreference)
     {
     case StartupRendererPreference::Console:
         decision.rendererSelection = StartupRendererSelection::Console;
@@ -439,9 +497,9 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     addTraceEntry(
         diagnosticsContext,
         RendererSelectionStage::FinalSelection,
-        "Startup selection finalized",
+        "Launcher startup selection finalized",
         std::string("host=") + toString(diagnosticsContext.actualHost) +
-        ", renderer=" + toString(diagnosticsContext.actualRenderer) +
+        ", requestedRenderer=" + toString(diagnosticsContext.requestedRenderer) +
         ", relaunchPerformed=" + (diagnosticsContext.relaunchPerformed ? "true" : "false"));
 
     decision.diagnosticsContext = diagnosticsContext;

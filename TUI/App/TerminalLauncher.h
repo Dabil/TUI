@@ -1,6 +1,6 @@
 #pragma once
 
-#include "App/StartupConfig.h"
+#include "App/StartupOptions.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 
 enum class StartupRendererSelection
@@ -19,7 +19,7 @@ struct StartupLaunchDecision
 class TerminalLauncher
 {
 public:
-    static StartupLaunchDecision prepareStartup(const StartupConfig& config);
+    static StartupLaunchDecision prepareStartup(const StartupOptions& options);
 
 private:
     static bool tryRelaunchInWindowsTerminal();

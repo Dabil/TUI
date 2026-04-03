@@ -40,3 +40,16 @@ public:
 private:
     static std::wstring getStartupConfigPath();
 };
+
+inline const char* toString(StartupValidationScreenPreference preference)
+{
+    switch (preference)
+    {
+    case StartupValidationScreenPreference::ValidationStartTrue:
+        return "True";
+
+    case StartupValidationScreenPreference::ValidationStartFalse:
+    default:
+        return "False";
+    }
+}
