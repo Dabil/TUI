@@ -32,6 +32,11 @@ public:
     TerminalRenderer();
     ~TerminalRenderer() override;
 
+    const RenderDiagnostics* renderDiagnostics() const override
+    {
+        return &m_renderDiagnostics;
+    }
+
     bool initialize() override;
     void shutdown() override;
 

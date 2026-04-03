@@ -13,6 +13,8 @@
 #include "Screens/DigitalRainScreen.h"
 #include "Screens/Donut3DScreen.h"
 #include "Screens/FireScreen.h"
+#include "Screens/RendererDiagnosticsScreen.h"
+#include "Screens/TerminalCapabilitiesScreen.h"
 #include "Screens/WaterEffectScreen.h"
 
 static Application* g_appInstance = nullptr;
@@ -213,6 +215,14 @@ void Application::switchToScreen(ScreenType screenType)
     case ScreenType::Fire:
         m_screenManager->pushScreen(std::make_unique<FireScreen>());
         break;
+
+    case ScreenType::TerminalCapabilities:
+        m_screenManager->pushScreen(std::make_unique<TerminalCapabilitiesScreen>(m_renderer.get()));
+        break;
+
+    case ScreenType::RendererDiagnostics:
+        m_screenManager->pushScreen(std::make_unique<RendererDiagnosticsScreen>(m_renderer.get()));
+        break;
     }
 
     m_currentScreenType = screenType;
@@ -235,6 +245,14 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::Fire:
+        switchToScreen(ScreenType::TerminalCapabilities);
+        break;
+
+    case ScreenType::TerminalCapabilities:
+        switchToScreen(ScreenType::RendererDiagnostics);
+        break;
+
+    case ScreenType::RendererDiagnostics:
         switchToScreen(ScreenType::DigitalRain);
         break;
     }

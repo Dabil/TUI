@@ -27,7 +27,9 @@ private:
         DigitalRain,
         WaterEffect,
         Donut3D,
-        Fire
+        Fire,
+        TerminalCapabilities,
+        RendererDiagnostics
     };
 
 private:

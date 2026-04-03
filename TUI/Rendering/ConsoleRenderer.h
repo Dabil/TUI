@@ -26,6 +26,11 @@ public:
     ConsoleRenderer();
     ~ConsoleRenderer() override;
 
+    const RenderDiagnostics* renderDiagnostics() const override
+    {
+        return &m_renderDiagnostics;
+    }
+
     bool maximizeConsole();
 
     bool initialize() override;
