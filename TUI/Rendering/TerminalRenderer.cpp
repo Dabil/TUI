@@ -13,6 +13,7 @@
 #include "Rendering/SgrEmitter.h"
 #include "Rendering/VtFrameEmitter.h"
 #include "Rendering/TerminalPresentPolicy.h"
+#include "Rendering/Styles/StylePolicyFactory.h"
 #include "Rendering/VtRun.h"
 
 /*
@@ -56,59 +57,9 @@ namespace
 
     StylePolicy buildStylePolicyFromCapabilities(const RendererCapabilities& capabilities)
     {
-        StylePolicy policy = StylePolicy::PreserveIntent();
-
-        policy = policy.withBasicColorMode(
-            capabilities.supportsBasicColors()
-            ? ColorRenderMode::Direct
-            : ColorRenderMode::Omit);
-
-        policy = policy.withIndexed256ColorMode(
-            capabilities.supportsIndexed256Colors()
-            ? ColorRenderMode::Direct
-            : (capabilities.supportsBasicColors()
-                ? ColorRenderMode::DowngradeToBasic
-                : ColorRenderMode::Omit));
-
-        policy = policy.withRgbColorMode(
-            capabilities.supportsTrueColor()
-            ? ColorRenderMode::Direct
-            : (capabilities.supportsIndexed256Colors()
-                ? ColorRenderMode::DowngradeToIndexed256
-                : (capabilities.supportsBasicColors()
-                    ? ColorRenderMode::DowngradeToBasic
-                    : ColorRenderMode::Omit)));
-
-        policy = policy.withBoldMode(textAttributeModeFromSupport(capabilities.bold));
-        policy = policy.withDimMode(textAttributeModeFromSupport(capabilities.dim));
-        policy = policy.withUnderlineMode(textAttributeModeFromSupport(capabilities.underline));
-        policy = policy.withReverseMode(textAttributeModeFromSupport(capabilities.reverse));
-        policy = policy.withInvisibleMode(textAttributeModeFromSupport(capabilities.invisible));
-        policy = policy.withStrikeMode(textAttributeModeFromSupport(capabilities.strike));
-
-        const bool allowSafeFallback = capabilities.usesPreserveStyleSafeFallback();
-
-        const bool maySafelyEmulateSlowBlink =
-            capabilities.mayEmulateSlowBlink();
-
-        const bool maySafelyEmulateFastBlink =
-            capabilities.mayEmulateFastBlink();
-
-        policy = policy.withSlowBlinkMode(
-            capabilities.supportsSlowBlinkDirect()
-            ? BlinkRenderMode::Direct
-            : ((allowSafeFallback && maySafelyEmulateSlowBlink)
-                ? BlinkRenderMode::Emulate
-                : BlinkRenderMode::Omit));
-
-        policy = policy.withFastBlinkMode(
-            capabilities.supportsFastBlinkDirect()
-            ? BlinkRenderMode::Direct
-            : ((allowSafeFallback && maySafelyEmulateFastBlink)
-                ? BlinkRenderMode::Emulate
-                : BlinkRenderMode::Omit));
-
-        return policy;
+        return StylePolicyFactory::buildFromCapabilities(
+            capabilities,
+            RendererStylePolicyProfile::TerminalSequenceBackend);
     }
 
     bool isContinuationCell(const ScreenCell& cell)

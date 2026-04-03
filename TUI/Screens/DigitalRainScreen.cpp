@@ -80,7 +80,7 @@ namespace
             U"オォコソトノホモヨョロヲゴゾドボポヴッン"
             U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
             U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           //  greek alphabet 
-            U"♔♕♖♗♘♙♚♛♜♝♞♟"                // chess pieces
+         // U"♔♕♖♗♘♙♚♛♜♝♞♟"                // chess pieces
             U"♪♫⌘₿äü∄∃ƒ±£µℇ")
             + std::u32string(1, RabbitGlyph);
     }

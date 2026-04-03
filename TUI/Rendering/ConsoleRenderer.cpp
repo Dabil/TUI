@@ -11,6 +11,7 @@
 #include "Rendering/Styles/ColorResolver.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
+#include "Rendering/Styles/StylePolicyFactory.h"
 
 /*
     ConsoleRenderer is now a backend/output layer.
@@ -218,56 +219,10 @@ namespace
 
     StylePolicy buildStylePolicyFromCapabilities(const RendererCapabilities& capabilities)
     {
-        StylePolicy policy = StylePolicy::PreserveIntent();
-
-        policy = policy.withBasicColorMode(
-            capabilities.supportsBasicColors()
-            ? ColorRenderMode::Direct
-            : ColorRenderMode::Omit);
-
-        policy = policy.withIndexed256ColorMode(
-            capabilities.supportsIndexed256Colors()
-            ? ColorRenderMode::Direct
-            : (capabilities.supportsBasicColors()
-                ? ColorRenderMode::DowngradeToBasic
-                : ColorRenderMode::Omit));
-
-        policy = policy.withRgbColorMode(
-            capabilities.supportsTrueColor()
-            ? ColorRenderMode::Direct
-            : (capabilities.supportsIndexed256Colors()
-                ? ColorRenderMode::DowngradeToIndexed256
-                : (capabilities.supportsBasicColors()
-                    ? ColorRenderMode::DowngradeToBasic
-                    : ColorRenderMode::Omit)));
-
-        policy = policy.withBoldMode(textAttributeModeFromSupport(capabilities.bold));
-        policy = policy.withDimMode(textAttributeModeFromSupport(capabilities.dim));
-        policy = policy.withUnderlineMode(textAttributeModeFromSupport(capabilities.underline));
-        policy = policy.withReverseMode(textAttributeModeFromSupport(capabilities.reverse));
-        policy = policy.withInvisibleMode(textAttributeModeFromSupport(capabilities.invisible));
-        policy = policy.withStrikeMode(textAttributeModeFromSupport(capabilities.strike));
-
-        const bool allowSafeFallback = capabilities.usesPreserveStyleSafeFallback();
-
-        policy = policy.withSlowBlinkMode(
-            capabilities.supportsSlowBlinkDirect()
-            ? BlinkRenderMode::Direct
-            : ((allowSafeFallback && capabilities.mayEmulateSlowBlink())
-                ? BlinkRenderMode::Emulate
-                : BlinkRenderMode::Omit));
-
-        policy = policy.withFastBlinkMode(
-            capabilities.supportsFastBlinkDirect()
-            ? BlinkRenderMode::Direct
-            : ((allowSafeFallback && capabilities.mayEmulateFastBlink())
-                ? BlinkRenderMode::Emulate
-                : BlinkRenderMode::Omit));
-
-        return policy;
+        return StylePolicyFactory::buildFromCapabilities(
+            capabilities,
+            RendererStylePolicyProfile::ConsoleAttributeBackend);
     }
-
-
 
     WORD resolvedStyleToAttributes(const Style& style, WORD defaultAttributes)
     {
