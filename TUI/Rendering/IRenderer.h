@@ -3,6 +3,8 @@
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Text/TextTypes.h"
 
+class RenderDiagnostics;
+
 class IRenderer
 {
 public:
@@ -20,4 +22,6 @@ public:
     virtual int getConsoleHeight() const = 0;
 
     virtual TextBackendCapabilities textCapabilities() const = 0;
+
+    virtual const RenderDiagnostics* renderDiagnostics() const = 0;
 };
