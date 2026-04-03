@@ -30,7 +30,7 @@ struct StartupDiagnosticsContext
     StartupRendererPreference configuredRendererPreference = StartupRendererPreference::Auto;
 
     bool startupConfigFileFound = false;
-    std::string startupConfigSource = "startup.ini";
+    std::string startupConfigSource = "startup.config";
 
     TerminalHostKind requestedHost = TerminalHostKind::Unknown;
     TerminalHostKind actualHost = TerminalHostKind::Unknown;

@@ -16,10 +16,17 @@ enum class StartupRendererPreference
     Terminal
 };
 
+enum class StartupValidationScreenPreference
+{
+    ValidationStartFalse = 0,
+    ValidationStartTrue
+};
+
 struct StartupConfig
 {
     StartupHostPreference hostPreference = StartupHostPreference::Auto;
     StartupRendererPreference rendererPreference = StartupRendererPreference::Auto;
+    StartupValidationScreenPreference validationScreenPreference = StartupValidationScreenPreference::ValidationStartFalse;
 
     bool configFileFound = false;
     std::wstring configFilePath;
@@ -28,8 +35,8 @@ struct StartupConfig
 class StartupConfigLoader
 {
 public:
-    static StartupConfig loadFromStartupIni();
+    static StartupConfig loadFromStartupConfig();
 
 private:
-    static std::wstring getStartupIniPath();
+    static std::wstring getStartupConfigPath();
 };

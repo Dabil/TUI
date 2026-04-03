@@ -98,7 +98,7 @@ struct TerminalPresentPerformanceSnapshot
 
 struct BackendStateSnapshot
 {
-    std::string startupConfigSource = "startup.ini";
+    std::string startupConfigSource = "startup.config";
     bool startupConfigFileFound = false;
 
     std::string configuredHostPreference = "Auto";

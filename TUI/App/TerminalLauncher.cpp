@@ -276,7 +276,7 @@ StartupLaunchDecision TerminalLauncher::prepareStartup(const StartupConfig& conf
     diagnosticsContext.configuredHostPreference = config.hostPreference;
     diagnosticsContext.configuredRendererPreference = config.rendererPreference;
     diagnosticsContext.startupConfigFileFound = config.configFileFound;
-    diagnosticsContext.startupConfigSource = "startup.ini";
+    diagnosticsContext.startupConfigSource = "startup.config";
     diagnosticsContext.requestedHost = toRequestedHost(config.hostPreference);
     diagnosticsContext.actualHost = hostInfo.hostKind;
     diagnosticsContext.launchedByWindowsTerminalFlag = launchedByWtFlag;

@@ -21,8 +21,10 @@ static Application* g_appInstance = nullptr;
 
 Application::Application(
     StartupRendererSelection rendererSelection,
+    StartupValidationScreenPreference validationScreenSelection,
     const StartupDiagnosticsContext& startupDiagnostics)
     : m_rendererSelection(rendererSelection)
+    , m_validationScreenStart(validationScreenSelection)
     , m_startupDiagnostics(startupDiagnostics)
 {
 }
@@ -121,7 +123,14 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
-    m_currentScreenType = ScreenType::DigitalRain;
+    if (m_validationScreenStart == StartupValidationScreenPreference::ValidationStartTrue)
+    {
+        m_currentScreenType = ScreenType::TerminalCapabilities;
+    }
+    else
+    {
+        m_currentScreenType = ScreenType::DigitalRain;
+    }
     m_screenCycleElapsedSeconds = 0.0;
 
     switchToScreen(m_currentScreenType);
@@ -200,6 +209,14 @@ void Application::switchToScreen(ScreenType screenType)
 
     switch (screenType)
     {
+    case ScreenType::TerminalCapabilities:
+        m_screenManager->pushScreen(std::make_unique<TerminalCapabilitiesScreen>(m_renderer.get()));
+        break;
+
+    case ScreenType::RendererDiagnostics:
+        m_screenManager->pushScreen(std::make_unique<RendererDiagnosticsScreen>(m_renderer.get()));
+        break;
+
     case ScreenType::DigitalRain:
         m_screenManager->pushScreen(std::make_unique<DigitalRainScreen>());
         break;
@@ -214,14 +231,6 @@ void Application::switchToScreen(ScreenType screenType)
 
     case ScreenType::Fire:
         m_screenManager->pushScreen(std::make_unique<FireScreen>());
-        break;
-
-    case ScreenType::TerminalCapabilities:
-        m_screenManager->pushScreen(std::make_unique<TerminalCapabilitiesScreen>(m_renderer.get()));
-        break;
-
-    case ScreenType::RendererDiagnostics:
-        m_screenManager->pushScreen(std::make_unique<RendererDiagnosticsScreen>(m_renderer.get()));
         break;
     }
 
@@ -245,7 +254,7 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::Fire:
-        switchToScreen(ScreenType::TerminalCapabilities);
+        switchToScreen(ScreenType::DigitalRain);
         break;
 
     case ScreenType::TerminalCapabilities:
@@ -253,7 +262,7 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::RendererDiagnostics:
-        switchToScreen(ScreenType::DigitalRain);
+        switchToScreen(ScreenType::TerminalCapabilities);
         break;
     }
 }

@@ -75,7 +75,22 @@ namespace
         return StartupRendererPreference::Auto;
     }
 
-    std::wstring getIniString(
+    StartupValidationScreenPreference parseValidationPreference(const std::wstring& value)
+    {
+        const std::wstring normalized = toLower(trim(value));
+
+        if (normalized == L"true")
+        {
+            return StartupValidationScreenPreference::ValidationStartTrue;
+        }
+
+        if (normalized == L"false")
+        {
+            return StartupValidationScreenPreference::ValidationStartFalse;
+        }
+    }
+
+    std::wstring getConfigString(
         const std::wstring& section,
         const std::wstring& key,
         const std::wstring& defaultValue,
@@ -102,14 +117,14 @@ namespace
     }
 }
 
-std::wstring StartupConfigLoader::getStartupIniPath()
+std::wstring StartupConfigLoader::getStartupConfigPath()
 {
     wchar_t modulePath[MAX_PATH]{};
     const DWORD length = GetModuleFileNameW(nullptr, modulePath, MAX_PATH);
 
     if (length == 0 || length >= MAX_PATH)
     {
-        return L"startup.ini";
+        return L"startup.config";
     }
 
     std::wstring path(modulePath, length);
@@ -117,30 +132,34 @@ std::wstring StartupConfigLoader::getStartupIniPath()
     const std::size_t slashPos = path.find_last_of(L"\\/");
     if (slashPos == std::wstring::npos)
     {
-        return L"startup.ini";
+        return L"startup.config";
     }
 
     path.erase(slashPos + 1);
-    path += L"startup.ini";
+    path += L"startup.config";
     return path;
 }
 
-StartupConfig StartupConfigLoader::loadFromStartupIni()
+StartupConfig StartupConfigLoader::loadFromStartupConfig()
 {
     StartupConfig config{};
 
-    const std::wstring iniPath = getStartupIniPath();
-    config.configFilePath = iniPath;
-    config.configFileFound = fileExists(iniPath);
+    const std::wstring configPath = getStartupConfigPath();
+    config.configFilePath = configPath;
+    config.configFileFound = fileExists(configPath);
 
     const std::wstring hostValue =
-        getIniString(L"Startup", L"Host", L"Auto", iniPath);
+        getConfigString(L"Startup", L"Host", L"Auto", configPath);
 
     const std::wstring rendererValue =
-        getIniString(L"Startup", L"Renderer", L"Auto", iniPath);
+        getConfigString(L"Startup", L"Renderer", L"Auto", configPath);
+
+    const std::wstring validationScreenValue =
+        getConfigString(L"Startup", L"ValidationScreen", L"False", configPath);
 
     config.hostPreference = parseHostPreference(hostValue);
     config.rendererPreference = parseRendererPreference(rendererValue);
+    config.validationScreenPreference = parseValidationPreference(validationScreenValue);
 
     return config;
 }

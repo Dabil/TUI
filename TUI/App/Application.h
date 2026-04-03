@@ -14,6 +14,7 @@ class Application
 public:
     explicit Application(
         StartupRendererSelection rendererSelection,
+        StartupValidationScreenPreference validationScreenSelection,
         const StartupDiagnosticsContext& startupDiagnostics);
     ~Application();
 
@@ -24,12 +25,12 @@ public:
 private:
     enum class ScreenType
     {
+        TerminalCapabilities,
+        RendererDiagnostics,
         DigitalRain,
         WaterEffect,
         Donut3D,
-        Fire,
-        TerminalCapabilities,
-        RendererDiagnostics
+        Fire
     };
 
 private:
@@ -43,6 +44,7 @@ private:
 
 private:
     StartupRendererSelection m_rendererSelection = StartupRendererSelection::Console;
+    StartupValidationScreenPreference m_validationScreenStart = StartupValidationScreenPreference::ValidationStartFalse;
     StartupDiagnosticsContext m_startupDiagnostics{};
 
     std::unique_ptr<ScreenManager> m_screenManager;

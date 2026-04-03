@@ -334,6 +334,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="startup.ini" />
+    <None Include="startup.config" />
   </ItemGroup>
 </Project>

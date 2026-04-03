@@ -15,7 +15,7 @@ If the window is larger than the buffer, Windows will fail.
 
 int main()
 {
-    const StartupConfig startupConfig = StartupConfigLoader::loadFromStartupIni();
+    const StartupConfig startupConfig = StartupConfigLoader::loadFromStartupConfig();
     const StartupLaunchDecision launchDecision = TerminalLauncher::prepareStartup(startupConfig);
 
     if (launchDecision.relaunchPerformed)
@@ -25,6 +25,7 @@ int main()
 
     Application app(
         launchDecision.rendererSelection,
+        startupConfig.validationScreenPreference,
         launchDecision.diagnosticsContext);
 
     if (!app.initialize())

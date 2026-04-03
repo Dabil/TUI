@@ -262,7 +262,7 @@
     <ClCompile Include="Utilities\Unicode\UnicodeWidth.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="startup.ini" />
+    <None Include="startup.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
