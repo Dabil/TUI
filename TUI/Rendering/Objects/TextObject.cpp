@@ -4,6 +4,7 @@
 #include <iterator>
 #include <stdexcept>
 
+#include "Rendering/Objects/TextObjectExporter.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
@@ -125,6 +126,30 @@ bool TextObject::loadUtf8File(const std::string& filePath, const Style& style)
     *this = fromUtf8(std::string_view(bytes.data(), bytes.size()), style);
     m_loaded = true;
     return true;
+}
+
+TextObjectExporter::SaveResult TextObject::saveToFile(const std::string& filePath) const
+{
+    return TextObjectExporter::saveToFile(*this, filePath);
+}
+
+TextObjectExporter::SaveResult TextObject::saveToFile(
+    const std::string& filePath,
+    const TextObjectExporter::SaveOptions& options) const
+{
+    return TextObjectExporter::saveToFile(*this, filePath, options);
+}
+
+bool TextObject::trySaveToFile(const std::string& filePath) const
+{
+    return TextObjectExporter::trySaveToFile(*this, filePath);
+}
+
+bool TextObject::trySaveToFile(
+    const std::string& filePath,
+    const TextObjectExporter::SaveOptions& options) const
+{
+    return TextObjectExporter::trySaveToFile(*this, filePath, options);
 }
 
 void TextObject::clear()

@@ -1,9 +1,10 @@
 #include "Rendering/Objects/TextObjectExporter.h"
 
 #include <algorithm>
-#include <array>
 #include <cctype>
+#include <cstdint>
 #include <fstream>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -12,6 +13,12 @@
 
 namespace
 {
+    struct ExportCodePoint
+    {
+        char32_t value = U'\0';
+        TextObjectExporter::SourcePosition source;
+    };
+
     std::string toLowerCopy(std::string value)
     {
         std::transform(
@@ -38,7 +45,6 @@ namespace
     }
 
     TextObjectExporter::FileType resolveFileType(
-        const std::string& filePath,
         const TextObjectExporter::SaveOptions& options)
     {
         if (options.fileType != TextObjectExporter::FileType::Auto)
@@ -46,26 +52,7 @@ namespace
             return options.fileType;
         }
 
-        return TextObjectExporter::detectFileType(filePath);
-    }
-
-    TextObjectExporter::Encoding resolveEncoding(
-        TextObjectExporter::FileType fileType,
-        const TextObjectExporter::SaveOptions& options,
-        std::string& outError)
-    {
-        if (options.encoding != TextObjectExporter::Encoding::Auto)
-        {
-            return options.encoding;
-        }
-
-        if (fileType == TextObjectExporter::FileType::Nfo)
-        {
-            outError = "NFO export requires explicit encoding. Use Encoding::Cp437 or another deliberate choice.";
-            return TextObjectExporter::Encoding::Auto;
-        }
-
-        return TextObjectExporter::Encoding::Utf8;
+        return TextObjectExporter::FileType::Unknown;
     }
 
     char32_t decodeCp437Byte(unsigned char value)
@@ -96,6 +83,37 @@ namespace
         };
 
         return UnicodeConversion::sanitizeCodePoint(kCp437Table[value - 0x80]);
+    }
+
+    TextObjectExporter::Encoding resolveEncoding(
+        TextObjectExporter::FileType fileType,
+        const TextObjectExporter::SaveOptions& options,
+        std::string& outError)
+    {
+        if (fileType == TextObjectExporter::FileType::Nfo)
+        {
+            if (options.encoding == TextObjectExporter::Encoding::Auto)
+            {
+                return TextObjectExporter::Encoding::Cp437;
+            }
+
+            if (options.encoding != TextObjectExporter::Encoding::Cp437 &&
+                !options.allowNonCp437NfoEncoding)
+            {
+                outError =
+                    "NFO export only permits CP437 unless SaveOptions::allowNonCp437NfoEncoding is true.";
+                return TextObjectExporter::Encoding::Auto;
+            }
+
+            return options.encoding;
+        }
+
+        if (options.encoding != TextObjectExporter::Encoding::Auto)
+        {
+            return options.encoding;
+        }
+
+        return TextObjectExporter::Encoding::Utf8;
     }
 
     bool tryEncodeAscii(
@@ -183,90 +201,99 @@ namespace
         return true;
     }
 
-    std::u32string buildLineText(
-        const TextObject& object,
-        int row,
-        bool preserveTrailingSpaces)
-    {
-        std::u32string line;
-        line.reserve(static_cast<std::size_t>(object.getWidth()));
-
-        for (int x = 0; x < object.getWidth(); ++x)
-        {
-            const TextObjectCell& cell = object.getCell(x, row);
-
-            if (cell.kind == CellKind::WideTrailing ||
-                cell.kind == CellKind::CombiningContinuation)
-            {
-                continue;
-            }
-
-            if (cell.kind == CellKind::Empty)
-            {
-                line.push_back(U' ');
-                continue;
-            }
-
-            line.push_back(UnicodeConversion::sanitizeCodePoint(cell.glyph));
-        }
-
-        if (!preserveTrailingSpaces)
-        {
-            while (!line.empty() && line.back() == U' ')
-            {
-                line.pop_back();
-            }
-        }
-
-        return line;
-    }
-
-    std::u32string buildPlainText(
+    std::vector<ExportCodePoint> buildExportCodePoints(
         const TextObject& object,
         const TextObjectExporter::SaveOptions& options)
     {
-        std::u32string text;
+        std::vector<ExportCodePoint> result;
 
         if (!object.isLoaded())
         {
-            return text;
+            return result;
         }
 
-        const int height = object.getHeight();
-
-        for (int row = 0; row < height; ++row)
+        for (int row = 0; row < object.getHeight(); ++row)
         {
-            std::u32string line = buildLineText(object, row, options.preserveTrailingSpaces);
-            text.append(line);
+            std::size_t lineStart = result.size();
 
-            if (row + 1 < height)
+            for (int x = 0; x < object.getWidth(); ++x)
             {
-                text.push_back(U'\n');
+                const TextObjectCell& cell = object.getCell(x, row);
+
+                if (cell.kind == CellKind::WideTrailing ||
+                    cell.kind == CellKind::CombiningContinuation)
+                {
+                    continue;
+                }
+
+                ExportCodePoint item;
+                item.source.x = x;
+                item.source.y = row;
+
+                if (cell.kind == CellKind::Empty)
+                {
+                    item.value = U' ';
+                }
+                else
+                {
+                    item.value = UnicodeConversion::sanitizeCodePoint(cell.glyph);
+                }
+
+                result.push_back(item);
+            }
+
+            if (!options.preserveTrailingSpaces)
+            {
+                while (result.size() > lineStart && result.back().value == U' ')
+                {
+                    result.pop_back();
+                }
+            }
+
+            if (row + 1 < object.getHeight())
+            {
+                ExportCodePoint newline;
+                newline.value = U'\n';
+                newline.source.x = -1;
+                newline.source.y = row;
+                result.push_back(newline);
             }
         }
 
-        return text;
+        return result;
     }
 
-    bool tryEncodeText(
-        std::u32string_view text,
+    bool tryEncodeCodePoints(
+        const std::vector<ExportCodePoint>& codePoints,
         TextObjectExporter::Encoding encoding,
         const TextObjectExporter::SaveOptions& options,
         std::string& outBytes,
-        std::size_t& outLossyCount)
+        std::size_t& outLossyCount,
+        char32_t& outFirstFailingCodePoint,
+        TextObjectExporter::SourcePosition& outFirstFailingPosition)
     {
         outBytes.clear();
         outLossyCount = 0;
+        outFirstFailingCodePoint = U'\0';
+        outFirstFailingPosition = {};
 
         if (encoding == TextObjectExporter::Encoding::Utf8)
         {
+            std::u32string text;
+            text.reserve(codePoints.size());
+
+            for (const ExportCodePoint& item : codePoints)
+            {
+                text.push_back(item.value);
+            }
+
             outBytes = UnicodeConversion::u32ToUtf8(text);
             return true;
         }
 
-        outBytes.reserve(text.size());
+        outBytes.reserve(codePoints.size());
 
-        for (char32_t codePoint : text)
+        for (const ExportCodePoint& item : codePoints)
         {
             bool lossyForThisCodePoint = false;
             bool success = false;
@@ -275,7 +302,7 @@ namespace
             {
             case TextObjectExporter::Encoding::Ascii:
                 success = tryEncodeAscii(
-                    codePoint,
+                    item.value,
                     options.replacementChar,
                     options.allowLossyConversion,
                     outBytes,
@@ -284,7 +311,7 @@ namespace
 
             case TextObjectExporter::Encoding::Latin1:
                 success = tryEncodeLatin1(
-                    codePoint,
+                    item.value,
                     options.replacementChar,
                     options.allowLossyConversion,
                     outBytes,
@@ -293,7 +320,7 @@ namespace
 
             case TextObjectExporter::Encoding::Cp437:
                 success = tryEncodeCp437(
-                    codePoint,
+                    item.value,
                     options.replacementChar,
                     options.allowLossyConversion,
                     outBytes,
@@ -309,6 +336,8 @@ namespace
 
             if (!success)
             {
+                outFirstFailingCodePoint = item.value;
+                outFirstFailingPosition = item.source;
                 return false;
             }
 
@@ -347,6 +376,17 @@ namespace
 
         return result;
     }
+
+    std::string toHexCodePoint(char32_t codePoint)
+    {
+        std::ostringstream stream;
+        stream << "U+";
+        stream << std::hex << std::uppercase;
+        stream.width(4);
+        stream.fill('0');
+        stream << static_cast<std::uint32_t>(codePoint);
+        return stream.str();
+    }
 }
 
 namespace TextObjectExporter
@@ -381,9 +421,7 @@ namespace TextObjectExporter
     SaveResult exportToBytes(const TextObject& object, const SaveOptions& options)
     {
         SaveResult result;
-        result.resolvedFileType = options.fileType == FileType::Auto
-            ? FileType::Unknown
-            : options.fileType;
+        result.resolvedFileType = resolveFileType(options);
 
         if (!object.isLoaded())
         {
@@ -399,12 +437,25 @@ namespace TextObjectExporter
             return result;
         }
 
-        const std::u32string plainText = buildPlainText(object, options);
+        const std::vector<ExportCodePoint> codePoints = buildExportCodePoints(object, options);
 
         std::string encodedBytes;
         std::size_t lossyCount = 0;
-        if (!tryEncodeText(plainText, result.resolvedEncoding, options, encodedBytes, lossyCount))
+        char32_t firstFailingCodePoint = U'\0';
+        SourcePosition firstFailingPosition;
+
+        if (!tryEncodeCodePoints(
+            codePoints,
+            result.resolvedEncoding,
+            options,
+            encodedBytes,
+            lossyCount,
+            firstFailingCodePoint,
+            firstFailingPosition))
         {
+            result.hasEncodingFailure = true;
+            result.firstFailingCodePoint = firstFailingCodePoint;
+            result.firstFailingPosition = firstFailingPosition;
             result.errorMessage =
                 "Export failed because the TextObject contains code points that cannot be represented "
                 "in the selected encoding without lossy conversion.";
@@ -413,7 +464,6 @@ namespace TextObjectExporter
 
         result.hadLossyConversion = (lossyCount > 0);
         result.lossyCodePointCount = lossyCount;
-
         result.bytes = applyLineEndings(encodedBytes, options.lineEnding);
 
         if (result.resolvedEncoding == Encoding::Utf8 && options.includeUtf8Bom)
@@ -472,6 +522,46 @@ namespace TextObjectExporter
     bool trySaveToFile(const TextObject& object, const std::string& filePath, const SaveOptions& options)
     {
         return saveToFile(object, filePath, options).success;
+    }
+
+    std::string formatSaveError(const SaveResult& result)
+    {
+        if (result.success)
+        {
+            return {};
+        }
+
+        std::ostringstream message;
+
+        if (!result.errorMessage.empty())
+        {
+            message << result.errorMessage;
+        }
+        else
+        {
+            message << "TextObject export failed.";
+        }
+
+        if (result.hasEncodingFailure)
+        {
+            message << " Encoding=" << toString(result.resolvedEncoding) << ".";
+
+            if (result.firstFailingCodePoint != U'\0')
+            {
+                message << " First failing code point=" << toHexCodePoint(result.firstFailingCodePoint) << ".";
+            }
+
+            if (result.firstFailingPosition.isValid())
+            {
+                message << " Position=("
+                    << result.firstFailingPosition.x
+                    << ", "
+                    << result.firstFailingPosition.y
+                    << ").";
+            }
+        }
+
+        return message.str();
     }
 
     const char* toString(FileType fileType)

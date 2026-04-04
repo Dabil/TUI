@@ -33,6 +33,17 @@ namespace TextObjectExporter
         CrLf
     };
 
+    struct SourcePosition
+    {
+        int x = -1;
+        int y = -1;
+
+        bool isValid() const
+        {
+            return x >= 0 && y >= 0;
+        }
+    };
+
     struct SaveOptions
     {
         FileType fileType = FileType::Auto;
@@ -45,6 +56,8 @@ namespace TextObjectExporter
 
         bool allowLossyConversion = false;
         char replacementChar = '?';
+
+        bool allowNonCp437NfoEncoding = false;
     };
 
     struct SaveResult
@@ -58,6 +71,10 @@ namespace TextObjectExporter
         bool hadLossyConversion = false;
         std::size_t lossyCodePointCount = 0;
 
+        bool hasEncodingFailure = false;
+        char32_t firstFailingCodePoint = U'\0';
+        SourcePosition firstFailingPosition;
+
         std::string bytes;
         std::string errorMessage;
     };
@@ -69,6 +86,8 @@ namespace TextObjectExporter
 
     bool trySaveToFile(const TextObject& object, const std::string& filePath);
     bool trySaveToFile(const TextObject& object, const std::string& filePath, const SaveOptions& options);
+
+    std::string formatSaveError(const SaveResult& result);
 
     const char* toString(FileType fileType);
     const char* toString(Encoding encoding);
