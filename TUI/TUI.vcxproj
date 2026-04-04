@@ -187,6 +187,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="Rendering\TerminalSessionOptions.h" />
+    <ClInclude Include="Rendering\Objects\TextObject.h" />
     <ClInclude Include="Rendering\Text\TextCluster.h" />
     <ClInclude Include="Rendering\Text\TextTypes.h" />
     <ClInclude Include="Rendering\Styles\Themes.h" />
@@ -228,6 +229,7 @@
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RendererSelectionTrace.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
+    <ClCompile Include="Rendering\Objects\TextObject.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />
