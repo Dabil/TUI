@@ -163,6 +163,7 @@
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\Objects\ObjectFactory.h" />
     <ClInclude Include="Rendering\Objects\PlainTextLoader.h" />
+    <ClInclude Include="Rendering\Objects\TextObjectExporter.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
     <ClInclude Include="Rendering\SgrEmitter.h" />
@@ -234,6 +235,7 @@
     <ClCompile Include="Rendering\Objects\ObjectFactory.cpp" />
     <ClCompile Include="Rendering\Objects\PlainTextLoader.cpp" />
     <ClCompile Include="Rendering\Objects\TextObject.cpp" />
+    <ClCompile Include="Rendering\Objects\TextObjectExporter.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />
