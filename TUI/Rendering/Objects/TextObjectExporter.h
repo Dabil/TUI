@@ -64,6 +64,8 @@ namespace TextObjectExporter
     {
         bool success = false;
 
+        std::string outputPath;
+
         FileType resolvedFileType = FileType::Unknown;
         Encoding resolvedEncoding = Encoding::Utf8;
         LineEnding resolvedLineEnding = LineEnding::Lf;

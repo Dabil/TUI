@@ -487,6 +487,7 @@ namespace TextObjectExporter
         }
 
         SaveResult result = exportToBytes(object, resolvedOptions);
+        result.outputPath = filePath;
         result.resolvedFileType = resolvedOptions.fileType;
 
         if (!result.success)
@@ -534,6 +535,11 @@ namespace TextObjectExporter
 
         std::ostringstream message;
 
+        if (!result.outputPath.empty())
+        {
+            message << "TextObject export failed for \"" << result.outputPath << "\". ";
+        }
+
         if (!result.errorMessage.empty())
         {
             message << result.errorMessage;
@@ -573,7 +579,14 @@ namespace TextObjectExporter
         }
 
         std::ostringstream message;
-        message << "TextObject export succeeded.";
+        message << "TextObject export succeeded";
+
+        if (!result.outputPath.empty())
+        {
+            message << " for \"" << result.outputPath << "\"";
+        }
+
+        message << ".";
         message << " FileType=" << toString(result.resolvedFileType) << ".";
         message << " Encoding=" << toString(result.resolvedEncoding) << ".";
         message << " LineEnding=" << toString(result.resolvedLineEnding) << ".";
