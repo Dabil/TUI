@@ -12,6 +12,7 @@
 #include "Rendering/Styles/Themes.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
+
 // TODO:
 //  Add Shedding Glyphs
 //  have dead glyphs change color or shape rarely
@@ -19,6 +20,8 @@
 
 namespace
 {   
+    constexpr char32_t RabbitGlyph = U'\U0001F407';
+
     constexpr int MinimumScreenWidth = 48;
     constexpr int MinimumScreenHeight = 14;
     constexpr int FooterRows = 2;
@@ -45,49 +48,62 @@ namespace
         WhiteOnly,          // 25%
         GreenOnly           // 50%
     };
-    // characters that don't display:
-    // △▽◆◇◢◣◤◥
-    // use this poo for console
-    /*
-    std::u32string buildGlyphPool()
-    {
-        return std::u32string(
-            U"0123456789A₿CDEFGHIJKLMNOPQRSTUVWXYZ"
-            U"@#$%&*+=<>"
-            U"[]{}()"
-            U"█▓▒░"
-            U"■□▪▫"
-            U"▲▼"
-            U"○●"
-            U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"
-            U"┌┐└┘├┤┬┴┼"
-            U"╔╗╚╝╠╣╦╩╬"
-            U"│┃─━"
-            U"←↑→↓");
-    }
-    */
-    // use this pool for terminal
-   
-    constexpr char32_t RabbitGlyph = U'\U0001F407';
+}
 
-    std::u32string buildGlyphPool()
+std::u32string DigitalRainScreen::buildConsoleGlyphPool()
+{
+    return std::u32string(
+        U"0123456789A₿CDEFGHIJKLMNOPQRSTUVWXYZ"
+        U"@#$%&*+=<>"
+        U"[]{}()"
+        U"█▓▒░"
+        U"■□▪▫"
+        U"▲▼"
+        U"○●"
+        U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"
+        U"┌┐└┘├┤┬┴┼"
+        U"╔╗╚╝╠╣╦╩╬"
+        U"│┃─━"
+        U"←↑→↓");
+}
+
+std::u32string DigitalRainScreen::buildTerminalGlyphPool()
+{
+    return std::u32string(
+        U"アァカサタナハマヤャラワガザダバパ"
+        U"イィキシチニヒミリヰギジヂビピ"
+        U"ウゥクスツヌフムユュルグズブヅプ"
+        U"エェケセテネヘメレヱゲゼデベペ"
+        U"オォコソトノホモヨョロヲゴゾドボポヴッン"
+        U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
+        U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           //  greek alphabet 
+        // U"♔♕♖♗♘♙♚♛♜♝♞♟"                // chess pieces
+        U"♪♫⌘₿äü∄∃ƒ±£µℇ")
+        + std::u32string(1, RabbitGlyph);
+}
+
+std::u32string DigitalRainScreen::buildGlyphPoolForHost(TerminalHostKind hostKind)
+{
+    switch (hostKind)
     {
-        return std::u32string(
-            U"アァカサタナハマヤャラワガザダバパ"
-            U"イィキシチニヒミリヰギジヂビピ"
-            U"ウゥクスツヌフムユュルグズブヅプ"
-            U"エェケセテネヘメレヱゲゼデベペ"
-            U"オォコソトノホモヨョロヲゴゾドボポヴッン"
-            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
-            U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           //  greek alphabet 
-         // U"♔♕♖♗♘♙♚♛♜♝♞♟"                // chess pieces
-            U"♪♫⌘₿äü∄∃ƒ±£µℇ")
-            + std::u32string(1, RabbitGlyph);
+    case TerminalHostKind::ClassicConsoleWindow:
+    case TerminalHostKind::RedirectedOrPipe:
+    case TerminalHostKind::Unknown:
+        return buildConsoleGlyphPool();
+
+    case TerminalHostKind::WindowsTerminal:
+    case TerminalHostKind::VsCodeIntegratedTerminal:
+    case TerminalHostKind::ConEmu:
+    case TerminalHostKind::Mintty:
+    case TerminalHostKind::OtherTerminalHost:
+    default:
+        return buildTerminalGlyphPool();
     }
 }
 
-DigitalRainScreen::DigitalRainScreen()
-    : m_glyphPool(buildGlyphPool())
+DigitalRainScreen::DigitalRainScreen(TerminalHostKind hostKind)
+    : m_hostKind(hostKind)
+    , m_glyphPool(buildGlyphPoolForHost(hostKind))
     , m_rng(0x4D415452u)
 {
     const Color black = Color::FromBasic(Color::Basic::Black);

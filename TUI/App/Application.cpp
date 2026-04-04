@@ -218,7 +218,8 @@ void Application::switchToScreen(ScreenType screenType)
         break;
 
     case ScreenType::DigitalRain:
-        m_screenManager->pushScreen(std::make_unique<DigitalRainScreen>());
+        m_screenManager->pushScreen(
+            std::make_unique<DigitalRainScreen>(m_startupDiagnostics.actualHost));
         break;
 
     case ScreenType::WaterEffect:

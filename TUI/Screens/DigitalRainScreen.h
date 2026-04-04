@@ -7,15 +7,17 @@
 
 #include "Screens/Screen.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 
 class Surface;
 class ScreenBuffer;
 
+
 class DigitalRainScreen : public Screen
 {
 public:
-    DigitalRainScreen();
     ~DigitalRainScreen() override = default;
+    explicit DigitalRainScreen(TerminalHostKind hostKind = TerminalHostKind::Unknown);
 
     void onEnter() override;
     void update(double deltaTime) override;
@@ -42,6 +44,10 @@ private:
     };
 
 private:
+    static std::u32string buildConsoleGlyphPool();
+    static std::u32string buildTerminalGlyphPool();
+    static std::u32string buildGlyphPoolForHost(TerminalHostKind hostKind);
+
     void ensureLayout(int screenWidth, int screenHeight);
     void rebuildStreams();
     void resetStream(Stream& stream, bool staggerStart);
@@ -73,6 +79,7 @@ private:
     double m_previewAdvanceTimer = 0.0;
     int m_previewOffset = 0;
 
+    TerminalHostKind m_hostKind = TerminalHostKind::Unknown;
     std::u32string m_glyphPool;
     std::vector<Stream> m_streams;
 
