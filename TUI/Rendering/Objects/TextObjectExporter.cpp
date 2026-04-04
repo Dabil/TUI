@@ -422,6 +422,7 @@ namespace TextObjectExporter
     {
         SaveResult result;
         result.resolvedFileType = resolveFileType(options);
+        result.resolvedLineEnding = options.lineEnding;
 
         if (!object.isLoaded())
         {
@@ -559,6 +560,39 @@ namespace TextObjectExporter
                     << result.firstFailingPosition.y
                     << ").";
             }
+        }
+
+        return message.str();
+    }
+
+    std::string formatSaveSuccess(const SaveResult& result)
+    {
+        if (!result.success)
+        {
+            return {};
+        }
+
+        std::ostringstream message;
+        message << "TextObject export succeeded.";
+        message << " FileType=" << toString(result.resolvedFileType) << ".";
+        message << " Encoding=" << toString(result.resolvedEncoding) << ".";
+        message << " LineEnding=" << toString(result.resolvedLineEnding) << ".";
+        message << " Bytes=" << result.bytes.size() << ".";
+
+        if (result.usedUtf8Bom)
+        {
+            message << " UTF-8 BOM included.";
+        }
+
+        if (result.hadLossyConversion)
+        {
+            message << " Lossy conversion occurred for "
+                << result.lossyCodePointCount
+                << " code point(s).";
+        }
+        else
+        {
+            message << " No lossy conversion.";
         }
 
         return message.str();

@@ -66,6 +66,7 @@ namespace TextObjectExporter
 
         FileType resolvedFileType = FileType::Unknown;
         Encoding resolvedEncoding = Encoding::Utf8;
+        LineEnding resolvedLineEnding = LineEnding::Lf;
 
         bool usedUtf8Bom = false;
         bool hadLossyConversion = false;
@@ -88,6 +89,7 @@ namespace TextObjectExporter
     bool trySaveToFile(const TextObject& object, const std::string& filePath, const SaveOptions& options);
 
     std::string formatSaveError(const SaveResult& result);
+    std::string formatSaveSuccess(const SaveResult& result);
 
     const char* toString(FileType fileType);
     const char* toString(Encoding encoding);
