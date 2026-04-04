@@ -162,6 +162,7 @@
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\Objects\ObjectFactory.h" />
+    <ClInclude Include="Rendering\Objects\PlainTextLoader.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
     <ClInclude Include="Rendering\SgrEmitter.h" />
@@ -231,6 +232,7 @@
     <ClCompile Include="Rendering\Diagnostics\RendererSelectionTrace.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\Objects\ObjectFactory.cpp" />
+    <ClCompile Include="Rendering\Objects\PlainTextLoader.cpp" />
     <ClCompile Include="Rendering\Objects\TextObject.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
