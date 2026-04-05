@@ -34,6 +34,14 @@ namespace TextObjectExporter
         CrLf
     };
 
+    enum class SaveWarningCode
+    {
+        None,
+        NonCp437NfoEncodingOverride,
+        LossyConversionOccurred,
+        Utf8BomIncluded
+    };
+
     struct SourcePosition
     {
         int x = -1;
@@ -42,6 +50,17 @@ namespace TextObjectExporter
         bool isValid() const
         {
             return x >= 0 && y >= 0;
+        }
+    };
+
+    struct SaveWarning
+    {
+        SaveWarningCode code = SaveWarningCode::None;
+        std::string message;
+
+        bool isValid() const
+        {
+            return code != SaveWarningCode::None;
         }
     };
 
@@ -79,7 +98,7 @@ namespace TextObjectExporter
         char32_t firstFailingCodePoint = U'\0';
         SourcePosition firstFailingPosition;
 
-        std::vector<std::string> warningMessages;
+        std::vector<SaveWarning> warnings;
 
         std::string bytes;
         std::string errorMessage;
@@ -99,4 +118,5 @@ namespace TextObjectExporter
     const char* toString(FileType fileType);
     const char* toString(Encoding encoding);
     const char* toString(LineEnding lineEnding);
+    const char* toString(SaveWarningCode warningCode);
 }

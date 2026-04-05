@@ -8,7 +8,6 @@
 #include <string>
 #include <string_view>
 #include <vector>
-#include <sstream>
 
 #include "Utilities/Unicode/UnicodeConversion.h"
 
@@ -115,6 +114,17 @@ namespace
         }
 
         return TextObjectExporter::Encoding::Utf8;
+    }
+
+    void addWarning(
+        TextObjectExporter::SaveResult& result,
+        TextObjectExporter::SaveWarningCode code,
+        const std::string& message)
+    {
+        TextObjectExporter::SaveWarning warning;
+        warning.code = code;
+        warning.message = message;
+        result.warnings.push_back(warning);
     }
 
     bool tryEncodeAscii(
@@ -443,7 +453,9 @@ namespace TextObjectExporter
             result.resolvedEncoding != Encoding::Cp437 &&
             options.allowNonCp437NfoEncoding)
         {
-            result.warningMessages.push_back(
+            addWarning(
+                result,
+                SaveWarningCode::NonCp437NfoEncodingOverride,
                 "NFO export is using a non-CP437 encoding by explicit override. "
                 "Compatibility with traditional NFO viewers may be reduced.");
         }
@@ -482,7 +494,11 @@ namespace TextObjectExporter
             warning << "Lossy conversion occurred for "
                 << result.lossyCodePointCount
                 << " code point(s).";
-            result.warningMessages.push_back(warning.str());
+
+            addWarning(
+                result,
+                SaveWarningCode::LossyConversionOccurred,
+                warning.str());
         }
 
         result.bytes = applyLineEndings(encodedBytes, options.lineEnding);
@@ -491,7 +507,11 @@ namespace TextObjectExporter
         {
             result.bytes.insert(0, "\xEF\xBB\xBF");
             result.usedUtf8Bom = true;
-            result.warningMessages.push_back("UTF-8 BOM was included in the exported output.");
+
+            addWarning(
+                result,
+                SaveWarningCode::Utf8BomIncluded,
+                "UTF-8 BOM was included in the exported output.");
         }
 
         result.success = true;
@@ -589,9 +609,9 @@ namespace TextObjectExporter
             }
         }
 
-        if (!result.warningMessages.empty())
+        if (!result.warnings.empty())
         {
-            message << " Warnings=" << result.warningMessages.size() << ".";
+            message << " Warnings=" << result.warnings.size() << ".";
         }
 
         return message.str();
@@ -618,13 +638,13 @@ namespace TextObjectExporter
         message << " LineEnding=" << toString(result.resolvedLineEnding) << ".";
         message << " Bytes=" << result.bytes.size() << ".";
 
-        if (result.warningMessages.empty())
+        if (result.warnings.empty())
         {
             message << " No warnings.";
         }
         else
         {
-            message << " Warnings=" << result.warningMessages.size() << ".";
+            message << " Warnings=" << result.warnings.size() << ".";
         }
 
         return message.str();
@@ -678,6 +698,23 @@ namespace TextObjectExporter
             return "LF";
         case LineEnding::CrLf:
             return "CRLF";
+        default:
+            return "Unknown";
+        }
+    }
+
+    const char* toString(SaveWarningCode warningCode)
+    {
+        switch (warningCode)
+        {
+        case SaveWarningCode::None:
+            return "None";
+        case SaveWarningCode::NonCp437NfoEncodingOverride:
+            return "NonCp437NfoEncodingOverride";
+        case SaveWarningCode::LossyConversionOccurred:
+            return "LossyConversionOccurred";
+        case SaveWarningCode::Utf8BomIncluded:
+            return "Utf8BomIncluded";
         default:
             return "Unknown";
         }
