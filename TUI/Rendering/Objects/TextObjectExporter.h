@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "Rendering/Objects/TextObject.h"
 
@@ -77,6 +78,8 @@ namespace TextObjectExporter
         bool hasEncodingFailure = false;
         char32_t firstFailingCodePoint = U'\0';
         SourcePosition firstFailingPosition;
+
+        std::vector<std::string> warningMessages;
 
         std::string bytes;
         std::string errorMessage;

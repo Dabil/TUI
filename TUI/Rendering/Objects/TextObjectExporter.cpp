@@ -8,6 +8,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <sstream>
 
 #include "Utilities/Unicode/UnicodeConversion.h"
 
@@ -438,6 +439,15 @@ namespace TextObjectExporter
             return result;
         }
 
+        if (result.resolvedFileType == FileType::Nfo &&
+            result.resolvedEncoding != Encoding::Cp437 &&
+            options.allowNonCp437NfoEncoding)
+        {
+            result.warningMessages.push_back(
+                "NFO export is using a non-CP437 encoding by explicit override. "
+                "Compatibility with traditional NFO viewers may be reduced.");
+        }
+
         const std::vector<ExportCodePoint> codePoints = buildExportCodePoints(object, options);
 
         std::string encodedBytes;
@@ -465,12 +475,23 @@ namespace TextObjectExporter
 
         result.hadLossyConversion = (lossyCount > 0);
         result.lossyCodePointCount = lossyCount;
+
+        if (result.hadLossyConversion)
+        {
+            std::ostringstream warning;
+            warning << "Lossy conversion occurred for "
+                << result.lossyCodePointCount
+                << " code point(s).";
+            result.warningMessages.push_back(warning.str());
+        }
+
         result.bytes = applyLineEndings(encodedBytes, options.lineEnding);
 
         if (result.resolvedEncoding == Encoding::Utf8 && options.includeUtf8Bom)
         {
             result.bytes.insert(0, "\xEF\xBB\xBF");
             result.usedUtf8Bom = true;
+            result.warningMessages.push_back("UTF-8 BOM was included in the exported output.");
         }
 
         result.success = true;
@@ -568,6 +589,11 @@ namespace TextObjectExporter
             }
         }
 
+        if (!result.warningMessages.empty())
+        {
+            message << " Warnings=" << result.warningMessages.size() << ".";
+        }
+
         return message.str();
     }
 
@@ -592,20 +618,13 @@ namespace TextObjectExporter
         message << " LineEnding=" << toString(result.resolvedLineEnding) << ".";
         message << " Bytes=" << result.bytes.size() << ".";
 
-        if (result.usedUtf8Bom)
+        if (result.warningMessages.empty())
         {
-            message << " UTF-8 BOM included.";
-        }
-
-        if (result.hadLossyConversion)
-        {
-            message << " Lossy conversion occurred for "
-                << result.lossyCodePointCount
-                << " code point(s).";
+            message << " No warnings.";
         }
         else
         {
-            message << " No lossy conversion.";
+            message << " Warnings=" << result.warningMessages.size() << ".";
         }
 
         return message.str();
