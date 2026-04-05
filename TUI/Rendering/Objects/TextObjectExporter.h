@@ -115,6 +115,12 @@ namespace TextObjectExporter
     std::string formatSaveError(const SaveResult& result);
     std::string formatSaveSuccess(const SaveResult& result);
 
+    bool hasWarning(const SaveResult& result, SaveWarningCode code);
+
+    const SaveWarning* getWarningByCode(
+        const SaveResult& result,
+        SaveWarningCode code);
+
     const char* toString(FileType fileType);
     const char* toString(Encoding encoding);
     const char* toString(LineEnding lineEnding);

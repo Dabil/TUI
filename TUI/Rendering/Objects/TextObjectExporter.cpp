@@ -650,6 +650,34 @@ namespace TextObjectExporter
         return message.str();
     }
 
+    bool hasWarning(const SaveResult& result, SaveWarningCode code)
+    {
+        for (const SaveWarning& warning : result.warnings)
+        {
+            if (warning.code == code)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    const SaveWarning* getWarningByCode(
+        const SaveResult& result,
+        SaveWarningCode code)
+    {
+        for (const SaveWarning& warning : result.warnings)
+        {
+            if (warning.code == code)
+            {
+                return &warning;
+            }
+        }
+
+        return nullptr;
+    }
+
     const char* toString(FileType fileType)
     {
         switch (fileType)
