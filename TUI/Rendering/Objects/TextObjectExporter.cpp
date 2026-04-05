@@ -429,6 +429,70 @@ namespace TextObjectExporter
         return FileType::Unknown;
     }
 
+    Encoding resolveEffectiveEncoding(
+        FileType fileType,
+        const SaveOptions& options,
+        std::string* outErrorMessage)
+    {
+        std::string error;
+        const Encoding encoding = resolveEncoding(fileType, options, error);
+
+        if (outErrorMessage != nullptr)
+        {
+            *outErrorMessage = error;
+        }
+
+        return encoding;
+    }
+
+    bool canEncodeCodePoint(char32_t codePoint, Encoding encoding)
+    {
+        std::string bytes;
+        bool lossy = false;
+
+        const SaveOptions strictOptions = []()
+            {
+                SaveOptions options;
+                options.allowLossyConversion = false;
+                options.replacementChar = '?';
+                return options;
+            }();
+
+        switch (encoding)
+        {
+        case Encoding::Utf8:
+            return true;
+
+        case Encoding::Ascii:
+            return tryEncodeAscii(
+                codePoint,
+                strictOptions.replacementChar,
+                strictOptions.allowLossyConversion,
+                bytes,
+                lossy);
+
+        case Encoding::Latin1:
+            return tryEncodeLatin1(
+                codePoint,
+                strictOptions.replacementChar,
+                strictOptions.allowLossyConversion,
+                bytes,
+                lossy);
+
+        case Encoding::Cp437:
+            return tryEncodeCp437(
+                codePoint,
+                strictOptions.replacementChar,
+                strictOptions.allowLossyConversion,
+                bytes,
+                lossy);
+
+        case Encoding::Auto:
+        default:
+            return false;
+        }
+    }
+
     SaveResult exportToBytes(const TextObject& object, const SaveOptions& options)
     {
         SaveResult result;
@@ -442,7 +506,10 @@ namespace TextObjectExporter
         }
 
         std::string encodingError;
-        result.resolvedEncoding = resolveEncoding(result.resolvedFileType, options, encodingError);
+        result.resolvedEncoding = resolveEffectiveEncoding(
+            result.resolvedFileType,
+            options,
+            &encodingError);
         if (result.resolvedEncoding == Encoding::Auto)
         {
             result.errorMessage = encodingError;

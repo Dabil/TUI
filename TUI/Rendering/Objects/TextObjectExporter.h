@@ -106,6 +106,13 @@ namespace TextObjectExporter
 
     FileType detectFileType(const std::string& filePath);
 
+    Encoding resolveEffectiveEncoding(
+        FileType fileType,
+        const SaveOptions& options,
+        std::string* outErrorMessage = nullptr);
+
+    bool canEncodeCodePoint(char32_t codePoint, Encoding encoding);
+
     SaveResult exportToBytes(const TextObject& object, const SaveOptions& options = {});
     SaveResult saveToFile(const TextObject& object, const std::string& filePath, const SaveOptions& options = {});
 
