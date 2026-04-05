@@ -9,6 +9,12 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Text/TextTypes.h"
 
+namespace TextObjectExporter
+{
+    struct SaveOptions;
+    struct SaveResult;
+}
+
 struct TextObjectCell
 {
     char32_t glyph = U' ';
@@ -58,6 +64,16 @@ public:
 
     bool loadUtf8File(const std::string& filePath);
     bool loadUtf8File(const std::string& filePath, const Style& style);
+
+    TextObjectExporter::SaveResult saveToFile(const std::string& filePath) const;
+    TextObjectExporter::SaveResult saveToFile(
+        const std::string& filePath,
+        const TextObjectExporter::SaveOptions& options) const;
+
+    bool trySaveToFile(const std::string& filePath) const;
+    bool trySaveToFile(
+        const std::string& filePath,
+        const TextObjectExporter::SaveOptions& options) const;
 
     void clear();
 
