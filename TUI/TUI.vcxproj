@@ -203,6 +203,7 @@
     <ClInclude Include="Screens\Screen.h" />
     <ClInclude Include="Screens\ShowcaseScreen.h" />
     <ClInclude Include="Screens\TerminalCapabilitiesScreen.h" />
+    <ClInclude Include="Screens\TextObjectExportValidationScreen.h" />
     <ClInclude Include="Screens\WaterEffectScreen.h" />
     <ClInclude Include="Utilities\Unicode\GraphemeSegmentation.h" />
     <ClInclude Include="Utilities\Unicode\UnicodeConversion.h" />
@@ -268,6 +269,7 @@
     <ClCompile Include="Screens\RendererDiagnosticsScreen.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
     <ClCompile Include="Screens\TerminalCapabilitiesScreen.cpp" />
+    <ClCompile Include="Screens\TextObjectExportValidationScreen.cpp" />
     <ClCompile Include="Screens\WaterEffectScreen.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\UnicodeConversion.cpp" />
