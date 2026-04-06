@@ -20,18 +20,12 @@ public:
 
     bool inBounds(int x, int y) const;
 
-    void fill(
-        char32_t glyph,
-        CellKind kind = CellKind::Glyph,
-        CellWidth width = CellWidth::One,
-        const std::optional<Style>& style = std::nullopt);
-
     bool setCell(
         int x,
         int y,
         char32_t glyph,
-        CellKind kind = CellKind::Glyph,
-        CellWidth width = CellWidth::One,
+        CellKind kind,
+        CellWidth width,
         const std::optional<Style>& style = std::nullopt);
 
     bool setGlyph(
@@ -51,7 +45,11 @@ public:
         int y,
         const std::optional<Style>& style = std::nullopt);
 
-    const TextObjectCell* tryGetCell(int x, int y) const;
+    void fill(
+        char32_t glyph,
+        CellKind kind = CellKind::Glyph,
+        CellWidth width = CellWidth::One,
+        const std::optional<Style>& style = std::nullopt);
 
     TextObject build() const;
     TextObject buildAndReset();

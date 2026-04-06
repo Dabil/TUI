@@ -22,7 +22,6 @@ void TextObjectBuilder::reset(int width, int height)
     }
 
     m_object.m_cells.resize(static_cast<std::size_t>(m_object.m_width * m_object.m_height));
-
     fill(U' ', CellKind::Empty, CellWidth::One, std::nullopt);
 }
 
@@ -33,9 +32,9 @@ void TextObjectBuilder::clear()
 
 bool TextObjectBuilder::isInitialized() const
 {
-    return m_object.isLoaded()
-        && m_object.getWidth() > 0
-        && m_object.getHeight() > 0;
+    return m_object.isLoaded() &&
+        m_object.getWidth() > 0 &&
+        m_object.getHeight() > 0;
 }
 
 int TextObjectBuilder::getWidth() const
@@ -50,32 +49,10 @@ int TextObjectBuilder::getHeight() const
 
 bool TextObjectBuilder::inBounds(int x, int y) const
 {
-    return x >= 0
-        && x < m_object.m_width
-        && y >= 0
-        && y < m_object.m_height;
-}
-
-void TextObjectBuilder::fill(
-    char32_t glyph,
-    CellKind kind,
-    CellWidth width,
-    const std::optional<Style>& style)
-{
-    if (!isInitialized())
-    {
-        return;
-    }
-
-    glyph = UnicodeConversion::sanitizeCodePoint(glyph);
-
-    for (int y = 0; y < m_object.m_height; ++y)
-    {
-        for (int x = 0; x < m_object.m_width; ++x)
-        {
-            setCell(x, y, glyph, kind, width, style);
-        }
-    }
+    return x >= 0 &&
+        x < m_object.m_width &&
+        y >= 0 &&
+        y < m_object.m_height;
 }
 
 bool TextObjectBuilder::setCell(
@@ -141,14 +118,24 @@ bool TextObjectBuilder::setEmpty(
     return setCell(x, y, U' ', CellKind::Empty, CellWidth::One, style);
 }
 
-const TextObjectCell* TextObjectBuilder::tryGetCell(int x, int y) const
+void TextObjectBuilder::fill(
+    char32_t glyph,
+    CellKind kind,
+    CellWidth width,
+    const std::optional<Style>& style)
 {
-    if (!inBounds(x, y))
+    if (!isInitialized())
     {
-        return nullptr;
+        return;
     }
 
-    return &m_object.m_cells[static_cast<std::size_t>(index(x, y))];
+    for (int y = 0; y < m_object.m_height; ++y)
+    {
+        for (int x = 0; x < m_object.m_width; ++x)
+        {
+            setCell(x, y, glyph, kind, width, style);
+        }
+    }
 }
 
 TextObject TextObjectBuilder::build() const

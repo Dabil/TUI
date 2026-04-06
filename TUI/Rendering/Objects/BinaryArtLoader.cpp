@@ -7,6 +7,7 @@
 #include <iterator>
 #include <sstream>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "Rendering/Objects/TextObjectBuilder.h"
@@ -15,14 +16,6 @@
 
 namespace
 {
-    struct SauceRecord
-    {
-        bool found = false;
-        bool truncated = false;
-        std::size_t contentSize = 0;
-        BinaryArtLoader::SauceMetadata metadata;
-    };
-
     std::string toLowerCopy(std::string value)
     {
         std::transform(
@@ -63,17 +56,6 @@ namespace
         return true;
     }
 
-    std::string trimRightAscii(const std::string& value)
-    {
-        std::size_t end = value.size();
-        while (end > 0 && (value[end - 1] == ' ' || value[end - 1] == '\0'))
-        {
-            --end;
-        }
-
-        return value.substr(0, end);
-    }
-
     std::uint16_t readLe16(std::string_view bytes, std::size_t offset, bool& ok)
     {
         if (offset + 1 >= bytes.size())
@@ -88,65 +70,20 @@ namespace
             (static_cast<unsigned char>(bytes[offset + 1]) << 8));
     }
 
-    SauceRecord parseSauce(std::string_view bytes)
+    std::uint32_t readLe32(std::string_view bytes, std::size_t offset, bool& ok)
     {
-        SauceRecord result;
-        result.contentSize = bytes.size();
-
-        if (bytes.size() < 128)
+        if (offset + 3 >= bytes.size())
         {
-            return result;
+            ok = false;
+            return 0;
         }
 
-        const std::size_t sauceOffset = bytes.size() - 128;
-        const std::string_view sauce = bytes.substr(sauceOffset, 128);
-
-        if (sauce.substr(0, 5) != "SAUCE")
-        {
-            return result;
-        }
-
-        result.found = true;
-        result.contentSize = sauceOffset;
-
-        result.metadata.present = true;
-        result.metadata.title = trimRightAscii(std::string(sauce.substr(7, 35)));
-        result.metadata.author = trimRightAscii(std::string(sauce.substr(42, 20)));
-        result.metadata.group = trimRightAscii(std::string(sauce.substr(62, 20)));
-        result.metadata.date = trimRightAscii(std::string(sauce.substr(82, 8)));
-        result.metadata.dataType = static_cast<std::uint8_t>(sauce[94]);
-        result.metadata.fileType = static_cast<std::uint8_t>(sauce[95]);
-
-        bool ok = false;
-        result.metadata.tInfo1 = readLe16(sauce, 96, ok);
-        result.metadata.tInfo2 = readLe16(sauce, 98, ok);
-        result.metadata.tInfo3 = readLe16(sauce, 100, ok);
-        result.metadata.tInfo4 = readLe16(sauce, 102, ok);
-        result.metadata.commentLineCount = static_cast<std::uint8_t>(sauce[104]);
-        result.metadata.flags = static_cast<std::uint8_t>(sauce[105]);
-        result.metadata.fontName = trimRightAscii(std::string(sauce.substr(106, 22)));
-
-        const std::size_t commentBytes =
-            (result.metadata.commentLineCount > 0)
-            ? (5u + static_cast<std::size_t>(result.metadata.commentLineCount) * 64u)
-            : 0u;
-
-        if (commentBytes > 0)
-        {
-            if (result.contentSize < commentBytes)
-            {
-                result.truncated = true;
-                return result;
-            }
-
-            const std::size_t commentBlockOffset = result.contentSize - commentBytes;
-            if (bytes.substr(commentBlockOffset, 5) == "COMNT")
-            {
-                result.contentSize = commentBlockOffset;
-            }
-        }
-
-        return result;
+        ok = true;
+        return static_cast<std::uint32_t>(
+            static_cast<unsigned char>(bytes[offset]) |
+            (static_cast<unsigned char>(bytes[offset + 1]) << 8) |
+            (static_cast<unsigned char>(bytes[offset + 2]) << 16) |
+            (static_cast<unsigned char>(bytes[offset + 3]) << 24));
     }
 
     char32_t decodeCp437Byte(unsigned char value)
@@ -250,15 +187,57 @@ namespace
     BinaryArtLoader::LoadResult fail(
         BinaryArtLoader::FileType fileType,
         const std::string& message,
-        std::size_t byteOffset = 0)
+        std::size_t byteOffset = 0,
+        char32_t failingCodePoint = U'\0',
+        const BinaryArtLoader::SourcePosition& position = {})
     {
         BinaryArtLoader::LoadResult result;
         result.success = false;
         result.detectedFileType = fileType;
         result.hasParseFailure = true;
         result.failingByteOffset = byteOffset;
+        result.firstFailingCodePoint = failingCodePoint;
+        result.firstFailingPosition = position;
         result.errorMessage = message;
         return result;
+    }
+
+    void appendSauceWarnings(
+        BinaryArtLoader::LoadResult& result,
+        const BinaryArtLoader::LoadOptions& options,
+        const decltype(SauceSupport::parse(std::string_view{}))& sauceRecord)
+    {
+        result.sauce = sauceRecord.metadata;
+
+        if (result.sauce.present)
+        {
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::SauceMetadataPresent,
+                "SAUCE metadata was detected and parsed.",
+                0,
+                {});
+        }
+
+        if (options.importSauceComments && !result.sauce.comments.empty())
+        {
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::SauceCommentsImported,
+                "SAUCE comments were imported into metadata.",
+                0,
+                {});
+        }
+
+        if (sauceRecord.truncated)
+        {
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::TruncatedSauceIgnored,
+                "SAUCE metadata or comments appeared truncated and were partially ignored.",
+                sauceRecord.contentSize,
+                {});
+        }
     }
 
     BinaryArtLoader::LoadResult decodeCellStream(
@@ -267,7 +246,8 @@ namespace
         const BinaryArtLoader::LoadOptions& options,
         BinaryArtLoader::FileType fileType,
         bool usedIceColors,
-        const BinaryArtLoader::SauceMetadata& sauce)
+        const BinaryArtLoader::SauceMetadata& sauce,
+        std::size_t baseByteOffset = 0)
     {
         BinaryArtLoader::LoadResult result;
         result.detectedFileType = fileType;
@@ -281,7 +261,7 @@ namespace
 
         if ((bytes.size() % 2u) != 0u)
         {
-            return fail(fileType, "Binary art byte stream must contain glyph/attribute pairs.");
+            return fail(fileType, "Binary art byte stream must contain glyph/attribute pairs.", baseByteOffset + bytes.size());
         }
 
         const std::size_t cellCount = bytes.size() / 2u;
@@ -304,9 +284,15 @@ namespace
                 const std::optional<Style> style =
                     styleFromDosAttribute(attrByte, options.baseStyle, usedIceColors);
 
-                if (!builder.setGlyph(x, y, decodeCp437Byte(glyphByte), style))
+                const char32_t glyph = decodeCp437Byte(glyphByte);
+                if (!builder.setGlyph(x, y, glyph, style))
                 {
-                    return fail(fileType, "Failed to populate TextObjectBuilder for binary art.", offset);
+                    return fail(
+                        fileType,
+                        "Failed to populate TextObjectBuilder for binary art.",
+                        baseByteOffset + offset,
+                        glyph,
+                        { x, y });
                 }
             }
         }
@@ -318,34 +304,139 @@ namespace
         return result;
     }
 
-    BinaryArtLoader::LoadResult decodeCompressedXBinStub(
+    bool decodeCompressedXBinCells(
         std::string_view bytes,
         std::size_t payloadOffset,
         int width,
         int height,
-        const BinaryArtLoader::LoadOptions& options,
-        const BinaryArtLoader::SauceMetadata& sauce,
-        bool usedIceColors)
+        std::vector<unsigned char>& outCellBytes,
+        std::size_t& outConsumedBytes,
+        std::size_t& outFailingByteOffset)
     {
-        (void)bytes;
-        (void)payloadOffset;
-        (void)width;
-        (void)height;
-        (void)options;
-        (void)sauce;
-        (void)usedIceColors;
+        outCellBytes.clear();
+        outConsumedBytes = 0;
+        outFailingByteOffset = payloadOffset;
 
-        BinaryArtLoader::LoadResult result =
-            fail(BinaryArtLoader::FileType::XBin, "Compressed XBIN payload decoding hook is not implemented yet.", payloadOffset);
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
 
-        addWarning(
-            result,
-            BinaryArtLoader::LoadWarningCode::CompressedXBinStubEncountered,
-            "Compressed XBIN payload was detected and routed to the explicit stub hook.",
-            payloadOffset,
-            {});
+        const std::size_t expectedBytes =
+            static_cast<std::size_t>(width) *
+            static_cast<std::size_t>(height) * 2u;
 
-        return result;
+        outCellBytes.reserve(expectedBytes);
+
+        std::size_t cursor = payloadOffset;
+        while (outCellBytes.size() < expectedBytes)
+        {
+            if (cursor >= bytes.size())
+            {
+                outFailingByteOffset = cursor;
+                return false;
+            }
+
+            const unsigned char control = static_cast<unsigned char>(bytes[cursor++]);
+            const std::size_t runLength = static_cast<std::size_t>((control & 0x3F) + 1u);
+            const unsigned char mode = static_cast<unsigned char>(control >> 6);
+
+            if (mode == 0)
+            {
+                const std::size_t needed = runLength * 2u;
+                if (cursor + needed > bytes.size())
+                {
+                    outFailingByteOffset = cursor;
+                    return false;
+                }
+
+                if (outCellBytes.size() + needed > expectedBytes)
+                {
+                    outFailingByteOffset = cursor;
+                    return false;
+                }
+
+                outCellBytes.insert(
+                    outCellBytes.end(),
+                    bytes.begin() + static_cast<std::ptrdiff_t>(cursor),
+                    bytes.begin() + static_cast<std::ptrdiff_t>(cursor + needed));
+
+                cursor += needed;
+                continue;
+            }
+
+            if (mode == 1)
+            {
+                if (cursor + runLength + 1 > bytes.size())
+                {
+                    outFailingByteOffset = cursor;
+                    return false;
+                }
+
+                const unsigned char attr = static_cast<unsigned char>(bytes[cursor++]);
+                if (outCellBytes.size() + (runLength * 2u) > expectedBytes)
+                {
+                    outFailingByteOffset = cursor;
+                    return false;
+                }
+
+                for (std::size_t i = 0; i < runLength; ++i)
+                {
+                    outCellBytes.push_back(static_cast<unsigned char>(bytes[cursor++]));
+                    outCellBytes.push_back(attr);
+                }
+
+                continue;
+            }
+
+            if (mode == 2)
+            {
+                if (cursor + runLength + 1 > bytes.size())
+                {
+                    outFailingByteOffset = cursor;
+                    return false;
+                }
+
+                const unsigned char glyph = static_cast<unsigned char>(bytes[cursor++]);
+                if (outCellBytes.size() + (runLength * 2u) > expectedBytes)
+                {
+                    outFailingByteOffset = cursor;
+                    return false;
+                }
+
+                for (std::size_t i = 0; i < runLength; ++i)
+                {
+                    outCellBytes.push_back(glyph);
+                    outCellBytes.push_back(static_cast<unsigned char>(bytes[cursor++]));
+                }
+
+                continue;
+            }
+
+            if (cursor + 2 > bytes.size())
+            {
+                outFailingByteOffset = cursor;
+                return false;
+            }
+
+            const unsigned char glyph = static_cast<unsigned char>(bytes[cursor++]);
+            const unsigned char attr = static_cast<unsigned char>(bytes[cursor++]);
+
+            if (outCellBytes.size() + (runLength * 2u) > expectedBytes)
+            {
+                outFailingByteOffset = cursor;
+                return false;
+            }
+
+            for (std::size_t i = 0; i < runLength; ++i)
+            {
+                outCellBytes.push_back(glyph);
+                outCellBytes.push_back(attr);
+            }
+        }
+
+        outConsumedBytes = cursor - payloadOffset;
+        return true;
     }
 
     BinaryArtLoader::LoadResult loadBin(
@@ -353,60 +444,32 @@ namespace
         const BinaryArtLoader::LoadOptions& options,
         const BinaryArtLoader::SauceMetadata& sauce)
     {
-        int width = options.defaultColumns;
+        int width = std::max(1, options.defaultColumns);
         if (options.preferSauceWidth && sauce.present && sauce.tInfo1 > 0)
         {
             width = static_cast<int>(sauce.tInfo1);
         }
 
         BinaryArtLoader::LoadResult result =
-            decodeCellStream(bytes, width, options, BinaryArtLoader::FileType::Bin, options.enableIceColors, sauce);
+            decodeCellStream(
+                bytes,
+                width,
+                options,
+                BinaryArtLoader::FileType::Bin,
+                options.enableIceColors,
+                sauce);
 
-        if (sauce.present)
+        if (result.success &&
+            options.preferSauceWidth &&
+            sauce.present &&
+            sauce.tInfo1 > 0)
         {
-            addWarning(result, BinaryArtLoader::LoadWarningCode::SauceMetadataPresent,
-                "SAUCE metadata was detected and parsed.", 0, {});
-        }
-
-        if (options.preferSauceWidth && sauce.present && sauce.tInfo1 > 0)
-        {
-            addWarning(result, BinaryArtLoader::LoadWarningCode::SauceWidthOverrideApplied,
-                "SAUCE width metadata was applied to binary art import.", 0, {});
-        }
-
-        return result;
-    }
-
-    BinaryArtLoader::LoadResult loadAdf(
-        std::string_view bytes,
-        const BinaryArtLoader::LoadOptions& options,
-        const BinaryArtLoader::SauceMetadata& sauce)
-    {
-        int width = options.defaultColumns;
-        if (options.preferSauceWidth && sauce.present && sauce.tInfo1 > 0)
-        {
-            width = static_cast<int>(sauce.tInfo1);
-        }
-
-        BinaryArtLoader::LoadResult result =
-            decodeCellStream(bytes, width, options, BinaryArtLoader::FileType::Adf, options.enableIceColors, sauce);
-
-        if (result.success)
-        {
-            addWarning(result, BinaryArtLoader::LoadWarningCode::AdfSubsetAssumed,
-                "ADF was loaded using the initial ArtWorx-style bin-compatible subset.", 0, {});
-        }
-
-        if (sauce.present)
-        {
-            addWarning(result, BinaryArtLoader::LoadWarningCode::SauceMetadataPresent,
-                "SAUCE metadata was detected and parsed.", 0, {});
-        }
-
-        if (options.preferSauceWidth && sauce.present && sauce.tInfo1 > 0)
-        {
-            addWarning(result, BinaryArtLoader::LoadWarningCode::SauceWidthOverrideApplied,
-                "SAUCE width metadata was applied to binary art import.", 0, {});
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::SauceWidthOverrideApplied,
+                "SAUCE width metadata was applied to binary art import.",
+                0,
+                {});
         }
 
         return result;
@@ -422,8 +485,11 @@ namespace
             return fail(BinaryArtLoader::FileType::XBin, "XBIN file is too small to contain a valid header.");
         }
 
-        if (!(bytes[0] == 'X' && bytes[1] == 'B' && bytes[2] == 'I' && bytes[3] == 'N' &&
-              static_cast<unsigned char>(bytes[4]) == 0x1A))
+        if (!(bytes[0] == 'X' &&
+            bytes[1] == 'B' &&
+            bytes[2] == 'I' &&
+            bytes[3] == 'N' &&
+            static_cast<unsigned char>(bytes[4]) == 0x1A))
         {
             return fail(BinaryArtLoader::FileType::XBin, "Missing XBIN signature.");
         }
@@ -443,6 +509,11 @@ namespace
 
         const unsigned char fontHeight = static_cast<unsigned char>(bytes[9]);
         const unsigned char flags = static_cast<unsigned char>(bytes[10]);
+
+        if (width == 0 || height == 0)
+        {
+            return fail(BinaryArtLoader::FileType::XBin, "XBIN width and height must be non-zero.", 5);
+        }
 
         const bool hasPalette = (flags & 0x01) != 0;
         const bool hasFont = (flags & 0x02) != 0;
@@ -464,9 +535,14 @@ namespace
                 return fail(BinaryArtLoader::FileType::XBin, "XBIN palette section is truncated.", offset);
             }
 
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::PaletteDataIgnored,
+                "XBIN palette data was present but is not yet imported into engine palette state.",
+                offset,
+                {});
+
             offset += 48;
-            addWarning(result, BinaryArtLoader::LoadWarningCode::PaletteDataIgnored,
-                "XBIN palette data was present but is not yet imported into engine palette state.", offset, {});
         }
 
         if (hasFont)
@@ -479,40 +555,81 @@ namespace
                 return fail(BinaryArtLoader::FileType::XBin, "XBIN font section is truncated.", offset);
             }
 
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::FontDataIgnored,
+                "XBIN font data was present but is not yet imported into engine glyph/font policy.",
+                offset,
+                {});
+
             offset += fontBytes;
-            addWarning(result, BinaryArtLoader::LoadWarningCode::FontDataIgnored,
-                "XBIN font data was present but is not yet imported into engine glyph/font policy.", offset, {});
         }
 
         if (isCompressed)
         {
-            if (options.xbinCompressionSupport == BinaryArtLoader::XBinCompressionSupport::StubHookOnly)
+            if (options.xbinCompressionSupport == BinaryArtLoader::XBinCompressionSupport::RejectCompressed)
             {
-                BinaryArtLoader::LoadResult stub =
-                    decodeCompressedXBinStub(
-                        bytes,
-                        offset,
-                        static_cast<int>(width),
-                        static_cast<int>(height),
-                        options,
-                        sauce,
-                        result.usedIceColors);
-
-                stub.warnings.insert(
-                    stub.warnings.begin(),
-                    result.warnings.begin(),
-                    result.warnings.end());
-
-                return stub;
+                return fail(
+                    BinaryArtLoader::FileType::XBin,
+                    "Compressed XBIN is disabled by current loader options.",
+                    offset);
             }
 
-            BinaryArtLoader::LoadResult rejected =
-                fail(BinaryArtLoader::FileType::XBin, "Compressed XBIN is not supported in this build.", offset);
+            std::vector<unsigned char> decodedCellBytes;
+            std::size_t consumedBytes = 0;
+            std::size_t failingByteOffset = offset;
 
-            addWarning(rejected, BinaryArtLoader::LoadWarningCode::CompressedXBinStubEncountered,
-                "Compressed XBIN payload was detected and rejected explicitly.", offset, {});
+            if (!decodeCompressedXBinCells(
+                bytes,
+                offset,
+                static_cast<int>(width),
+                static_cast<int>(height),
+                decodedCellBytes,
+                consumedBytes,
+                failingByteOffset))
+            {
+                return fail(
+                    BinaryArtLoader::FileType::XBin,
+                    "Failed to decode compressed XBIN payload.",
+                    failingByteOffset);
+            }
 
-            return rejected;
+            BinaryArtLoader::LoadResult decoded =
+                decodeCellStream(
+                    std::string_view(
+                        reinterpret_cast<const char*>(decodedCellBytes.data()),
+                        decodedCellBytes.size()),
+                    static_cast<int>(width),
+                    options,
+                    BinaryArtLoader::FileType::XBin,
+                    result.usedIceColors,
+                    sauce,
+                    offset);
+
+            decoded.warnings.insert(
+                decoded.warnings.begin(),
+                result.warnings.begin(),
+                result.warnings.end());
+
+            addWarning(
+                decoded,
+                BinaryArtLoader::LoadWarningCode::CompressedXBinDecoded,
+                "Compressed XBIN payload was decoded successfully.",
+                offset,
+                {});
+
+            const std::size_t payloadEnd = offset + consumedBytes;
+            if (payloadEnd < bytes.size())
+            {
+                addWarning(
+                    decoded,
+                    BinaryArtLoader::LoadWarningCode::ExtraTrailingBytesIgnored,
+                    "Extra trailing bytes after XBIN payload were ignored.",
+                    payloadEnd,
+                    {});
+            }
+
+            return decoded;
         }
 
         const std::size_t expectedCellBytes =
@@ -531,26 +648,255 @@ namespace
                 options,
                 BinaryArtLoader::FileType::XBin,
                 result.usedIceColors,
-                sauce);
+                sauce,
+                offset);
 
         decoded.warnings.insert(
             decoded.warnings.begin(),
             result.warnings.begin(),
             result.warnings.end());
 
-        if (sauce.present)
-        {
-            addWarning(decoded, BinaryArtLoader::LoadWarningCode::SauceMetadataPresent,
-                "SAUCE metadata was detected and parsed.", 0, {});
-        }
-
         if (offset + expectedCellBytes < bytes.size())
         {
-            addWarning(decoded, BinaryArtLoader::LoadWarningCode::ExtraTrailingBytesIgnored,
-                "Extra trailing bytes after XBIN payload were ignored.", offset + expectedCellBytes, {});
+            addWarning(
+                decoded,
+                BinaryArtLoader::LoadWarningCode::ExtraTrailingBytesIgnored,
+                "Extra trailing bytes after XBIN payload were ignored.",
+                offset + expectedCellBytes,
+                {});
         }
 
         return decoded;
+    }
+
+    BinaryArtLoader::LoadResult loadAdf(
+        std::string_view bytes,
+        const BinaryArtLoader::LoadOptions& options,
+        const BinaryArtLoader::SauceMetadata& sauce)
+    {
+        BinaryArtLoader::LoadResult result;
+        result.detectedFileType = BinaryArtLoader::FileType::Adf;
+        result.sauce = sauce;
+        result.usedIceColors = options.enableIceColors;
+
+        if (bytes.empty())
+        {
+            return fail(BinaryArtLoader::FileType::Adf, "ADF file is empty.");
+        }
+
+        std::size_t offset = 0;
+        bool ok = false;
+
+        int width = 0;
+        int height = 0;
+        bool hasExplicitCellBlock = false;
+        std::string_view cellBytes;
+
+        const bool looksLikeChunkedAdf =
+            bytes.size() >= 12 &&
+            ((bytes[0] == 'A' && bytes[1] == 'D' && bytes[2] == 'F') ||
+                (bytes[0] == 'a' && bytes[1] == 'd' && bytes[2] == 'f'));
+
+        if (looksLikeChunkedAdf)
+        {
+            offset = 3;
+
+            if (offset < bytes.size() && static_cast<unsigned char>(bytes[offset]) == 0x1A)
+            {
+                ++offset;
+            }
+
+            if (offset + 4 <= bytes.size())
+            {
+                const std::string_view magic = bytes.substr(offset, 4);
+                if (magic == "MAIN" || magic == "main")
+                {
+                    offset += 4;
+                }
+            }
+
+            while (offset + 8 <= bytes.size())
+            {
+                const std::string chunkId(bytes.substr(offset, 4));
+                offset += 4;
+
+                const std::uint32_t chunkSize = readLe32(bytes, offset, ok);
+                if (!ok)
+                {
+                    return fail(BinaryArtLoader::FileType::Adf, "Failed to read ADF chunk size.", offset);
+                }
+                offset += 4;
+
+                if (offset + chunkSize > bytes.size())
+                {
+                    return fail(BinaryArtLoader::FileType::Adf, "ADF chunk extends past end of file.", offset);
+                }
+
+                const std::string_view chunkData = bytes.substr(offset, chunkSize);
+
+                if (chunkId == "CELL" || chunkId == "cell" || chunkId == "TEXT" || chunkId == "text")
+                {
+                    if (chunkSize < 4)
+                    {
+                        return fail(BinaryArtLoader::FileType::Adf, "ADF cell chunk is too small.", offset);
+                    }
+
+                    const std::uint16_t chunkWidth = readLe16(chunkData, 0, ok);
+                    if (!ok)
+                    {
+                        return fail(BinaryArtLoader::FileType::Adf, "Failed to read ADF cell width.", offset);
+                    }
+
+                    const std::uint16_t chunkHeight = readLe16(chunkData, 2, ok);
+                    if (!ok)
+                    {
+                        return fail(BinaryArtLoader::FileType::Adf, "Failed to read ADF cell height.", offset + 2);
+                    }
+
+                    if (chunkWidth == 0 || chunkHeight == 0)
+                    {
+                        return fail(BinaryArtLoader::FileType::Adf, "ADF width and height must be non-zero.", offset);
+                    }
+
+                    const std::size_t expectedBytes =
+                        static_cast<std::size_t>(chunkWidth) *
+                        static_cast<std::size_t>(chunkHeight) * 2u;
+
+                    if (chunkSize < 4u + expectedBytes)
+                    {
+                        return fail(BinaryArtLoader::FileType::Adf, "ADF cell chunk payload is truncated.", offset + 4);
+                    }
+
+                    width = static_cast<int>(chunkWidth);
+                    height = static_cast<int>(chunkHeight);
+                    cellBytes = chunkData.substr(4, expectedBytes);
+                    hasExplicitCellBlock = true;
+
+                    if (4u + expectedBytes < chunkSize)
+                    {
+                        addWarning(
+                            result,
+                            BinaryArtLoader::LoadWarningCode::ExtraTrailingBytesIgnored,
+                            "Extra bytes inside ADF cell chunk were ignored.",
+                            offset + 4u + expectedBytes,
+                            {});
+                    }
+                }
+                else if (chunkId == "SIZE" || chunkId == "size")
+                {
+                    if (chunkSize >= 4)
+                    {
+                        const std::uint16_t chunkWidth = readLe16(chunkData, 0, ok);
+                        if (!ok)
+                        {
+                            return fail(BinaryArtLoader::FileType::Adf, "Failed to read ADF SIZE width.", offset);
+                        }
+
+                        const std::uint16_t chunkHeight = readLe16(chunkData, 2, ok);
+                        if (!ok)
+                        {
+                            return fail(BinaryArtLoader::FileType::Adf, "Failed to read ADF SIZE height.", offset + 2);
+                        }
+
+                        width = static_cast<int>(chunkWidth);
+                        height = static_cast<int>(chunkHeight);
+                    }
+                }
+                else
+                {
+                    addWarning(
+                        result,
+                        BinaryArtLoader::LoadWarningCode::AdfUnsupportedChunkIgnored,
+                        "Unsupported ADF chunk was ignored: " + chunkId,
+                        offset,
+                        {});
+                }
+
+                offset += chunkSize;
+            }
+        }
+
+        if (hasExplicitCellBlock)
+        {
+            BinaryArtLoader::LoadResult decoded =
+                decodeCellStream(
+                    cellBytes,
+                    width,
+                    options,
+                    BinaryArtLoader::FileType::Adf,
+                    options.enableIceColors,
+                    sauce,
+                    0);
+
+            decoded.warnings.insert(
+                decoded.warnings.begin(),
+                result.warnings.begin(),
+                result.warnings.end());
+
+            return decoded;
+        }
+
+        if (options.preferSauceWidth && sauce.present && sauce.tInfo1 > 0)
+        {
+            width = static_cast<int>(sauce.tInfo1);
+        }
+
+        if (width <= 0)
+        {
+            width = std::max(1, options.defaultColumns);
+        }
+
+        if (height > 0)
+        {
+            const std::size_t expectedBytes =
+                static_cast<std::size_t>(width) *
+                static_cast<std::size_t>(height) * 2u;
+
+            if (expectedBytes <= bytes.size())
+            {
+                BinaryArtLoader::LoadResult decoded =
+                    decodeCellStream(
+                        bytes.substr(0, expectedBytes),
+                        width,
+                        options,
+                        BinaryArtLoader::FileType::Adf,
+                        options.enableIceColors,
+                        sauce);
+
+                decoded.warnings.insert(
+                    decoded.warnings.begin(),
+                    result.warnings.begin(),
+                    result.warnings.end());
+
+                if (expectedBytes < bytes.size())
+                {
+                    addWarning(
+                        decoded,
+                        BinaryArtLoader::LoadWarningCode::ExtraTrailingBytesIgnored,
+                        "Extra trailing bytes after ADF payload were ignored.",
+                        expectedBytes,
+                        {});
+                }
+
+                return decoded;
+            }
+        }
+
+        BinaryArtLoader::LoadResult fallback =
+            decodeCellStream(
+                bytes,
+                width,
+                options,
+                BinaryArtLoader::FileType::Adf,
+                options.enableIceColors,
+                sauce);
+
+        fallback.warnings.insert(
+            fallback.warnings.begin(),
+            result.warnings.begin(),
+            result.warnings.end());
+
+        return fallback;
     }
 }
 
@@ -595,8 +941,19 @@ namespace BinaryArtLoader
             return result;
         }
 
-        LoadResult result = loadFromBytes(bytes, options);
-        result.detectedFileType = detectFileType(filePath);
+        LoadOptions resolvedOptions = options;
+        if (resolvedOptions.fileType == FileType::Auto)
+        {
+            resolvedOptions.fileType = detectFileType(filePath);
+        }
+
+        LoadResult result = loadFromBytes(bytes, resolvedOptions);
+
+        if (result.detectedFileType == FileType::Unknown)
+        {
+            result.detectedFileType = detectFileType(filePath);
+        }
+
         return result;
     }
 
@@ -645,33 +1002,53 @@ namespace BinaryArtLoader
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options)
     {
-        const SauceRecord sauce = parseSauce(bytes);
-        const std::string_view content = bytes.substr(0, sauce.contentSize);
+        const auto sauceRecord = SauceSupport::parse(bytes);
+        const std::string_view content = bytes.substr(0, sauceRecord.contentSize);
 
         LoadResult result;
+        const FileType type = options.fileType;
 
-        if (content.size() >= 5 &&
+        const bool isXBin =
+            content.size() >= 5 &&
             content[0] == 'X' &&
             content[1] == 'B' &&
             content[2] == 'I' &&
             content[3] == 'N' &&
-            static_cast<unsigned char>(content[4]) == 0x1A)
+            static_cast<unsigned char>(content[4]) == 0x1A;
+
+        if (type == FileType::XBin || (type == FileType::Auto && isXBin))
         {
-            result = loadXBin(content, options, sauce.metadata);
+            result = loadXBin(content, options, sauceRecord.metadata);
         }
-        else if (options.fileType == FileType::Adf)
+        else if (type == FileType::Adf)
         {
-            result = loadAdf(content, options, sauce.metadata);
+            result = loadAdf(content, options, sauceRecord.metadata);
+        }
+        else if (type == FileType::Bin || type == FileType::Auto || type == FileType::Unknown)
+        {
+            result = loadBin(content, options, sauceRecord.metadata);
         }
         else
         {
-            result = loadBin(content, options, sauce.metadata);
+            result.success = false;
+            result.detectedFileType = FileType::Unknown;
+            result.errorMessage = "Unsupported binary art file type.";
         }
 
-        if (sauce.truncated)
+        appendSauceWarnings(result, options, sauceRecord);
+
+        if (result.success &&
+            options.preferSauceWidth &&
+            result.sauce.present &&
+            result.detectedFileType != FileType::XBin &&
+            result.sauce.tInfo1 > 0)
         {
-            addWarning(result, LoadWarningCode::TruncatedSauceIgnored,
-                "SAUCE comment metadata appeared truncated and was partially ignored.", sauce.contentSize, {});
+            addWarning(
+                result,
+                LoadWarningCode::SauceWidthOverrideApplied,
+                "SAUCE width metadata was applied to binary art import.",
+                0,
+                {});
         }
 
         return result;
@@ -714,7 +1091,24 @@ namespace BinaryArtLoader
 
         if (result.hasParseFailure)
         {
-            stream << " [byte=" << result.failingByteOffset << "]";
+            stream << " [byte=" << result.failingByteOffset;
+
+            if (result.firstFailingPosition.isValid())
+            {
+                stream << ", x=" << result.firstFailingPosition.x
+                    << ", y=" << result.firstFailingPosition.y;
+            }
+
+            if (result.firstFailingCodePoint != U'\0')
+            {
+                stream << ", codepoint=U+"
+                    << std::hex
+                    << std::uppercase
+                    << static_cast<std::uint32_t>(result.firstFailingCodePoint)
+                    << std::dec;
+            }
+
+            stream << "]";
         }
 
         return stream.str();
@@ -724,8 +1118,8 @@ namespace BinaryArtLoader
     {
         std::ostringstream stream;
         stream << "Binary art load succeeded: "
-               << result.resolvedWidth << "x" << result.resolvedHeight
-               << ", type=" << toString(result.detectedFileType);
+            << result.resolvedWidth << "x" << result.resolvedHeight
+            << ", type=" << toString(result.detectedFileType);
 
         if (result.usedIceColors)
         {
@@ -735,6 +1129,11 @@ namespace BinaryArtLoader
         if (result.sauce.present)
         {
             stream << ", SAUCE title=\"" << result.sauce.title << "\"";
+        }
+
+        if (!result.sauce.comments.empty())
+        {
+            stream << ", sauceComments=" << result.sauce.comments.size();
         }
 
         if (!result.warnings.empty())
@@ -764,13 +1163,15 @@ namespace BinaryArtLoader
         {
         case LoadWarningCode::None: return "None";
         case LoadWarningCode::SauceMetadataPresent: return "SauceMetadataPresent";
+        case LoadWarningCode::SauceCommentsImported: return "SauceCommentsImported";
         case LoadWarningCode::SauceWidthOverrideApplied: return "SauceWidthOverrideApplied";
+        case LoadWarningCode::InvalidSauceCommentBlockIgnored: return "InvalidSauceCommentBlockIgnored";
+        case LoadWarningCode::TruncatedSauceIgnored: return "TruncatedSauceIgnored";
         case LoadWarningCode::PaletteDataIgnored: return "PaletteDataIgnored";
         case LoadWarningCode::FontDataIgnored: return "FontDataIgnored";
-        case LoadWarningCode::AdfSubsetAssumed: return "AdfSubsetAssumed";
         case LoadWarningCode::ExtraTrailingBytesIgnored: return "ExtraTrailingBytesIgnored";
-        case LoadWarningCode::CompressedXBinStubEncountered: return "CompressedXBinStubEncountered";
-        case LoadWarningCode::TruncatedSauceIgnored: return "TruncatedSauceIgnored";
+        case LoadWarningCode::CompressedXBinDecoded: return "CompressedXBinDecoded";
+        case LoadWarningCode::AdfUnsupportedChunkIgnored: return "AdfUnsupportedChunkIgnored";
         default: return "Unknown";
         }
     }
@@ -779,8 +1180,8 @@ namespace BinaryArtLoader
     {
         switch (mode)
         {
+        case XBinCompressionSupport::DecodeCompressed: return "DecodeCompressed";
         case XBinCompressionSupport::RejectCompressed: return "RejectCompressed";
-        case XBinCompressionSupport::StubHookOnly: return "StubHookOnly";
         default: return "Unknown";
         }
     }

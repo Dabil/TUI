@@ -1,12 +1,12 @@
 #pragma once
 
 #include <cstddef>
-#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "Rendering/Objects/SauceSupport.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"
 
@@ -23,21 +23,26 @@ namespace BinaryArtLoader
 
     enum class XBinCompressionSupport
     {
-        RejectCompressed,
-        StubHookOnly
+        DecodeCompressed,
+        RejectCompressed
     };
 
     enum class LoadWarningCode
     {
         None,
+
         SauceMetadataPresent,
+        SauceCommentsImported,
         SauceWidthOverrideApplied,
+        InvalidSauceCommentBlockIgnored,
+        TruncatedSauceIgnored,
+
         PaletteDataIgnored,
         FontDataIgnored,
-        AdfSubsetAssumed,
         ExtraTrailingBytesIgnored,
-        CompressedXBinStubEncountered,
-        TruncatedSauceIgnored
+
+        CompressedXBinDecoded,
+        AdfUnsupportedChunkIgnored
     };
 
     struct SourcePosition
@@ -64,23 +69,7 @@ namespace BinaryArtLoader
         }
     };
 
-    struct SauceMetadata
-    {
-        bool present = false;
-        std::string title;
-        std::string author;
-        std::string group;
-        std::string date;
-        std::uint8_t dataType = 0;
-        std::uint8_t fileType = 0;
-        std::uint16_t tInfo1 = 0;
-        std::uint16_t tInfo2 = 0;
-        std::uint16_t tInfo3 = 0;
-        std::uint16_t tInfo4 = 0;
-        std::uint8_t commentLineCount = 0;
-        std::uint8_t flags = 0;
-        std::string fontName;
-    };
+    using SauceMetadata = SauceSupport::SauceMetadata;
 
     struct LoadOptions
     {
@@ -93,7 +82,10 @@ namespace BinaryArtLoader
         bool strictSizeValidation = true;
         bool strictUnsupportedFeatures = false;
 
-        XBinCompressionSupport xbinCompressionSupport = XBinCompressionSupport::RejectCompressed;
+        XBinCompressionSupport xbinCompressionSupport =
+            XBinCompressionSupport::DecodeCompressed;
+
+        bool importSauceComments = true;
 
         std::optional<Style> baseStyle;
     };

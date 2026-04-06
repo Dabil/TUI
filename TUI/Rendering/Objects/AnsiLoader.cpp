@@ -16,14 +16,6 @@
 
 namespace
 {
-    struct SauceRecord
-    {
-        bool found = false;
-        bool truncated = false;
-        std::size_t contentSize = 0;
-        AnsiLoader::SauceMetadata metadata;
-    };
-
     std::string toLowerCopy(std::string value)
     {
         std::transform(
@@ -62,92 +54,6 @@ namespace
             std::istreambuf_iterator<char>());
 
         return true;
-    }
-
-    std::string trimRightAscii(const std::string& value)
-    {
-        std::size_t end = value.size();
-        while (end > 0 && (value[end - 1] == ' ' || value[end - 1] == '\0'))
-        {
-            --end;
-        }
-
-        return value.substr(0, end);
-    }
-
-    std::uint16_t readLe16(std::string_view bytes, std::size_t offset, bool& ok)
-    {
-        if (offset + 1 >= bytes.size())
-        {
-            ok = false;
-            return 0;
-        }
-
-        ok = true;
-        return static_cast<std::uint16_t>(
-            static_cast<unsigned char>(bytes[offset]) |
-            (static_cast<unsigned char>(bytes[offset + 1]) << 8));
-    }
-
-    SauceRecord parseSauce(std::string_view bytes)
-    {
-        SauceRecord result;
-        result.contentSize = bytes.size();
-
-        if (bytes.size() < 128)
-        {
-            return result;
-        }
-
-        const std::size_t sauceOffset = bytes.size() - 128;
-        const std::string_view sauce = bytes.substr(sauceOffset, 128);
-
-        if (sauce.substr(0, 5) != "SAUCE")
-        {
-            return result;
-        }
-
-        result.found = true;
-        result.contentSize = sauceOffset;
-
-        result.metadata.present = true;
-        result.metadata.title = trimRightAscii(std::string(sauce.substr(7, 35)));
-        result.metadata.author = trimRightAscii(std::string(sauce.substr(42, 20)));
-        result.metadata.group = trimRightAscii(std::string(sauce.substr(62, 20)));
-        result.metadata.date = trimRightAscii(std::string(sauce.substr(82, 8)));
-        result.metadata.dataType = static_cast<std::uint8_t>(sauce[94]);
-        result.metadata.fileType = static_cast<std::uint8_t>(sauce[95]);
-
-        bool ok = false;
-        result.metadata.tInfo1 = readLe16(sauce, 96, ok);
-        result.metadata.tInfo2 = readLe16(sauce, 98, ok);
-        result.metadata.tInfo3 = readLe16(sauce, 100, ok);
-        result.metadata.tInfo4 = readLe16(sauce, 102, ok);
-        result.metadata.commentLineCount = static_cast<std::uint8_t>(sauce[104]);
-        result.metadata.flags = static_cast<std::uint8_t>(sauce[105]);
-        result.metadata.fontName = trimRightAscii(std::string(sauce.substr(106, 22)));
-
-        const std::size_t commentBytes =
-            (result.metadata.commentLineCount > 0)
-            ? (5u + static_cast<std::size_t>(result.metadata.commentLineCount) * 64u)
-            : 0u;
-
-        if (commentBytes > 0)
-        {
-            if (result.contentSize < commentBytes)
-            {
-                result.truncated = true;
-                return result;
-            }
-
-            const std::size_t commentBlockOffset = result.contentSize - commentBytes;
-            if (bytes.substr(commentBlockOffset, 5) == "COMNT")
-            {
-                result.contentSize = commentBlockOffset;
-            }
-        }
-
-        return result;
     }
 
     char32_t decodeCp437Byte(unsigned char value)
@@ -232,7 +138,7 @@ namespace
     public:
         Parser(
             const AnsiLoader::LoadOptions& options,
-            const SauceRecord& sauce)
+            const SauceSupport::SauceParseResult& sauce)
             : m_options(options)
             , m_sauce(sauce)
         {
@@ -245,6 +151,11 @@ namespace
             if (m_width <= 0)
             {
                 m_width = 80;
+            }
+
+            if (m_width > m_options.maxColumns)
+            {
+                m_width = m_options.maxColumns;
             }
 
             m_cursorStyle = options.baseStyle;
@@ -287,7 +198,9 @@ namespace
                     {
                         m_cursorX = 0;
                         ++m_cursorY;
+                        clampCursor(i);
                     }
+
                     continue;
                 }
 
@@ -325,18 +238,28 @@ namespace
                     result,
                     AnsiLoader::LoadWarningCode::SauceMetadataPresent,
                     "SAUCE metadata was detected and parsed.",
-                    0,
+                    m_sauce.contentSize,
                     {});
-            }
 
-            if (m_options.preferSauceWidth && m_sauce.metadata.present && m_sauce.metadata.tInfo1 > 0)
-            {
-                addWarning(
-                    result,
-                    AnsiLoader::LoadWarningCode::SauceWidthOverrideApplied,
-                    "SAUCE width metadata was applied to ANSI import.",
-                    0,
-                    {});
+                if (m_options.preferSauceWidth && m_sauce.metadata.tInfo1 > 0)
+                {
+                    addWarning(
+                        result,
+                        AnsiLoader::LoadWarningCode::SauceWidthOverrideApplied,
+                        "SAUCE width metadata was applied to ANSI canvas width.",
+                        m_sauce.contentSize,
+                        {});
+                }
+
+                if (m_options.importSauceComments && !m_sauce.metadata.comments.empty())
+                {
+                    addWarning(
+                        result,
+                        AnsiLoader::LoadWarningCode::SauceCommentsImported,
+                        "SAUCE comments were parsed and imported into metadata.",
+                        m_sauce.contentSize,
+                        {});
+                }
             }
 
             if (m_sauce.truncated)
@@ -349,21 +272,39 @@ namespace
                     {});
             }
 
-            result.warnings.insert(
-                result.warnings.end(),
-                m_warnings.begin(),
-                m_warnings.end());
+            for (const LoadWarning& warning : m_warnings)
+            {
+                result.warnings.push_back(warning);
+            }
 
             return result;
         }
 
     private:
+        using LoadWarning = AnsiLoader::LoadWarning;
+        using LoadWarningCode = AnsiLoader::LoadWarningCode;
+        using SourcePosition = AnsiLoader::SourcePosition;
+
+        void addRuntimeWarning(
+            LoadWarningCode code,
+            const std::string& message,
+            std::size_t byteOffset,
+            const SourcePosition& position)
+        {
+            LoadWarning warning;
+            warning.code = code;
+            warning.message = message;
+            warning.byteOffset = byteOffset;
+            warning.sourcePosition = position;
+            m_warnings.push_back(warning);
+        }
+
         void preScanDimensions(std::string_view bytes)
         {
             int x = 0;
             int y = 0;
-            int maxX = 0;
-            int maxY = 0;
+
+            m_height = 1;
 
             for (std::size_t i = 0; i < bytes.size(); ++i)
             {
@@ -373,16 +314,29 @@ namespace
                 {
                     if (i + 1 < bytes.size() && bytes[i + 1] == '[')
                     {
-                        while (i + 1 < bytes.size())
+                        std::size_t cursor = i + 2;
+                        while (cursor < bytes.size())
                         {
-                            ++i;
-                            const unsigned char ch = static_cast<unsigned char>(bytes[i]);
+                            const unsigned char ch = static_cast<unsigned char>(bytes[cursor]);
                             if (ch >= 0x40 && ch <= 0x7E)
                             {
+                                i = cursor;
                                 break;
                             }
+
+                            ++cursor;
+                        }
+
+                        if (cursor >= bytes.size())
+                        {
+                            break;
                         }
                     }
+                    else if (i + 1 < bytes.size())
+                    {
+                        ++i;
+                    }
+
                     continue;
                 }
 
@@ -394,9 +348,13 @@ namespace
 
                 if (byte == '\n')
                 {
-                    x = 0;
-                    ++y;
-                    maxY = std::max(maxY, y);
+                    if (m_options.treatBareLfAsNewLine)
+                    {
+                        x = 0;
+                        ++y;
+                        m_height = std::max(m_height, y + 1);
+                    }
+
                     continue;
                 }
 
@@ -409,58 +367,74 @@ namespace
                 if (byte == '\t')
                 {
                     x = ((x / 8) + 1) * 8;
-                    maxX = std::max(maxX, x);
+                    if (m_options.wrapAtColumnBoundary && x >= m_width)
+                    {
+                        x = 0;
+                        ++y;
+                        m_height = std::max(m_height, y + 1);
+                    }
                     continue;
                 }
 
-                const CellWidth measuredWidth =
-                    UnicodeWidth::measureCodePointWidth(decodeCp437Byte(byte));
-
-                if (measuredWidth == CellWidth::Two)
+                const char32_t glyph = decodeCp437Byte(byte);
+                const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(glyph);
+                if (measuredWidth == CellWidth::Zero)
                 {
-                    x += 2;
-                }
-                else if (measuredWidth != CellWidth::Zero)
-                {
-                    x += 1;
+                    continue;
                 }
 
-                maxX = std::max(maxX, x);
+                const int glyphWidth = (measuredWidth == CellWidth::Two) ? 2 : 1;
+
+                if (m_options.wrapAtColumnBoundary && x + glyphWidth > m_width && x > 0)
+                {
+                    x = 0;
+                    ++y;
+                }
+
+                x += glyphWidth;
+                m_height = std::max(m_height, y + 1);
             }
 
-            if (m_options.expandCanvasOnDemand)
+            if (m_height > m_options.maxRows)
             {
-                m_width = std::clamp(std::max(m_width, maxX), 1, m_options.maxColumns);
+                m_height = m_options.maxRows;
             }
-
-            m_height = std::clamp(std::max(1, maxY + 1), 1, m_options.maxRows);
         }
 
         bool consumeEscape(std::string_view bytes, std::size_t& ioIndex)
         {
             if (ioIndex + 1 >= bytes.size())
             {
-                AnsiLoader::LoadWarning warning;
-                warning.code = AnsiLoader::LoadWarningCode::BareEscapeIgnored;
-                warning.message = "Trailing ESC byte was ignored.";
-                warning.byteOffset = ioIndex;
-                warning.sourcePosition = { m_cursorX, m_cursorY };
-                m_warnings.push_back(warning);
+                addRuntimeWarning(
+                    LoadWarningCode::BareEscapeIgnored,
+                    "Trailing ESC byte was ignored.",
+                    ioIndex,
+                    currentPosition());
 
-                return !m_options.strictUnsupportedCommands;
+                if (m_options.strictUnsupportedCommands)
+                {
+                    return false;
+                }
+
+                return true;
             }
 
-            if (bytes[ioIndex + 1] != '[')
+            const unsigned char next = static_cast<unsigned char>(bytes[ioIndex + 1]);
+            if (next != '[')
             {
-                AnsiLoader::LoadWarning warning;
-                warning.code = AnsiLoader::LoadWarningCode::UnsupportedSequenceIgnored;
-                warning.message = "Non-CSI escape sequence was ignored.";
-                warning.byteOffset = ioIndex;
-                warning.sourcePosition = { m_cursorX, m_cursorY };
-                m_warnings.push_back(warning);
+                addRuntimeWarning(
+                    LoadWarningCode::UnsupportedSequenceIgnored,
+                    "Non-CSI ESC sequence was ignored.",
+                    ioIndex,
+                    currentPosition());
+
+                if (m_options.strictUnsupportedCommands)
+                {
+                    return false;
+                }
 
                 ++ioIndex;
-                return !m_options.strictUnsupportedCommands;
+                return true;
             }
 
             std::size_t cursor = ioIndex + 2;
@@ -483,61 +457,12 @@ namespace
             return false;
         }
 
-        std::vector<int> parseParams(const std::string& body) const
-        {
-            if (body.empty())
-            {
-                return {};
-            }
-
-            std::vector<int> result;
-            std::string token;
-
-            for (char ch : body)
-            {
-                if (ch == ';')
-                {
-                    result.push_back(token.empty() ? 0 : std::stoi(token));
-                    token.clear();
-                    continue;
-                }
-
-                if (std::isdigit(static_cast<unsigned char>(ch)))
-                {
-                    token.push_back(ch);
-                }
-            }
-
-            result.push_back(token.empty() ? 0 : std::stoi(token));
-            return result;
-        }
-
-        int firstOr(const std::vector<int>& params, int fallback) const
-        {
-            if (params.empty())
-            {
-                return fallback;
-            }
-
-            return params[0] == 0 ? fallback : params[0];
-        }
-
-        int paramAt(const std::vector<int>& params, std::size_t index, int fallback) const
-        {
-            if (index >= params.size())
-            {
-                return fallback;
-            }
-
-            return params[index] == 0 ? fallback : params[index];
-        }
-
         bool applyCsi(const std::string& payload, char finalByte, std::size_t byteOffset)
         {
             bool privateMode = false;
             std::string body = payload;
 
-            if (!body.empty() && (body[0] == '?' || body[0] == '=' || body[0] == '>'))
+            if (!body.empty() && (body[0] == '?' || body[0] == '>' || body[0] == '='))
             {
                 privateMode = true;
                 body.erase(body.begin());
@@ -545,12 +470,12 @@ namespace
 
             if (privateMode)
             {
-                AnsiLoader::LoadWarning warning;
-                warning.code = AnsiLoader::LoadWarningCode::UnsupportedPrivateSequenceIgnored;
-                warning.message = "Private CSI sequence was ignored.";
-                warning.byteOffset = byteOffset;
-                warning.sourcePosition = { m_cursorX, m_cursorY };
-                m_warnings.push_back(warning);
+                addRuntimeWarning(
+                    LoadWarningCode::UnsupportedPrivateSequenceIgnored,
+                    "ANSI private CSI sequence was ignored.",
+                    byteOffset,
+                    currentPosition());
+
                 return !m_options.strictUnsupportedCommands;
             }
 
@@ -562,61 +487,126 @@ namespace
                 return applySgr(params, byteOffset);
 
             case 'A':
-                m_cursorY -= firstOr(params, 1);
-                clampCursor(byteOffset);
+                moveRelative(0, -firstOr(params, 1), byteOffset);
                 return true;
 
             case 'B':
-                m_cursorY += firstOr(params, 1);
-                clampCursor(byteOffset);
+                moveRelative(0, firstOr(params, 1), byteOffset);
                 return true;
 
             case 'C':
-                m_cursorX += firstOr(params, 1);
-                clampCursor(byteOffset);
+                moveRelative(firstOr(params, 1), 0, byteOffset);
                 return true;
 
             case 'D':
-                m_cursorX -= firstOr(params, 1);
-                clampCursor(byteOffset);
+                moveRelative(-firstOr(params, 1), 0, byteOffset);
                 return true;
 
             case 'H':
             case 'f':
-                m_cursorY = std::max(0, firstOr(params, 1) - 1);
-                m_cursorX = std::max(0, paramAt(params, 1, 1) - 1);
-                clampCursor(byteOffset);
+                moveAbsolute(firstOr(params, 1) - 1, getParam(params, 1, 1) - 1, byteOffset);
                 return true;
 
             case 'G':
-                m_cursorX = std::max(0, firstOr(params, 1) - 1);
-                clampCursor(byteOffset);
+                setColumn(firstOr(params, 1) - 1, byteOffset);
                 return true;
 
+            case 'J':
+                return eraseDisplay(firstOr(params, 0));
+
+            case 'K':
+                return eraseLine(firstOr(params, 0));
+
             case 's':
-                m_savedX = m_cursorX;
-                m_savedY = m_cursorY;
+                m_savedCursorX = m_cursorX;
+                m_savedCursorY = m_cursorY;
                 m_savedStyle = m_cursorStyle;
                 return true;
 
             case 'u':
-                m_cursorX = m_savedX;
-                m_cursorY = m_savedY;
+                m_cursorX = m_savedCursorX;
+                m_cursorY = m_savedCursorY;
                 m_cursorStyle = m_savedStyle;
                 clampCursor(byteOffset);
                 return true;
 
             default:
-            {
-                AnsiLoader::LoadWarning warning;
-                warning.code = AnsiLoader::LoadWarningCode::UnsupportedSequenceIgnored;
-                warning.message = std::string("Unsupported CSI command ignored: ") + finalByte;
-                warning.byteOffset = byteOffset;
-                warning.sourcePosition = { m_cursorX, m_cursorY };
-                m_warnings.push_back(warning);
+                addRuntimeWarning(
+                    LoadWarningCode::UnsupportedSequenceIgnored,
+                    std::string("Unsupported CSI final byte ignored: ") + finalByte,
+                    byteOffset,
+                    currentPosition());
+
                 return !m_options.strictUnsupportedCommands;
             }
+        }
+
+        std::vector<int> parseParams(const std::string& body) const
+        {
+            if (body.empty())
+            {
+                return {};
             }
+
+            std::vector<int> params;
+            std::string current;
+
+            for (char ch : body)
+            {
+                if (ch == ';')
+                {
+                    params.push_back(current.empty() ? 0 : std::stoi(current));
+                    current.clear();
+                    continue;
+                }
+
+                if (std::isdigit(static_cast<unsigned char>(ch)))
+                {
+                    current.push_back(ch);
+                    continue;
+                }
+
+                params.push_back(0);
+                current.clear();
+            }
+
+            params.push_back(current.empty() ? 0 : std::stoi(current));
+            return params;
+        }
+
+        int firstOr(const std::vector<int>& params, int fallback) const
+        {
+            return params.empty() ? fallback : (params[0] == 0 ? fallback : params[0]);
+        }
+
+        int getParam(const std::vector<int>& params, std::size_t index, int fallback) const
+        {
+            if (index >= params.size())
+            {
+                return fallback;
+            }
+
+            return params[index] == 0 ? fallback : params[index];
+        }
+
+        void moveRelative(int dx, int dy, std::size_t byteOffset)
+        {
+            m_cursorX += dx;
+            m_cursorY += dy;
+            clampCursor(byteOffset);
+        }
+
+        void moveAbsolute(int row, int column, std::size_t byteOffset)
+        {
+            m_cursorY = std::max(0, row);
+            m_cursorX = std::max(0, column);
+            clampCursor(byteOffset);
+        }
+
+        void setColumn(int column, std::size_t byteOffset)
+        {
+            m_cursorX = std::max(0, column);
+            clampCursor(byteOffset);
         }
 
         void clampCursor(std::size_t byteOffset)
@@ -634,24 +624,237 @@ namespace
 
             if (m_cursorX != oldX || m_cursorY != oldY)
             {
-                AnsiLoader::LoadWarning warning;
-                warning.code = AnsiLoader::LoadWarningCode::CursorClamped;
-                warning.message = "Cursor movement exceeded configured bounds and was clamped.";
-                warning.byteOffset = byteOffset;
-                warning.sourcePosition = { m_cursorX, m_cursorY };
-                m_warnings.push_back(warning);
+                addRuntimeWarning(
+                    LoadWarningCode::CursorClamped,
+                    "Cursor movement exceeded configured bounds and was clamped.",
+                    byteOffset,
+                    currentPosition());
             }
         }
 
-        Style effectiveStyle() const
+        bool eraseDisplay(int mode)
         {
-            return m_cursorStyle.value_or(Style{});
+            if (!m_builderInitialized)
+            {
+                return false;
+            }
+
+            if (mode == 2)
+            {
+                for (int y = 0; y < m_height; ++y)
+                {
+                    for (int x = 0; x < m_width; ++x)
+                    {
+                        m_builder->setGlyph(x, y, U' ', m_cursorStyle);
+                    }
+                }
+
+                return true;
+            }
+
+            if (mode == 1)
+            {
+                for (int y = 0; y <= m_cursorY; ++y)
+                {
+                    const int rowEnd = (y == m_cursorY) ? (m_cursorX + 1) : m_width;
+                    for (int x = 0; x < rowEnd; ++x)
+                    {
+                        m_builder->setGlyph(x, y, U' ', m_cursorStyle);
+                    }
+                }
+
+                return true;
+            }
+
+            for (int y = m_cursorY; y < m_height; ++y)
+            {
+                const int rowStart = (y == m_cursorY) ? m_cursorX : 0;
+                for (int x = rowStart; x < m_width; ++x)
+                {
+                    m_builder->setGlyph(x, y, U' ', m_cursorStyle);
+                }
+            }
+
+            return true;
         }
 
-        bool applyExtendedColor(
-            const std::vector<int>& params,
-            std::size_t& ioIndex,
-            bool foreground)
+        bool eraseLine(int mode)
+        {
+            if (!m_builderInitialized)
+            {
+                return false;
+            }
+
+            if (mode == 2)
+            {
+                for (int x = 0; x < m_width; ++x)
+                {
+                    m_builder->setGlyph(x, m_cursorY, U' ', m_cursorStyle);
+                }
+
+                return true;
+            }
+
+            if (mode == 1)
+            {
+                for (int x = 0; x <= m_cursorX && x < m_width; ++x)
+                {
+                    m_builder->setGlyph(x, m_cursorY, U' ', m_cursorStyle);
+                }
+
+                return true;
+            }
+
+            for (int x = m_cursorX; x < m_width; ++x)
+            {
+                m_builder->setGlyph(x, m_cursorY, U' ', m_cursorStyle);
+            }
+
+            return true;
+        }
+
+        bool applySgr(const std::vector<int>& params, std::size_t byteOffset)
+        {
+            if (params.empty())
+            {
+                m_cursorStyle = m_options.baseStyle;
+                return true;
+            }
+
+            for (std::size_t i = 0; i < params.size(); ++i)
+            {
+                const int p = params[i];
+
+                switch (p)
+                {
+                case 0:
+                    m_cursorStyle = m_options.baseStyle;
+                    break;
+
+                case 1:
+                    m_cursorStyle = resolveStyle().withBold(true);
+                    break;
+
+                case 2:
+                    m_cursorStyle = resolveStyle().withDim(true);
+                    break;
+
+                case 4:
+                    m_cursorStyle = resolveStyle().withUnderline(true);
+                    break;
+
+                case 5:
+                    m_cursorStyle = resolveStyle().withSlowBlink(true);
+                    break;
+
+                case 6:
+                    m_cursorStyle = resolveStyle().withFastBlink(true);
+                    break;
+
+                case 7:
+                    m_cursorStyle = resolveStyle().withReverse(true);
+                    break;
+
+                case 8:
+                    m_cursorStyle = resolveStyle().withInvisible(true);
+                    break;
+
+                case 9:
+                    m_cursorStyle = resolveStyle().withStrike(true);
+                    break;
+
+                case 22:
+                    m_cursorStyle = resolveStyle().withoutBold().withoutDim();
+                    break;
+
+                case 24:
+                    m_cursorStyle = resolveStyle().withoutUnderline();
+                    break;
+
+                case 25:
+                    m_cursorStyle = resolveStyle().withoutSlowBlink().withoutFastBlink();
+                    break;
+
+                case 27:
+                    m_cursorStyle = resolveStyle().withoutReverse();
+                    break;
+
+                case 28:
+                    m_cursorStyle = resolveStyle().withoutInvisible();
+                    break;
+
+                case 29:
+                    m_cursorStyle = resolveStyle().withoutStrike();
+                    break;
+
+                case 39:
+                    m_cursorStyle = resolveStyle().withoutForeground();
+                    break;
+
+                case 49:
+                    m_cursorStyle = resolveStyle().withoutBackground();
+                    break;
+
+                default:
+                    if (p >= 30 && p <= 37)
+                    {
+                        m_cursorStyle = resolveStyle().withForeground(
+                            Color::FromBasic(ansiBasicToColor(p - 30)));
+                    }
+                    else if (p >= 40 && p <= 47)
+                    {
+                        m_cursorStyle = resolveStyle().withBackground(
+                            Color::FromBasic(ansiBasicToColor(p - 40)));
+                    }
+                    else if (p >= 90 && p <= 97)
+                    {
+                        m_cursorStyle = resolveStyle().withForeground(
+                            Color::FromBasic(ansiBrightBasicToColor(p - 90)));
+                    }
+                    else if (p >= 100 && p <= 107)
+                    {
+                        m_cursorStyle = resolveStyle().withBackground(
+                            Color::FromBasic(ansiBrightBasicToColor(p - 100)));
+                    }
+                    else if (p == 38 || p == 48)
+                    {
+                        const bool foreground = (p == 38);
+                        if (!applyExtendedColor(params, i, foreground))
+                        {
+                            addRuntimeWarning(
+                                LoadWarningCode::UnsupportedSgrIgnored,
+                                "Malformed extended SGR color sequence ignored.",
+                                byteOffset,
+                                currentPosition());
+
+                            if (m_options.strictUnsupportedCommands)
+                            {
+                                return false;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        addRuntimeWarning(
+                            LoadWarningCode::UnsupportedSgrIgnored,
+                            "Unsupported SGR attribute ignored.",
+                            byteOffset,
+                            currentPosition());
+
+                        if (m_options.strictUnsupportedCommands)
+                        {
+                            return false;
+                        }
+                    }
+
+                    break;
+                }
+            }
+
+            return true;
+        }
+
+        bool applyExtendedColor(const std::vector<int>& params, std::size_t& ioIndex, bool foreground)
         {
             if (ioIndex + 1 >= params.size())
             {
@@ -675,12 +878,12 @@ namespace
 
                 if (foreground)
                 {
-                    m_cursorStyle = effectiveStyle().withForeground(
+                    m_cursorStyle = resolveStyle().withForeground(
                         Color::FromIndexed(static_cast<std::uint8_t>(value)));
                 }
                 else
                 {
-                    m_cursorStyle = effectiveStyle().withBackground(
+                    m_cursorStyle = resolveStyle().withBackground(
                         Color::FromIndexed(static_cast<std::uint8_t>(value)));
                 }
 
@@ -705,7 +908,7 @@ namespace
 
                 if (foreground)
                 {
-                    m_cursorStyle = effectiveStyle().withForeground(
+                    m_cursorStyle = resolveStyle().withForeground(
                         Color::FromRgb(
                             static_cast<std::uint8_t>(r),
                             static_cast<std::uint8_t>(g),
@@ -713,7 +916,7 @@ namespace
                 }
                 else
                 {
-                    m_cursorStyle = effectiveStyle().withBackground(
+                    m_cursorStyle = resolveStyle().withBackground(
                         Color::FromRgb(
                             static_cast<std::uint8_t>(r),
                             static_cast<std::uint8_t>(g),
@@ -726,102 +929,16 @@ namespace
             return false;
         }
 
-        bool applySgr(const std::vector<int>& params, std::size_t byteOffset)
+        Style resolveStyle() const
         {
-            if (params.empty())
-            {
-                m_cursorStyle = m_options.baseStyle;
-                return true;
-            }
-
-            for (std::size_t i = 0; i < params.size(); ++i)
-            {
-                const int p = params[i];
-
-                switch (p)
-                {
-                case 0:  m_cursorStyle = m_options.baseStyle; break;
-                case 1:  m_cursorStyle = effectiveStyle().withBold(true); break;
-                case 2:  m_cursorStyle = effectiveStyle().withDim(true); break;
-                case 4:  m_cursorStyle = effectiveStyle().withUnderline(true); break;
-                case 5:  m_cursorStyle = effectiveStyle().withSlowBlink(true); break;
-                case 6:  m_cursorStyle = effectiveStyle().withFastBlink(true); break;
-                case 7:  m_cursorStyle = effectiveStyle().withReverse(true); break;
-                case 8:  m_cursorStyle = effectiveStyle().withInvisible(true); break;
-                case 9:  m_cursorStyle = effectiveStyle().withStrike(true); break;
-
-                case 22: m_cursorStyle = effectiveStyle().withoutBold().withoutDim(); break;
-                case 24: m_cursorStyle = effectiveStyle().withoutUnderline(); break;
-                case 25: m_cursorStyle = effectiveStyle().withoutSlowBlink().withoutFastBlink(); break;
-                case 27: m_cursorStyle = effectiveStyle().withoutReverse(); break;
-                case 28: m_cursorStyle = effectiveStyle().withoutInvisible(); break;
-                case 29: m_cursorStyle = effectiveStyle().withoutStrike(); break;
-
-                case 39: m_cursorStyle = effectiveStyle().withoutForeground(); break;
-                case 49: m_cursorStyle = effectiveStyle().withoutBackground(); break;
-
-                default:
-                    if (p >= 30 && p <= 37)
-                    {
-                        m_cursorStyle = effectiveStyle().withForeground(
-                            Color::FromBasic(ansiBasicToColor(p - 30)));
-                    }
-                    else if (p >= 40 && p <= 47)
-                    {
-                        m_cursorStyle = effectiveStyle().withBackground(
-                            Color::FromBasic(ansiBasicToColor(p - 40)));
-                    }
-                    else if (p >= 90 && p <= 97)
-                    {
-                        m_cursorStyle = effectiveStyle().withForeground(
-                            Color::FromBasic(ansiBrightBasicToColor(p - 90)));
-                    }
-                    else if (p >= 100 && p <= 107)
-                    {
-                        m_cursorStyle = effectiveStyle().withBackground(
-                            Color::FromBasic(ansiBrightBasicToColor(p - 100)));
-                    }
-                    else if (p == 38 || p == 48)
-                    {
-                        const bool foreground = (p == 38);
-                        if (!applyExtendedColor(params, i, foreground))
-                        {
-                            AnsiLoader::LoadWarning warning;
-                            warning.code = AnsiLoader::LoadWarningCode::UnsupportedSgrIgnored;
-                            warning.message = "Malformed extended SGR color sequence ignored.";
-                            warning.byteOffset = byteOffset;
-                            warning.sourcePosition = { m_cursorX, m_cursorY };
-                            m_warnings.push_back(warning);
-
-                            if (m_options.strictUnsupportedCommands)
-                            {
-                                return false;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        AnsiLoader::LoadWarning warning;
-                        warning.code = AnsiLoader::LoadWarningCode::UnsupportedSgrIgnored;
-                        warning.message = "Unsupported SGR attribute ignored.";
-                        warning.byteOffset = byteOffset;
-                        warning.sourcePosition = { m_cursorX, m_cursorY };
-                        m_warnings.push_back(warning);
-
-                        if (m_options.strictUnsupportedCommands)
-                        {
-                            return false;
-                        }
-                    }
-                    break;
-                }
-            }
-
-            return true;
+            return m_cursorStyle.value_or(Style{});
         }
 
         bool writeGlyph(TextObjectBuilder& builder, char32_t glyph, std::size_t byteOffset)
         {
+            m_builder = &builder;
+            m_builderInitialized = true;
+
             glyph = UnicodeConversion::sanitizeCodePoint(glyph);
 
             const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(glyph);
@@ -830,65 +947,98 @@ namespace
                 return true;
             }
 
-            if (m_options.wrapAtDefaultColumn && m_cursorX >= m_width)
+            const int glyphWidth = (measuredWidth == CellWidth::Two) ? 2 : 1;
+
+            if (m_options.wrapAtColumnBoundary && m_cursorX + glyphWidth > m_width && m_cursorX > 0)
             {
                 m_cursorX = 0;
                 ++m_cursorY;
+                clampCursor(byteOffset);
             }
 
-            if (m_cursorX < 0 || m_cursorY < 0 || m_cursorY >= m_height)
+            if (m_cursorX < 0 || m_cursorY < 0 || m_cursorX >= m_width || m_cursorY >= m_height)
             {
                 return false;
             }
 
-            const std::optional<Style> style = m_cursorStyle;
-
-            bool ok = false;
             if (measuredWidth == CellWidth::Two)
             {
-                ok = builder.setWideGlyph(m_cursorX, m_cursorY, glyph, style);
-                m_cursorX += 2;
+                if (m_cursorX + 1 >= m_width)
+                {
+                    if (!m_options.wrapAtColumnBoundary)
+                    {
+                        return false;
+                    }
+
+                    m_cursorX = 0;
+                    ++m_cursorY;
+                    clampCursor(byteOffset);
+
+                    if (m_cursorX + 1 >= m_width || m_cursorY >= m_height)
+                    {
+                        return false;
+                    }
+                }
+
+                if (!builder.setWideGlyph(m_cursorX, m_cursorY, glyph, m_cursorStyle))
+                {
+                    return false;
+                }
             }
             else
             {
-                ok = builder.setGlyph(m_cursorX, m_cursorY, glyph, style);
-                m_cursorX += 1;
+                if (!builder.setGlyph(m_cursorX, m_cursorY, glyph, m_cursorStyle))
+                {
+                    return false;
+                }
             }
 
-            if (!ok)
-            {
-                AnsiLoader::LoadWarning warning;
-                warning.code = AnsiLoader::LoadWarningCode::CanvasExpanded;
-                warning.message = "Parsed ANSI glyph reached beyond available builder bounds.";
-                warning.byteOffset = byteOffset;
-                warning.sourcePosition = { m_cursorX, m_cursorY };
-                m_warnings.push_back(warning);
-            }
+            m_cursorX += glyphWidth;
+            return true;
+        }
 
-            return ok;
+        SourcePosition currentPosition() const
+        {
+            SourcePosition position;
+            position.x = m_cursorX;
+            position.y = m_cursorY;
+            return position;
         }
 
         AnsiLoader::LoadResult fail(
             const std::string& message,
             std::size_t byteOffset,
-            char32_t codePoint = U'\0')
+            char32_t firstFailingCodePoint = U'\0')
         {
             AnsiLoader::LoadResult result;
             result.success = false;
             result.detectedFileType = AnsiLoader::FileType::Ans;
             result.sauce = m_sauce.metadata;
-            result.warnings = m_warnings;
+            result.resolvedWidth = m_width;
+            result.resolvedHeight = m_height;
             result.hasParseFailure = true;
             result.failingByteOffset = byteOffset;
-            result.firstFailingCodePoint = codePoint;
-            result.firstFailingPosition = { m_cursorX, m_cursorY };
+            result.firstFailingCodePoint = firstFailingCodePoint;
+            result.firstFailingPosition = currentPosition();
             result.errorMessage = message;
+            result.warnings = m_warnings;
+
+            if (m_sauce.truncated)
+            {
+                addWarning(
+                    result,
+                    LoadWarningCode::TruncatedSauceIgnored,
+                    "SAUCE comment metadata appeared truncated and was partially ignored.",
+                    m_sauce.contentSize,
+                    {});
+            }
+
             return result;
         }
 
     private:
-        AnsiLoader::LoadOptions m_options;
-        SauceRecord m_sauce;
+        const AnsiLoader::LoadOptions& m_options;
+        const SauceSupport::SauceParseResult& m_sauce;
 
         int m_width = 80;
         int m_height = 1;
@@ -896,13 +1046,16 @@ namespace
         int m_cursorX = 0;
         int m_cursorY = 0;
 
-        int m_savedX = 0;
-        int m_savedY = 0;
+        int m_savedCursorX = 0;
+        int m_savedCursorY = 0;
 
         std::optional<Style> m_cursorStyle;
         std::optional<Style> m_savedStyle;
 
-        std::vector<AnsiLoader::LoadWarning> m_warnings;
+        TextObjectBuilder* m_builder = nullptr;
+        bool m_builderInitialized = false;
+
+        std::vector<LoadWarning> m_warnings;
     };
 }
 
@@ -911,6 +1064,7 @@ namespace AnsiLoader
     FileType detectFileType(const std::string& filePath)
     {
         const std::string extension = getFileExtensionLower(filePath);
+
         if (extension == ".ans")
         {
             return FileType::Ans;
@@ -937,7 +1091,11 @@ namespace AnsiLoader
         }
 
         LoadResult result = loadFromBytes(bytes, options);
-        result.detectedFileType = detectFileType(filePath);
+        if (result.detectedFileType == FileType::Unknown)
+        {
+            result.detectedFileType = detectFileType(filePath);
+        }
+
         return result;
     }
 
@@ -986,11 +1144,18 @@ namespace AnsiLoader
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options)
     {
-        const SauceRecord sauce = parseSauce(bytes);
+        const SauceSupport::SauceParseResult sauce = SauceSupport::parse(bytes);
         const std::string_view content = bytes.substr(0, sauce.contentSize);
 
         Parser parser(options, sauce);
-        return parser.parse(content);
+        LoadResult result = parser.parse(content);
+
+        if (result.detectedFileType == FileType::Unknown)
+        {
+            result.detectedFileType = FileType::Ans;
+        }
+
+        return result;
     }
 
     bool hasWarning(const LoadResult& result, LoadWarningCode code)
@@ -1021,64 +1186,98 @@ namespace AnsiLoader
 
     std::string formatLoadError(const LoadResult& result)
     {
-        std::ostringstream stream;
-        stream << "ANSI load failed";
+        if (result.success)
+        {
+            return {};
+        }
+
+        std::ostringstream message;
+        message << "ANSI load failed";
+
         if (!result.errorMessage.empty())
         {
-            stream << ": " << result.errorMessage;
+            message << ": " << result.errorMessage;
         }
 
         if (result.hasParseFailure)
         {
-            stream << " [byte=" << result.failingByteOffset;
-
-            if (result.firstFailingPosition.isValid())
-            {
-                stream << ", x=" << result.firstFailingPosition.x
-                       << ", y=" << result.firstFailingPosition.y;
-            }
+            message << " [byte=" << result.failingByteOffset << "]";
 
             if (result.firstFailingCodePoint != U'\0')
             {
-                stream << ", codepoint=U+"
-                       << std::hex << std::uppercase
-                       << static_cast<std::uint32_t>(result.firstFailingCodePoint)
-                       << std::dec;
+                message << " [codepoint=U+"
+                    << std::uppercase << std::hex
+                    << static_cast<std::uint32_t>(result.firstFailingCodePoint)
+                    << std::dec << "]";
             }
 
-            stream << "]";
-        }
-
-        return stream.str();
-    }
-
-    std::string formatLoadSuccess(const LoadResult& result)
-    {
-        std::ostringstream stream;
-        stream << "ANSI load succeeded: "
-               << result.resolvedWidth << "x" << result.resolvedHeight;
-
-        if (result.sauce.present)
-        {
-            stream << ", SAUCE title=\"" << result.sauce.title << "\"";
+            if (result.firstFailingPosition.isValid())
+            {
+                message << " [position=("
+                    << result.firstFailingPosition.x
+                    << ", "
+                    << result.firstFailingPosition.y
+                    << ")]";
+            }
         }
 
         if (!result.warnings.empty())
         {
-            stream << ", warnings=" << result.warnings.size();
+            message << " [warnings=" << result.warnings.size() << "]";
         }
 
-        return stream.str();
+        return message.str();
+    }
+
+    std::string formatLoadSuccess(const LoadResult& result)
+    {
+        if (!result.success)
+        {
+            return {};
+        }
+
+        std::ostringstream message;
+        message << "ANSI load succeeded";
+        message << ". FileType=" << toString(result.detectedFileType) << ".";
+        message << " Size=" << result.resolvedWidth << "x" << result.resolvedHeight << ".";
+
+        if (result.sauce.present)
+        {
+            message << " SAUCE=true.";
+            if (!result.sauce.title.empty())
+            {
+                message << " Title=\"" << result.sauce.title << "\".";
+            }
+        }
+        else
+        {
+            message << " SAUCE=false.";
+        }
+
+        if (result.warnings.empty())
+        {
+            message << " No warnings.";
+        }
+        else
+        {
+            message << " Warnings=" << result.warnings.size() << ".";
+        }
+
+        return message.str();
     }
 
     const char* toString(FileType fileType)
     {
         switch (fileType)
         {
-        case FileType::Auto: return "Auto";
-        case FileType::Unknown: return "Unknown";
-        case FileType::Ans: return "Ans";
-        default: return "Unknown";
+        case FileType::Auto:
+            return "Auto";
+        case FileType::Unknown:
+            return "Unknown";
+        case FileType::Ans:
+            return "ANS";
+        default:
+            return "Unknown";
         }
     }
 
@@ -1086,17 +1285,30 @@ namespace AnsiLoader
     {
         switch (warningCode)
         {
-        case LoadWarningCode::None: return "None";
-        case LoadWarningCode::SauceMetadataPresent: return "SauceMetadataPresent";
-        case LoadWarningCode::SauceWidthOverrideApplied: return "SauceWidthOverrideApplied";
-        case LoadWarningCode::UnsupportedSequenceIgnored: return "UnsupportedSequenceIgnored";
-        case LoadWarningCode::UnsupportedPrivateSequenceIgnored: return "UnsupportedPrivateSequenceIgnored";
-        case LoadWarningCode::UnsupportedSgrIgnored: return "UnsupportedSgrIgnored";
-        case LoadWarningCode::BareEscapeIgnored: return "BareEscapeIgnored";
-        case LoadWarningCode::CursorClamped: return "CursorClamped";
-        case LoadWarningCode::CanvasExpanded: return "CanvasExpanded";
-        case LoadWarningCode::TruncatedSauceIgnored: return "TruncatedSauceIgnored";
-        default: return "Unknown";
+        case LoadWarningCode::None:
+            return "None";
+        case LoadWarningCode::SauceMetadataPresent:
+            return "SauceMetadataPresent";
+        case LoadWarningCode::SauceCommentsImported:
+            return "SauceCommentsImported";
+        case LoadWarningCode::SauceWidthOverrideApplied:
+            return "SauceWidthOverrideApplied";
+        case LoadWarningCode::InvalidSauceCommentBlockIgnored:
+            return "InvalidSauceCommentBlockIgnored";
+        case LoadWarningCode::TruncatedSauceIgnored:
+            return "TruncatedSauceIgnored";
+        case LoadWarningCode::UnsupportedSequenceIgnored:
+            return "UnsupportedSequenceIgnored";
+        case LoadWarningCode::UnsupportedPrivateSequenceIgnored:
+            return "UnsupportedPrivateSequenceIgnored";
+        case LoadWarningCode::UnsupportedSgrIgnored:
+            return "UnsupportedSgrIgnored";
+        case LoadWarningCode::BareEscapeIgnored:
+            return "BareEscapeIgnored";
+        case LoadWarningCode::CursorClamped:
+            return "CursorClamped";
+        default:
+            return "Unknown";
         }
     }
 }

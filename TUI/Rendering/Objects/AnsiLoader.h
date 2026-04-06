@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Rendering/Objects/TextObject.h"
+#include "Rendering/Objects/SauceSupport.h"
 #include "Rendering/Styles/Style.h"
 
 namespace AnsiLoader
@@ -22,14 +23,16 @@ namespace AnsiLoader
     {
         None,
         SauceMetadataPresent,
+        SauceCommentsImported,
         SauceWidthOverrideApplied,
+        InvalidSauceCommentBlockIgnored,
+        TruncatedSauceIgnored,
+
         UnsupportedSequenceIgnored,
         UnsupportedPrivateSequenceIgnored,
         UnsupportedSgrIgnored,
         BareEscapeIgnored,
-        CursorClamped,
-        CanvasExpanded,
-        TruncatedSauceIgnored
+        CursorClamped
     };
 
     struct SourcePosition
@@ -56,24 +59,6 @@ namespace AnsiLoader
         }
     };
 
-    struct SauceMetadata
-    {
-        bool present = false;
-        std::string title;
-        std::string author;
-        std::string group;
-        std::string date;
-        std::uint8_t dataType = 0;
-        std::uint8_t fileType = 0;
-        std::uint16_t tInfo1 = 0;
-        std::uint16_t tInfo2 = 0;
-        std::uint16_t tInfo3 = 0;
-        std::uint16_t tInfo4 = 0;
-        std::uint8_t commentLineCount = 0;
-        std::uint8_t flags = 0;
-        std::string fontName;
-    };
-
     struct LoadOptions
     {
         FileType fileType = FileType::Auto;
@@ -82,12 +67,13 @@ namespace AnsiLoader
         int maxColumns = 4096;
         int maxRows = 4096;
 
+        bool preferSauceWidth = true;
+        bool importSauceComments = true;
+
         bool strictUnsupportedCommands = false;
         bool clampCursorToBounds = true;
-        bool expandCanvasOnDemand = true;
-        bool wrapAtDefaultColumn = true;
+        bool wrapAtColumnBoundary = true;
         bool treatBareLfAsNewLine = true;
-        bool preferSauceWidth = true;
 
         std::optional<Style> baseStyle;
     };
@@ -101,8 +87,7 @@ namespace AnsiLoader
         int resolvedWidth = 0;
         int resolvedHeight = 0;
 
-        SauceMetadata sauce;
-
+        SauceSupport::SauceMetadata sauce;
         std::vector<LoadWarning> warnings;
 
         bool hasParseFailure = false;
@@ -126,10 +111,7 @@ namespace AnsiLoader
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options = {});
 
     bool hasWarning(const LoadResult& result, LoadWarningCode code);
-
-    const LoadWarning* getWarningByCode(
-        const LoadResult& result,
-        LoadWarningCode code);
+    const LoadWarning* getWarningByCode(const LoadResult& result, LoadWarningCode code);
 
     std::string formatLoadError(const LoadResult& result);
     std::string formatLoadSuccess(const LoadResult& result);
