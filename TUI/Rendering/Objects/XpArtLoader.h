@@ -92,6 +92,9 @@ namespace XpArtLoader
         const CellData* tryGetCell(int x, int y) const;
     };
 
+    // ParsedDocument is the raw parsed XP payload representation.
+    // It reflects file structure closely and is intentionally kept separate
+    // from the retained runtime-ready XP document model below.
     struct ParsedDocument
     {
         int formatVersion = 0;
@@ -118,13 +121,65 @@ namespace XpArtLoader
         SourcePosition firstFailingPosition;
     };
 
+    // XpLayerCell / XpLayer / XpDocument form the retained XP model.
+    //
+    // Responsibilities:
+    // - ParsedDocument:
+    //     raw parsed file data and parse-time metadata.
+    // - XpDocument:
+    //     retained, runtime-ready layered XP content that preserves layer order
+    //     and per-cell authored data for future visibility toggles, diagnostics,
+    //     alternate merge policies, and animation/frame workflows.
+    // - TextObject:
+    //     current flattened runtime import target used by the existing placement
+    //     and rendering pipeline.
+    struct XpLayerCell
+    {
+        std::uint32_t glyph = 0;
+        RgbColor foreground;
+        RgbColor background;
+
+        bool hasTransparentBackground() const;
+    };
+
+    struct XpLayer
+    {
+        int width = 0;
+        int height = 0;
+        bool visible = true;
+        std::vector<XpLayerCell> cells;
+
+        bool isValid() const;
+        bool inBounds(int x, int y) const;
+        const XpLayerCell* tryGetCell(int x, int y) const;
+    };
+
+    struct XpDocument
+    {
+        int width = 0;
+        int height = 0;
+        int formatVersion = 0;
+        bool usesLegacyLayerCountHeader = false;
+        std::vector<XpLayer> layers;
+
+        bool isValid() const;
+        int getLayerCount() const;
+    };
+
     struct LoadOptions
     {
         FileType fileType = FileType::Auto;
 
         bool allowCompressedInput = true;
         bool allowAlreadyDecompressedInput = true;
+
+        // When true, retained XP layers are flattened into TextObject output,
+        // which remains the current runtime import path.
+        //
+        // When false, the loader still succeeds and preserves a retained
+        // XpDocument in LoadResult, but does not build a flattened TextObject.
         bool flattenLayers = true;
+
         bool treatMagentaBackgroundAsTransparent = true;
         bool visibleTransparentBaseCellsUseBlackBackground = true;
         bool strictLayerSizeValidation = true;
@@ -135,7 +190,10 @@ namespace XpArtLoader
     struct LoadResult
     {
         TextObject object;
+        XpDocument retainedDocument;
+
         bool success = false;
+        bool hasRetainedDocument = false;
 
         FileType detectedFileType = FileType::Unknown;
         int resolvedWidth = 0;
@@ -160,6 +218,10 @@ namespace XpArtLoader
 
     ParseResult parseDecompressedPayload(std::string_view bytes);
 
+    // Explicit conversion boundary:
+    // ParsedDocument -> retained XpDocument
+    XpDocument buildRetainedDocument(const ParsedDocument& document);
+
     LoadResult loadFromFile(const std::string& filePath);
     LoadResult loadFromFile(const std::string& filePath, const LoadOptions& options);
     LoadResult loadFromFile(const std::string& filePath, const Style& style);
@@ -169,7 +231,14 @@ namespace XpArtLoader
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const Style& style);
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options = {});
+
+    // Existing convenience path preserved:
+    // ParsedDocument -> retained XpDocument -> flattened TextObject
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options = {});
+
+    // New retained-model flattening entry point:
+    // XpDocument -> flattened TextObject
+    LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options = {});
 
     bool hasWarning(const LoadResult& result, LoadWarningCode code);
     const LoadWarning* getWarningByCode(const LoadResult& result, LoadWarningCode code);

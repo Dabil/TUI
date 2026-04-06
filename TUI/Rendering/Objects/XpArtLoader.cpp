@@ -282,8 +282,8 @@ namespace
     }
 
     bool isCanvasCompatibleLayer(
-        const XpArtLoader::LayerData& layer,
-        const XpArtLoader::ParsedDocument& document,
+        const XpArtLoader::XpLayer& layer,
+        const XpArtLoader::XpDocument& document,
         const XpArtLoader::LoadOptions& options)
     {
         if (!layer.isValid())
@@ -293,15 +293,15 @@ namespace
 
         if (!options.strictLayerSizeValidation)
         {
-            return layer.width <= document.canvasWidth && layer.height <= document.canvasHeight;
+            return layer.width <= document.width && layer.height <= document.height;
         }
 
-        return layer.width == document.canvasWidth && layer.height == document.canvasHeight;
+        return layer.width == document.width && layer.height == document.height;
     }
 
     void applyTransparentGlyphOnlyCell(
         CompositedCell& destination,
-        const XpArtLoader::CellData& source,
+        const XpArtLoader::XpLayerCell& source,
         char32_t glyph,
         const XpArtLoader::LoadOptions& options)
     {
@@ -319,7 +319,7 @@ namespace
 
     void applyOpaqueCell(
         CompositedCell& destination,
-        const XpArtLoader::CellData& source,
+        const XpArtLoader::XpLayerCell& source,
         char32_t glyph,
         bool visibleGlyph)
     {
@@ -333,7 +333,7 @@ namespace
 
     void composeLayerCell(
         CompositedCell& destination,
-        const XpArtLoader::CellData& source,
+        const XpArtLoader::XpLayerCell& source,
         const XpArtLoader::LoadOptions& options,
         FlattenStats& stats)
     {
@@ -341,16 +341,15 @@ namespace
         const bool visibleGlyph = hasVisibleGlyph(glyph);
         const bool transparentBackground = isTransparentBackground(source.background, options);
 
-        // XP merge policy for the current flattened runtime path:
+        // Current flattened XP merge policy:
         // a) transparent background + visible glyph:
         //    overlay glyph/foreground only; preserve prior background.
-        //    If nothing is under it and the option is enabled, synthesize black.
         // b) transparent background + blank glyph:
-        //    contribute nothing; keep the previously composed cell unchanged.
+        //    contribute nothing.
         // c) opaque background + visible glyph:
         //    replace glyph, foreground, and background.
         // d) opaque background + blank glyph:
-        //    clear any lower glyph and paint only the new opaque background.
+        //    clear lower glyph and paint only the new background.
         if (transparentBackground)
         {
             if (visibleGlyph)
@@ -391,14 +390,14 @@ namespace
         return style;
     }
 
-    FlattenResult flattenDocument(
-        const XpArtLoader::ParsedDocument& document,
+    FlattenResult flattenRetainedDocument(
+        const XpArtLoader::XpDocument& document,
         const XpArtLoader::LoadOptions& options)
     {
         FlattenResult result;
 
         bool countOk = false;
-        const std::size_t cellCount = checkedCellCount(document.canvasWidth, document.canvasHeight, countOk);
+        const std::size_t cellCount = checkedCellCount(document.width, document.height, countOk);
         if (!countOk)
         {
             return result;
@@ -406,12 +405,17 @@ namespace
 
         result.cells.resize(cellCount);
 
-        for (const XpArtLoader::LayerData& layer : document.layers)
+        for (const XpArtLoader::XpLayer& layer : document.layers)
         {
-            const int compositedWidth = std::min(layer.width, document.canvasWidth);
-            const int compositedHeight = std::min(layer.height, document.canvasHeight);
+            if (!layer.visible)
+            {
+                continue;
+            }
 
-            if (layer.width != document.canvasWidth || layer.height != document.canvasHeight)
+            const int compositedWidth = std::min(layer.width, document.width);
+            const int compositedHeight = std::min(layer.height, document.height);
+
+            if (layer.width != document.width || layer.height != document.height)
             {
                 result.stats.clippedLayerContent = true;
             }
@@ -420,14 +424,14 @@ namespace
             {
                 for (int x = 0; x < compositedWidth; ++x)
                 {
-                    const XpArtLoader::CellData* sourceCell = layer.tryGetCell(x, y);
+                    const XpArtLoader::XpLayerCell* sourceCell = layer.tryGetCell(x, y);
                     if (sourceCell == nullptr)
                     {
                         continue;
                     }
 
                     CompositedCell& destinationCell =
-                        result.cells[static_cast<std::size_t>(canvasIndex(x, y, document.canvasWidth))];
+                        result.cells[static_cast<std::size_t>(canvasIndex(x, y, document.width))];
 
                     composeLayerCell(destinationCell, *sourceCell, options, result.stats);
                 }
@@ -616,31 +620,66 @@ namespace XpArtLoader
         return result;
     }
 
+    XpDocument buildRetainedDocument(const ParsedDocument& document)
+    {
+        XpDocument retained;
+        retained.width = document.canvasWidth;
+        retained.height = document.canvasHeight;
+        retained.formatVersion = document.formatVersion;
+        retained.usesLegacyLayerCountHeader = document.usesLegacyLayerCountHeader;
+        retained.layers.reserve(document.layers.size());
+
+        for (const LayerData& parsedLayer : document.layers)
+        {
+            XpLayer retainedLayer;
+            retainedLayer.width = parsedLayer.width;
+            retainedLayer.height = parsedLayer.height;
+            retainedLayer.visible = true;
+            retainedLayer.cells.reserve(parsedLayer.cells.size());
+
+            for (const CellData& parsedCell : parsedLayer.cells)
+            {
+                XpLayerCell retainedCell;
+                retainedCell.glyph = parsedCell.glyph;
+                retainedCell.foreground = parsedCell.foreground;
+                retainedCell.background = parsedCell.background;
+                retainedLayer.cells.push_back(retainedCell);
+            }
+
+            retained.layers.push_back(std::move(retainedLayer));
+        }
+
+        return retained;
+    }
+
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options)
+    {
+        const XpDocument retained = buildRetainedDocument(document);
+        LoadResult result = buildTextObject(retained, options);
+        result.parsedFormatVersion = document.formatVersion;
+        return result;
+    }
+
+    LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options)
     {
         LoadResult result;
         result.detectedFileType = FileType::Xp;
-        result.resolvedWidth = document.canvasWidth;
-        result.resolvedHeight = document.canvasHeight;
+        result.retainedDocument = document;
+        result.hasRetainedDocument = document.isValid();
+        result.resolvedWidth = document.width;
+        result.resolvedHeight = document.height;
         result.resolvedLayerCount = static_cast<int>(document.layers.size());
         result.parsedFormatVersion = document.formatVersion;
-        result.usedLayerFlattening = options.flattenLayers && document.layers.size() > 1;
-
-        if (!options.flattenLayers)
-        {
-            result.success = false;
-            result.errorMessage = "Retained XP layers are not yet supported; flattenLayers must currently be true.";
-            return result;
-        }
+        result.usedLayerFlattening = document.layers.size() > 1;
 
         if (!document.isValid())
         {
             result.success = false;
-            result.errorMessage = "Invalid parsed XP document.";
+            result.errorMessage = "Invalid retained XP document.";
             return result;
         }
 
-        for (const LayerData& layer : document.layers)
+        for (const XpLayer& layer : document.layers)
         {
             if (!isCanvasCompatibleLayer(layer, document, options))
             {
@@ -665,15 +704,15 @@ namespace XpArtLoader
                 "Multiple XP layers were flattened into a single TextObject.");
         }
 
-        const FlattenResult flattened = flattenDocument(document, options);
-        TextObjectBuilder builder(document.canvasWidth, document.canvasHeight);
+        const FlattenResult flattened = flattenRetainedDocument(document, options);
+        TextObjectBuilder builder(document.width, document.height);
 
-        for (int y = 0; y < document.canvasHeight; ++y)
+        for (int y = 0; y < document.height; ++y)
         {
-            for (int x = 0; x < document.canvasWidth; ++x)
+            for (int x = 0; x < document.width; ++x)
             {
                 const CompositedCell& cell =
-                    flattened.cells[static_cast<std::size_t>(canvasIndex(x, y, document.canvasWidth))];
+                    flattened.cells[static_cast<std::size_t>(canvasIndex(x, y, document.width))];
 
                 const Style style = buildCellStyle(cell, options);
 
@@ -767,27 +806,78 @@ namespace XpArtLoader
                 parse.firstFailingPosition);
         }
 
-        LoadResult built = buildTextObject(parse.document, options);
-        built.detectedFileType = FileType::Xp;
-        built.inputWasCompressed = compressedInput;
-        built.inputWasAlreadyDecompressed = !compressedInput;
-        built.parsedFormatVersion = parse.document.formatVersion;
-        built.resolvedLayerCount = static_cast<int>(parse.document.layers.size());
-        built.resolvedWidth = parse.document.canvasWidth;
-        built.resolvedHeight = parse.document.canvasHeight;
+        const XpDocument retained = buildRetainedDocument(parse.document);
+        if (!retained.isValid())
+        {
+            return failLoad(FileType::Xp, "Failed to build retained XP document from parsed content.");
+        }
+
+        result.retainedDocument = retained;
+        result.hasRetainedDocument = true;
+        result.detectedFileType = FileType::Xp;
+        result.inputWasCompressed = compressedInput;
+        result.inputWasAlreadyDecompressed = !compressedInput;
+        result.parsedFormatVersion = retained.formatVersion;
+        result.resolvedLayerCount = retained.getLayerCount();
+        result.resolvedWidth = retained.width;
+        result.resolvedHeight = retained.height;
+
+        if (options.flattenLayers)
+        {
+            LoadResult built = buildTextObject(retained, options);
+            built.detectedFileType = FileType::Xp;
+            built.inputWasCompressed = compressedInput;
+            built.inputWasAlreadyDecompressed = !compressedInput;
+            built.parsedFormatVersion = retained.formatVersion;
+            built.resolvedLayerCount = retained.getLayerCount();
+            built.resolvedWidth = retained.width;
+            built.resolvedHeight = retained.height;
+            built.retainedDocument = retained;
+            built.hasRetainedDocument = true;
+
+            if (!compressedInput)
+            {
+                addWarningOnce(
+                    built,
+                    LoadWarningCode::InputWasAlreadyDecompressed,
+                    "XP input was already decompressed before loading.");
+            }
+
+            if (retained.usesLegacyLayerCountHeader)
+            {
+                addWarningOnce(
+                    built,
+                    LoadWarningCode::LegacyVersionHeaderDetected,
+                    "XP input used a legacy header where the first field stores layer count.");
+            }
+
+            if (parse.bytesConsumed < bytes.size())
+            {
+                addWarningOnce(
+                    built,
+                    LoadWarningCode::ExtraTrailingBytesIgnored,
+                    "Extra trailing bytes were ignored after the XP payload.",
+                    parse.bytesConsumed);
+            }
+
+            return built;
+        }
+
+        result.success = true;
+        result.usedLayerFlattening = false;
 
         if (!compressedInput)
         {
             addWarningOnce(
-                built,
+                result,
                 LoadWarningCode::InputWasAlreadyDecompressed,
                 "XP input was already decompressed before loading.");
         }
 
-        if (parse.document.usesLegacyLayerCountHeader)
+        if (retained.usesLegacyLayerCountHeader)
         {
             addWarningOnce(
-                built,
+                result,
                 LoadWarningCode::LegacyVersionHeaderDetected,
                 "XP input used a legacy header where the first field stores layer count.");
         }
@@ -795,26 +885,11 @@ namespace XpArtLoader
         if (parse.bytesConsumed < bytes.size())
         {
             addWarningOnce(
-                built,
+                result,
                 LoadWarningCode::ExtraTrailingBytesIgnored,
                 "Extra trailing bytes were ignored after the XP payload.",
                 parse.bytesConsumed);
         }
-
-        appendWarnings(result, built);
-        result.object = built.object;
-        result.success = built.success;
-        result.resolvedWidth = built.resolvedWidth;
-        result.resolvedHeight = built.resolvedHeight;
-        result.resolvedLayerCount = built.resolvedLayerCount;
-        result.parsedFormatVersion = built.parsedFormatVersion;
-        result.inputWasCompressed = built.inputWasCompressed;
-        result.inputWasAlreadyDecompressed = built.inputWasAlreadyDecompressed;
-        result.usedLayerFlattening = built.usedLayerFlattening;
-        result.hasParseFailure = built.hasParseFailure;
-        result.failingByteOffset = built.failingByteOffset;
-        result.firstFailingPosition = built.firstFailingPosition;
-        result.errorMessage = built.errorMessage;
 
         return result;
     }
@@ -948,6 +1023,69 @@ namespace XpArtLoader
         return true;
     }
 
+    bool XpLayerCell::hasTransparentBackground() const
+    {
+        return background == kTransparentBackground;
+    }
+
+    bool XpLayer::isValid() const
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        const std::uint64_t expected =
+            static_cast<std::uint64_t>(width) *
+            static_cast<std::uint64_t>(height);
+
+        return cells.size() == static_cast<std::size_t>(expected);
+    }
+
+    bool XpLayer::inBounds(int x, int y) const
+    {
+        return x >= 0 && y >= 0 && x < width && y < height;
+    }
+
+    const XpLayerCell* XpLayer::tryGetCell(int x, int y) const
+    {
+        if (!inBounds(x, y))
+        {
+            return nullptr;
+        }
+
+        const std::size_t index = static_cast<std::size_t>(layerIndex(x, y, height));
+        if (index >= cells.size())
+        {
+            return nullptr;
+        }
+
+        return &cells[index];
+    }
+
+    bool XpDocument::isValid() const
+    {
+        if (layers.empty() || width <= 0 || height <= 0)
+        {
+            return false;
+        }
+
+        for (const XpLayer& layer : layers)
+        {
+            if (!layer.isValid())
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    int XpDocument::getLayerCount() const
+    {
+        return static_cast<int>(layers.size());
+    }
+
     bool hasWarning(const LoadResult& result, LoadWarningCode code)
     {
         for (const LoadWarning& warning : result.warnings)
@@ -1004,12 +1142,9 @@ namespace XpArtLoader
         stream << "XP load success: "
             << result.resolvedWidth << 'x' << result.resolvedHeight
             << ", layers=" << result.resolvedLayerCount
-            << ", version=" << result.parsedFormatVersion;
-
-        if (result.usedLayerFlattening)
-        {
-            stream << ", flattened=true";
-        }
+            << ", version=" << result.parsedFormatVersion
+            << ", retained=" << (result.hasRetainedDocument ? "true" : "false")
+            << ", flattened=" << (result.usedLayerFlattening ? "true" : "false");
 
         if (!result.warnings.empty())
         {
