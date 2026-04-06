@@ -260,6 +260,16 @@ namespace
                         m_sauce.contentSize,
                         {});
                 }
+
+                if (m_sauce.invalidCommentBlock)
+                {
+                    addWarning(
+                        result,
+                        AnsiLoader::LoadWarningCode::InvalidSauceCommentBlockIgnored,
+                        "SAUCE declared a comment block, but the COMNT marker was invalid and the block was ignored.",
+                        m_sauce.contentSize,
+                        {});
+                }
             }
 
             if (m_sauce.truncated)
@@ -1022,6 +1032,16 @@ namespace
             result.firstFailingPosition = currentPosition();
             result.errorMessage = message;
             result.warnings = m_warnings;
+
+            if (m_sauce.metadata.present && m_sauce.invalidCommentBlock)
+            {
+                addWarning(
+                    result,
+                    LoadWarningCode::InvalidSauceCommentBlockIgnored,
+                    "SAUCE declared a comment block, but the COMNT marker was invalid and the block was ignored.",
+                    m_sauce.contentSize,
+                    {});
+            }
 
             if (m_sauce.truncated)
             {
