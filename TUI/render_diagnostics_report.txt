@@ -92,16 +92,16 @@ Strike: capability=Supported, policy=Direct
 
 Adaptation Summary Counts
 -------------------------
-ForegroundColor / Direct: 4329
-BackgroundColor / Direct: 5294
-Bold / Direct: 1808
+ForegroundColor / Direct: 1672
+BackgroundColor / Direct: 2083
+Bold / Direct: 626
 Underline / Direct: 4
 
 Observed Output Feature Outcomes
 --------------------------------
-ForegroundColor: emitted-direct=4329, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
-BackgroundColor: emitted-direct=5294, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
-Bold: emitted-direct=1808, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
+ForegroundColor: emitted-direct=1672, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
+BackgroundColor: emitted-direct=2083, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
+Bold: emitted-direct=626, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
 Dim: emitted-direct=0, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
 Underline: emitted-direct=4, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
 SlowBlink: emitted-direct=0, emitted-approximated=0, emitted-downgraded=0, emulated=0, omitted=0, logical-only=0
@@ -112,7 +112,7 @@ Strike: emitted-direct=0, emitted-approximated=0, emitted-downgraded=0, emulated
 
 Totals By Outcome Kind
 ----------------------
-Direct: 11435
+Direct: 4385
 Downgraded: 0
 Approximated: 0
 Emulated: 0
@@ -171,18 +171,18 @@ Notes
 - Author-facing hints are advisory only and do not change rendering behavior.
 VT Present Performance
 ----------------------
-Present calls: 84
-Skipped presents: 5
+Present calls: 52
+Skipped presents: 3
 Full redraw presents: 2
-Diff presents: 77
-Changed cells: 28156
-Dirty spans: 4577
-Cursor moves: 4575
-Runs: 5470
-Text bytes: 37925
-SGR bytes: 29123
-Control bytes: 37429
-Total bytes: 104477
+Diff presents: 47
+Changed cells: 20708
+Dirty spans: 1531
+Cursor moves: 1529
+Runs: 2106
+Text bytes: 26852
+SGR bytes: 10765
+Control bytes: 12371
+Total bytes: 49988
 Last present strategy: DiffBased
 Last present reason: Dirty-region coverage is low enough to benefit from diff-based presentation.
 
