@@ -229,6 +229,16 @@ namespace
                 {});
         }
 
+        if (sauceRecord.invalidCommentBlock)
+        {
+            addWarning(
+                result,
+                BinaryArtLoader::LoadWarningCode::InvalidSauceCommentBlockIgnored,
+                "SAUCE declared a comment block, but the COMNT marker was invalid and the block was ignored.",
+                sauceRecord.contentSize,
+                {});
+        }
+
         if (sauceRecord.truncated)
         {
             addWarning(
