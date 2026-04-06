@@ -188,6 +188,32 @@ namespace
         result.warnings.push_back(warning);
     }
 
+    void addWarningOnce(
+        XpArtLoader::LoadResult& result,
+        XpArtLoader::LoadWarningCode code,
+        const std::string& message,
+        std::size_t byteOffset = 0,
+        const XpArtLoader::SourcePosition& position = {})
+    {
+        for (const XpArtLoader::LoadWarning& warning : result.warnings)
+        {
+            if (warning.code == code)
+            {
+                return;
+            }
+        }
+
+        addWarning(result, code, message, byteOffset, position);
+    }
+
+    void appendWarnings(XpArtLoader::LoadResult& destination, const XpArtLoader::LoadResult& source)
+    {
+        destination.warnings.insert(
+            destination.warnings.end(),
+            source.warnings.begin(),
+            source.warnings.end());
+    }
+
     XpArtLoader::ParseResult failParse(
         const std::string& message,
         std::size_t byteOffset = 0,
@@ -216,6 +242,34 @@ namespace
         result.failingByteOffset = byteOffset;
         result.firstFailingPosition = position;
         return result;
+    }
+
+    bool isTransparentBackground(const XpArtLoader::RgbColor& color, const XpArtLoader::LoadOptions& options)
+    {
+        return options.treatMagentaBackgroundAsTransparent && color == kTransparentBackground;
+    }
+
+    bool hasVisibleGlyph(char32_t glyph)
+    {
+        return glyph != U'\0' && glyph != U' ';
+    }
+
+    bool isCanvasCompatibleLayer(
+        const XpArtLoader::LayerData& layer,
+        const XpArtLoader::ParsedDocument& document,
+        const XpArtLoader::LoadOptions& options)
+    {
+        if (!layer.isValid())
+        {
+            return false;
+        }
+
+        if (!options.strictLayerSizeValidation)
+        {
+            return layer.width <= document.canvasWidth && layer.height <= document.canvasHeight;
+        }
+
+        return layer.width == document.canvasWidth && layer.height == document.canvasHeight;
     }
 
 #if TUI_XP_ART_LOADER_HAS_ZLIB
@@ -269,6 +323,8 @@ namespace
 
         ParseResult result;
         result.success = false;
+        result.inputWasCompressed = false;
+        result.inputWasAlreadyDecompressed = false;
 
         std::size_t offset = 0;
         bool ok = false;
@@ -294,7 +350,6 @@ namespace
         }
         else
         {
-            // Legacy header: version actually contains layer count
             result.document.usesLegacyLayerCountHeader = true;
             result.document.formatVersion = 0;
             layerCount = static_cast<std::uint32_t>(rawVersion);
@@ -316,21 +371,29 @@ namespace
 
             const int width = static_cast<int>(readLe32(bytes, offset, okLayer));
             if (!okLayer)
+            {
                 return failParse("Failed to read layer width.", offset);
+            }
             offset += kLayerWidthBytes;
 
             const int height = static_cast<int>(readLe32(bytes, offset, okLayer));
             if (!okLayer)
+            {
                 return failParse("Failed to read layer height.", offset);
+            }
             offset += kLayerHeightBytes;
 
             if (width <= 0 || height <= 0)
+            {
                 return failParse("Invalid layer dimensions.", offset);
+            }
 
             bool countOk = false;
             const std::size_t cellCount = checkedCellCount(width, height, countOk);
             if (!countOk)
+            {
                 return failParse("Layer cell count overflow.", offset);
+            }
 
             LayerData layer;
             layer.width = width;
@@ -340,24 +403,28 @@ namespace
             for (std::size_t i = 0; i < cellCount; ++i)
             {
                 if (offset + kCellBytes > bytes.size())
+                {
                     return failParse("Unexpected end of XP cell data.", offset);
+                }
 
                 bool glyphOk = false;
                 const std::uint32_t glyph = readLe32(bytes, offset, glyphOk);
                 if (!glyphOk)
+                {
                     return failParse("Failed to read glyph.", offset);
+                }
                 offset += kGlyphBytes;
 
                 CellData& cell = layer.cells[i];
                 cell.glyph = glyph;
 
-                cell.foreground.red = static_cast<uint8_t>(bytes[offset++]);
-                cell.foreground.green = static_cast<uint8_t>(bytes[offset++]);
-                cell.foreground.blue = static_cast<uint8_t>(bytes[offset++]);
+                cell.foreground.red = static_cast<std::uint8_t>(bytes[offset++]);
+                cell.foreground.green = static_cast<std::uint8_t>(bytes[offset++]);
+                cell.foreground.blue = static_cast<std::uint8_t>(bytes[offset++]);
 
-                cell.background.red = static_cast<uint8_t>(bytes[offset++]);
-                cell.background.green = static_cast<uint8_t>(bytes[offset++]);
-                cell.background.blue = static_cast<uint8_t>(bytes[offset++]);
+                cell.background.red = static_cast<std::uint8_t>(bytes[offset++]);
+                cell.background.green = static_cast<std::uint8_t>(bytes[offset++]);
+                cell.background.blue = static_cast<std::uint8_t>(bytes[offset++]);
             }
 
             maxWidth = std::max(maxWidth, width);
@@ -368,7 +435,6 @@ namespace
 
         result.document.canvasWidth = maxWidth;
         result.document.canvasHeight = maxHeight;
-
         result.bytesConsumed = offset;
         result.success = true;
         return result;
@@ -380,20 +446,31 @@ namespace
     }
 }
 
-// ============================================================
-// PUBLIC API IMPLEMENTATION
-// ============================================================
-
 namespace XpArtLoader
 {
     ParseResult parseDecompressedPayload(std::string_view bytes)
     {
-        return parseXpPayloadInternal(bytes);
+        ParseResult result = parseXpPayloadInternal(bytes);
+        result.inputWasAlreadyDecompressed = true;
+        result.inputWasCompressed = false;
+        return result;
     }
 
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options)
     {
         LoadResult result;
+        result.detectedFileType = FileType::Xp;
+        result.resolvedWidth = document.canvasWidth;
+        result.resolvedHeight = document.canvasHeight;
+        result.resolvedLayerCount = static_cast<int>(document.layers.size());
+        result.parsedFormatVersion = document.formatVersion;
+
+        if (!options.flattenLayers)
+        {
+            result.success = false;
+            result.errorMessage = "Retained XP layers are not yet supported; flattenLayers must currently be true.";
+            return result;
+        }
 
         if (!document.isValid())
         {
@@ -402,58 +479,63 @@ namespace XpArtLoader
             return result;
         }
 
-        TextObjectBuilder builder(document.canvasWidth, document.canvasHeight);
-
-        if (document.layers.empty())
+        for (const LayerData& layer : document.layers)
         {
-            result.success = true;
-            result.object = builder.build();
-            return result;
+            if (!isCanvasCompatibleLayer(layer, document, options))
+            {
+                result.success = false;
+                if (options.strictLayerSizeValidation)
+                {
+                    result.errorMessage = "XP layer size does not match document canvas under strict validation.";
+                }
+                else
+                {
+                    result.errorMessage = "XP layer is structurally invalid or exceeds the document canvas.";
+                }
+                return result;
+            }
         }
 
-        const bool flatten = options.flattenLayers;
+        TextObjectBuilder builder(document.canvasWidth, document.canvasHeight);
 
-        if (flatten && document.layers.size() > 1)
+        if (document.layers.size() > 1)
         {
             result.usedLayerFlattening = true;
             addWarning(result,
                 LoadWarningCode::MultipleLayersFlattened,
-                "Multiple layers flattened into single TextObject.");
+                "Multiple XP layers were flattened into a single TextObject.");
         }
 
-        const int layerCount = static_cast<int>(document.layers.size());
-
-        for (int li = 0; li < layerCount; ++li)
+        for (const LayerData& layer : document.layers)
         {
-            const auto& layer = document.layers[li];
-
             for (int x = 0; x < layer.width; ++x)
             {
                 for (int y = 0; y < layer.height; ++y)
                 {
                     const CellData* cell = layer.tryGetCell(x, y);
-                    if (!cell) continue;
-
-                    const bool isTransparent =
-                        options.treatMagentaBackgroundAsTransparent &&
-                        cell->background == kTransparentBackground;
-
-                    if (isTransparent)
+                    if (cell == nullptr)
                     {
-                        addWarning(result,
+                        continue;
+                    }
+
+                    const char32_t glyph = decodeRexPaintGlyph(cell->glyph);
+                    const bool visibleGlyph = hasVisibleGlyph(glyph);
+                    const bool transparentBackground = isTransparentBackground(cell->background, options);
+
+                    if (transparentBackground && !visibleGlyph)
+                    {
+                        addWarningOnce(result,
                             LoadWarningCode::TransparentCellsSkipped,
-                            "Transparent XP cell skipped.",
+                            "Transparent XP cells with no visible glyph were skipped.",
                             0,
                             { x, y });
                         continue;
                     }
 
-                    const char32_t ch = decodeRexPaintGlyph(cell->glyph);
-
                     Style style = options.baseStyle.value_or(Style{});
                     style = style.withForeground(toColor(cell->foreground));
 
-                    if (!isTransparent)
+                    if (!transparentBackground)
                     {
                         style = style.withBackground(toColor(cell->background));
                     }
@@ -462,21 +544,13 @@ namespace XpArtLoader
                         style = style.withBackground(toColor(kOpaqueBlack));
                     }
 
-                    builder.setGlyph(x, y, ch, style);
+                    builder.setGlyph(x, y, glyph, style);
                 }
             }
-
-            if (!flatten)
-                break;
         }
 
         result.object = builder.build();
         result.success = true;
-        result.resolvedWidth = document.canvasWidth;
-        result.resolvedHeight = document.canvasHeight;
-        result.resolvedLayerCount = static_cast<int>(document.layers.size());
-        result.parsedFormatVersion = document.formatVersion;
-
         return result;
     }
 
@@ -485,71 +559,190 @@ namespace XpArtLoader
         LoadResult result;
         result.detectedFileType = FileType::Xp;
 
-        std::string decompressed;
+        const bool compressedInput = looksLikeGzip(bytes);
+        std::string decompressedBytes;
 
 #if TUI_XP_ART_LOADER_HAS_ZLIB
-        if (options.allowCompressedInput && looksLikeGzip(bytes))
+        if (compressedInput)
         {
-            if (!tryInflateXpBytes(bytes, decompressed))
-                return failLoad(FileType::Xp, "Failed to decompress XP data.");
+            if (!options.allowCompressedInput)
+            {
+                return failLoad(FileType::Xp, "Compressed XP input not allowed.");
+            }
 
+            if (!tryInflateXpBytes(bytes, decompressedBytes))
+            {
+                return failLoad(FileType::Xp, "Failed to decompress XP data.");
+            }
+
+            bytes = decompressedBytes;
             result.inputWasCompressed = true;
-            bytes = decompressed;
-        }
-        else if (looksLikeGzip(bytes))
-        {
-            return failLoad(FileType::Xp, "Compressed XP input not allowed.");
         }
 #else
-        if (looksLikeGzip(bytes))
+        if (compressedInput)
         {
             return failLoad(FileType::Xp, "XP file appears compressed but zlib is unavailable.");
         }
 #endif
 
+        if (!compressedInput)
+        {
+            if (!options.allowAlreadyDecompressedInput)
+            {
+                return failLoad(FileType::Xp, "Already-decompressed XP payload input is not allowed.");
+            }
+
+            result.inputWasAlreadyDecompressed = true;
+        }
+
         ParseResult parse = parseDecompressedPayload(bytes);
+        parse.inputWasCompressed = compressedInput;
+        parse.inputWasAlreadyDecompressed = !compressedInput;
 
         if (!parse.success)
         {
-            return failLoad(FileType::Xp,
+            return failLoad(
+                FileType::Xp,
                 parse.errorMessage,
                 parse.failingByteOffset,
                 parse.firstFailingPosition);
         }
 
-        result.parsedFormatVersion = parse.document.formatVersion;
-        result.inputWasAlreadyDecompressed = parse.inputWasAlreadyDecompressed;
+        LoadResult built = buildTextObject(parse.document, options);
+        if (!built.success)
+        {
+            built.detectedFileType = FileType::Xp;
+            built.inputWasCompressed = compressedInput;
+            built.inputWasAlreadyDecompressed = !compressedInput;
+            built.parsedFormatVersion = parse.document.formatVersion;
+            return built;
+        }
 
-        return buildTextObject(parse.document, options);
+        built.detectedFileType = FileType::Xp;
+        built.inputWasCompressed = compressedInput;
+        built.inputWasAlreadyDecompressed = !compressedInput;
+        built.parsedFormatVersion = parse.document.formatVersion;
+        built.resolvedLayerCount = static_cast<int>(parse.document.layers.size());
+        built.resolvedWidth = parse.document.canvasWidth;
+        built.resolvedHeight = parse.document.canvasHeight;
+
+        if (!compressedInput)
+        {
+            addWarningOnce(
+                built,
+                LoadWarningCode::InputWasAlreadyDecompressed,
+                "XP input was already decompressed before loading.");
+        }
+
+        if (parse.document.usesLegacyLayerCountHeader)
+        {
+            addWarningOnce(
+                built,
+                LoadWarningCode::LegacyVersionHeaderDetected,
+                "XP input used a legacy header where the first field stores layer count.");
+        }
+
+        if (parse.bytesConsumed < bytes.size())
+        {
+            addWarningOnce(
+                built,
+                LoadWarningCode::ExtraTrailingBytesIgnored,
+                "Extra trailing bytes were ignored after the XP payload.",
+                parse.bytesConsumed);
+        }
+
+        appendWarnings(result, built);
+        result.object = built.object;
+        result.success = built.success;
+        result.resolvedWidth = built.resolvedWidth;
+        result.resolvedHeight = built.resolvedHeight;
+        result.resolvedLayerCount = built.resolvedLayerCount;
+        result.parsedFormatVersion = built.parsedFormatVersion;
+        result.inputWasCompressed = built.inputWasCompressed;
+        result.inputWasAlreadyDecompressed = built.inputWasAlreadyDecompressed;
+        result.usedLayerFlattening = built.usedLayerFlattening;
+        result.hasParseFailure = built.hasParseFailure;
+        result.failingByteOffset = built.failingByteOffset;
+        result.firstFailingPosition = built.firstFailingPosition;
+        result.errorMessage = built.errorMessage;
+
+        return result;
+    }
+
+    LoadResult loadFromFile(const std::string& filePath)
+    {
+        return loadFromFile(filePath, LoadOptions{});
+    }
+
+    LoadResult loadFromFile(const std::string& filePath, const LoadOptions& options)
+    {
+        std::string bytes;
+        if (!readAllBytes(filePath, bytes))
+        {
+            return failLoad(FileType::Xp, "Failed to read file: " + filePath);
+        }
+
+        return loadFromBytes(bytes, options);
+    }
+
+    LoadResult loadFromFile(const std::string& filePath, const Style& style)
+    {
+        LoadOptions options;
+        options.baseStyle = style;
+        return loadFromFile(filePath, options);
     }
 
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject)
     {
-        LoadResult r = loadFromFile(filePath);
-        if (!r.success) return false;
-        outObject = r.object;
+        const LoadResult result = loadFromFile(filePath);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        outObject = result.object;
         return true;
     }
 
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const LoadOptions& options)
     {
-        LoadResult r = loadFromFile(filePath, options);
-        if (!r.success) return false;
-        outObject = r.object;
+        const LoadResult result = loadFromFile(filePath, options);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        outObject = result.object;
         return true;
     }
 
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const Style& style)
     {
-        LoadResult r = loadFromFile(filePath, style);
-        if (!r.success) return false;
-        outObject = r.object;
+        const LoadResult result = loadFromFile(filePath, style);
+        if (!result.success)
+        {
+            return false;
+        }
+
+        outObject = result.object;
         return true;
+    }
+
+    FileType detectFileType(const std::string& filePath)
+    {
+        const std::string extension = getFileExtensionLower(filePath);
+
+        if (extension == ".xp")
+        {
+            return FileType::Xp;
+        }
+
+        return FileType::Unknown;
     }
 
     bool CellData::hasTransparentBackground() const
     {
-        return background == RgbColor{ 255, 0, 255 };
+        return background == kTransparentBackground;
     }
 
     bool LayerData::isValid() const
@@ -578,9 +771,7 @@ namespace XpArtLoader
             return nullptr;
         }
 
-        const std::size_t index =
-            static_cast<std::size_t>((x * height) + y);
-
+        const std::size_t index = static_cast<std::size_t>(layerIndex(x, y, height));
         if (index >= cells.size())
         {
             return nullptr;
@@ -591,12 +782,7 @@ namespace XpArtLoader
 
     bool ParsedDocument::isValid() const
     {
-        if (layers.empty())
-        {
-            return false;
-        }
-
-        if (canvasWidth <= 0 || canvasHeight <= 0)
+        if (layers.empty() || canvasWidth <= 0 || canvasHeight <= 0)
         {
             return false;
         }
@@ -612,43 +798,105 @@ namespace XpArtLoader
         return true;
     }
 
-    LoadResult loadFromFile(const std::string& filePath)
+    bool hasWarning(const LoadResult& result, LoadWarningCode code)
     {
-        return loadFromFile(filePath, LoadOptions{});
-    }
-
-    LoadResult loadFromFile(const std::string& filePath, const LoadOptions& options)
-    {
-        std::string bytes;
-        if (!readAllBytes(filePath, bytes))
+        for (const LoadWarning& warning : result.warnings)
         {
-            return failLoad(FileType::Xp, "Failed to read file: " + filePath);
+            if (warning.code == code)
+            {
+                return true;
+            }
         }
 
-        LoadResult result = loadFromBytes(bytes, options);
-        if (result.detectedFileType == FileType::Unknown)
-        {
-            result.detectedFileType = detectFileType(filePath);
-        }
-        return result;
+        return false;
     }
 
-    LoadResult loadFromFile(const std::string& filePath, const Style& style)
+    const LoadWarning* getWarningByCode(const LoadResult& result, LoadWarningCode code)
     {
-        LoadOptions options;
-        options.baseStyle = style;
-        return loadFromFile(filePath, options);
-    }
-
-    FileType detectFileType(const std::string& filePath)
-    {
-        const std::string extension = getFileExtensionLower(filePath);
-
-        if (extension == ".xp")
+        for (const LoadWarning& warning : result.warnings)
         {
-            return FileType::Xp;
+            if (warning.code == code)
+            {
+                return &warning;
+            }
         }
 
-        return FileType::Unknown;
+        return nullptr;
+    }
+
+    std::string formatLoadError(const LoadResult& result)
+    {
+        std::ostringstream stream;
+        stream << "XP load failed";
+
+        if (!result.errorMessage.empty())
+        {
+            stream << ": " << result.errorMessage;
+        }
+
+        if (result.hasParseFailure)
+        {
+            stream << " (byte " << result.failingByteOffset;
+            if (result.firstFailingPosition.isValid())
+            {
+                stream << ", x=" << result.firstFailingPosition.x
+                    << ", y=" << result.firstFailingPosition.y;
+            }
+            stream << ")";
+        }
+
+        return stream.str();
+    }
+
+    std::string formatLoadSuccess(const LoadResult& result)
+    {
+        std::ostringstream stream;
+        stream << "XP load success: "
+            << result.resolvedWidth << 'x' << result.resolvedHeight
+            << ", layers=" << result.resolvedLayerCount
+            << ", version=" << result.parsedFormatVersion;
+
+        if (!result.warnings.empty())
+        {
+            stream << ", warnings=" << result.warnings.size();
+        }
+
+        return stream.str();
+    }
+
+    const char* toString(FileType fileType)
+    {
+        switch (fileType)
+        {
+        case FileType::Auto:
+            return "Auto";
+        case FileType::Unknown:
+            return "Unknown";
+        case FileType::Xp:
+            return "Xp";
+        default:
+            return "Unknown";
+        }
+    }
+
+    const char* toString(LoadWarningCode warningCode)
+    {
+        switch (warningCode)
+        {
+        case LoadWarningCode::None:
+            return "None";
+        case LoadWarningCode::InputWasAlreadyDecompressed:
+            return "InputWasAlreadyDecompressed";
+        case LoadWarningCode::TransparentCellsSkipped:
+            return "TransparentCellsSkipped";
+        case LoadWarningCode::MultipleLayersFlattened:
+            return "MultipleLayersFlattened";
+        case LoadWarningCode::ExtraTrailingBytesIgnored:
+            return "ExtraTrailingBytesIgnored";
+        case LoadWarningCode::LegacyVersionHeaderDetected:
+            return "LegacyVersionHeaderDetected";
+        default:
+            return "Unknown";
+        }
     }
 }
