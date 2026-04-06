@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -20,22 +21,57 @@ namespace AnsiLoader
     enum class LoadWarningCode
     {
         None,
+        SauceMetadataPresent,
+        SauceWidthOverrideApplied,
         UnsupportedSequenceIgnored,
         UnsupportedPrivateSequenceIgnored,
+        UnsupportedSgrIgnored,
+        BareEscapeIgnored,
         CursorClamped,
         CanvasExpanded,
-        BareEscapeIgnored
+        TruncatedSauceIgnored
+    };
+
+    struct SourcePosition
+    {
+        int x = -1;
+        int y = -1;
+
+        bool isValid() const
+        {
+            return x >= 0 && y >= 0;
+        }
     };
 
     struct LoadWarning
     {
         LoadWarningCode code = LoadWarningCode::None;
         std::string message;
+        std::size_t byteOffset = 0;
+        SourcePosition sourcePosition;
 
         bool isValid() const
         {
             return code != LoadWarningCode::None;
         }
+    };
+
+    struct SauceMetadata
+    {
+        bool present = false;
+        std::string title;
+        std::string author;
+        std::string group;
+        std::string date;
+        std::uint8_t dataType = 0;
+        std::uint8_t fileType = 0;
+        std::uint16_t tInfo1 = 0;
+        std::uint16_t tInfo2 = 0;
+        std::uint16_t tInfo3 = 0;
+        std::uint16_t tInfo4 = 0;
+        std::uint8_t commentLineCount = 0;
+        std::uint8_t flags = 0;
+        std::string fontName;
     };
 
     struct LoadOptions
@@ -47,11 +83,11 @@ namespace AnsiLoader
         int maxRows = 4096;
 
         bool strictUnsupportedCommands = false;
-        bool clampCursorToCanvas = true;
+        bool clampCursorToBounds = true;
         bool expandCanvasOnDemand = true;
-        bool wrapAtColumnLimit = true;
+        bool wrapAtDefaultColumn = true;
         bool treatBareLfAsNewLine = true;
-        bool preserveTrailingSpaces = true;
+        bool preferSauceWidth = true;
 
         std::optional<Style> baseStyle;
     };
@@ -62,11 +98,18 @@ namespace AnsiLoader
         bool success = false;
 
         FileType detectedFileType = FileType::Unknown;
-
         int resolvedWidth = 0;
         int resolvedHeight = 0;
 
+        SauceMetadata sauce;
+
         std::vector<LoadWarning> warnings;
+
+        bool hasParseFailure = false;
+        std::size_t failingByteOffset = 0;
+        char32_t firstFailingCodePoint = U'\0';
+        SourcePosition firstFailingPosition;
+
         std::string errorMessage;
     };
 
@@ -81,6 +124,15 @@ namespace AnsiLoader
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const Style& style);
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options = {});
+
+    bool hasWarning(const LoadResult& result, LoadWarningCode code);
+
+    const LoadWarning* getWarningByCode(
+        const LoadResult& result,
+        LoadWarningCode code);
+
+    std::string formatLoadError(const LoadResult& result);
+    std::string formatLoadSuccess(const LoadResult& result);
 
     const char* toString(FileType fileType);
     const char* toString(LoadWarningCode warningCode);

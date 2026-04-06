@@ -15,6 +15,8 @@ namespace TextObjectExporter
     struct SaveResult;
 }
 
+class TextObjectBuilder;
+
 struct TextObjectCell
 {
     char32_t glyph = U' ';
@@ -50,6 +52,8 @@ struct TextObjectCell
 
 class TextObject
 {
+    friend class TextObjectBuilder;
+
 public:
     TextObject();
 
