@@ -169,6 +169,17 @@ namespace
         return UnicodeConversion::sanitizeCodePoint(static_cast<char32_t>(glyph));
     }
 
+    bool hasVisibleGlyph(char32_t glyph)
+    {
+        return glyph != U'\0' && glyph != U' ';
+    }
+
+    bool isTransparentBackground(const XpArtLoader::RgbColor& color, const XpArtLoader::LoadOptions& options)
+    {
+        return options.treatMagentaBackgroundAsTransparent &&
+            color == kTransparentBackground;
+    }
+
     int layerIndex(int x, int y, int height)
     {
         return (x * height) + y;
@@ -264,17 +275,6 @@ namespace
         return result;
     }
 
-    bool isTransparentBackground(const XpArtLoader::RgbColor& color, const XpArtLoader::LoadOptions& options)
-    {
-        return options.treatMagentaBackgroundAsTransparent &&
-            color == kTransparentBackground;
-    }
-
-    bool hasVisibleGlyph(char32_t glyph)
-    {
-        return glyph != U'\0' && glyph != U' ';
-    }
-
     bool isCanvasCompatibleLayer(
         const XpArtLoader::XpLayer& layer,
         const XpArtLoader::XpDocument& document,
@@ -293,6 +293,36 @@ namespace
 
         return layer.width == document.width &&
             layer.height == document.height;
+    }
+
+    void initializeDocumentMetadata(
+        XpArtLoader::XpDocument& document,
+        bool flattenPathUsed,
+        bool inputWasCompressed,
+        bool inputWasAlreadyDecompressed,
+        XpArtLoader::XpCompositeMode compositeMode)
+    {
+        document.metadata.canvasWidth = document.width;
+        document.metadata.canvasHeight = document.height;
+        document.metadata.layerCount = static_cast<int>(document.layers.size());
+        document.metadata.parsedFormatVersion = document.formatVersion;
+        document.metadata.retainedPathAvailable = document.isValid();
+        document.metadata.flattenPathUsed = flattenPathUsed;
+        document.metadata.inputWasCompressed = inputWasCompressed;
+        document.metadata.inputWasAlreadyDecompressed = inputWasAlreadyDecompressed;
+        document.metadata.compositeModeUsed = compositeMode;
+    }
+
+    void initializeLayerFlattenMetadata(
+        XpArtLoader::XpDocument& document,
+        XpArtLoader::XpCompositeMode compositeMode)
+    {
+        for (XpArtLoader::XpLayer& layer : document.layers)
+        {
+            layer.metadata.visibilityUsedForFlattening = layer.visible;
+            layer.metadata.clippingOccurredDuringFlatten = false;
+            layer.metadata.compositeModeUsed = compositeMode;
+        }
     }
 
     void applyTransparentGlyphOnlyCell(
@@ -338,15 +368,6 @@ namespace
         const bool visibleGlyph = hasVisibleGlyph(glyph);
         const bool transparentBackground = isTransparentBackground(source.background, options);
 
-        // Default Phase 4.5B-compatible policy:
-        // a) transparent background + visible glyph:
-        //    overlay glyph/foreground only; preserve prior background.
-        // b) transparent background + blank glyph:
-        //    contribute nothing.
-        // c) opaque background + visible glyph:
-        //    replace glyph, foreground, and background.
-        // d) opaque background + blank glyph:
-        //    clear lower glyph and paint only the new background.
         if (transparentBackground)
         {
             if (visibleGlyph)
@@ -374,9 +395,6 @@ namespace
         const bool visibleGlyph = hasVisibleGlyph(glyph);
         const bool transparentBackground = isTransparentBackground(source.background, options);
 
-        // Alternate policy:
-        // - transparent-background cells contribute nothing at all
-        // - only opaque cells can modify destination content
         if (transparentBackground)
         {
             if (!visibleGlyph)
@@ -435,7 +453,7 @@ namespace
     }
 
     FlattenResult flattenRetainedDocument(
-        const XpArtLoader::XpDocument& document,
+        XpArtLoader::XpDocument& document,
         const XpArtLoader::LoadOptions& options)
     {
         FlattenResult result;
@@ -449,8 +467,11 @@ namespace
 
         result.cells.resize(cellCount);
 
-        for (const XpArtLoader::XpLayer& layer : document.layers)
+        for (XpArtLoader::XpLayer& layer : document.layers)
         {
+            layer.metadata.visibilityUsedForFlattening = layer.visible;
+            layer.metadata.compositeModeUsed = options.compositeMode;
+
             if (!layer.visible)
             {
                 ++result.stats.skippedHiddenLayers;
@@ -463,6 +484,7 @@ namespace
             if (layer.width != document.width || layer.height != document.height)
             {
                 result.stats.clippedLayerContent = true;
+                layer.metadata.clippingOccurredDuringFlatten = true;
             }
 
             for (int y = 0; y < compositedHeight; ++y)
@@ -674,12 +696,24 @@ namespace XpArtLoader
         retained.usesLegacyLayerCountHeader = document.usesLegacyLayerCountHeader;
         retained.layers.reserve(document.layers.size());
 
-        for (const LayerData& parsedLayer : document.layers)
+        for (std::size_t layerIndexValue = 0; layerIndexValue < document.layers.size(); ++layerIndexValue)
         {
+            const LayerData& parsedLayer = document.layers[layerIndexValue];
+
             XpLayer retainedLayer;
             retainedLayer.width = parsedLayer.width;
             retainedLayer.height = parsedLayer.height;
             retainedLayer.visible = true;
+
+            retainedLayer.metadata.sourceLayerIndex = static_cast<int>(layerIndexValue);
+            retainedLayer.metadata.sourceWidth = parsedLayer.width;
+            retainedLayer.metadata.sourceHeight = parsedLayer.height;
+            retainedLayer.metadata.matchedCanvasSize =
+                parsedLayer.width == document.canvasWidth &&
+                parsedLayer.height == document.canvasHeight;
+            retainedLayer.metadata.visibilityUsedForFlattening = true;
+            retainedLayer.metadata.compositeModeUsed = XpCompositeMode::Phase45BCompatible;
+
             retainedLayer.cells.reserve(parsedLayer.cells.size());
 
             for (const CellData& parsedCell : parsedLayer.cells)
@@ -689,10 +723,28 @@ namespace XpArtLoader
                 retainedCell.foreground = parsedCell.foreground;
                 retainedCell.background = parsedCell.background;
                 retainedLayer.cells.push_back(retainedCell);
+
+                if (parsedCell.background == kTransparentBackground)
+                {
+                    retainedLayer.metadata.encounteredTransparentBackgroundCells = true;
+
+                    const char32_t glyph = decodeRexPaintGlyph(parsedCell.glyph);
+                    if (hasVisibleGlyph(glyph))
+                    {
+                        retainedLayer.metadata.encounteredVisibleGlyphsOnTransparentBackground = true;
+                    }
+                }
             }
 
             retained.layers.push_back(std::move(retainedLayer));
         }
+
+        initializeDocumentMetadata(
+            retained,
+            false,
+            false,
+            false,
+            XpCompositeMode::Phase45BCompatible);
 
         return retained;
     }
@@ -718,6 +770,15 @@ namespace XpArtLoader
         result.usedLayerFlattening = document.layers.size() > 1;
         result.compositeModeUsed = options.compositeMode;
 
+        initializeDocumentMetadata(
+            result.retainedDocument,
+            true,
+            false,
+            false,
+            options.compositeMode);
+
+        initializeLayerFlattenMetadata(result.retainedDocument, options.compositeMode);
+
         if (!document.isValid())
         {
             result.success = false;
@@ -725,9 +786,9 @@ namespace XpArtLoader
             return result;
         }
 
-        for (const XpLayer& layer : document.layers)
+        for (const XpLayer& layer : result.retainedDocument.layers)
         {
-            if (!isCanvasCompatibleLayer(layer, document, options))
+            if (!isCanvasCompatibleLayer(layer, result.retainedDocument, options))
             {
                 result.success = false;
                 if (options.strictLayerSizeValidation)
@@ -742,7 +803,7 @@ namespace XpArtLoader
             }
         }
 
-        for (const XpLayer& layer : document.layers)
+        for (const XpLayer& layer : result.retainedDocument.layers)
         {
             if (layer.visible)
             {
@@ -754,7 +815,7 @@ namespace XpArtLoader
             }
         }
 
-        if (document.layers.size() > 1)
+        if (result.retainedDocument.layers.size() > 1)
         {
             addWarningOnce(
                 result,
@@ -779,15 +840,16 @@ namespace XpArtLoader
                 toString(options.compositeMode) + ".");
         }
 
-        const FlattenResult flattened = flattenRetainedDocument(document, options);
-        TextObjectBuilder builder(document.width, document.height);
+        FlattenResult flattened = flattenRetainedDocument(result.retainedDocument, options);
+        TextObjectBuilder builder(result.retainedDocument.width, result.retainedDocument.height);
 
-        for (int y = 0; y < document.height; ++y)
+        for (int y = 0; y < result.retainedDocument.height; ++y)
         {
-            for (int x = 0; x < document.width; ++x)
+            for (int x = 0; x < result.retainedDocument.width; ++x)
             {
                 const CompositedCell& cell =
-                    flattened.cells[static_cast<std::size_t>(canvasIndex(x, y, document.width))];
+                    flattened.cells[static_cast<std::size_t>(
+                        canvasIndex(x, y, result.retainedDocument.width))];
 
                 const Style style = buildCellStyle(cell, options);
 
@@ -898,9 +960,18 @@ namespace XpArtLoader
         result.resolvedWidth = retained.width;
         result.resolvedHeight = retained.height;
 
+        initializeDocumentMetadata(
+            result.retainedDocument,
+            options.flattenLayers,
+            compressedInput,
+            !compressedInput,
+            options.compositeMode);
+
+        initializeLayerFlattenMetadata(result.retainedDocument, options.compositeMode);
+
         if (options.flattenLayers)
         {
-            LoadResult built = buildTextObject(retained, options);
+            LoadResult built = buildTextObject(result.retainedDocument, options);
             built.detectedFileType = FileType::Xp;
             built.inputWasCompressed = compressedInput;
             built.inputWasAlreadyDecompressed = !compressedInput;
@@ -908,9 +979,8 @@ namespace XpArtLoader
             built.resolvedLayerCount = retained.getLayerCount();
             built.resolvedWidth = retained.width;
             built.resolvedHeight = retained.height;
-            built.retainedDocument = retained;
-            built.hasRetainedDocument = true;
-            built.compositeModeUsed = options.compositeMode;
+            built.retainedDocument.metadata.inputWasCompressed = compressedInput;
+            built.retainedDocument.metadata.inputWasAlreadyDecompressed = !compressedInput;
 
             if (!compressedInput)
             {
@@ -943,7 +1013,7 @@ namespace XpArtLoader
         result.success = true;
         result.usedLayerFlattening = false;
 
-        for (const XpLayer& layer : retained.layers)
+        for (const XpLayer& layer : result.retainedDocument.layers)
         {
             if (layer.visible)
             {
@@ -1207,6 +1277,27 @@ namespace XpArtLoader
         return nullptr;
     }
 
+    const XpLayer* tryGetLayer(const XpDocument& document, int layerIndexValue)
+    {
+        if (layerIndexValue < 0 || layerIndexValue >= static_cast<int>(document.layers.size()))
+        {
+            return nullptr;
+        }
+
+        return &document.layers[static_cast<std::size_t>(layerIndexValue)];
+    }
+
+    const XpLayerMetadata* tryGetLayerMetadata(const XpDocument& document, int layerIndexValue)
+    {
+        const XpLayer* layer = tryGetLayer(document, layerIndexValue);
+        if (layer == nullptr)
+        {
+            return nullptr;
+        }
+
+        return &layer->metadata;
+    }
+
     std::string formatLoadError(const LoadResult& result)
     {
         std::ostringstream stream;
@@ -1248,6 +1339,52 @@ namespace XpArtLoader
         {
             stream << ", warnings=" << result.warnings.size();
         }
+
+        return stream.str();
+    }
+
+    std::string formatRetainedDocumentSummary(const LoadResult& result)
+    {
+        if (!result.hasRetainedDocument || !result.retainedDocument.isValid())
+        {
+            return "XP retained document: unavailable";
+        }
+
+        const XpDocumentMetadata& metadata = result.retainedDocument.metadata;
+
+        std::ostringstream stream;
+        stream << "XP retained document: "
+            << metadata.canvasWidth << 'x' << metadata.canvasHeight
+            << ", layers=" << metadata.layerCount
+            << ", version=" << metadata.parsedFormatVersion
+            << ", retained=" << (metadata.retainedPathAvailable ? "true" : "false")
+            << ", flattened=" << (metadata.flattenPathUsed ? "true" : "false")
+            << ", inputCompressed=" << (metadata.inputWasCompressed ? "true" : "false")
+            << ", inputAlreadyDecompressed=" << (metadata.inputWasAlreadyDecompressed ? "true" : "false")
+            << ", compositeMode=" << toString(metadata.compositeModeUsed);
+
+        return stream.str();
+    }
+
+    std::string formatRetainedLayerSummary(const LoadResult& result, int layerIndexValue)
+    {
+        const XpLayerMetadata* metadata =
+            tryGetLayerMetadata(result.retainedDocument, layerIndexValue);
+
+        if (metadata == nullptr)
+        {
+            return "XP retained layer: unavailable";
+        }
+
+        std::ostringstream stream;
+        stream << "XP layer " << metadata->sourceLayerIndex
+            << ": " << metadata->sourceWidth << 'x' << metadata->sourceHeight
+            << ", matchesCanvas=" << (metadata->matchedCanvasSize ? "true" : "false")
+            << ", visibleForFlatten=" << (metadata->visibilityUsedForFlattening ? "true" : "false")
+            << ", clipped=" << (metadata->clippingOccurredDuringFlatten ? "true" : "false")
+            << ", transparentCells=" << (metadata->encounteredTransparentBackgroundCells ? "true" : "false")
+            << ", transparentVisibleGlyphs=" << (metadata->encounteredVisibleGlyphsOnTransparentBackground ? "true" : "false")
+            << ", compositeMode=" << toString(metadata->compositeModeUsed);
 
         return stream.str();
     }

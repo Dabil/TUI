@@ -138,6 +138,44 @@ namespace XpArtLoader
         SourcePosition firstFailingPosition;
     };
 
+    // Per-layer retained metadata intended for diagnostics/inspection.
+    // This stores facts learned during parse/build and later updated facts
+    // about how flattening actually used the layer.
+    struct XpLayerMetadata
+    {
+        int sourceLayerIndex = -1;
+        int sourceWidth = 0;
+        int sourceHeight = 0;
+
+        bool matchedCanvasSize = false;
+        bool clippingOccurredDuringFlatten = false;
+
+        bool encounteredTransparentBackgroundCells = false;
+        bool encounteredVisibleGlyphsOnTransparentBackground = false;
+
+        bool visibilityUsedForFlattening = true;
+        XpCompositeMode compositeModeUsed = XpCompositeMode::Phase45BCompatible;
+    };
+
+    // Document-level retained metadata intended for diagnostics/inspection.
+    // This keeps the retained document self-describing enough for validation
+    // screens and import inspectors without forcing a re-parse.
+    struct XpDocumentMetadata
+    {
+        int canvasWidth = 0;
+        int canvasHeight = 0;
+        int layerCount = 0;
+        int parsedFormatVersion = 0;
+
+        bool retainedPathAvailable = false;
+        bool flattenPathUsed = false;
+
+        bool inputWasCompressed = false;
+        bool inputWasAlreadyDecompressed = false;
+
+        XpCompositeMode compositeModeUsed = XpCompositeMode::Phase45BCompatible;
+    };
+
     // Retained runtime-ready XP content.
     struct XpLayerCell
     {
@@ -154,6 +192,7 @@ namespace XpArtLoader
         int height = 0;
         bool visible = true;
         std::vector<XpLayerCell> cells;
+        XpLayerMetadata metadata;
 
         bool isValid() const;
         bool inBounds(int x, int y) const;
@@ -162,7 +201,7 @@ namespace XpArtLoader
 
     // XpDocument is the retained post-parse XP representation.
     // It preserves layer order, dimensions, cell content, visibility state,
-    // and future compositing/inspection/animation extension points.
+    // and inspection metadata for future validation/debug workflows.
     struct XpDocument
     {
         int width = 0;
@@ -170,6 +209,7 @@ namespace XpArtLoader
         int formatVersion = 0;
         bool usesLegacyLayerCountHeader = false;
         std::vector<XpLayer> layers;
+        XpDocumentMetadata metadata;
 
         bool isValid() const;
         int getLayerCount() const;
@@ -255,8 +295,14 @@ namespace XpArtLoader
     bool hasWarning(const LoadResult& result, LoadWarningCode code);
     const LoadWarning* getWarningByCode(const LoadResult& result, LoadWarningCode code);
 
+    // Small inspection helpers for diagnostics code.
+    const XpLayer* tryGetLayer(const XpDocument& document, int layerIndex);
+    const XpLayerMetadata* tryGetLayerMetadata(const XpDocument& document, int layerIndex);
+
     std::string formatLoadError(const LoadResult& result);
     std::string formatLoadSuccess(const LoadResult& result);
+    std::string formatRetainedDocumentSummary(const LoadResult& result);
+    std::string formatRetainedLayerSummary(const LoadResult& result, int layerIndex);
 
     const char* toString(FileType fileType);
     const char* toString(LoadWarningCode warningCode);
