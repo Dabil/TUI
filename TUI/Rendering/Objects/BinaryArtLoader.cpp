@@ -86,6 +86,126 @@ namespace
             (static_cast<unsigned char>(bytes[offset + 3]) << 24));
     }
 
+    bool startsWithAdfSignature(std::string_view bytes)
+    {
+        return bytes.size() >= 3 &&
+            ((bytes[0] == 'A' && bytes[1] == 'D' && bytes[2] == 'F') ||
+                (bytes[0] == 'a' && bytes[1] == 'd' && bytes[2] == 'f'));
+    }
+
+    bool isCellOrTextChunkId(std::string_view chunkId)
+    {
+        return chunkId == "CELL" || chunkId == "cell" ||
+            chunkId == "TEXT" || chunkId == "text";
+    }
+
+    bool isSizeChunkId(std::string_view chunkId)
+    {
+        return chunkId == "SIZE" || chunkId == "size";
+    }
+
+    bool looksLikeAdf(std::string_view bytes)
+    {
+        if (!startsWithAdfSignature(bytes))
+        {
+            return false;
+        }
+
+        std::size_t offset = 3;
+        if (offset < bytes.size() && static_cast<unsigned char>(bytes[offset]) == 0x1A)
+        {
+            ++offset;
+        }
+
+        if (offset + 4 <= bytes.size())
+        {
+            const std::string_view maybeMain = bytes.substr(offset, 4);
+            if (maybeMain == "MAIN" || maybeMain == "main")
+            {
+                offset += 4;
+            }
+        }
+
+        if (offset + 8 > bytes.size())
+        {
+            return false;
+        }
+
+        const std::string_view chunkId = bytes.substr(offset, 4);
+        if (!isCellOrTextChunkId(chunkId) && !isSizeChunkId(chunkId))
+        {
+            return false;
+        }
+
+        bool ok = false;
+        const std::uint32_t chunkSize = readLe32(bytes, offset + 4, ok);
+        if (!ok)
+        {
+            return false;
+        }
+
+        const std::size_t chunkDataOffset = offset + 8;
+        if (chunkDataOffset + static_cast<std::size_t>(chunkSize) > bytes.size())
+        {
+            return false;
+        }
+
+        if (isCellOrTextChunkId(chunkId))
+        {
+            if (chunkSize < 4)
+            {
+                return false;
+            }
+
+            const std::uint16_t width = readLe16(bytes, chunkDataOffset + 0, ok);
+            if (!ok || width == 0)
+            {
+                return false;
+            }
+
+            const std::uint16_t height = readLe16(bytes, chunkDataOffset + 2, ok);
+            if (!ok || height == 0)
+            {
+                return false;
+            }
+
+            const std::size_t expectedCellBytes =
+                static_cast<std::size_t>(width) *
+                static_cast<std::size_t>(height) * 2u;
+
+            if (4u + expectedCellBytes > static_cast<std::size_t>(chunkSize))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        if (isSizeChunkId(chunkId))
+        {
+            if (chunkSize < 4)
+            {
+                return false;
+            }
+
+            const std::uint16_t width = readLe16(bytes, chunkDataOffset + 0, ok);
+            if (!ok || width == 0)
+            {
+                return false;
+            }
+
+            const std::uint16_t height = readLe16(bytes, chunkDataOffset + 2, ok);
+            if (!ok || height == 0)
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
     char32_t decodeCp437Byte(unsigned char value)
     {
         if (value <= 0x7F)
@@ -1026,11 +1146,13 @@ namespace BinaryArtLoader
             content[3] == 'N' &&
             static_cast<unsigned char>(content[4]) == 0x1A;
 
+        const bool isLikelyAdf = looksLikeAdf(content);
+
         if (type == FileType::XBin || (type == FileType::Auto && isXBin))
         {
             result = loadXBin(content, options, sauceRecord.metadata);
         }
-        else if (type == FileType::Adf)
+        else if (type == FileType::Adf || (type == FileType::Auto && isLikelyAdf))
         {
             result = loadAdf(content, options, sauceRecord.metadata);
         }
