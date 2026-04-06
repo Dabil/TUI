@@ -28,7 +28,23 @@ namespace XpArtLoader
         MultipleLayersFlattened,
         ExtraTrailingBytesIgnored,
         LegacyVersionHeaderDetected,
-        LayerSizeMismatchClipped
+        LayerSizeMismatchClipped,
+        HiddenLayersSkipped,
+        NonDefaultCompositeModeUsed
+    };
+
+    enum class XpCompositeMode
+    {
+        // Default Phase 4.5B-compatible compositing behavior:
+        // - transparent background + visible glyph overlays glyph/foreground only
+        // - transparent background + blank glyph contributes nothing
+        // - opaque cells overwrite background and optionally glyph
+        Phase45BCompatible,
+
+        // Alternate policy:
+        // - transparent-background cells contribute nothing at all
+        // - only opaque cells affect the flattened result
+        StrictOpaqueOverwrite
     };
 
     struct SourcePosition
@@ -63,7 +79,9 @@ namespace XpArtLoader
 
         bool operator==(const RgbColor& other) const
         {
-            return red == other.red && green == other.green && blue == other.blue;
+            return red == other.red &&
+                green == other.green &&
+                blue == other.blue;
         }
 
         bool operator!=(const RgbColor& other) const
@@ -92,9 +110,8 @@ namespace XpArtLoader
         const CellData* tryGetCell(int x, int y) const;
     };
 
-    // ParsedDocument is the raw parsed XP payload representation.
-    // It reflects file structure closely and is intentionally kept separate
-    // from the retained runtime-ready XP document model below.
+    // ParsedDocument is the raw file-structure-oriented parse result.
+    // It should remain separate from retained runtime-ready layer content.
     struct ParsedDocument
     {
         int formatVersion = 0;
@@ -121,18 +138,7 @@ namespace XpArtLoader
         SourcePosition firstFailingPosition;
     };
 
-    // XpLayerCell / XpLayer / XpDocument form the retained XP model.
-    //
-    // Responsibilities:
-    // - ParsedDocument:
-    //     raw parsed file data and parse-time metadata.
-    // - XpDocument:
-    //     retained, runtime-ready layered XP content that preserves layer order
-    //     and per-cell authored data for future visibility toggles, diagnostics,
-    //     alternate merge policies, and animation/frame workflows.
-    // - TextObject:
-    //     current flattened runtime import target used by the existing placement
-    //     and rendering pipeline.
+    // Retained runtime-ready XP content.
     struct XpLayerCell
     {
         std::uint32_t glyph = 0;
@@ -154,6 +160,9 @@ namespace XpArtLoader
         const XpLayerCell* tryGetCell(int x, int y) const;
     };
 
+    // XpDocument is the retained post-parse XP representation.
+    // It preserves layer order, dimensions, cell content, visibility state,
+    // and future compositing/inspection/animation extension points.
     struct XpDocument
     {
         int width = 0;
@@ -173,16 +182,15 @@ namespace XpArtLoader
         bool allowCompressedInput = true;
         bool allowAlreadyDecompressedInput = true;
 
-        // When true, retained XP layers are flattened into TextObject output,
-        // which remains the current runtime import path.
-        //
-        // When false, the loader still succeeds and preserves a retained
-        // XpDocument in LoadResult, but does not build a flattened TextObject.
+        // Current runtime path still flattens into TextObject by default.
         bool flattenLayers = true;
 
         bool treatMagentaBackgroundAsTransparent = true;
         bool visibleTransparentBaseCellsUseBlackBackground = true;
         bool strictLayerSizeValidation = true;
+
+        // Phase 4.5D compositing policy selection.
+        XpCompositeMode compositeMode = XpCompositeMode::Phase45BCompatible;
 
         std::optional<Style> baseStyle;
     };
@@ -205,6 +213,10 @@ namespace XpArtLoader
         bool inputWasAlreadyDecompressed = false;
         bool usedLayerFlattening = false;
 
+        XpCompositeMode compositeModeUsed = XpCompositeMode::Phase45BCompatible;
+        int visibleLayerCount = 0;
+        int hiddenLayerCount = 0;
+
         std::vector<LoadWarning> warnings;
 
         bool hasParseFailure = false;
@@ -218,7 +230,7 @@ namespace XpArtLoader
 
     ParseResult parseDecompressedPayload(std::string_view bytes);
 
-    // Explicit conversion boundary:
+    // Conversion boundary:
     // ParsedDocument -> retained XpDocument
     XpDocument buildRetainedDocument(const ParsedDocument& document);
 
@@ -232,11 +244,11 @@ namespace XpArtLoader
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options = {});
 
-    // Existing convenience path preserved:
+    // Compatibility wrapper:
     // ParsedDocument -> retained XpDocument -> flattened TextObject
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options = {});
 
-    // New retained-model flattening entry point:
+    // Retained-model flattening entry point:
     // XpDocument -> flattened TextObject
     LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options = {});
 
@@ -248,4 +260,5 @@ namespace XpArtLoader
 
     const char* toString(FileType fileType);
     const char* toString(LoadWarningCode warningCode);
+    const char* toString(XpCompositeMode compositeMode);
 }

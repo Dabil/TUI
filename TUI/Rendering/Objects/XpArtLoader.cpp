@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
-#include <cstring>
 #include <fstream>
 #include <iterator>
 #include <limits>
@@ -57,6 +56,7 @@ namespace
     struct FlattenStats
     {
         int skippedTransparentBlankCells = 0;
+        int skippedHiddenLayers = 0;
         bool clippedLayerContent = false;
     };
 
@@ -182,6 +182,7 @@ namespace
     std::size_t checkedCellCount(int width, int height, bool& ok)
     {
         ok = false;
+
         if (width <= 0 || height <= 0)
         {
             return 0;
@@ -233,14 +234,6 @@ namespace
         addWarning(result, code, message, byteOffset, position);
     }
 
-    void appendWarnings(XpArtLoader::LoadResult& destination, const XpArtLoader::LoadResult& source)
-    {
-        destination.warnings.insert(
-            destination.warnings.end(),
-            source.warnings.begin(),
-            source.warnings.end());
-    }
-
     XpArtLoader::ParseResult failParse(
         const std::string& message,
         std::size_t byteOffset = 0,
@@ -273,7 +266,8 @@ namespace
 
     bool isTransparentBackground(const XpArtLoader::RgbColor& color, const XpArtLoader::LoadOptions& options)
     {
-        return options.treatMagentaBackgroundAsTransparent && color == kTransparentBackground;
+        return options.treatMagentaBackgroundAsTransparent &&
+            color == kTransparentBackground;
     }
 
     bool hasVisibleGlyph(char32_t glyph)
@@ -293,10 +287,12 @@ namespace
 
         if (!options.strictLayerSizeValidation)
         {
-            return layer.width <= document.width && layer.height <= document.height;
+            return layer.width <= document.width &&
+                layer.height <= document.height;
         }
 
-        return layer.width == document.width && layer.height == document.height;
+        return layer.width == document.width &&
+            layer.height == document.height;
     }
 
     void applyTransparentGlyphOnlyCell(
@@ -310,7 +306,8 @@ namespace
         destination.foreground = source.foreground;
         destination.hasForeground = true;
 
-        if (!destination.hasBackground && options.visibleTransparentBaseCellsUseBlackBackground)
+        if (!destination.hasBackground &&
+            options.visibleTransparentBaseCellsUseBlackBackground)
         {
             destination.background = kOpaqueBlack;
             destination.hasBackground = true;
@@ -331,7 +328,7 @@ namespace
         destination.hasGlyph = visibleGlyph;
     }
 
-    void composeLayerCell(
+    void composeLayerCellPhase45BCompatible(
         CompositedCell& destination,
         const XpArtLoader::XpLayerCell& source,
         const XpArtLoader::LoadOptions& options,
@@ -341,7 +338,7 @@ namespace
         const bool visibleGlyph = hasVisibleGlyph(glyph);
         const bool transparentBackground = isTransparentBackground(source.background, options);
 
-        // Current flattened XP merge policy:
+        // Default Phase 4.5B-compatible policy:
         // a) transparent background + visible glyph:
         //    overlay glyph/foreground only; preserve prior background.
         // b) transparent background + blank glyph:
@@ -365,6 +362,53 @@ namespace
         }
 
         applyOpaqueCell(destination, source, glyph, visibleGlyph);
+    }
+
+    void composeLayerCellStrictOpaqueOverwrite(
+        CompositedCell& destination,
+        const XpArtLoader::XpLayerCell& source,
+        const XpArtLoader::LoadOptions& options,
+        FlattenStats& stats)
+    {
+        const char32_t glyph = decodeRexPaintGlyph(source.glyph);
+        const bool visibleGlyph = hasVisibleGlyph(glyph);
+        const bool transparentBackground = isTransparentBackground(source.background, options);
+
+        // Alternate policy:
+        // - transparent-background cells contribute nothing at all
+        // - only opaque cells can modify destination content
+        if (transparentBackground)
+        {
+            if (!visibleGlyph)
+            {
+                ++stats.skippedTransparentBlankCells;
+            }
+            return;
+        }
+
+        applyOpaqueCell(destination, source, glyph, visibleGlyph);
+    }
+
+    void composeLayerCell(
+        CompositedCell& destination,
+        const XpArtLoader::XpLayerCell& source,
+        const XpArtLoader::LoadOptions& options,
+        FlattenStats& stats)
+    {
+        switch (options.compositeMode)
+        {
+        case XpArtLoader::XpCompositeMode::Phase45BCompatible:
+            composeLayerCellPhase45BCompatible(destination, source, options, stats);
+            return;
+
+        case XpArtLoader::XpCompositeMode::StrictOpaqueOverwrite:
+            composeLayerCellStrictOpaqueOverwrite(destination, source, options, stats);
+            return;
+
+        default:
+            composeLayerCellPhase45BCompatible(destination, source, options, stats);
+            return;
+        }
     }
 
     Style buildCellStyle(const CompositedCell& cell, const XpArtLoader::LoadOptions& options)
@@ -409,6 +453,7 @@ namespace
         {
             if (!layer.visible)
             {
+                ++result.stats.skippedHiddenLayers;
                 continue;
             }
 
@@ -671,6 +716,7 @@ namespace XpArtLoader
         result.resolvedLayerCount = static_cast<int>(document.layers.size());
         result.parsedFormatVersion = document.formatVersion;
         result.usedLayerFlattening = document.layers.size() > 1;
+        result.compositeModeUsed = options.compositeMode;
 
         if (!document.isValid())
         {
@@ -696,12 +742,41 @@ namespace XpArtLoader
             }
         }
 
+        for (const XpLayer& layer : document.layers)
+        {
+            if (layer.visible)
+            {
+                ++result.visibleLayerCount;
+            }
+            else
+            {
+                ++result.hiddenLayerCount;
+            }
+        }
+
         if (document.layers.size() > 1)
         {
             addWarningOnce(
                 result,
                 LoadWarningCode::MultipleLayersFlattened,
                 "Multiple XP layers were flattened into a single TextObject.");
+        }
+
+        if (result.hiddenLayerCount > 0)
+        {
+            addWarningOnce(
+                result,
+                LoadWarningCode::HiddenLayersSkipped,
+                "One or more retained XP layers were hidden and skipped during flattening.");
+        }
+
+        if (options.compositeMode != XpCompositeMode::Phase45BCompatible)
+        {
+            addWarningOnce(
+                result,
+                LoadWarningCode::NonDefaultCompositeModeUsed,
+                std::string("XP flattening used non-default composite mode: ") +
+                toString(options.compositeMode) + ".");
         }
 
         const FlattenResult flattened = flattenRetainedDocument(document, options);
@@ -756,6 +831,7 @@ namespace XpArtLoader
     {
         LoadResult result;
         result.detectedFileType = FileType::Xp;
+        result.compositeModeUsed = options.compositeMode;
 
         const bool compressedInput = looksLikeGzip(bytes);
         std::string decompressedBytes;
@@ -834,6 +910,7 @@ namespace XpArtLoader
             built.resolvedHeight = retained.height;
             built.retainedDocument = retained;
             built.hasRetainedDocument = true;
+            built.compositeModeUsed = options.compositeMode;
 
             if (!compressedInput)
             {
@@ -865,6 +942,18 @@ namespace XpArtLoader
 
         result.success = true;
         result.usedLayerFlattening = false;
+
+        for (const XpLayer& layer : retained.layers)
+        {
+            if (layer.visible)
+            {
+                ++result.visibleLayerCount;
+            }
+            else
+            {
+                ++result.hiddenLayerCount;
+            }
+        }
 
         if (!compressedInput)
         {
@@ -986,7 +1075,10 @@ namespace XpArtLoader
 
     bool LayerData::inBounds(int x, int y) const
     {
-        return x >= 0 && y >= 0 && x < width && y < height;
+        return x >= 0 &&
+            y >= 0 &&
+            x < width &&
+            y < height;
     }
 
     const CellData* LayerData::tryGetCell(int x, int y) const
@@ -1044,7 +1136,10 @@ namespace XpArtLoader
 
     bool XpLayer::inBounds(int x, int y) const
     {
-        return x >= 0 && y >= 0 && x < width && y < height;
+        return x >= 0 &&
+            y >= 0 &&
+            x < width &&
+            y < height;
     }
 
     const XpLayerCell* XpLayer::tryGetCell(int x, int y) const
@@ -1142,9 +1237,12 @@ namespace XpArtLoader
         stream << "XP load success: "
             << result.resolvedWidth << 'x' << result.resolvedHeight
             << ", layers=" << result.resolvedLayerCount
+            << ", visible=" << result.visibleLayerCount
+            << ", hidden=" << result.hiddenLayerCount
             << ", version=" << result.parsedFormatVersion
             << ", retained=" << (result.hasRetainedDocument ? "true" : "false")
-            << ", flattened=" << (result.usedLayerFlattening ? "true" : "false");
+            << ", flattened=" << (result.usedLayerFlattening ? "true" : "false")
+            << ", compositeMode=" << toString(result.compositeModeUsed);
 
         if (!result.warnings.empty())
         {
@@ -1187,6 +1285,23 @@ namespace XpArtLoader
             return "LegacyVersionHeaderDetected";
         case LoadWarningCode::LayerSizeMismatchClipped:
             return "LayerSizeMismatchClipped";
+        case LoadWarningCode::HiddenLayersSkipped:
+            return "HiddenLayersSkipped";
+        case LoadWarningCode::NonDefaultCompositeModeUsed:
+            return "NonDefaultCompositeModeUsed";
+        default:
+            return "Unknown";
+        }
+    }
+
+    const char* toString(XpCompositeMode compositeMode)
+    {
+        switch (compositeMode)
+        {
+        case XpCompositeMode::Phase45BCompatible:
+            return "Phase45BCompatible";
+        case XpCompositeMode::StrictOpaqueOverwrite:
+            return "StrictOpaqueOverwrite";
         default:
             return "Unknown";
         }
