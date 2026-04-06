@@ -27,7 +27,8 @@ namespace XpArtLoader
         TransparentCellsSkipped,
         MultipleLayersFlattened,
         ExtraTrailingBytesIgnored,
-        LegacyVersionHeaderDetected
+        LegacyVersionHeaderDetected,
+        LayerSizeMismatchClipped
     };
 
     struct SourcePosition

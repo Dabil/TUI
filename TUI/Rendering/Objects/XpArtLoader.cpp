@@ -44,6 +44,28 @@ namespace
     const XpArtLoader::RgbColor kTransparentBackground{ 255, 0, 255 };
     const XpArtLoader::RgbColor kOpaqueBlack{ 0, 0, 0 };
 
+    struct CompositedCell
+    {
+        char32_t glyph = U' ';
+        bool hasGlyph = false;
+        bool hasForeground = false;
+        bool hasBackground = false;
+        XpArtLoader::RgbColor foreground;
+        XpArtLoader::RgbColor background;
+    };
+
+    struct FlattenStats
+    {
+        int skippedTransparentBlankCells = 0;
+        bool clippedLayerContent = false;
+    };
+
+    struct FlattenResult
+    {
+        std::vector<CompositedCell> cells;
+        FlattenStats stats;
+    };
+
     std::string toLowerCopy(std::string value)
     {
         std::transform(
@@ -150,6 +172,11 @@ namespace
     int layerIndex(int x, int y, int height)
     {
         return (x * height) + y;
+    }
+
+    int canvasIndex(int x, int y, int width)
+    {
+        return (y * width) + x;
     }
 
     std::size_t checkedCellCount(int width, int height, bool& ok)
@@ -270,6 +297,144 @@ namespace
         }
 
         return layer.width == document.canvasWidth && layer.height == document.canvasHeight;
+    }
+
+    void applyTransparentGlyphOnlyCell(
+        CompositedCell& destination,
+        const XpArtLoader::CellData& source,
+        char32_t glyph,
+        const XpArtLoader::LoadOptions& options)
+    {
+        destination.glyph = glyph;
+        destination.hasGlyph = true;
+        destination.foreground = source.foreground;
+        destination.hasForeground = true;
+
+        if (!destination.hasBackground && options.visibleTransparentBaseCellsUseBlackBackground)
+        {
+            destination.background = kOpaqueBlack;
+            destination.hasBackground = true;
+        }
+    }
+
+    void applyOpaqueCell(
+        CompositedCell& destination,
+        const XpArtLoader::CellData& source,
+        char32_t glyph,
+        bool visibleGlyph)
+    {
+        destination.background = source.background;
+        destination.hasBackground = true;
+        destination.foreground = source.foreground;
+        destination.hasForeground = true;
+        destination.glyph = visibleGlyph ? glyph : U' ';
+        destination.hasGlyph = visibleGlyph;
+    }
+
+    void composeLayerCell(
+        CompositedCell& destination,
+        const XpArtLoader::CellData& source,
+        const XpArtLoader::LoadOptions& options,
+        FlattenStats& stats)
+    {
+        const char32_t glyph = decodeRexPaintGlyph(source.glyph);
+        const bool visibleGlyph = hasVisibleGlyph(glyph);
+        const bool transparentBackground = isTransparentBackground(source.background, options);
+
+        // XP merge policy for the current flattened runtime path:
+        // a) transparent background + visible glyph:
+        //    overlay glyph/foreground only; preserve prior background.
+        //    If nothing is under it and the option is enabled, synthesize black.
+        // b) transparent background + blank glyph:
+        //    contribute nothing; keep the previously composed cell unchanged.
+        // c) opaque background + visible glyph:
+        //    replace glyph, foreground, and background.
+        // d) opaque background + blank glyph:
+        //    clear any lower glyph and paint only the new opaque background.
+        if (transparentBackground)
+        {
+            if (visibleGlyph)
+            {
+                applyTransparentGlyphOnlyCell(destination, source, glyph, options);
+            }
+            else
+            {
+                ++stats.skippedTransparentBlankCells;
+            }
+
+            return;
+        }
+
+        applyOpaqueCell(destination, source, glyph, visibleGlyph);
+    }
+
+    Style buildCellStyle(const CompositedCell& cell, const XpArtLoader::LoadOptions& options)
+    {
+        Style style = options.baseStyle.value_or(Style{});
+
+        if (cell.hasForeground)
+        {
+            style = style.withForeground(Color::FromRgb(
+                cell.foreground.red,
+                cell.foreground.green,
+                cell.foreground.blue));
+        }
+
+        if (cell.hasBackground)
+        {
+            style = style.withBackground(Color::FromRgb(
+                cell.background.red,
+                cell.background.green,
+                cell.background.blue));
+        }
+
+        return style;
+    }
+
+    FlattenResult flattenDocument(
+        const XpArtLoader::ParsedDocument& document,
+        const XpArtLoader::LoadOptions& options)
+    {
+        FlattenResult result;
+
+        bool countOk = false;
+        const std::size_t cellCount = checkedCellCount(document.canvasWidth, document.canvasHeight, countOk);
+        if (!countOk)
+        {
+            return result;
+        }
+
+        result.cells.resize(cellCount);
+
+        for (const XpArtLoader::LayerData& layer : document.layers)
+        {
+            const int compositedWidth = std::min(layer.width, document.canvasWidth);
+            const int compositedHeight = std::min(layer.height, document.canvasHeight);
+
+            if (layer.width != document.canvasWidth || layer.height != document.canvasHeight)
+            {
+                result.stats.clippedLayerContent = true;
+            }
+
+            for (int y = 0; y < compositedHeight; ++y)
+            {
+                for (int x = 0; x < compositedWidth; ++x)
+                {
+                    const XpArtLoader::CellData* sourceCell = layer.tryGetCell(x, y);
+                    if (sourceCell == nullptr)
+                    {
+                        continue;
+                    }
+
+                    CompositedCell& destinationCell =
+                        result.cells[static_cast<std::size_t>(canvasIndex(x, y, document.canvasWidth))];
+
+                    composeLayerCell(destinationCell, *sourceCell, options, result.stats);
+                }
+            }
+        }
+
+        return result;
     }
 
 #if TUI_XP_ART_LOADER_HAS_ZLIB
@@ -439,11 +604,6 @@ namespace
         result.success = true;
         return result;
     }
-
-    Color toColor(const XpArtLoader::RgbColor& rgb)
-    {
-        return Color::FromRgb(rgb.red, rgb.green, rgb.blue);
-    }
 }
 
 namespace XpArtLoader
@@ -464,6 +624,7 @@ namespace XpArtLoader
         result.resolvedHeight = document.canvasHeight;
         result.resolvedLayerCount = static_cast<int>(document.layers.size());
         result.parsedFormatVersion = document.formatVersion;
+        result.usedLayerFlattening = options.flattenLayers && document.layers.size() > 1;
 
         if (!options.flattenLayers)
         {
@@ -496,57 +657,55 @@ namespace XpArtLoader
             }
         }
 
-        TextObjectBuilder builder(document.canvasWidth, document.canvasHeight);
-
         if (document.layers.size() > 1)
         {
-            result.usedLayerFlattening = true;
-            addWarning(result,
+            addWarningOnce(
+                result,
                 LoadWarningCode::MultipleLayersFlattened,
                 "Multiple XP layers were flattened into a single TextObject.");
         }
 
-        for (const LayerData& layer : document.layers)
+        const FlattenResult flattened = flattenDocument(document, options);
+        TextObjectBuilder builder(document.canvasWidth, document.canvasHeight);
+
+        for (int y = 0; y < document.canvasHeight; ++y)
         {
-            for (int x = 0; x < layer.width; ++x)
+            for (int x = 0; x < document.canvasWidth; ++x)
             {
-                for (int y = 0; y < layer.height; ++y)
+                const CompositedCell& cell =
+                    flattened.cells[static_cast<std::size_t>(canvasIndex(x, y, document.canvasWidth))];
+
+                const Style style = buildCellStyle(cell, options);
+
+                if (cell.hasGlyph)
                 {
-                    const CellData* cell = layer.tryGetCell(x, y);
-                    if (cell == nullptr)
-                    {
-                        continue;
-                    }
-
-                    const char32_t glyph = decodeRexPaintGlyph(cell->glyph);
-                    const bool visibleGlyph = hasVisibleGlyph(glyph);
-                    const bool transparentBackground = isTransparentBackground(cell->background, options);
-
-                    if (transparentBackground && !visibleGlyph)
-                    {
-                        addWarningOnce(result,
-                            LoadWarningCode::TransparentCellsSkipped,
-                            "Transparent XP cells with no visible glyph were skipped.",
-                            0,
-                            { x, y });
-                        continue;
-                    }
-
-                    Style style = options.baseStyle.value_or(Style{});
-                    style = style.withForeground(toColor(cell->foreground));
-
-                    if (!transparentBackground)
-                    {
-                        style = style.withBackground(toColor(cell->background));
-                    }
-                    else if (options.visibleTransparentBaseCellsUseBlackBackground)
-                    {
-                        style = style.withBackground(toColor(kOpaqueBlack));
-                    }
-
-                    builder.setGlyph(x, y, glyph, style);
+                    builder.setGlyph(x, y, cell.glyph, style);
+                }
+                else if (cell.hasBackground)
+                {
+                    builder.setEmpty(x, y, style);
+                }
+                else if (options.baseStyle.has_value())
+                {
+                    builder.setEmpty(x, y, style);
                 }
             }
+        }
+
+        if (flattened.stats.skippedTransparentBlankCells > 0)
+        {
+            addWarningOnce(
+                result,
+                LoadWarningCode::TransparentCellsSkipped,
+                "Transparent XP cells with no visible glyph were skipped during flattening.");
+        }
+
+        if (!options.strictLayerSizeValidation && flattened.stats.clippedLayerContent)
+        {
+            addWarningOnce(
+                result,
+                LoadWarningCode::LayerSizeMismatchClipped,
+                "One or more XP layers did not match the document canvas and were composited only within valid bounds.");
         }
 
         result.object = builder.build();
@@ -609,15 +768,6 @@ namespace XpArtLoader
         }
 
         LoadResult built = buildTextObject(parse.document, options);
-        if (!built.success)
-        {
-            built.detectedFileType = FileType::Xp;
-            built.inputWasCompressed = compressedInput;
-            built.inputWasAlreadyDecompressed = !compressedInput;
-            built.parsedFormatVersion = parse.document.formatVersion;
-            return built;
-        }
-
         built.detectedFileType = FileType::Xp;
         built.inputWasCompressed = compressedInput;
         built.inputWasAlreadyDecompressed = !compressedInput;
@@ -856,6 +1006,11 @@ namespace XpArtLoader
             << ", layers=" << result.resolvedLayerCount
             << ", version=" << result.parsedFormatVersion;
 
+        if (result.usedLayerFlattening)
+        {
+            stream << ", flattened=true";
+        }
+
         if (!result.warnings.empty())
         {
             stream << ", warnings=" << result.warnings.size();
@@ -895,6 +1050,8 @@ namespace XpArtLoader
             return "ExtraTrailingBytesIgnored";
         case LoadWarningCode::LegacyVersionHeaderDetected:
             return "LegacyVersionHeaderDetected";
+        case LoadWarningCode::LayerSizeMismatchClipped:
+            return "LayerSizeMismatchClipped";
         default:
             return "Unknown";
         }
