@@ -161,8 +161,12 @@
     </ClInclude>
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
+    <ClInclude Include="Rendering\Objects\AnsiLoader.h" />
+    <ClInclude Include="Rendering\Objects\BinaryArtLoader.h" />
     <ClInclude Include="Rendering\Objects\ObjectFactory.h" />
     <ClInclude Include="Rendering\Objects\PlainTextLoader.h" />
+    <ClInclude Include="Rendering\Objects\SauceSupport.h" />
+    <ClInclude Include="Rendering\Objects\TextObjectBuilder.h" />
     <ClInclude Include="Rendering\Objects\TextObjectExporter.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
@@ -233,9 +237,13 @@
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RendererSelectionTrace.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
+    <ClCompile Include="Rendering\Objects\AnsiLoader.cpp" />
+    <ClCompile Include="Rendering\Objects\BinaryArtLoader.cpp" />
     <ClCompile Include="Rendering\Objects\ObjectFactory.cpp" />
     <ClCompile Include="Rendering\Objects\PlainTextLoader.cpp" />
+    <ClCompile Include="Rendering\Objects\SauceSupport.cpp" />
     <ClCompile Include="Rendering\Objects\TextObject.cpp" />
+    <ClCompile Include="Rendering\Objects\TextObjectBuilder.cpp" />
     <ClCompile Include="Rendering\Objects\TextObjectExporter.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
