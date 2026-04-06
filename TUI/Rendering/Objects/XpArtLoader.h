@@ -215,6 +215,32 @@ namespace XpArtLoader
         int getLayerCount() const;
     };
 
+    // A retained frame wraps one retained XP document so the importer can grow
+    // from today's single-document path into future animation/state-variant or
+    // frame-sequence workflows without redesigning the retained XP model.
+    struct XpFrame
+    {
+        int frameIndex = 0;
+        std::string label;
+        XpDocument document;
+
+        bool isValid() const;
+    };
+
+    // Minimal retained frame container.
+    // Current single XP imports populate this as a trivial one-frame sequence.
+    // Future multi-frame importers can append additional frames without changing
+    // the current XpDocument or flattened TextObject conversion model.
+    struct XpSequence
+    {
+        std::vector<XpFrame> frames;
+
+        bool isValid() const;
+        int getFrameCount() const;
+        const XpFrame* tryGetFrame(int frameIndex) const;
+        const XpFrame* getDefaultFrame() const;
+    };
+
     struct LoadOptions
     {
         FileType fileType = FileType::Auto;
@@ -239,14 +265,17 @@ namespace XpArtLoader
     {
         TextObject object;
         XpDocument retainedDocument;
+        XpSequence retainedSequence;
 
         bool success = false;
         bool hasRetainedDocument = false;
+        bool hasRetainedSequence = false;
 
         FileType detectedFileType = FileType::Unknown;
         int resolvedWidth = 0;
         int resolvedHeight = 0;
         int resolvedLayerCount = 0;
+        int resolvedFrameCount = 0;
         int parsedFormatVersion = 0;
 
         bool inputWasCompressed = false;
@@ -274,6 +303,19 @@ namespace XpArtLoader
     // ParsedDocument -> retained XpDocument
     XpDocument buildRetainedDocument(const ParsedDocument& document);
 
+    // Future-ready frame/container conversion seams.
+    XpFrame buildRetainedFrame(
+        const ParsedDocument& document,
+        int frameIndex = 0,
+        const std::string& label = std::string());
+
+    XpSequence buildRetainedSequence(const ParsedDocument& document);
+
+    XpSequence buildRetainedSequence(
+        const XpDocument& document,
+        int frameIndex = 0,
+        const std::string& label = std::string());
+
     LoadResult loadFromFile(const std::string& filePath);
     LoadResult loadFromFile(const std::string& filePath, const LoadOptions& options);
     LoadResult loadFromFile(const std::string& filePath, const Style& style);
@@ -287,6 +329,8 @@ namespace XpArtLoader
     // Compatibility wrapper:
     // ParsedDocument -> retained XpDocument -> flattened TextObject
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options = {});
+    LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options = {});
+    LoadResult buildTextObject(const XpSequence& sequence, const LoadOptions& options = {});
 
     // Retained-model flattening entry point:
     // XpDocument -> flattened TextObject
@@ -298,11 +342,13 @@ namespace XpArtLoader
     // Small inspection helpers for diagnostics code.
     const XpLayer* tryGetLayer(const XpDocument& document, int layerIndex);
     const XpLayerMetadata* tryGetLayerMetadata(const XpDocument& document, int layerIndex);
+    const XpFrame* tryGetFrame(const XpSequence& sequence, int frameIndex);
 
     std::string formatLoadError(const LoadResult& result);
     std::string formatLoadSuccess(const LoadResult& result);
     std::string formatRetainedDocumentSummary(const LoadResult& result);
     std::string formatRetainedLayerSummary(const LoadResult& result, int layerIndex);
+    std::string formatRetainedSequenceSummary(const LoadResult& result);
 
     const char* toString(FileType fileType);
     const char* toString(LoadWarningCode warningCode);

@@ -325,6 +325,20 @@ namespace
         }
     }
 
+    XpArtLoader::XpSequence makeSingleFrameSequence(
+        const XpArtLoader::XpDocument& document,
+        int frameIndex = 0,
+        const std::string& label = std::string())
+    {
+        XpArtLoader::XpSequence sequence;
+        XpArtLoader::XpFrame frame;
+        frame.frameIndex = frameIndex;
+        frame.label = label;
+        frame.document = document;
+        sequence.frames.push_back(std::move(frame));
+        return sequence;
+    }
+
     void applyTransparentGlyphOnlyCell(
         CompositedCell& destination,
         const XpArtLoader::XpLayerCell& source,
@@ -749,6 +763,33 @@ namespace XpArtLoader
         return retained;
     }
 
+    XpFrame buildRetainedFrame(
+        const ParsedDocument& document,
+        int frameIndex,
+        const std::string& label)
+    {
+        XpFrame frame;
+        frame.frameIndex = frameIndex;
+        frame.label = label;
+        frame.document = buildRetainedDocument(document);
+        return frame;
+    }
+
+    XpSequence buildRetainedSequence(const ParsedDocument& document)
+    {
+        XpSequence sequence;
+        sequence.frames.push_back(buildRetainedFrame(document, 0, std::string()));
+        return sequence;
+    }
+
+    XpSequence buildRetainedSequence(
+        const XpDocument& document,
+        int frameIndex,
+        const std::string& label)
+    {
+        return makeSingleFrameSequence(document, frameIndex, label);
+    }
+
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options)
     {
         const XpDocument retained = buildRetainedDocument(document);
@@ -762,10 +803,13 @@ namespace XpArtLoader
         LoadResult result;
         result.detectedFileType = FileType::Xp;
         result.retainedDocument = document;
+        result.retainedSequence = buildRetainedSequence(document, 0, std::string());
         result.hasRetainedDocument = document.isValid();
+        result.hasRetainedSequence = result.retainedSequence.isValid();
         result.resolvedWidth = document.width;
         result.resolvedHeight = document.height;
         result.resolvedLayerCount = static_cast<int>(document.layers.size());
+        result.resolvedFrameCount = result.retainedSequence.getFrameCount();
         result.parsedFormatVersion = document.formatVersion;
         result.usedLayerFlattening = document.layers.size() > 1;
         result.compositeModeUsed = options.compositeMode;
@@ -889,6 +933,43 @@ namespace XpArtLoader
         return result;
     }
 
+    LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options)
+    {
+        LoadResult result = buildTextObject(frame.document, options);
+        result.retainedSequence = buildRetainedSequence(frame.document, frame.frameIndex, frame.label);
+        result.hasRetainedSequence = result.retainedSequence.isValid();
+        result.resolvedFrameCount = result.retainedSequence.getFrameCount();
+        return result;
+    }
+
+    LoadResult buildTextObject(const XpSequence& sequence, const LoadOptions& options)
+    {
+        if (!sequence.isValid())
+        {
+            LoadResult result;
+            result.success = false;
+            result.detectedFileType = FileType::Xp;
+            result.errorMessage = "Invalid retained XP sequence.";
+            return result;
+        }
+
+        const XpFrame* frame = sequence.getDefaultFrame();
+        if (frame == nullptr)
+        {
+            LoadResult result;
+            result.success = false;
+            result.detectedFileType = FileType::Xp;
+            result.errorMessage = "Retained XP sequence does not contain a default frame.";
+            return result;
+        }
+
+        LoadResult result = buildTextObject(frame->document, options);
+        result.retainedSequence = sequence;
+        result.hasRetainedSequence = true;
+        result.resolvedFrameCount = sequence.getFrameCount();
+        return result;
+    }
+
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options)
     {
         LoadResult result;
@@ -951,12 +1032,15 @@ namespace XpArtLoader
         }
 
         result.retainedDocument = retained;
+        result.retainedSequence = buildRetainedSequence(retained, 0, std::string());
         result.hasRetainedDocument = true;
+        result.hasRetainedSequence = result.retainedSequence.isValid();
         result.detectedFileType = FileType::Xp;
         result.inputWasCompressed = compressedInput;
         result.inputWasAlreadyDecompressed = !compressedInput;
         result.parsedFormatVersion = retained.formatVersion;
         result.resolvedLayerCount = retained.getLayerCount();
+        result.resolvedFrameCount = result.retainedSequence.getFrameCount();
         result.resolvedWidth = retained.width;
         result.resolvedHeight = retained.height;
 
@@ -977,10 +1061,13 @@ namespace XpArtLoader
             built.inputWasAlreadyDecompressed = !compressedInput;
             built.parsedFormatVersion = retained.formatVersion;
             built.resolvedLayerCount = retained.getLayerCount();
+            built.resolvedFrameCount = 1;
             built.resolvedWidth = retained.width;
             built.resolvedHeight = retained.height;
             built.retainedDocument.metadata.inputWasCompressed = compressedInput;
             built.retainedDocument.metadata.inputWasAlreadyDecompressed = !compressedInput;
+            built.retainedSequence = buildRetainedSequence(built.retainedDocument, 0, std::string());
+            built.hasRetainedSequence = built.retainedSequence.isValid();
 
             if (!compressedInput)
             {
@@ -1264,6 +1351,49 @@ namespace XpArtLoader
         return false;
     }
 
+    bool XpFrame::isValid() const
+    {
+        return frameIndex >= 0 && document.isValid();
+    }
+
+    bool XpSequence::isValid() const
+    {
+        if (frames.empty())
+        {
+            return false;
+        }
+
+        for (const XpFrame& frame : frames)
+        {
+            if (!frame.isValid())
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    int XpSequence::getFrameCount() const
+    {
+        return static_cast<int>(frames.size());
+    }
+
+    const XpFrame* XpSequence::tryGetFrame(int frameIndexValue) const
+    {
+        if (frameIndexValue < 0 || frameIndexValue >= static_cast<int>(frames.size()))
+        {
+            return nullptr;
+        }
+
+        return &frames[static_cast<std::size_t>(frameIndexValue)];
+    }
+
+    const XpFrame* XpSequence::getDefaultFrame() const
+    {
+        return tryGetFrame(0);
+    }
+
     const LoadWarning* getWarningByCode(const LoadResult& result, LoadWarningCode code)
     {
         for (const LoadWarning& warning : result.warnings)
@@ -1298,6 +1428,11 @@ namespace XpArtLoader
         return &layer->metadata;
     }
 
+    const XpFrame* tryGetFrame(const XpSequence& sequence, int frameIndex)
+    {
+        return sequence.tryGetFrame(frameIndex);
+    }
+
     std::string formatLoadError(const LoadResult& result)
     {
         std::ostringstream stream;
@@ -1328,10 +1463,12 @@ namespace XpArtLoader
         stream << "XP load success: "
             << result.resolvedWidth << 'x' << result.resolvedHeight
             << ", layers=" << result.resolvedLayerCount
+            << ", frames=" << result.resolvedFrameCount
             << ", visible=" << result.visibleLayerCount
             << ", hidden=" << result.hiddenLayerCount
             << ", version=" << result.parsedFormatVersion
             << ", retained=" << (result.hasRetainedDocument ? "true" : "false")
+            << ", sequence=" << (result.hasRetainedSequence ? "true" : "false")
             << ", flattened=" << (result.usedLayerFlattening ? "true" : "false")
             << ", compositeMode=" << toString(result.compositeModeUsed);
 
@@ -1385,6 +1522,35 @@ namespace XpArtLoader
             << ", transparentCells=" << (metadata->encounteredTransparentBackgroundCells ? "true" : "false")
             << ", transparentVisibleGlyphs=" << (metadata->encounteredVisibleGlyphsOnTransparentBackground ? "true" : "false")
             << ", compositeMode=" << toString(metadata->compositeModeUsed);
+
+        return stream.str();
+    }
+
+    std::string formatRetainedSequenceSummary(const LoadResult& result)
+    {
+        if (!result.hasRetainedSequence || !result.retainedSequence.isValid())
+        {
+            return "XP retained sequence: unavailable";
+        }
+
+        const XpFrame* firstFrame = result.retainedSequence.getDefaultFrame();
+
+        std::ostringstream stream;
+        stream << "XP retained sequence: "
+            << "frames=" << result.retainedSequence.getFrameCount();
+
+        if (firstFrame != nullptr)
+        {
+            stream << ", defaultFrameIndex=" << firstFrame->frameIndex;
+
+            if (!firstFrame->label.empty())
+            {
+                stream << ", defaultFrameLabel=" << firstFrame->label;
+            }
+
+            stream << ", defaultFrameCanvas="
+                << firstFrame->document.width << 'x' << firstFrame->document.height;
+        }
 
         return stream.str();
     }
