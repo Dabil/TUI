@@ -890,6 +890,14 @@ Rules:
 - imported content must become engine-owned structured data
 - unknown or unsupported commands must fail gracefully without crashing
 
+4.5A-G XP ART LOADER (REXPAINT FORMAT)
+- XP ART LOADER STABILIZATION
+- XP LAYER COMPOSITOR (REXPAINT FLATTENING + TRANSPARENCY RULES)
+- RETAINED XP LAYER DOCUMENT MODEL
+- LAYER VISIBILITY TOGGLES + COMPOSITING POLICY MODES
+- LAYER METADATA PRESERVATION + DIAGNOSTICS INSPECTION SUPPORT
+- XP MULTI-FRAME  ANIMATION IMPORT FOUNDATION
+
 4.6 ANSI / terminal art saving support
 Support saving where it makes architectural sense:
 - save/export TextObject to:
@@ -907,6 +915,514 @@ Rules:
   - approximate
   - or fail clearly
 - never hide lossy conversion
+
+4.6A XP ART SAVING SUPPORT (REXPAINT FORMAT)
+
+4.6B XP ANIMATION EXPORT SUPPORT (REXPAINT FORMAT)
+
+Support saving/exporting multi-frame XP content where it makes architectural sense.
+
+Support:
+- export retained XP sequence to:
+  - multi-layer .xp files (static)
+  - multi-frame XP sequences (engine-defined or future-compatible format)
+
+Responsibilities:
+- convert XpSequence / XpFrame → XP-compatible output
+- preserve:
+  - layer order
+  - glyphs
+  - RGB foreground/background
+  - transparency (magenta handling)
+- support optional frame labeling or metadata if present
+
+Rules:
+- exporter must be explicit about limitations:
+  - XP format does not natively support animation → define:
+    - frame-per-file strategy OR
+    - engine-side sequence format (.xpseq or similar)
+- do not silently discard:
+  - hidden layers
+  - compositing policy differences
+- flattening must be optional and explicit:
+  - allow export of:
+    - flattened result
+    - retained layered document
+
+Notes:
+- this phase establishes export symmetry with 4.5G import foundation
+- animation playback is NOT implemented here
+
+
+
+4.6BA XPSEQ SEQUENCE FORMAT (ENGINE-NATIVE XP ANIMATION CONTAINER)
+
+Define and implement the .xpseq format as the engine-native container for XP-based animation sequences.
+
+PURPOSE:
+- provide a clean, declarative container for multi-frame XP animation
+- avoid extending the .xp binary format beyond its intended scope
+- integrate seamlessly with:
+  - retained XP document model
+  - asset system
+  - PageComposer frame-aware placement
+  - interpreter commands
+  - Phase 13 animation playback system
+
+CORE DESIGN:
+
+.xpseq is a UTF-8 manifest format that describes a sequence of XP frames.
+
+It must NOT:
+- duplicate XP binary data
+- introduce a second rendering model
+- bypass retained XP document structures
+
+It must:
+- reference existing .xp files as frame sources
+- optionally describe playback metadata
+- remain human-readable and diagnosable
+
+---
+
+FORMAT OVERVIEW:
+
+File type:
+- UTF-8 text
+- versioned header (e.g. "XPSEQ 1")
+
+Structure:
+- sequence-level properties
+- ordered frame blocks
+
+Example:
+
+XPSEQ 1
+
+name = IntroLogo
+loop = true
+default_frame_duration_ms = 125
+default_composite = Default
+default_visible_layers = All
+
+frame {
+    index = 0
+    source = Assets/XP/logo_000.xp
+}
+
+frame {
+    index = 1
+    source = Assets/XP/logo_001.xp
+    duration_ms = 250
+}
+
+---
+
+SUPPORTED FIELDS:
+
+Sequence-level (optional unless noted):
+- name
+- loop (true/false)
+- ping_pong (future)
+- default_frame_duration_ms
+- default_fps (optional convenience)
+- default_composite (maps to XpCompositeMode)
+- default_visible_layers (All / Default / explicit list)
+
+Frame-level (required: index, source):
+- index (required)
+- source (required path to .xp)
+- label (optional)
+- duration_ms (optional override)
+- composite (optional override)
+- visible_layers (optional override)
+
+---
+
+4.6BA.1 XPSEQ DATA MODEL
+
+Introduce:
+
+struct XpSequence
+- name
+- loop / playback flags
+- default conversion settings
+- vector<XpFrame>
+
+struct XpFrame
+- index
+- source path
+- shared_ptr<XpDocument>
+- optional overrides:
+  - duration
+  - composite mode
+  - visible layers
+
+Rules:
+- XpSequence owns frame ordering
+- XpFrame references retained XpDocument (not flattened data)
+- must support per-frame conversion overrides
+
+---
+
+4.6BA.2 XPSEQ LOADER
+
+Add:
+
+XpSequenceLoader
+
+Responsibilities:
+- parse .xpseq manifest
+- validate header/version
+- resolve frame source paths
+- load referenced .xp files via existing XP loader
+- construct XpSequence
+
+Rules:
+- must reuse:
+  - XpArtLoader
+  - retained XP document model
+- must not duplicate XP parsing logic
+- must support relative path resolution (relative to .xpseq file)
+- must produce structured diagnostics
+
+Diagnostics must report:
+- invalid header/version
+- missing frame blocks
+- duplicate frame indices
+- missing or invalid source paths
+- XP load failures
+- invalid composite/visibility values
+
+---
+
+4.6BA.3 XPSEQ ASSET INTEGRATION
+
+Extend Asset system:
+
+Support:
+- loading .xpseq files
+- caching XpSequence objects
+- lookup by:
+  - asset name
+  - frame index
+
+Rules:
+- must integrate with AssetLibrary
+- must not break existing TextObject or XP asset handling
+- must allow:
+  - retrieval of full sequence
+  - retrieval of individual frame
+
+---
+
+4.6BA.4 XPSEQ → TEXTOBJECT CONVERSION PATH
+
+Ensure compatibility with existing conversion APIs:
+
+Support:
+- buildTextObjectFromXpFrame(...)
+- per-frame conversion using:
+  - default sequence settings
+  - frame-level overrides
+
+Rules:
+- conversion must remain:
+  - explicit
+  - deterministic
+  - policy-driven
+- must not embed conversion logic in:
+  - PageComposer
+  - interpreter
+
+---
+
+4.6BA.5 XPSEQ EXPORT SUPPORT
+
+Extend XP export system:
+
+Support:
+- exporting XpSequence → .xpseq
+- exporting frames:
+  - as referenced .xp files
+  - or linking to existing XP assets
+
+Rules:
+- must not inline XP binary data into .xpseq
+- must preserve:
+  - frame ordering
+  - timing metadata
+  - conversion defaults
+
+Notes:
+- integrates with 4.6B animation export support
+
+---
+
+4.6BA.6 XPSEQ VALIDATION + ROUND-TRIP SUPPORT
+
+Extend validation system:
+
+Support:
+- load → export → reload parity checks
+- validation of:
+  - frame ordering
+  - source resolution
+  - metadata preservation
+
+Rules:
+- must report:
+  - lossy metadata
+  - missing frame references
+  - inconsistent overrides
+
+---
+
+4.6BA.7 ARCHITECTURAL RULES
+
+.xpseq must follow the engine pipeline:
+
+XpSequence
+    ↓
+XpFrame (selected)
+    ↓
+buildTextObjectFromXpFrame(...)
+    ↓
+PageComposer
+    ↓
+ScreenBuffer
+    ↓
+Renderer
+
+Rules:
+- .xpseq must not introduce a new rendering path
+- .xpseq must not bypass XP retained document model
+- .xpseq must not embed renderer or layout behavior
+- .xpseq must remain compatible with:
+  - interpreter (Phase 6)
+  - animation system (Phase 13)
+
+---
+
+OUTPUT OF 4.6BA
+
+- A formal, engine-native XP animation container format
+- A loader and asset integration path
+- Full compatibility with:
+  - XP retained documents
+  - PageComposer
+  - interpreter commands
+  - animation playback system
+
+This establishes .xpseq as the canonical multi-frame XP format for the engine.
+
+4.6C XP ROUND-TRIP FIDELITY SUPPORT
+
+Ensure XP import → export cycles preserve data as accurately as possible.
+
+Purpose:
+- validate retained XP architecture correctness
+- support editing workflows
+- prevent silent data loss
+
+Support:
+- load → retain → export → reload parity checks
+- preservation of:
+  - glyphs
+  - RGB colors
+  - layer count/order
+  - transparency usage
+  - document dimensions
+
+Responsibilities:
+- add validation helpers:
+  - compare XpDocument structures
+  - compare flattened results
+- detect and report:
+  - lossy conversions
+  - unsupported conditions
+
+Rules:
+- exporter must emit warnings when:
+  - style approximations occur
+  - transparency rules differ
+- diagnostics must integrate with existing warning system
+
+Notes:
+- this phase strengthens the XP pipeline as a true asset format, not just an import format
+
+
+
+4.6D XP SEQUENCE / ANIMATION ASSET MODEL INTEGRATION
+
+Extend asset system to treat XP sequences as first-class assets.
+
+Support:
+- AssetLoader support for:
+  - single-frame XP
+  - multi-frame XP sequences (future or engine-defined)
+- caching of:
+  - XpDocument
+  - XpSequence
+
+Responsibilities:
+- integrate with AssetLibrary / caching layer
+- allow lookup by:
+  - asset name
+  - frame index
+- support:
+  - retrieving specific frames
+  - retrieving full sequence
+
+Rules:
+- must not break existing TextObject asset pipeline
+- XP assets remain separate from TextObject but convertible to it
+- do not force PageComposer to become frame-aware yet
+
+Notes:
+- prepares for animation playback in Phase 13
+
+
+
+4.6E XP → TEXTOBJECT CONVERSION MODES
+
+Formalize conversion from retained XP data into TextObject.
+
+Support multiple conversion modes:
+- Flattened (default)
+- Visible-layers-only
+- Policy-driven (uses XpCompositeMode)
+- Per-frame conversion (for sequences)
+
+Responsibilities:
+- provide explicit API:
+  - buildTextObjectFromXpDocument(...)
+  - buildTextObjectFromXpFrame(...)
+- allow:
+  - conversion using custom compositing policy
+  - conversion using layer visibility state
+
+Rules:
+- conversion must be:
+  - deterministic
+  - diagnosable
+- must not embed compositing logic outside XP pipeline
+
+Notes:
+- ensures PageComposer integration remains clean and predictable
+
+
+
+4.6F XP DIAGNOSTICS + VALIDATION SCREEN SUPPORT
+
+Extend diagnostics system to support XP inspection workflows.
+
+Support:
+- visual or textual inspection of:
+  - layers
+  - visibility state
+  - compositing results
+  - metadata
+
+Responsibilities:
+- integrate XP metadata into:
+  - ValidationScreen
+  - diagnostics output
+- provide helpers:
+  - formatXpDocumentSummary(...)
+  - formatXpLayerDetails(...)
+
+Rules:
+- diagnostics must remain optional
+- must not introduce renderer-specific logic
+
+Notes:
+- prepares for future editor/debug tooling
+
+
+
+4.6G XP EDITING / AUTHORING HOOKS (FOUNDATION ONLY)
+
+Prepare XP system for future editing workflows without implementing a full editor.
+
+Support:
+- mutable retained XP document:
+  - modify cells
+  - toggle layer visibility
+  - reorder layers
+- safe update pathways:
+  - mark dirty state
+  - trigger recomposition
+
+Responsibilities:
+- define minimal APIs:
+  - setCell(...)
+  - setLayerVisibility(...)
+  - reorderLayer(...)
+- ensure compositing can be re-run safely after edits
+
+Rules:
+- do NOT build UI/editor in this phase
+- do NOT bypass retained document model
+
+Notes:
+- this phase enables future:
+  - XP editor
+  - in-engine art tools
+  - procedural generation
+
+
+
+4.6H XP FORMAT EXTENSIBILITY + FUTURE COMPATIBILITY
+
+Prepare XP system for format evolution and alternate sources.
+
+Support:
+- version-tolerant parsing and export
+- extension points for:
+  - additional metadata
+  - alternate transparency rules
+  - custom layer attributes
+
+Responsibilities:
+- isolate XP-specific constants and rules
+- allow future:
+  - alternate import sources (non-RexPaint XP-like formats)
+  - extended XP variants
+
+Rules:
+- must not break current XP compatibility
+- must not overgeneralize prematurely
+
+Notes:
+- protects against future format lock-in
+
+
+
+4.6I XP ANIMATION PLAYBACK INTEGRATION (HOOK INTO PHASE 13)
+
+Bridge XP sequences into the animation system.
+
+Support:
+- mapping:
+  - XpSequence → Animation frames
+- frame timing placeholders:
+  - default duration
+  - optional metadata-driven timing later
+
+Responsibilities:
+- provide adapter:
+  - XpSequence → Animation
+- allow PageComposer or UI layer to:
+  - render frame N as TextObject
+
+Rules:
+- playback logic belongs to Phase 13 (Animation system)
+- this phase only provides integration hooks
+
+Notes:
+- completes the XP pipeline from:
+  import → retain → compose → animate → render
 
 4.7 Asset loading / caching layer
 Goal:
@@ -1383,14 +1899,83 @@ This preserves the old layering workflow described in the docs.
 - writeStyleBlock(...)
 - plus generic writeObject(..., WritePolicy)
 
+6.6A Object source abstraction (NEW)
+
+PageComposer must accept object sources beyond raw TextObject without breaking the unified composition model.
+
+Support:
+- TextObject (existing)
+- XP-derived objects via explicit conversion
+- future asset types (animation frames, generated content)
+
+Responsibilities:
+- all non-TextObject inputs must be converted before composition
+- PageComposer must NOT embed format-specific parsing logic
+
+Rules:
+- PageComposer operates ONLY on:
+  - TextObject
+  - WritePolicy
+- conversion must happen through:
+  - loader utilities
+  - conversion helpers (e.g., XP → TextObject)
+
+Notes:
+- ensures PageComposer remains format-agnostic while supporting XP pipeline
+
 6.7 Object writing by region + alignment
 - same operations using region name and alignments
+
+6.6B XP object placement support (NEW)
+
+Allow XP-derived content to be placed through explicit conversion paths.
+
+Support:
+- place XP document via:
+  - buildTextObjectFromXpDocument(...)
+- place XP frame via:
+  - buildTextObjectFromXpFrame(...)
+
+Responsibilities:
+- ensure compositing policy used during conversion is explicit
+- allow passing:
+  - XpCompositeMode
+  - layer visibility configuration
+
+Rules:
+- PageComposer must not:
+  - directly access XpDocument internals
+- all XP placement must go through conversion APIs
+
+Notes:
+- keeps XP system cleanly layered under PageComposer
 
 6.8 Full-screen aligned placement
 - same operations using implicit full screen as region
 
-6.9 Render/debug export
+6.9 Render / composition output (UPGRADE)
+
+Replace:
 - render() -> std::string
+
+With:
+- renderToUtf8String()
+- renderToU32String()
+- optional:
+  - captureBuffer() → ScreenBuffer snapshot
+
+Responsibilities:
+- provide deterministic output for:
+  - testing
+  - animation systems
+  - diagnostics
+
+Rules:
+- render output must reflect fully composed buffer state
+- must not depend on renderer behavior
+
+Notes:
+- required for animation playback and snapshot testing
 
 6.10 Optional future-friendly API helpers
 - centerX()
@@ -1407,6 +1992,129 @@ Future object/layout formats should be able to resolve into:
 - region/alignment-based placement
 
 This keeps later declarative formats aligned with the same composition model rather than creating a second UI system.
+
+6.12 Asset-aware placement layer
+
+Introduce a thin integration layer between Asset system and PageComposer.
+
+Support:
+- place asset by name:
+  - placeAsset("logo", x, y)
+- resolve:
+  - TextObject assets
+  - XP assets (single-frame or sequence)
+
+Responsibilities:
+- resolve asset → correct runtime representation
+- convert to TextObject if needed
+
+Rules:
+- PageComposer must not:
+  - perform file IO
+  - perform format detection
+- must rely on AssetLibrary / loader system
+
+Notes:
+- prepares interpreter and data-driven layouts
+
+6.13 Frame-aware placement (non-breaking extension)
+
+Allow PageComposer to optionally work with frame-based content without requiring animation awareness.
+
+Support:
+- placeFrame(frameIndex, ...)
+- placeSequenceFrame(assetName, frameIndex, ...)
+
+Responsibilities:
+- resolve frame → TextObject
+- allow caller to control frame selection
+
+Rules:
+- PageComposer must NOT:
+  - manage timing
+  - manage playback
+- this is a static placement of a selected frame
+
+Notes:
+- enables animation systems in Phase 13 to drive PageComposer
+
+6.14 Composition diagnostics integration
+
+Expose composition-level diagnostics for debugging and validation.
+
+Support:
+- record:
+  - objects placed
+  - regions used
+  - WritePolicy usage
+- optional debug output:
+  - composition summary
+
+Responsibilities:
+- integrate with existing diagnostics system
+- allow ValidationScreen to inspect:
+  - composition decisions
+  - object placement order
+
+Rules:
+- diagnostics must be optional
+- must not affect runtime behavior
+
+Notes:
+- complements XP diagnostics system
+
+6.15 Deterministic composition contract
+
+Guarantee that PageComposer produces identical output for identical inputs.
+
+Purpose:
+- enable:
+  - snapshot testing
+  - animation frame stability
+  - reproducible rendering
+
+Requirements:
+- no hidden state
+- no dependency on:
+  - timing
+  - renderer state
+- composition order must be explicit
+
+Rules:
+- all writes must be:
+  - explicit
+  - ordered
+  - deterministic
+
+Notes:
+- critical for animation and testing systems
+
+6.16 Animation system integration hooks
+
+Prepare PageComposer to integrate cleanly with Phase 13 animation systems.
+
+Support:
+- external systems can:
+  - drive frame index
+  - recompose page per frame
+
+Responsibilities:
+- ensure PageComposer can be:
+  - reused per frame without reset issues
+- support:
+  - fast recomposition
+  - partial redraw compatibility
+
+Rules:
+- PageComposer must not:
+  - manage animation timing
+- must remain a pure composition layer
+
+Notes:
+- enables:
+  - XP animation playback
+  - animated banners
+  - UI transitions
 
 OUTPUT OF PHASE 5
 The first complete authoring API for building pages cleanly in C++.
@@ -1448,6 +2156,8 @@ UPDATE NOTES:
 
 IMPLEMENT IN THIS PHASE
 
+MODIFY 7.1 TO:
+
 7.1 Define page language syntax
 Commands should cover:
 - CLEAR
@@ -1460,7 +2170,16 @@ Commands should cover:
 - MODE
 - ALIGN
 - AT
+- ASSET
+- XP
+- FRAME
+- SEQUENCEFRAME
 - optional comments
+
+Rules:
+- command set must remain a thin declarative layer over PageComposer
+- commands must resolve into the same composition APIs used by native C++ code
+- XP and animation-aware commands must not introduce a second rendering or composition model
 
 7.2 Page parser
 - tokenize commands
@@ -1472,10 +2191,140 @@ Commands should cover:
 - resolve themes/styles
 - call PageComposer methods
 
+7.3A Asset-aware interpreter resolution
+
+Extend interpreter resolution so script commands can target asset-backed content, not just inline text/object definitions.
+
+Support:
+- resolve named TextObject assets
+- resolve named XP assets
+- resolve named XP sequences
+- resolve frame-specific asset references
+
+Responsibilities:
+- use centralized asset lookup
+- route resolved assets through:
+  - TextObject placement
+  - XP → TextObject conversion helpers
+  - frame selection helpers where applicable
+
+Rules:
+- interpreter must not perform file-format parsing directly
+- interpreter must not bypass AssetLibrary / loader systems
+- all resolved content must still compose through PageComposer
+
+Notes:
+- this is the interpreter-side counterpart to Phase 5 asset-aware placement
+
+7.3B XP document placement commands
+
+Add script commands for placing retained XP content through explicit conversion paths.
+
+Support commands such as:
+- XP "assetName" AT x y
+- XP "assetName" IN regionName ALIGN hAlign vAlign
+
+Optional command arguments:
+- COMPOSITE Default
+- COMPOSITE GlyphPriority
+- VISIBLELAYERS Default
+- VISIBLELAYERS All
+- VISIBLELAYERS "0,2,3"
+
+Responsibilities:
+- resolve the XP asset
+- convert retained XP document to TextObject using explicit conversion settings
+- place the resulting TextObject through PageComposer
+
+Rules:
+- interpreter must not directly manipulate XpDocument internals
+- compositing and visibility choices must be explicit and diagnosable
+- default behavior must match the default XP flattening path already defined by the loader/conversion system
+
+Notes:
+- preserves the separation between XP retained data and PageComposer composition
+
+7.3C Frame-aware static placement commands
+
+Allow scripts to place a chosen frame from a sequence without introducing playback logic into the interpreter.
+
+Support commands such as:
+- FRAME "assetName" 0 AT x y
+- FRAME "assetName" 3 IN regionName ALIGN Center Top
+- SEQUENCEFRAME "assetName" INDEX 5 AT x y
+
+Responsibilities:
+- resolve sequence asset
+- select requested frame
+- convert selected frame to TextObject
+- compose the frame through normal PageComposer placement
+
+Rules:
+- frame selection is static for the current page execution unless later bound to an animation controller
+- interpreter must not manage timing, playback, looping, or animation state here
+- out-of-range frame requests must fail clearly with line/file diagnostics
+
+Notes:
+- this maps directly to Phase 5 frame-aware placement without making the interpreter itself an animation engine
+- this also establishes the same frame-addressing vocabulary that Phase 13 animation playback will drive later
+
+7.3D Named conversion / compositing options in script
+
+Expose a small declarative vocabulary so scripts can request XP conversion behavior safely.
+
+Support:
+- COMPOSITE <mode>
+- FRAME <index>
+- VISIBLELAYERS <preset or explicit list>
+- FLATTEN <true|false when supported>
+- POLICY <named placement/composition preset when applicable>
+- BIND <animationBindingName> for future animation-controlled frame sources
+
+Responsibilities:
+- parse simple, explicit option values
+- validate against supported runtime options
+- forward validated options into:
+  - XP conversion helpers
+  - PageComposer placement calls
+  - future animation binding descriptors where applicable
+
+Rules:
+- option names should map to real engine enums/configuration rather than ad hoc string behavior
+- unsupported options must produce explicit parser/interpreter diagnostics
+- script options must not mutate global hidden state
+- BIND declarations in Phase 6 are descriptive only; playback behavior belongs to Phase 13
+
+Notes:
+- keeps data-driven pages aligned with explicit engine policy types
+- prepares script-authored placements to be animation-driven later without redesigning the language
+
 7.4 Page asset references
 - resolve ASCII assets
 - resolve screen templates
 - resolve fonts if needed later
+
+7.4A XP and sequence asset references
+
+Extend page asset references to include retained XP and frame-sequence assets.
+
+Support:
+- single XP document references
+- XP sequence references
+- optional future engine-defined XP sequence container references
+
+Examples of referenced asset classes:
+- screen template assets
+- TextObject assets
+- XP document assets
+- XP sequence assets
+
+Rules:
+- asset references must resolve through the same centralized asset/path system
+- interpreter syntax may distinguish:
+  - OBJECT for TextObject-like assets
+  - XP for retained XP assets
+  - FRAME / SEQUENCEFRAME for frame-driven placement
+- references must remain declarative and stable across native/API/script usage
 
 7.5 Style/theme name lookup
 - e.g. "Field", "Helmets", "Title"
@@ -1483,9 +2332,51 @@ Commands should cover:
 7.6 Page execution result
 - build final page into ScreenBuffer / Surface
 
+7.6A Page execution must remain deterministic
+
+Interpreter-driven page execution must produce the same composed result for the same script input and asset state.
+
+Requirements:
+- no hidden interpreter mode state
+- no implicit dependence on playback time
+- frame selection must be explicit in the script or provided by a higher-level animation system later
+
+Rules:
+- all XP and frame-aware commands must resolve into deterministic PageComposer calls
+- output must remain suitable for:
+  - snapshot testing
+  - diagnostics
+  - future animation recomposition loops
+
+Notes:
+- this matches the deterministic composition contract defined for PageComposer
+
 7.7 Testing/examples
 - create sample page files
 - verify parity with equivalent C++ page definitions
+
+7.7A XP / animation-aware script examples and tests
+
+Add focused examples and tests for XP-aware and frame-aware script behavior.
+
+Coverage should include:
+- XP asset placed at explicit coordinates
+- XP asset placed in a named region with alignment
+- XP asset placed with alternate compositing mode
+- selected frame from sequence placed statically
+- invalid frame index diagnostics
+- invalid asset reference diagnostics
+- parity checks between:
+  - equivalent C++ PageComposer usage
+  - equivalent interpreted script usage
+
+Rules:
+- tests should validate final composed output and diagnostics
+- tests should not depend on renderer-specific behavior
+- frame-aware script tests must remain static/deterministic in Phase 6
+
+Notes:
+- this protects the script layer from diverging from the C++ authoring layer
 
 7.8 Structured page/config input formats (initial declarative layer)
 Support later parsing/import for:
@@ -1503,6 +2394,21 @@ Rules:
 - they must not introduce a second rendering or composition model
 - use them for page/layout description, not as a replacement for ScreenBuffer or TextObject
 
+7.8A Structured declarative support for XP and frame placement
+
+When JSON / YAML / INI page formats are added, they must be able to describe the same XP-aware and frame-aware placement semantics as the script language.
+
+Support:
+- XP asset placement
+- frame index selection
+- region/alignment placement
+- explicit conversion/compositing options
+
+Rules:
+- structured formats must compile down to the same interpreter/PageComposer operations
+- structured formats must not create a parallel XP composition path
+- XP/frame placement in structured formats must remain explicit and deterministic
+
 7.9 Structured asset references
 Structured page files may reference:
 - TextObject assets
@@ -1513,6 +2419,86 @@ Structured page files may reference:
 
 All references must resolve through centralized asset/path systems.
 
+7.10 Interpreter hooks for future animation systems
+
+Prepare the interpreter so Phase 13 animation systems can drive frame changes without redesigning the page language.
+
+Support:
+- script-authored frame placeholders
+- externally supplied frame index overrides
+- named animation bindings
+- page recomposition using selected frame values
+
+Responsibilities:
+- allow future animation system to bind:
+  - sequence asset
+  - current frame index
+  - optional playback state identifier
+- keep interpreter-side representation compatible with re-evaluation/recomposition
+- preserve the original declarative source intent so the same page can be recomposed at different animation states
+
+Rules:
+- Phase 6 does NOT implement playback
+- Phase 6 only defines script/addressing structure that later animation systems can drive
+- timing, looping, interpolation, and invalidation belong to Phase 13
+
+Notes:
+- this cleanly bridges:
+  - Phase 4.5G XP sequence foundation
+  - Phase 4.6I animation playback integration
+  - Phase 5 frame-aware placement
+  - Phase 13 animation/timer systems
+  
+7.11 Declarative animation target references
+
+Allow page scripts to declare animation targets that later systems can resolve without changing page composition syntax.
+
+Support:
+- naming a sequence-backed placement target
+- associating a placement with an animation binding name
+- optional default frame selection for non-animated execution
+
+Examples of intent:
+- a title logo sequence placed at a region
+- a splash banner sequence bound to "IntroLogo"
+- a decorative sequence with a default fallback frame
+
+Responsibilities:
+- preserve these references in the parsed/interpreted page model
+- allow Phase 13 systems to discover which placed assets are animation-capable
+- allow non-animated execution to fall back to explicit/default frame selection cleanly
+
+Rules:
+- target references must remain declarative
+- target references must not execute playback behavior in Phase 6
+- static execution path must still be deterministic when no animation system is active
+
+Notes:
+- this prevents script redesign later when animated page assets are introduced  
+  
+7.12 Recomposition-safe interpreter output
+
+Interpreter output must be safe to re-run repeatedly as animation state changes.
+
+Purpose:
+- enable frame-driven recomposition from Phase 13 without rebuilding the page language
+- ensure animation playback can reuse the same page definitions safely
+
+Requirements:
+- parsed page representation must remain reusable
+- resolved asset references should support repeat evaluation
+- frame-bound placements must be recomposed from declarative state, not patched through hidden mutable output state
+
+Rules:
+- interpreter must support:
+  - parse once
+  - re-evaluate many times
+- animation systems must drive recomposition by supplying state, not by mutating parser behavior
+- recomposition must remain deterministic for the same asset state and frame bindings
+
+Notes:
+- this is critical for efficient and correct animation playback on top of interpreted pages  
+  
 OUTPUT OF PHASE 6
 A first interpreted page system that uses the same engine as the C++ API.
 
@@ -1954,6 +2940,16 @@ IMPLEMENT IN THIS PHASE
 - elapsed
 - progress
 - target properties
+- frame-based playback sources
+- sequence-backed playback state
+- optional named animation bindings for interpreted pages
+
+Requirements:
+- animation model must support:
+  - time-driven frame selection
+  - explicit frame index override
+  - deterministic binding from animation state to composed page output
+- animation model must remain separate from renderer logic
 
 14.4 Invalidation system
 - invalidate rect
@@ -1965,7 +2961,20 @@ This was part of the earlier architecture guidance and belongs here once richer 
 Support later loading/playback of time-based text assets such as:
 - multi-frame .ans animation
 - .txt frame sequences
+- XP sequence / retained XP animation assets
 - custom .anim format
+
+Purpose:
+- animated banners
+- splash/title effects
+- lightweight TUI motion systems
+- XP-backed animated art and overlays
+
+Rules:
+- animations must be modeled as frame sequences or time-based asset sets
+- playback must compose through existing surfaces/buffers
+- animation formats must not bypass compositing or PageComposer placement semantics
+- interpreted page animation must drive the same frame-aware placement model defined in Phase 6 rather than introducing a parallel playback path
 
 Purpose:
 - animated banners
@@ -1976,6 +2985,161 @@ Rules:
 - animations must be modeled as frame sequences or time-based asset sets
 - playback must compose through existing surfaces/buffers
 - animation formats must not bypass compositing or PageComposer placement semantics
+
+14.6 Sequence playback controller
+
+Add a reusable controller for frame-sequence playback.
+
+Support:
+- play
+- pause
+- stop
+- restart
+- loop
+- one-shot playback
+- explicit frame selection
+- optional playback rate control
+
+Responsibilities:
+- manage time-to-frame mapping
+- expose current frame index for:
+  - PageComposer-driven recomposition
+  - interpreted page animation bindings
+- remain asset-format agnostic where practical
+
+Rules:
+- controller must not render directly
+- controller must not bypass PageComposer or ScreenBuffer
+- controller must work equally for:
+  - XP sequences
+  - text frame sequences
+  - future animation asset sources
+
+Notes:
+- this is the runtime counterpart to the frame-selection hooks introduced in Phase 6
+
+14.7 Animation binding resolution for interpreted pages
+
+Allow Phase 13 animation systems to bind runtime playback controllers to declarative animation targets defined in interpreted pages.
+
+Support:
+- bind named animation controller to:
+  - sequence asset placement
+  - frame placeholder
+  - XP-backed animated placement
+- update frame selection during page recomposition
+
+Responsibilities:
+- resolve script-declared animation target references
+- map runtime animation state to frame-aware placement calls
+- keep the interpreted page source declarative while runtime state remains external
+
+Rules:
+- runtime animation binding must not alter the meaning of the original page script
+- interpreter AST / page model remains the source of truth for placement intent
+- playback state remains external runtime data
+
+Notes:
+- this is the missing bridge that makes Phase 6 and Phase 13 fit together cleanly
+
+14.8 Animation-driven recomposition loop
+
+Support recomposing pages when animation state changes.
+
+Responsibilities:
+- detect when current frame selection changes
+- trigger page recomposition
+- produce updated composed buffer state for presentation
+- cooperate with invalidation so only needed updates are redrawn when possible
+
+Rules:
+- recomposition must reuse:
+  - PageComposer
+  - interpreter placement model
+  - deterministic composition contracts already defined earlier
+- animation must not patch renderer output directly
+- animation frame updates must flow through the same composition path as static page content
+
+Notes:
+- this keeps animation architectural behavior consistent with the rest of the engine
+
+14.9 Animation invalidation integration
+
+Integrate animation playback with invalidation and redraw behavior.
+
+Support:
+- invalidate whole page when simplest/necessary
+- invalidate affected regions/objects when practical
+- distinguish:
+  - frame change requiring recomposition
+  - animation state change with no visible output difference
+
+Responsibilities:
+- work with InvalidationRegion and frame diff systems
+- avoid unnecessary redraw where animation only affects a known area
+- remain correct before being optimal
+
+Rules:
+- correctness first:
+  - full recomposition/full invalidation is acceptable initially
+- optimization can be added later without changing the animation binding model
+- invalidation logic must stay separate from renderer-specific output logic
+
+Notes:
+- this is especially important for XP overlays and animated title/splash assets
+
+14.10 XP animation playback integration
+
+Implement the runtime side of XP sequence playback promised by earlier XP phases.
+
+Support:
+- XP sequence frame playback
+- XP frame selection through animation controllers
+- XP sequence placement through:
+  - native PageComposer code
+  - interpreted page bindings
+
+Responsibilities:
+- use:
+  - XpSequence
+  - buildTextObjectFromXpFrame(...)
+  - PageComposer frame-aware placement
+- preserve explicit XP compositing/conversion policies during playback
+
+Rules:
+- XP animation playback must not bypass retained XP or conversion systems
+- playback must remain diagnosable and deterministic for a given asset state and time state
+- XP animation must use the same generic animation controller/binding system where possible
+
+Notes:
+- this completes the intended path from XP import foundation to actual XP animation playback
+
+14.11 Animation diagnostics and tooling hooks
+
+Expose runtime diagnostics for animation playback and binding behavior.
+
+Support:
+- report:
+  - active animation bindings
+  - current frame index
+  - loop/one-shot state
+  - invalid binding references
+  - sequence asset resolution failures
+- optional logging or inspector support for:
+  - interpreted animation targets
+  - XP sequence playback
+  - recomposition activity
+
+Responsibilities:
+- integrate with existing diagnostics patterns
+- help authors understand why an animation is or is not advancing as expected
+
+Rules:
+- diagnostics must remain optional
+- diagnostics must not alter timing or playback behavior
+
+Notes:
+- complements interpreter diagnostics, PageComposer diagnostics, and XP diagnostics
 
 OUTPUT OF PHASE 13
 Stable time-based polish features layered on top of a finished UI model.
@@ -1995,6 +3159,27 @@ Rendering/
   InvalidationRegion.cpp
 
 
+
+PHASE 13 ANIMATION ARCHITECTURE RULE
+
+Animation must follow this pipeline:
+
+Animation state / controller
+    ↓
+Frame selection / binding resolution
+    ↓
+XP or sequence frame conversion to TextObject
+    ↓
+PageComposer recomposition
+    ↓
+ScreenBuffer / Surface
+    ↓
+Renderer
+
+Rules:
+- no direct renderer-side animation
+- no bypass around PageComposer
+- no hidden mutation of composed output outside the normal composition path
 
 ============================================================
 15. PHASE 14 — ALTERNATE BACKENDS / BACKEND-NEUTRAL RENDERING
