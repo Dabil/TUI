@@ -59,7 +59,9 @@ namespace TextObjectExporter
         XpReverseApproximated,
         XpInvisibleApproximated,
         XpGlyphFallbackSubstituted,
-        XpGlyphReplacementUsed
+        XpGlyphReplacementUsed,
+
+        HighFidelityXpRecommended
     };
 
     struct SourcePosition
@@ -152,6 +154,8 @@ namespace TextObjectExporter
     std::string formatSaveSuccess(const SaveResult& result);
 
     bool hasWarning(const SaveResult& result, SaveWarningCode code);
+
+    bool shouldRecommendXpForFidelity(const SaveResult& result);
 
     const SaveWarning* getWarningByCode(
         const SaveResult& result,

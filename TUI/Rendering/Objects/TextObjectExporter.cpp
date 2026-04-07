@@ -235,6 +235,54 @@ namespace
         result.warnings.push_back(warning);
     }
 
+
+    bool warningImpliesTerminalArtFidelityLoss(TextObjectExporter::SaveWarningCode code)
+    {
+        switch (code)
+        {
+        case TextObjectExporter::SaveWarningCode::LossyConversionOccurred:
+        case TextObjectExporter::SaveWarningCode::TerminalArtColorApproximationOccurred:
+        case TextObjectExporter::SaveWarningCode::TerminalArtThemeColorApproximationOccurred:
+        case TextObjectExporter::SaveWarningCode::TerminalArtUnsupportedStyleDropped:
+        case TextObjectExporter::SaveWarningCode::TerminalArtReverseApproximated:
+        case TextObjectExporter::SaveWarningCode::TerminalArtBoldApproximated:
+        case TextObjectExporter::SaveWarningCode::TerminalArtIceColorExportUsed:
+        case TextObjectExporter::SaveWarningCode::HighFidelityXpRecommended:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool shouldRecommendXpForResult(const TextObjectExporter::SaveResult& result)
+    {
+        if (result.resolvedFileType != TextObjectExporter::FileType::Ans &&
+            result.resolvedFileType != TextObjectExporter::FileType::Bin)
+        {
+            return false;
+        }
+
+        for (const TextObjectExporter::SaveWarning& warning : result.warnings)
+        {
+            if (warningImpliesTerminalArtFidelityLoss(warning.code))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    std::string xpRecommendationMessage(TextObjectExporter::FileType sourceFileType)
+    {
+        std::ostringstream stream;
+        stream
+            << "XP is the recommended high-fidelity export format when "
+            << TextObjectExporter::toString(sourceFileType)
+            << " export would approximate colors, drop style information, or replace glyphs.";
+        return stream.str();
+    }
+
     bool tryEncodeAscii(
         char32_t codePoint,
         char replacementChar,
@@ -1034,6 +1082,14 @@ namespace
             true,
             false);
 
+        if (shouldRecommendXpForResult(result))
+        {
+            addWarning(
+                result,
+                TextObjectExporter::SaveWarningCode::HighFidelityXpRecommended,
+                xpRecommendationMessage(TextObjectExporter::FileType::Ans));
+        }
+
         result.success = true;
         return true;
     }
@@ -1138,6 +1194,14 @@ namespace
             usedIceColors,
             true,
             !options.preserveTrailingSpaces);
+
+        if (shouldRecommendXpForResult(result))
+        {
+            addWarning(
+                result,
+                TextObjectExporter::SaveWarningCode::HighFidelityXpRecommended,
+                xpRecommendationMessage(TextObjectExporter::FileType::Bin));
+        }
 
         result.success = true;
         return true;
@@ -1462,6 +1526,11 @@ namespace TextObjectExporter
             message << " Warnings=" << result.warnings.size() << ".";
         }
 
+        if (shouldRecommendXpForResult(result))
+        {
+            message << " Recommendation=Prefer XP for higher-fidelity export.";
+        }
+
         return message.str();
     }
 
@@ -1495,6 +1564,11 @@ namespace TextObjectExporter
             message << " Warnings=" << result.warnings.size() << ".";
         }
 
+        if (shouldRecommendXpForResult(result))
+        {
+            message << " Recommendation=Prefer XP for higher-fidelity export.";
+        }
+
         return message.str();
     }
 
@@ -1509,6 +1583,11 @@ namespace TextObjectExporter
         }
 
         return false;
+    }
+
+    bool shouldRecommendXpForFidelity(const SaveResult& result)
+    {
+        return shouldRecommendXpForResult(result);
     }
 
     const SaveWarning* getWarningByCode(
@@ -1627,6 +1706,8 @@ namespace TextObjectExporter
             return "XpGlyphFallbackSubstituted";
         case SaveWarningCode::XpGlyphReplacementUsed:
             return "XpGlyphReplacementUsed";
+        case SaveWarningCode::HighFidelityXpRecommended:
+            return "HighFidelityXpRecommended";
         default:
             return "Unknown";
         }

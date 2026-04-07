@@ -282,6 +282,31 @@ namespace
         char32_t replacementGlyph = U'\0';
     };
 
+    struct WarningOccurrence
+    {
+        std::size_t count = 0;
+        bool hasExample = false;
+        SourcePosition position;
+    };
+
+    struct StyleConversionStats
+    {
+        WarningOccurrence themeColorResolved;
+        WarningOccurrence reverseApproximated;
+        WarningOccurrence invisibleApproximated;
+        WarningOccurrence unsupportedStyleDropped;
+    };
+
+    void recordOccurrence(WarningOccurrence& occurrence, int x, int y)
+    {
+        ++occurrence.count;
+        if (!occurrence.hasExample)
+        {
+            occurrence.hasExample = true;
+            occurrence.position = { x, y };
+        }
+    }
+
     bool convertGlyphToXpCell(
         const TextObjectCell& sourceCell,
         int x,
@@ -359,6 +384,7 @@ namespace
         const SaveOptions& options,
         SaveResult& ioResult,
         GlyphConversionStats& ioGlyphStats,
+        StyleConversionStats& ioStyleStats,
         XpArtExporter::XpCell& outCell)
     {
         if (sourceCell.kind == CellKind::WideTrailing)
@@ -394,37 +420,108 @@ namespace
 
         if (styleInfo.usedThemeColor)
         {
-            addWarningOnce(
-                ioResult,
-                SaveWarningCode::XpThemeColorResolvedToRgb,
-                "One or more authored theme colors were resolved to concrete RGB values for XP export.");
+            recordOccurrence(ioStyleStats.themeColorResolved, x, y);
         }
 
         if (styleInfo.approximatedReverse)
         {
-            addWarningOnce(
-                ioResult,
-                SaveWarningCode::XpReverseApproximated,
-                "One or more reverse style flags were approximated by swapping foreground and background colors during XP export.");
+            recordOccurrence(ioStyleStats.reverseApproximated, x, y);
         }
 
         if (styleInfo.approximatedInvisible)
         {
-            addWarningOnce(
-                ioResult,
-                SaveWarningCode::XpInvisibleApproximated,
-                "One or more invisible style flags were approximated by matching foreground to background during XP export.");
+            recordOccurrence(ioStyleStats.invisibleApproximated, x, y);
         }
 
         if (styleInfo.droppedUnsupportedStyle)
         {
-            addWarningOnce(
-                ioResult,
-                SaveWarningCode::XpUnsupportedStyleDropped,
-                "One or more TextObject style attributes are not representable in XP cell data and were dropped explicitly.");
+            recordOccurrence(ioStyleStats.unsupportedStyleDropped, x, y);
         }
 
         return convertGlyphToXpCell(sourceCell, x, y, options, ioResult, ioGlyphStats, outCell);
+    }
+
+    void finalizeStyleWarnings(SaveResult& ioResult, const StyleConversionStats& stats)
+    {
+        if (stats.themeColorResolved.hasExample)
+        {
+            std::ostringstream message;
+            message
+                << stats.themeColorResolved.count
+                << " cell(s) resolved authored theme colors to concrete RGB values for XP export. First example at ("
+                << stats.themeColorResolved.position.x
+                << ", "
+                << stats.themeColorResolved.position.y
+                << ").";
+
+            addDetailedWarning(
+                ioResult,
+                SaveWarningCode::XpThemeColorResolvedToRgb,
+                message.str(),
+                stats.themeColorResolved.position,
+                U'\0',
+                U'\0');
+        }
+
+        if (stats.reverseApproximated.hasExample)
+        {
+            std::ostringstream message;
+            message
+                << stats.reverseApproximated.count
+                << " cell(s) approximated reverse styling by swapping foreground and background colors during XP export. First example at ("
+                << stats.reverseApproximated.position.x
+                << ", "
+                << stats.reverseApproximated.position.y
+                << ").";
+
+            addDetailedWarning(
+                ioResult,
+                SaveWarningCode::XpReverseApproximated,
+                message.str(),
+                stats.reverseApproximated.position,
+                U'\0',
+                U'\0');
+        }
+
+        if (stats.invisibleApproximated.hasExample)
+        {
+            std::ostringstream message;
+            message
+                << stats.invisibleApproximated.count
+                << " cell(s) approximated invisible styling by matching foreground to background during XP export. First example at ("
+                << stats.invisibleApproximated.position.x
+                << ", "
+                << stats.invisibleApproximated.position.y
+                << ").";
+
+            addDetailedWarning(
+                ioResult,
+                SaveWarningCode::XpInvisibleApproximated,
+                message.str(),
+                stats.invisibleApproximated.position,
+                U'\0',
+                U'\0');
+        }
+
+        if (stats.unsupportedStyleDropped.hasExample)
+        {
+            std::ostringstream message;
+            message
+                << stats.unsupportedStyleDropped.count
+                << " cell(s) dropped unsupported TextObject style attributes during XP export. First example at ("
+                << stats.unsupportedStyleDropped.position.x
+                << ", "
+                << stats.unsupportedStyleDropped.position.y
+                << ").";
+
+            addDetailedWarning(
+                ioResult,
+                SaveWarningCode::XpUnsupportedStyleDropped,
+                message.str(),
+                stats.unsupportedStyleDropped.position,
+                U'\0',
+                U'\0');
+        }
     }
 
     void finalizeGlyphWarnings(SaveResult& ioResult, const GlyphConversionStats& stats)
@@ -596,6 +693,7 @@ namespace XpArtExporter
         layer.cells.resize(cellCount);
 
         GlyphConversionStats glyphStats;
+        StyleConversionStats styleStats;
 
         for (int y = 0; y < object.getHeight(); ++y)
         {
@@ -603,7 +701,7 @@ namespace XpArtExporter
             {
                 const TextObjectCell& sourceCell = object.getCell(x, y);
                 XpCell convertedCell;
-                if (!convertTextObjectCell(sourceCell, x, y, options, ioResult, glyphStats, convertedCell))
+                if (!convertTextObjectCell(sourceCell, x, y, options, ioResult, glyphStats, styleStats, convertedCell))
                 {
                     return false;
                 }
@@ -614,6 +712,7 @@ namespace XpArtExporter
         }
 
         finalizeGlyphWarnings(ioResult, glyphStats);
+        finalizeStyleWarnings(ioResult, styleStats);
 
         outDocument.layers.clear();
         outDocument.layers.push_back(std::move(layer));

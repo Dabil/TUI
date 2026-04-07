@@ -33,6 +33,11 @@ namespace
         + style::Fg(Color::FromBasic(Color::Basic::Black))
         + style::Bg(Color::FromBasic(Color::Basic::BrightYellow));
 
+    const Style WarningCellStyle =
+        style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
+        + style::Bg(Color::FromBasic(Color::Basic::Magenta));
+
     const Style ViewportFrameStyle =
         Themes::Frame;
 
@@ -201,6 +206,7 @@ void TextObjectExportValidationScreen::draw(Surface& surface)
 void TextObjectExportValidationScreen::revalidate()
 {
     m_failingCells.clear();
+    m_warningCells.clear();
     m_encodingError.clear();
 
     m_resolvedFileType = (m_options.fileType == TextObjectExporter::FileType::Auto)
@@ -218,6 +224,14 @@ void TextObjectExportValidationScreen::revalidate()
     m_previewResult = TextObjectExporter::exportToBytes(m_object, previewOptions);
     m_previewResult.outputPath = m_outputPath;
     m_previewResult.resolvedFileType = m_resolvedFileType;
+
+    for (const TextObjectExporter::SaveWarning& warning : m_previewResult.warnings)
+    {
+        if (warning.sourcePosition.isValid())
+        {
+            m_warningCells.push_back(warning.sourcePosition);
+        }
+    }
 
     if (m_resolvedEncoding == TextObjectExporter::Encoding::Auto)
     {
@@ -325,6 +339,9 @@ void TextObjectExportValidationScreen::drawLegendPanel(
     buffer.writeString(x + 2, y + 3, "A", FirstFailingCellStyle);
     writeClipped(buffer, x + 6, y + 3, width - 8, "First failing glyph reported by exporter", Themes::Text);
 
+    buffer.writeString(x + 2, y + 4, "A", WarningCellStyle);
+    writeClipped(buffer, x + 6, y + 4, width - 8, "Warning hotspot from structured save diagnostics", Themes::Text);
+
     writeClipped(buffer, x + 2, y + 5, width - 4, "Policy notes", Themes::SectionHeader);
     writeClipped(buffer, x + 2, y + 6, width - 4, "The same encoding policy as TextObjectExporter is used here.", Themes::MutedText);
     writeClipped(buffer, x + 2, y + 7, width - 4, "Viewport shows the top-left crop of the TextObject.", Themes::MutedText);
@@ -370,6 +387,17 @@ void TextObjectExportValidationScreen::drawWarningsPanel(
         writeClipped(buffer, x + 2, row++, width - 4, "No warnings recorded for this export preview.", Themes::Success);
     }
 
+    if (TextObjectExporter::shouldRecommendXpForFidelity(m_previewResult) && row < y + height - 1)
+    {
+        writeClipped(
+            buffer,
+            x + 2,
+            row++,
+            width - 4,
+            "Recommendation: prefer .xp when RGB color or authored style fidelity matters.",
+            Themes::Info);
+    }
+
     if (row < y + height - 1)
     {
         writeClipped(
@@ -377,7 +405,7 @@ void TextObjectExportValidationScreen::drawWarningsPanel(
             x + 2,
             row,
             width - 4,
-            "Use the highlighted viewport below to locate non-encodable glyphs quickly.",
+            "Use the highlighted viewport below to locate failing or warning-producing cells quickly.",
             Themes::MutedText);
     }
 }
@@ -440,6 +468,10 @@ void TextObjectExportValidationScreen::drawViewportPanel(
             {
                 drawStyle = FailingCellStyle;
             }
+            else if (isWarningCell(col, row))
+            {
+                drawStyle = WarningCellStyle;
+            }
 
             buffer.writeCodePoint(innerX + col, innerY + row, cell.glyph, drawStyle);
         }
@@ -486,4 +518,17 @@ bool TextObjectExportValidationScreen::isFirstFailingCell(int x, int y) const
 
     return m_previewResult.firstFailingPosition.x == x
         && m_previewResult.firstFailingPosition.y == y;
+}
+
+bool TextObjectExportValidationScreen::isWarningCell(int x, int y) const
+{
+    for (const TextObjectExporter::SourcePosition& warningCell : m_warningCells)
+    {
+        if (warningCell.x == x && warningCell.y == y)
+        {
+            return true;
+        }
+    }
+
+    return false;
 }
