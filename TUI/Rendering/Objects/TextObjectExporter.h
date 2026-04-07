@@ -18,7 +18,8 @@ namespace TextObjectExporter
         Diz,
         Nfo,
         Ans,
-        Bin
+        Bin,
+        Xp
     };
 
     enum class Encoding
@@ -27,7 +28,8 @@ namespace TextObjectExporter
         Utf8,
         Ascii,
         Latin1,
-        Cp437
+        Cp437,
+        Binary
     };
 
     enum class LineEnding
@@ -50,7 +52,13 @@ namespace TextObjectExporter
         TerminalArtBoldApproximated,
         TerminalArtIceColorExportUsed,
         TerminalArtTrailingSpacesForced,
-        TerminalArtEncodingForcedToCp437
+        TerminalArtEncodingForcedToCp437,
+
+        XpThemeColorResolvedToRgb,
+        XpUnsupportedStyleDropped,
+        XpReverseApproximated,
+        XpInvisibleApproximated,
+        XpUnicodeGlyphStoredDirectly
     };
 
     struct SourcePosition

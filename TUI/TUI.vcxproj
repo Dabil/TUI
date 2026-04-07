@@ -168,6 +168,7 @@
     <ClInclude Include="Rendering\Objects\SauceSupport.h" />
     <ClInclude Include="Rendering\Objects\TextObjectBuilder.h" />
     <ClInclude Include="Rendering\Objects\TextObjectExporter.h" />
+    <ClInclude Include="Rendering\Objects\XpArtExporter.h" />
     <ClInclude Include="Rendering\Objects\XpArtLoader.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
@@ -250,6 +251,7 @@
     <ClCompile Include="Rendering\Objects\TextObject.cpp" />
     <ClCompile Include="Rendering\Objects\TextObjectBuilder.cpp" />
     <ClCompile Include="Rendering\Objects\TextObjectExporter.cpp" />
+    <ClCompile Include="Rendering\Objects\XpArtExporter.cpp" />
     <ClCompile Include="Rendering\Objects\XpArtLoader.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>

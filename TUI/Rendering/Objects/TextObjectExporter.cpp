@@ -15,6 +15,7 @@
 #include "Rendering/Styles/ColorMapping.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/ThemeColor.h"
+#include "Rendering/Objects/XpArtExporter.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 namespace
@@ -208,6 +209,11 @@ namespace
             outError =
                 "ANSI and BIN export currently require CP437 encoding so the output remains explicit about terminal-art format limits.";
             return Encoding::Auto;
+        }
+
+        if (fileType == FileType::Xp)
+        {
+            return Encoding::Binary;
         }
 
         if (options.encoding != Encoding::Auto)
@@ -1174,6 +1180,11 @@ namespace TextObjectExporter
             return FileType::Bin;
         }
 
+        if (ext == ".xp")
+        {
+            return FileType::Xp;
+        }
+
         return FileType::Unknown;
     }
 
@@ -1235,6 +1246,9 @@ namespace TextObjectExporter
                 bytes,
                 lossy);
 
+        case Encoding::Binary:
+            return true;
+
         case Encoding::Auto:
         default:
             return false;
@@ -1281,6 +1295,9 @@ namespace TextObjectExporter
 
         case FileType::Bin:
             return exportBin(object, options, result) ? result : result;
+
+        case FileType::Xp:
+            return XpArtExporter::exportToBytes(object, options, result) ? result : result;
 
         case FileType::Auto:
         case FileType::Unknown:
@@ -1529,6 +1546,8 @@ namespace TextObjectExporter
             return "ANS";
         case FileType::Bin:
             return "BIN";
+        case FileType::Xp:
+            return "XP";
         default:
             return "Unknown";
         }
@@ -1548,6 +1567,8 @@ namespace TextObjectExporter
             return "Latin-1";
         case Encoding::Cp437:
             return "CP437";
+        case Encoding::Binary:
+            return "Binary";
         default:
             return "Unknown";
         }
@@ -1594,6 +1615,16 @@ namespace TextObjectExporter
             return "TerminalArtTrailingSpacesForced";
         case SaveWarningCode::TerminalArtEncodingForcedToCp437:
             return "TerminalArtEncodingForcedToCp437";
+        case SaveWarningCode::XpThemeColorResolvedToRgb:
+            return "XpThemeColorResolvedToRgb";
+        case SaveWarningCode::XpUnsupportedStyleDropped:
+            return "XpUnsupportedStyleDropped";
+        case SaveWarningCode::XpReverseApproximated:
+            return "XpReverseApproximated";
+        case SaveWarningCode::XpInvisibleApproximated:
+            return "XpInvisibleApproximated";
+        case SaveWarningCode::XpUnicodeGlyphStoredDirectly:
+            return "XpUnicodeGlyphStoredDirectly";
         default:
             return "Unknown";
         }
