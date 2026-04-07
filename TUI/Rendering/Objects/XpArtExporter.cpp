@@ -1,17 +1,20 @@
 #include "Rendering/Objects/XpArtExporter.h"
 
 #include <algorithm>
-#include <array>
 #include <cstdint>
+#include <iomanip>
 #include <limits>
 #include <optional>
+#include <sstream>
 #include <string_view>
 
 #include "Rendering/Capabilities/ColorSupport.h"
+#include "Rendering/Objects/Cp437Encoding.h"
 #include "Rendering/Styles/ColorMapping.h"
 #include "Rendering/Styles/ColorResolver.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/ThemeColor.h"
+#include "Utilities/Unicode/UnicodeConversion.h"
 
 namespace
 {
@@ -40,6 +43,18 @@ namespace
         return makeColor(0, 0, 0);
     }
 
+    std::string toHexCodePoint(char32_t codePoint)
+    {
+        std::ostringstream stream;
+        stream << "U+"
+            << std::uppercase
+            << std::hex
+            << std::setw(4)
+            << std::setfill('0')
+            << static_cast<std::uint32_t>(UnicodeConversion::sanitizeCodePoint(codePoint));
+        return stream.str();
+    }
+
     void addWarningOnce(
         SaveResult& result,
         SaveWarningCode code,
@@ -56,6 +71,23 @@ namespace
         SaveWarning warning;
         warning.code = code;
         warning.message = message;
+        result.warnings.push_back(warning);
+    }
+
+    void addDetailedWarning(
+        SaveResult& result,
+        SaveWarningCode code,
+        const std::string& message,
+        const SourcePosition& position,
+        char32_t sourceCodePoint,
+        char32_t replacementCodePoint)
+    {
+        SaveWarning warning;
+        warning.code = code;
+        warning.message = message;
+        warning.sourcePosition = position;
+        warning.sourceCodePoint = sourceCodePoint;
+        warning.replacementCodePoint = replacementCodePoint;
         result.warnings.push_back(warning);
     }
 
@@ -154,46 +186,6 @@ namespace
         appendLe32(outBytes, crc);
         appendLe32(outBytes, static_cast<std::uint32_t>(payload.size() & 0xFFFFFFFFu));
         return true;
-    }
-
-    bool tryEncodeCp437Byte(char32_t codePoint, unsigned char& outByte)
-    {
-        if (codePoint <= 0x7Fu)
-        {
-            outByte = static_cast<unsigned char>(codePoint);
-            return true;
-        }
-
-        static const std::array<char32_t, 128> kCp437Table =
-        {
-            U'\u00C7', U'\u00FC', U'\u00E9', U'\u00E2', U'\u00E4', U'\u00E0', U'\u00E5', U'\u00E7',
-            U'\u00EA', U'\u00EB', U'\u00E8', U'\u00EF', U'\u00EE', U'\u00EC', U'\u00C4', U'\u00C5',
-            U'\u00C9', U'\u00E6', U'\u00C6', U'\u00F4', U'\u00F6', U'\u00F2', U'\u00FB', U'\u00F9',
-            U'\u00FF', U'\u00D6', U'\u00DC', U'\u00A2', U'\u00A3', U'\u00A5', U'\u20A7', U'\u0192',
-            U'\u00E1', U'\u00ED', U'\u00F3', U'\u00FA', U'\u00F1', U'\u00D1', U'\u00AA', U'\u00BA',
-            U'\u00BF', U'\u2310', U'\u00AC', U'\u00BD', U'\u00BC', U'\u00A1', U'\u00AB', U'\u00BB',
-            U'\u2591', U'\u2592', U'\u2593', U'\u2502', U'\u2524', U'\u2561', U'\u2562', U'\u2556',
-            U'\u2555', U'\u2563', U'\u2551', U'\u2557', U'\u255D', U'\u255C', U'\u255B', U'\u2510',
-            U'\u2514', U'\u2534', U'\u252C', U'\u251C', U'\u2500', U'\u253C', U'\u255E', U'\u255F',
-            U'\u255A', U'\u2554', U'\u2569', U'\u2566', U'\u2560', U'\u2550', U'\u256C', U'\u2567',
-            U'\u2568', U'\u2564', U'\u2565', U'\u2559', U'\u2558', U'\u2552', U'\u2553', U'\u256B',
-            U'\u256A', U'\u2518', U'\u250C', U'\u2588', U'\u2584', U'\u258C', U'\u2590', U'\u2580',
-            U'\u03B1', U'\u00DF', U'\u0393', U'\u03C0', U'\u03A3', U'\u03C3', U'\u00B5', U'\u03C4',
-            U'\u03A6', U'\u0398', U'\u03A9', U'\u03B4', U'\u221E', U'\u03C6', U'\u03B5', U'\u2229',
-            U'\u2261', U'\u00B1', U'\u2265', U'\u2264', U'\u2320', U'\u2321', U'\u00F7', U'\u2248',
-            U'\u00B0', U'\u2219', U'\u00B7', U'\u221A', U'\u207F', U'\u00B2', U'\u25A0', U'\u00A0'
-        };
-
-        for (std::size_t index = 0; index < kCp437Table.size(); ++index)
-        {
-            if (kCp437Table[index] == codePoint)
-            {
-                outByte = static_cast<unsigned char>(0x80u + index);
-                return true;
-            }
-        }
-
-        return false;
     }
 
     XpArtExporter::XpColor colorToXpColor(const Color& color)
@@ -327,11 +319,100 @@ namespace
         return result;
     }
 
+    struct GlyphConversionStats
+    {
+        std::size_t fallbackCount = 0;
+        std::size_t replacementCount = 0;
+
+        bool hasFallbackExample = false;
+        SourcePosition fallbackPosition;
+        char32_t fallbackSourceCodePoint = U'\0';
+        char32_t fallbackReplacementCodePoint = U'\0';
+        std::string fallbackReason;
+
+        bool hasReplacementExample = false;
+        SourcePosition replacementPosition;
+        char32_t replacementSourceCodePoint = U'\0';
+        char32_t replacementGlyph = U'\0';
+    };
+
+    bool convertGlyphToXpCell(
+        const TextObjectCell& sourceCell,
+        int x,
+        int y,
+        const SaveOptions& options,
+        SaveResult& ioResult,
+        GlyphConversionStats& ioStats,
+        XpArtExporter::XpCell& outCell)
+    {
+        char32_t glyph = U' ';
+        if (sourceCell.kind == CellKind::Glyph)
+        {
+            glyph = sourceCell.glyph;
+        }
+
+        Cp437Encoding::EncodeResult encodedGlyph;
+        if (!Cp437Encoding::tryEncodeWithFallback(glyph, options.xpReplacementGlyph, encodedGlyph))
+        {
+            ioResult.hasEncodingFailure = true;
+            ioResult.firstFailingCodePoint = glyph;
+            ioResult.firstFailingPosition = { x, y };
+            ioResult.errorMessage =
+                "XP export fallback configuration is invalid because SaveOptions::xpReplacementGlyph is not representable in CP437.";
+            return false;
+        }
+
+        outCell.glyph = static_cast<std::uint32_t>(encodedGlyph.byte);
+
+        if (encodedGlyph.kind == Cp437Encoding::ConversionKind::Exact)
+        {
+            return true;
+        }
+
+        ioResult.hadLossyConversion = true;
+        ++ioResult.lossyCodePointCount;
+
+        if (!hasWarning(ioResult, SaveWarningCode::LossyConversionOccurred))
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "XP export performed one or more lossy glyph conversions while mapping Unicode glyphs to CP437 bytes.");
+        }
+
+        if (encodedGlyph.kind == Cp437Encoding::ConversionKind::FallbackApproximation)
+        {
+            ++ioStats.fallbackCount;
+            if (!ioStats.hasFallbackExample)
+            {
+                ioStats.hasFallbackExample = true;
+                ioStats.fallbackPosition = { x, y };
+                ioStats.fallbackSourceCodePoint = glyph;
+                ioStats.fallbackReplacementCodePoint = encodedGlyph.outputCodePoint;
+                ioStats.fallbackReason = encodedGlyph.reason != nullptr ? encodedGlyph.reason : "fallback approximation";
+            }
+            return true;
+        }
+
+        ++ioStats.replacementCount;
+        if (!ioStats.hasReplacementExample)
+        {
+            ioStats.hasReplacementExample = true;
+            ioStats.replacementPosition = { x, y };
+            ioStats.replacementSourceCodePoint = glyph;
+            ioStats.replacementGlyph = encodedGlyph.outputCodePoint;
+        }
+
+        return true;
+    }
+
     bool convertTextObjectCell(
         const TextObjectCell& sourceCell,
         int x,
         int y,
+        const SaveOptions& options,
         SaveResult& ioResult,
+        GlyphConversionStats& ioGlyphStats,
         XpArtExporter::XpCell& outCell)
     {
         if (sourceCell.kind == CellKind::WideTrailing)
@@ -397,25 +478,62 @@ namespace
                 "One or more TextObject style attributes are not representable in XP cell data and were dropped explicitly.");
         }
 
-        char32_t glyph = U' ';
-        if (sourceCell.kind == CellKind::Glyph)
+        return convertGlyphToXpCell(sourceCell, x, y, options, ioResult, ioGlyphStats, outCell);
+    }
+
+    void finalizeGlyphWarnings(SaveResult& ioResult, const GlyphConversionStats& stats)
+    {
+        if (stats.hasFallbackExample)
         {
-            glyph = sourceCell.glyph;
+            std::ostringstream message;
+            message
+                << stats.fallbackCount
+                << " glyph(s) were approximated to nearby CP437 equivalents during XP export. First example: "
+                << toHexCodePoint(stats.fallbackSourceCodePoint)
+                << " -> "
+                << toHexCodePoint(stats.fallbackReplacementCodePoint)
+                << " at ("
+                << stats.fallbackPosition.x
+                << ", "
+                << stats.fallbackPosition.y
+                << ") because "
+                << stats.fallbackReason
+                << ".";
+
+            addDetailedWarning(
+                ioResult,
+                SaveWarningCode::XpGlyphFallbackSubstituted,
+                message.str(),
+                stats.fallbackPosition,
+                stats.fallbackSourceCodePoint,
+                stats.fallbackReplacementCodePoint);
         }
 
-        unsigned char cp437Byte = 0;
-        if (tryEncodeCp437Byte(glyph, cp437Byte))
+        if (stats.hasReplacementExample)
         {
-            outCell.glyph = static_cast<std::uint32_t>(cp437Byte);
-            return true;
-        }
+            std::ostringstream message;
+            message
+                << stats.replacementCount
+                << " glyph(s) were replaced with the configured XP replacement glyph "
+                << toHexCodePoint(stats.replacementGlyph)
+                << ". First example: "
+                << toHexCodePoint(stats.replacementSourceCodePoint)
+                << " -> "
+                << toHexCodePoint(stats.replacementGlyph)
+                << " at ("
+                << stats.replacementPosition.x
+                << ", "
+                << stats.replacementPosition.y
+                << ").";
 
-        outCell.glyph = static_cast<std::uint32_t>(glyph);
-        addWarningOnce(
-            ioResult,
-            SaveWarningCode::XpUnicodeGlyphStoredDirectly,
-            "One or more glyphs are not representable as CP437 and were stored directly as Unicode scalar values in XP cell data.");
-        return true;
+            addDetailedWarning(
+                ioResult,
+                SaveWarningCode::XpGlyphReplacementUsed,
+                message.str(),
+                stats.replacementPosition,
+                stats.replacementSourceCodePoint,
+                stats.replacementGlyph);
+        }
     }
 }
 
@@ -459,8 +577,6 @@ namespace XpArtExporter
         TextObjectExporter::SaveResult& ioResult,
         XpDocument& outDocument)
     {
-        (void)options;
-
         outDocument = XpDocument{};
         outDocument.formatVersion = 1;
         outDocument.canvasWidth = object.getWidth();
@@ -491,13 +607,15 @@ namespace XpArtExporter
         layer.height = object.getHeight();
         layer.cells.resize(cellCount);
 
+        GlyphConversionStats glyphStats;
+
         for (int y = 0; y < object.getHeight(); ++y)
         {
             for (int x = 0; x < object.getWidth(); ++x)
             {
                 const TextObjectCell& sourceCell = object.getCell(x, y);
                 XpCell convertedCell;
-                if (!convertTextObjectCell(sourceCell, x, y, ioResult, convertedCell))
+                if (!convertTextObjectCell(sourceCell, x, y, options, ioResult, glyphStats, convertedCell))
                 {
                     return false;
                 }
@@ -506,6 +624,8 @@ namespace XpArtExporter
                 layer.cells[index] = convertedCell;
             }
         }
+
+        finalizeGlyphWarnings(ioResult, glyphStats);
 
         outDocument.layers.clear();
         outDocument.layers.push_back(std::move(layer));

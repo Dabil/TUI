@@ -58,7 +58,8 @@ namespace TextObjectExporter
         XpUnsupportedStyleDropped,
         XpReverseApproximated,
         XpInvisibleApproximated,
-        XpUnicodeGlyphStoredDirectly
+        XpGlyphFallbackSubstituted,
+        XpGlyphReplacementUsed
     };
 
     struct SourcePosition
@@ -76,6 +77,9 @@ namespace TextObjectExporter
     {
         SaveWarningCode code = SaveWarningCode::None;
         std::string message;
+        SourcePosition sourcePosition;
+        char32_t sourceCodePoint = U'\0';
+        char32_t replacementCodePoint = U'\0';
 
         bool isValid() const
         {
@@ -101,6 +105,8 @@ namespace TextObjectExporter
         bool enableIceColors = false;
         bool ansiEmitFinalReset = true;
         bool allowTerminalArtApproximation = true;
+
+        char32_t xpReplacementGlyph = U'?';
     };
 
     struct SaveResult

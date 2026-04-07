@@ -1623,8 +1623,10 @@ namespace TextObjectExporter
             return "XpReverseApproximated";
         case SaveWarningCode::XpInvisibleApproximated:
             return "XpInvisibleApproximated";
-        case SaveWarningCode::XpUnicodeGlyphStoredDirectly:
-            return "XpUnicodeGlyphStoredDirectly";
+        case SaveWarningCode::XpGlyphFallbackSubstituted:
+            return "XpGlyphFallbackSubstituted";
+        case SaveWarningCode::XpGlyphReplacementUsed:
+            return "XpGlyphReplacementUsed";
         default:
             return "Unknown";
         }
