@@ -15,6 +15,7 @@
 #include "Rendering/Styles/ColorMapping.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/ThemeColor.h"
+#include "Rendering/Objects/XpArtExporter.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 namespace
@@ -210,6 +211,11 @@ namespace
             return Encoding::Auto;
         }
 
+        if (fileType == FileType::Xp)
+        {
+            return Encoding::Binary;
+        }
+
         if (options.encoding != Encoding::Auto)
         {
             return options.encoding;
@@ -227,6 +233,54 @@ namespace
         warning.code = code;
         warning.message = message;
         result.warnings.push_back(warning);
+    }
+
+
+    bool warningImpliesTerminalArtFidelityLoss(TextObjectExporter::SaveWarningCode code)
+    {
+        switch (code)
+        {
+        case TextObjectExporter::SaveWarningCode::LossyConversionOccurred:
+        case TextObjectExporter::SaveWarningCode::TerminalArtColorApproximationOccurred:
+        case TextObjectExporter::SaveWarningCode::TerminalArtThemeColorApproximationOccurred:
+        case TextObjectExporter::SaveWarningCode::TerminalArtUnsupportedStyleDropped:
+        case TextObjectExporter::SaveWarningCode::TerminalArtReverseApproximated:
+        case TextObjectExporter::SaveWarningCode::TerminalArtBoldApproximated:
+        case TextObjectExporter::SaveWarningCode::TerminalArtIceColorExportUsed:
+        case TextObjectExporter::SaveWarningCode::HighFidelityXpRecommended:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    bool shouldRecommendXpForResult(const TextObjectExporter::SaveResult& result)
+    {
+        if (result.resolvedFileType != TextObjectExporter::FileType::Ans &&
+            result.resolvedFileType != TextObjectExporter::FileType::Bin)
+        {
+            return false;
+        }
+
+        for (const TextObjectExporter::SaveWarning& warning : result.warnings)
+        {
+            if (warningImpliesTerminalArtFidelityLoss(warning.code))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    std::string xpRecommendationMessage(TextObjectExporter::FileType sourceFileType)
+    {
+        std::ostringstream stream;
+        stream
+            << "XP is the recommended high-fidelity export format when "
+            << TextObjectExporter::toString(sourceFileType)
+            << " export would approximate colors, drop style information, or replace glyphs.";
+        return stream.str();
     }
 
     bool tryEncodeAscii(
@@ -1028,6 +1082,14 @@ namespace
             true,
             false);
 
+        if (shouldRecommendXpForResult(result))
+        {
+            addWarning(
+                result,
+                TextObjectExporter::SaveWarningCode::HighFidelityXpRecommended,
+                xpRecommendationMessage(TextObjectExporter::FileType::Ans));
+        }
+
         result.success = true;
         return true;
     }
@@ -1133,6 +1195,14 @@ namespace
             true,
             !options.preserveTrailingSpaces);
 
+        if (shouldRecommendXpForResult(result))
+        {
+            addWarning(
+                result,
+                TextObjectExporter::SaveWarningCode::HighFidelityXpRecommended,
+                xpRecommendationMessage(TextObjectExporter::FileType::Bin));
+        }
+
         result.success = true;
         return true;
     }
@@ -1172,6 +1242,11 @@ namespace TextObjectExporter
         if (ext == ".bin")
         {
             return FileType::Bin;
+        }
+
+        if (ext == ".xp")
+        {
+            return FileType::Xp;
         }
 
         return FileType::Unknown;
@@ -1235,6 +1310,9 @@ namespace TextObjectExporter
                 bytes,
                 lossy);
 
+        case Encoding::Binary:
+            return true;
+
         case Encoding::Auto:
         default:
             return false;
@@ -1281,6 +1359,9 @@ namespace TextObjectExporter
 
         case FileType::Bin:
             return exportBin(object, options, result) ? result : result;
+
+        case FileType::Xp:
+            return XpArtExporter::exportToBytes(object, options, result) ? result : result;
 
         case FileType::Auto:
         case FileType::Unknown:
@@ -1445,6 +1526,11 @@ namespace TextObjectExporter
             message << " Warnings=" << result.warnings.size() << ".";
         }
 
+        if (shouldRecommendXpForResult(result))
+        {
+            message << " Recommendation=Prefer XP for higher-fidelity export.";
+        }
+
         return message.str();
     }
 
@@ -1478,6 +1564,11 @@ namespace TextObjectExporter
             message << " Warnings=" << result.warnings.size() << ".";
         }
 
+        if (shouldRecommendXpForResult(result))
+        {
+            message << " Recommendation=Prefer XP for higher-fidelity export.";
+        }
+
         return message.str();
     }
 
@@ -1492,6 +1583,11 @@ namespace TextObjectExporter
         }
 
         return false;
+    }
+
+    bool shouldRecommendXpForFidelity(const SaveResult& result)
+    {
+        return shouldRecommendXpForResult(result);
     }
 
     const SaveWarning* getWarningByCode(
@@ -1529,6 +1625,8 @@ namespace TextObjectExporter
             return "ANS";
         case FileType::Bin:
             return "BIN";
+        case FileType::Xp:
+            return "XP";
         default:
             return "Unknown";
         }
@@ -1548,6 +1646,8 @@ namespace TextObjectExporter
             return "Latin-1";
         case Encoding::Cp437:
             return "CP437";
+        case Encoding::Binary:
+            return "Binary";
         default:
             return "Unknown";
         }
@@ -1594,6 +1694,20 @@ namespace TextObjectExporter
             return "TerminalArtTrailingSpacesForced";
         case SaveWarningCode::TerminalArtEncodingForcedToCp437:
             return "TerminalArtEncodingForcedToCp437";
+        case SaveWarningCode::XpThemeColorResolvedToRgb:
+            return "XpThemeColorResolvedToRgb";
+        case SaveWarningCode::XpUnsupportedStyleDropped:
+            return "XpUnsupportedStyleDropped";
+        case SaveWarningCode::XpReverseApproximated:
+            return "XpReverseApproximated";
+        case SaveWarningCode::XpInvisibleApproximated:
+            return "XpInvisibleApproximated";
+        case SaveWarningCode::XpGlyphFallbackSubstituted:
+            return "XpGlyphFallbackSubstituted";
+        case SaveWarningCode::XpGlyphReplacementUsed:
+            return "XpGlyphReplacementUsed";
+        case SaveWarningCode::HighFidelityXpRecommended:
+            return "HighFidelityXpRecommended";
         default:
             return "Unknown";
         }

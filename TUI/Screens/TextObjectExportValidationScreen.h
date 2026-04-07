@@ -42,6 +42,7 @@ private:
 
     bool isFailingCell(int x, int y) const;
     bool isFirstFailingCell(int x, int y) const;
+    bool isWarningCell(int x, int y) const;
 
 private:
     TextObject m_object;
@@ -54,6 +55,7 @@ private:
 
     TextObjectExporter::SaveResult m_previewResult;
     std::vector<FailingCell> m_failingCells;
+    std::vector<TextObjectExporter::SourcePosition> m_warningCells;
 
     double m_elapsedSeconds = 0.0;
 };
