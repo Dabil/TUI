@@ -51,7 +51,12 @@ namespace XpArtExporter
     bool serializeDocument(
         const XpDocument& document,
         TextObjectExporter::SaveResult& ioResult,
-        std::string& outBytes);
+        std::string& outPayloadBytes);
+
+    bool compressSerializedDocument(
+        std::string_view payloadBytes,
+        TextObjectExporter::SaveResult& ioResult,
+        std::string& outCompressedBytes);
 
     bool exportToBytes(
         const TextObject& object,

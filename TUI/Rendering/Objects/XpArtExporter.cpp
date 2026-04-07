@@ -7,6 +7,18 @@
 #include <optional>
 #include <sstream>
 #include <string_view>
+#include <vector>
+
+#if defined(__has_include)
+#   if __has_include(<zlib.h>)
+#       include <zlib.h>
+#       define TUI_XP_ART_EXPORTER_HAS_ZLIB 1
+#   else
+#       define TUI_XP_ART_EXPORTER_HAS_ZLIB 0
+#   endif
+#else
+#   define TUI_XP_ART_EXPORTER_HAS_ZLIB 0
+#endif
 
 #include "Rendering/Capabilities/ColorSupport.h"
 #include "Rendering/Objects/Cp437Encoding.h"
@@ -19,10 +31,6 @@
 namespace
 {
     using namespace TextObjectExporter;
-
-    constexpr std::uint8_t kGzipId1 = 0x1F;
-    constexpr std::uint8_t kGzipId2 = 0x8B;
-    constexpr std::uint8_t kGzipCompressionMethodDeflate = 8;
 
     XpArtExporter::XpColor makeColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
     {
@@ -118,74 +126,12 @@ namespace
         return (x * height) + y;
     }
 
-    void appendLe16(std::string& bytes, std::uint16_t value)
-    {
-        bytes.push_back(static_cast<char>(value & 0xFF));
-        bytes.push_back(static_cast<char>((value >> 8) & 0xFF));
-    }
-
     void appendLe32(std::string& bytes, std::uint32_t value)
     {
         bytes.push_back(static_cast<char>(value & 0xFF));
         bytes.push_back(static_cast<char>((value >> 8) & 0xFF));
         bytes.push_back(static_cast<char>((value >> 16) & 0xFF));
         bytes.push_back(static_cast<char>((value >> 24) & 0xFF));
-    }
-
-    std::uint32_t crc32ForBytes(std::string_view bytes)
-    {
-        std::uint32_t crc = 0xFFFFFFFFu;
-
-        for (unsigned char byte : bytes)
-        {
-            crc ^= static_cast<std::uint32_t>(byte);
-
-            for (int bit = 0; bit < 8; ++bit)
-            {
-                const bool carry = (crc & 1u) != 0u;
-                crc >>= 1;
-                if (carry)
-                {
-                    crc ^= 0xEDB88320u;
-                }
-            }
-        }
-
-        return ~crc;
-    }
-
-    bool gzipStoreOnly(std::string_view payload, std::string& outBytes)
-    {
-        outBytes.clear();
-        outBytes.reserve(payload.size() + 32 + ((payload.size() / 65535u) * 5u));
-
-        outBytes.push_back(static_cast<char>(kGzipId1));
-        outBytes.push_back(static_cast<char>(kGzipId2));
-        outBytes.push_back(static_cast<char>(kGzipCompressionMethodDeflate));
-        outBytes.push_back(static_cast<char>(0));
-        appendLe32(outBytes, 0);
-        outBytes.push_back(static_cast<char>(0));
-        outBytes.push_back(static_cast<char>(255));
-
-        std::size_t offset = 0;
-        while (offset < payload.size())
-        {
-            const std::size_t remaining = payload.size() - offset;
-            const std::uint16_t blockSize = static_cast<std::uint16_t>(std::min<std::size_t>(remaining, 65535u));
-            const bool isFinalBlock = (offset + blockSize) == payload.size();
-
-            outBytes.push_back(static_cast<char>(isFinalBlock ? 0x01 : 0x00));
-            appendLe16(outBytes, blockSize);
-            appendLe16(outBytes, static_cast<std::uint16_t>(~blockSize));
-            outBytes.append(payload.data() + offset, blockSize);
-
-            offset += blockSize;
-        }
-
-        const std::uint32_t crc = crc32ForBytes(payload);
-        appendLe32(outBytes, crc);
-        appendLe32(outBytes, static_cast<std::uint32_t>(payload.size() & 0xFFFFFFFFu));
-        return true;
     }
 
     XpArtExporter::XpColor colorToXpColor(const Color& color)
@@ -535,6 +481,48 @@ namespace
                 stats.replacementGlyph);
         }
     }
+
+#if TUI_XP_ART_EXPORTER_HAS_ZLIB
+    bool gzipCompress(std::string_view payloadBytes, std::string& outCompressedBytes)
+    {
+        outCompressedBytes.clear();
+
+        z_stream stream{};
+        stream.next_in = reinterpret_cast<Bytef*>(const_cast<char*>(payloadBytes.data()));
+        stream.avail_in = static_cast<uInt>(payloadBytes.size());
+
+        const int windowBits = 15 + 16;
+        const int memLevel = 8;
+        if (deflateInit2(&stream, Z_BEST_COMPRESSION, Z_DEFLATED, windowBits, memLevel, Z_DEFAULT_STRATEGY) != Z_OK)
+        {
+            return false;
+        }
+
+        constexpr std::size_t kChunkSize = 16384;
+        std::vector<char> chunk(kChunkSize);
+
+        int rc = Z_OK;
+        while (rc == Z_OK)
+        {
+            stream.next_out = reinterpret_cast<Bytef*>(chunk.data());
+            stream.avail_out = static_cast<uInt>(chunk.size());
+
+            rc = deflate(&stream, Z_FINISH);
+            if (rc != Z_OK && rc != Z_STREAM_END)
+            {
+                deflateEnd(&stream);
+                outCompressedBytes.clear();
+                return false;
+            }
+
+            const std::size_t produced = chunk.size() - static_cast<std::size_t>(stream.avail_out);
+            outCompressedBytes.append(chunk.data(), produced);
+        }
+
+        deflateEnd(&stream);
+        return rc == Z_STREAM_END;
+    }
+#endif
 }
 
 namespace XpArtExporter
@@ -635,9 +623,9 @@ namespace XpArtExporter
     bool serializeDocument(
         const XpDocument& document,
         TextObjectExporter::SaveResult& ioResult,
-        std::string& outBytes)
+        std::string& outPayloadBytes)
     {
-        outBytes.clear();
+        outPayloadBytes.clear();
 
         if (!document.isValid())
         {
@@ -645,31 +633,73 @@ namespace XpArtExporter
             return false;
         }
 
-        std::string payload;
-        payload.reserve(static_cast<std::size_t>(8 + document.layers.size() * 8));
+        std::size_t totalCells = 0;
+        for (const XpLayer& layer : document.layers)
+        {
+            totalCells += layer.cells.size();
+        }
+
+        const std::size_t headerBytes = 8;
+        const std::size_t layerHeaderBytes = document.layers.size() * 8;
+        const std::size_t cellBytes = totalCells * 10;
+        outPayloadBytes.reserve(headerBytes + layerHeaderBytes + cellBytes);
 
         const std::int32_t versionHeader = -document.formatVersion;
-        appendLe32(payload, static_cast<std::uint32_t>(versionHeader));
-        appendLe32(payload, static_cast<std::uint32_t>(document.layers.size()));
+        appendLe32(outPayloadBytes, static_cast<std::uint32_t>(versionHeader));
+        appendLe32(outPayloadBytes, static_cast<std::uint32_t>(document.layers.size()));
 
         for (const XpLayer& layer : document.layers)
         {
-            appendLe32(payload, static_cast<std::uint32_t>(layer.width));
-            appendLe32(payload, static_cast<std::uint32_t>(layer.height));
+            appendLe32(outPayloadBytes, static_cast<std::uint32_t>(layer.width));
+            appendLe32(outPayloadBytes, static_cast<std::uint32_t>(layer.height));
 
             for (const XpCell& cell : layer.cells)
             {
-                appendLe32(payload, cell.glyph);
-                payload.push_back(static_cast<char>(cell.foreground.red));
-                payload.push_back(static_cast<char>(cell.foreground.green));
-                payload.push_back(static_cast<char>(cell.foreground.blue));
-                payload.push_back(static_cast<char>(cell.background.red));
-                payload.push_back(static_cast<char>(cell.background.green));
-                payload.push_back(static_cast<char>(cell.background.blue));
+                appendLe32(outPayloadBytes, cell.glyph);
+                outPayloadBytes.push_back(static_cast<char>(cell.foreground.red));
+                outPayloadBytes.push_back(static_cast<char>(cell.foreground.green));
+                outPayloadBytes.push_back(static_cast<char>(cell.foreground.blue));
+                outPayloadBytes.push_back(static_cast<char>(cell.background.red));
+                outPayloadBytes.push_back(static_cast<char>(cell.background.green));
+                outPayloadBytes.push_back(static_cast<char>(cell.background.blue));
             }
         }
 
-        return gzipStoreOnly(payload, outBytes);
+        return true;
+    }
+
+    bool compressSerializedDocument(
+        std::string_view payloadBytes,
+        TextObjectExporter::SaveResult& ioResult,
+        std::string& outCompressedBytes)
+    {
+        outCompressedBytes.clear();
+
+        if (payloadBytes.empty())
+        {
+            ioResult.errorMessage = "XP export cannot compress an empty payload.";
+            return false;
+        }
+
+#if TUI_XP_ART_EXPORTER_HAS_ZLIB
+        if (!gzipCompress(payloadBytes, outCompressedBytes))
+        {
+            ioResult.errorMessage = "XP export failed while compressing the serialized payload with zlib/gzip.";
+            return false;
+        }
+
+        if (outCompressedBytes.empty())
+        {
+            ioResult.errorMessage = "XP export compression completed but produced no output bytes.";
+            return false;
+        }
+
+        return true;
+#else
+        ioResult.errorMessage =
+            "XP export requires zlib support for gzip-compatible XP compression, but zlib was not available in this build.";
+        return false;
+#endif
     }
 
     bool exportToBytes(
@@ -683,7 +713,13 @@ namespace XpArtExporter
             return false;
         }
 
-        if (!serializeDocument(document, ioResult, ioResult.bytes))
+        std::string payloadBytes;
+        if (!serializeDocument(document, ioResult, payloadBytes))
+        {
+            return false;
+        }
+
+        if (!compressSerializedDocument(payloadBytes, ioResult, ioResult.bytes))
         {
             return false;
         }
