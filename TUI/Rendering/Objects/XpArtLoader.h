@@ -329,12 +329,12 @@ namespace XpArtLoader
     // Compatibility wrapper:
     // ParsedDocument -> retained XpDocument -> flattened TextObject
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options = {});
-    LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options = {});
-    LoadResult buildTextObject(const XpSequence& sequence, const LoadOptions& options = {});
 
     // Retained-model flattening entry point:
     // XpDocument -> flattened TextObject
     LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options = {});
+    LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options = {});
+    LoadResult buildTextObject(const XpSequence& sequence, const LoadOptions& options = {});
 
     bool hasWarning(const LoadResult& result, LoadWarningCode code);
     const LoadWarning* getWarningByCode(const LoadResult& result, LoadWarningCode code);
