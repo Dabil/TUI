@@ -9,6 +9,12 @@
 #include <string_view>
 #include <vector>
 
+#include "Rendering/Capabilities/RendererCapabilities.h"
+#include "Rendering/SgrEmitter.h"
+#include "Rendering/Styles/Color.h"
+#include "Rendering/Styles/ColorMapping.h"
+#include "Rendering/Styles/Style.h"
+#include "Rendering/Styles/ThemeColor.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 namespace
@@ -17,6 +23,19 @@ namespace
     {
         char32_t value = U'\0';
         TextObjectExporter::SourcePosition source;
+    };
+
+    struct TerminalArtStyleInfo
+    {
+        Style emittedStyle;
+        unsigned char dosAttribute = 0x07;
+
+        bool approximatedColor = false;
+        bool approximatedThemeColor = false;
+        bool droppedUnsupportedStyle = false;
+        bool approximatedReverse = false;
+        bool approximatedBold = false;
+        bool usedIceColors = false;
     };
 
     std::string toLowerCopy(std::string value)
@@ -85,35 +104,118 @@ namespace
         return UnicodeConversion::sanitizeCodePoint(kCp437Table[value - 0x80]);
     }
 
+    Color::Basic dosBasicColor(int value)
+    {
+        switch (value & 0x0F)
+        {
+        case 0x0: return Color::Basic::Black;
+        case 0x1: return Color::Basic::Blue;
+        case 0x2: return Color::Basic::Green;
+        case 0x3: return Color::Basic::Cyan;
+        case 0x4: return Color::Basic::Red;
+        case 0x5: return Color::Basic::Magenta;
+        case 0x6: return Color::Basic::Yellow;
+        case 0x7: return Color::Basic::White;
+        case 0x8: return Color::Basic::BrightBlack;
+        case 0x9: return Color::Basic::BrightBlue;
+        case 0xA: return Color::Basic::BrightGreen;
+        case 0xB: return Color::Basic::BrightCyan;
+        case 0xC: return Color::Basic::BrightRed;
+        case 0xD: return Color::Basic::BrightMagenta;
+        case 0xE: return Color::Basic::BrightYellow;
+        case 0xF: return Color::Basic::BrightWhite;
+        default: return Color::Basic::White;
+        }
+    }
+
+    int dosColorNibble(Color::Basic basic)
+    {
+        switch (basic)
+        {
+        case Color::Basic::Black:         return 0x0;
+        case Color::Basic::Blue:          return 0x1;
+        case Color::Basic::Green:         return 0x2;
+        case Color::Basic::Cyan:          return 0x3;
+        case Color::Basic::Red:           return 0x4;
+        case Color::Basic::Magenta:       return 0x5;
+        case Color::Basic::Yellow:        return 0x6;
+        case Color::Basic::White:         return 0x7;
+        case Color::Basic::BrightBlack:   return 0x8;
+        case Color::Basic::BrightBlue:    return 0x9;
+        case Color::Basic::BrightGreen:   return 0xA;
+        case Color::Basic::BrightCyan:    return 0xB;
+        case Color::Basic::BrightRed:     return 0xC;
+        case Color::Basic::BrightMagenta: return 0xD;
+        case Color::Basic::BrightYellow:  return 0xE;
+        case Color::Basic::BrightWhite:   return 0xF;
+        default:                          return 0x7;
+        }
+    }
+
+    Style styleFromDosAttribute(unsigned char attribute, bool iceColors)
+    {
+        Style style;
+        style = style.withForeground(Color::FromBasic(dosBasicColor(attribute & 0x0F)));
+
+        if (iceColors)
+        {
+            style = style.withBackground(Color::FromBasic(dosBasicColor((attribute >> 4) & 0x0F)));
+        }
+        else
+        {
+            style = style.withBackground(Color::FromBasic(dosBasicColor((attribute >> 4) & 0x07)));
+            if ((attribute & 0x80) != 0)
+            {
+                style = style.withSlowBlink(true);
+            }
+        }
+
+        return style;
+    }
+
     TextObjectExporter::Encoding resolveEncoding(
         TextObjectExporter::FileType fileType,
         const TextObjectExporter::SaveOptions& options,
         std::string& outError)
     {
-        if (fileType == TextObjectExporter::FileType::Nfo)
+        using namespace TextObjectExporter;
+
+        if (fileType == FileType::Nfo)
         {
-            if (options.encoding == TextObjectExporter::Encoding::Auto)
+            if (options.encoding == Encoding::Auto)
             {
-                return TextObjectExporter::Encoding::Cp437;
+                return Encoding::Cp437;
             }
 
-            if (options.encoding != TextObjectExporter::Encoding::Cp437 &&
+            if (options.encoding != Encoding::Cp437 &&
                 !options.allowNonCp437NfoEncoding)
             {
                 outError =
                     "NFO export only permits CP437 unless SaveOptions::allowNonCp437NfoEncoding is true.";
-                return TextObjectExporter::Encoding::Auto;
+                return Encoding::Auto;
             }
 
             return options.encoding;
         }
 
-        if (options.encoding != TextObjectExporter::Encoding::Auto)
+        if (fileType == FileType::Ans || fileType == FileType::Bin)
+        {
+            if (options.encoding == Encoding::Auto || options.encoding == Encoding::Cp437)
+            {
+                return Encoding::Cp437;
+            }
+
+            outError =
+                "ANSI and BIN export currently require CP437 encoding so the output remains explicit about terminal-art format limits.";
+            return Encoding::Auto;
+        }
+
+        if (options.encoding != Encoding::Auto)
         {
             return options.encoding;
         }
 
-        return TextObjectExporter::Encoding::Utf8;
+        return Encoding::Utf8;
     }
 
     void addWarning(
@@ -212,7 +314,7 @@ namespace
         return true;
     }
 
-    std::vector<ExportCodePoint> buildExportCodePoints(
+    std::vector<ExportCodePoint> buildPlainTextExportCodePoints(
         const TextObject& object,
         const TextObjectExporter::SaveOptions& options)
     {
@@ -225,7 +327,7 @@ namespace
 
         for (int row = 0; row < object.getHeight(); ++row)
         {
-            std::size_t lineStart = result.size();
+            const std::size_t lineStart = result.size();
 
             for (int x = 0; x < object.getWidth(); ++x)
             {
@@ -240,15 +342,9 @@ namespace
                 ExportCodePoint item;
                 item.source.x = x;
                 item.source.y = row;
-
-                if (cell.kind == CellKind::Empty)
-                {
-                    item.value = U' ';
-                }
-                else
-                {
-                    item.value = UnicodeConversion::sanitizeCodePoint(cell.glyph);
-                }
+                item.value = (cell.kind == CellKind::Empty)
+                    ? U' '
+                    : UnicodeConversion::sanitizeCodePoint(cell.glyph);
 
                 result.push_back(item);
             }
@@ -398,6 +494,648 @@ namespace
         stream << static_cast<std::uint32_t>(codePoint);
         return stream.str();
     }
+
+    std::string buildUnsupportedCellMessage(const TextObjectCell& cell)
+    {
+        if (cell.kind == CellKind::WideTrailing)
+        {
+            return "Terminal-art export cannot serialize WideTrailing cells directly.";
+        }
+
+        if (cell.kind == CellKind::CombiningContinuation)
+        {
+            return "Terminal-art export cannot serialize CombiningContinuation cells directly.";
+        }
+
+        if (cell.kind == CellKind::Glyph && cell.width != CellWidth::One)
+        {
+            return "Terminal-art export currently requires every emitted glyph to occupy exactly one cell.";
+        }
+
+        return "Terminal-art export encountered an unsupported cell kind.";
+    }
+
+    bool validateTerminalArtCells(
+        const TextObject& object,
+        TextObjectExporter::SaveResult& outResult)
+    {
+        for (int y = 0; y < object.getHeight(); ++y)
+        {
+            for (int x = 0; x < object.getWidth(); ++x)
+            {
+                const TextObjectCell& cell = object.getCell(x, y);
+
+                if (cell.kind == CellKind::WideTrailing ||
+                    cell.kind == CellKind::CombiningContinuation ||
+                    (cell.kind == CellKind::Glyph && cell.width != CellWidth::One))
+                {
+                    outResult.hasEncodingFailure = true;
+                    outResult.firstFailingCodePoint = cell.glyph;
+                    outResult.firstFailingPosition = { x, y };
+                    outResult.errorMessage = buildUnsupportedCellMessage(cell);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    bool tryEncodeCp437Glyph(
+        char32_t codePoint,
+        const TextObjectExporter::SaveOptions& options,
+        char& outByte,
+        bool& outLossy)
+    {
+        std::string encoded;
+        outLossy = false;
+
+        if (!tryEncodeCp437(
+            codePoint,
+            options.replacementChar,
+            options.allowLossyConversion,
+            encoded,
+            outLossy))
+        {
+            return false;
+        }
+
+        if (encoded.empty())
+        {
+            return false;
+        }
+
+        outByte = encoded[0];
+        return true;
+    }
+
+    bool selectThemeColorForTerminalArt(
+        const ThemeColor& themeColor,
+        Color& outColor,
+        bool& outApproximate)
+    {
+        if (themeColor.hasBasic())
+        {
+            outColor = *themeColor.basic();
+            return true;
+        }
+
+        if (themeColor.hasIndexed())
+        {
+            outColor = ColorMapping::indexedToBasic(*themeColor.indexed());
+            outApproximate = true;
+            return true;
+        }
+
+        if (themeColor.hasRgb())
+        {
+            outColor = ColorMapping::rgbToBasic(*themeColor.rgb());
+            outApproximate = true;
+            return true;
+        }
+
+        return false;
+    }
+
+    bool resolveStyleColorValueToBasic(
+        const std::optional<Style::StyleColorValue>& colorValue,
+        const std::optional<Color>& concreteFallback,
+        const std::optional<ThemeColor>& themeFallback,
+        Color::Basic defaultColor,
+        bool allowApproximation,
+        Color::Basic& outBasic,
+        bool& outApproximatedColor,
+        bool& outApproximatedTheme)
+    {
+        auto consumeConcrete = [&](const Color& color) -> bool
+            {
+                if (color.isDefault())
+                {
+                    outBasic = defaultColor;
+                    return true;
+                }
+
+                if (color.isBasic16())
+                {
+                    outBasic = color.basic();
+                    return true;
+                }
+
+                if (!allowApproximation)
+                {
+                    return false;
+                }
+
+                outApproximatedColor = true;
+                outBasic = ColorMapping::mapToSupport(color, ColorSupport::Basic16).basic();
+                return true;
+            };
+
+        auto consumeTheme = [&](const ThemeColor& themeColor) -> bool
+            {
+                Color resolved;
+                bool approximateTheme = false;
+                if (!selectThemeColorForTerminalArt(themeColor, resolved, approximateTheme))
+                {
+                    return false;
+                }
+
+                outApproximatedTheme = approximateTheme || !themeColor.hasBasic();
+                return consumeConcrete(resolved);
+            };
+
+        if (colorValue.has_value())
+        {
+            if (colorValue->hasConcreteColor())
+            {
+                return consumeConcrete(*colorValue->concreteColor());
+            }
+
+            if (colorValue->hasThemeColor())
+            {
+                return consumeTheme(*colorValue->themeColor());
+            }
+        }
+
+        if (concreteFallback.has_value())
+        {
+            return consumeConcrete(*concreteFallback);
+        }
+
+        if (themeFallback.has_value())
+        {
+            return consumeTheme(*themeFallback);
+        }
+
+        outBasic = defaultColor;
+        return true;
+    }
+
+    bool resolveTerminalArtStyle(
+        const std::optional<Style>& cellStyle,
+        const TextObjectExporter::SaveOptions& options,
+        bool forBin,
+        TerminalArtStyleInfo& outInfo)
+    {
+        outInfo = TerminalArtStyleInfo{};
+
+        if (!cellStyle.has_value() || cellStyle->isEmpty())
+        {
+            outInfo.dosAttribute = 0x07;
+            outInfo.emittedStyle = styleFromDosAttribute(outInfo.dosAttribute, options.enableIceColors);
+            return true;
+        }
+
+        const Style& style = *cellStyle;
+        Color::Basic foreground = Color::Basic::White;
+        Color::Basic background = Color::Basic::Black;
+
+        if (!resolveStyleColorValueToBasic(
+            style.foregroundColorValue(),
+            style.foreground(),
+            style.foregroundThemeColor(),
+            Color::Basic::White,
+            options.allowTerminalArtApproximation,
+            foreground,
+            outInfo.approximatedColor,
+            outInfo.approximatedThemeColor))
+        {
+            return false;
+        }
+
+        if (!resolveStyleColorValueToBasic(
+            style.backgroundColorValue(),
+            style.background(),
+            style.backgroundThemeColor(),
+            Color::Basic::Black,
+            options.allowTerminalArtApproximation,
+            background,
+            outInfo.approximatedColor,
+            outInfo.approximatedThemeColor))
+        {
+            return false;
+        }
+
+        if (style.reverse())
+        {
+            std::swap(foreground, background);
+            outInfo.approximatedReverse = true;
+        }
+
+        if (forBin && style.bold() && dosColorNibble(foreground) < 8)
+        {
+            foreground = dosBasicColor(dosColorNibble(foreground) | 0x08);
+            outInfo.approximatedBold = true;
+        }
+
+        unsigned char attribute = static_cast<unsigned char>(dosColorNibble(foreground) & 0x0F);
+
+        const int backgroundNibble = dosColorNibble(background);
+        if (options.enableIceColors)
+        {
+            attribute = static_cast<unsigned char>(attribute | ((backgroundNibble & 0x0F) << 4));
+            outInfo.usedIceColors = ((backgroundNibble & 0x08) != 0);
+        }
+        else
+        {
+            attribute = static_cast<unsigned char>(attribute | ((backgroundNibble & 0x07) << 4));
+            if (style.slowBlink() || style.fastBlink())
+            {
+                attribute = static_cast<unsigned char>(attribute | 0x80);
+            }
+            else if ((backgroundNibble & 0x08) != 0)
+            {
+                if (!options.allowTerminalArtApproximation)
+                {
+                    return false;
+                }
+
+                outInfo.approximatedColor = true;
+                outInfo.usedIceColors = true;
+            }
+        }
+
+        if (forBin)
+        {
+            if (style.dim() ||
+                style.underline() ||
+                style.invisible() ||
+                style.strike() ||
+                style.fastBlink())
+            {
+                outInfo.droppedUnsupportedStyle = true;
+            }
+        }
+
+        outInfo.dosAttribute = attribute;
+
+        Style emitted = styleFromDosAttribute(attribute, options.enableIceColors);
+        if (!forBin)
+        {
+            if (style.bold())
+            {
+                emitted = emitted.withBold(true);
+            }
+
+            if (style.dim())
+            {
+                emitted = emitted.withDim(true);
+            }
+
+            if (style.underline())
+            {
+                emitted = emitted.withUnderline(true);
+            }
+
+            if (style.reverse())
+            {
+                emitted = emitted.withReverse(true);
+            }
+
+            if (style.invisible())
+            {
+                emitted = emitted.withInvisible(true);
+            }
+
+            if (style.strike())
+            {
+                emitted = emitted.withStrike(true);
+            }
+
+            if (style.fastBlink())
+            {
+                emitted = emitted.withFastBlink(true);
+            }
+        }
+
+        outInfo.emittedStyle = emitted;
+        return true;
+    }
+
+    void appendTerminalArtWarnings(
+        TextObjectExporter::SaveResult& result,
+        bool approximatedColor,
+        bool approximatedThemeColor,
+        bool droppedUnsupportedStyle,
+        bool approximatedReverse,
+        bool approximatedBold,
+        bool usedIceColors,
+        bool forcedCp437,
+        bool forcedTrailingSpaces)
+    {
+        using namespace TextObjectExporter;
+
+        if (forcedCp437)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtEncodingForcedToCp437,
+                "ANSI/BIN export uses CP437 bytes for glyph data. A different logical encoding was not used.");
+        }
+
+        if (approximatedColor)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtColorApproximationOccurred,
+                "One or more terminal-art colors were approximated to the DOS/basic-16 palette.");
+        }
+
+        if (approximatedThemeColor)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtThemeColorApproximationOccurred,
+                "One or more theme colors were resolved through terminal-art palette fallback rather than preserved as authored theme intent.");
+        }
+
+        if (droppedUnsupportedStyle)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtUnsupportedStyleDropped,
+                "One or more TextObject style flags are not representable in BIN and were dropped explicitly.");
+        }
+
+        if (approximatedReverse)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtReverseApproximated,
+                "Reverse styling was approximated by swapping foreground and background colors before export.");
+        }
+
+        if (approximatedBold)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtBoldApproximated,
+                "BIN bold styling was approximated through the DOS bright-foreground bit.");
+        }
+
+        if (usedIceColors)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtIceColorExportUsed,
+                "BIN export used high-background ICE color attributes. Consumers that interpret bit 7 as blink may not match the authored result.");
+        }
+
+        if (forcedTrailingSpaces)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::TerminalArtTrailingSpacesForced,
+                "BIN export always writes the full rectangular grid, so trailing spaces were preserved regardless of SaveOptions::preserveTrailingSpaces.");
+        }
+    }
+
+    bool exportAnsi(
+        const TextObject& object,
+        const TextObjectExporter::SaveOptions& options,
+        TextObjectExporter::SaveResult& result)
+    {
+        if (!validateTerminalArtCells(object, result))
+        {
+            return false;
+        }
+
+        RendererCapabilities capabilities = RendererCapabilities::VirtualTerminal();
+        capabilities.colorTier = ColorSupport::Basic16;
+        capabilities.brightBasicColors = RendererFeatureSupport::Supported;
+        capabilities.bold = RendererFeatureSupport::Supported;
+        capabilities.dim = RendererFeatureSupport::Supported;
+        capabilities.underline = RendererFeatureSupport::Supported;
+        capabilities.reverse = RendererFeatureSupport::Supported;
+        capabilities.invisible = RendererFeatureSupport::Supported;
+        capabilities.strike = RendererFeatureSupport::Supported;
+        capabilities.slowBlink = RendererFeatureSupport::Supported;
+        capabilities.fastBlink = RendererFeatureSupport::Supported;
+
+        SgrEmitter emitter;
+        emitter.setCapabilities(capabilities);
+        emitter.reset();
+
+        std::string output;
+        bool approximatedColor = false;
+        bool approximatedThemeColor = false;
+        bool droppedUnsupportedStyle = false;
+        bool approximatedReverse = false;
+        bool approximatedBold = false;
+        bool usedIceColors = false;
+        bool hadLossyConversion = false;
+        std::size_t lossyCount = 0;
+
+        for (int y = 0; y < object.getHeight(); ++y)
+        {
+            for (int x = 0; x < object.getWidth(); ++x)
+            {
+                const TextObjectCell& cell = object.getCell(x, y);
+                if (cell.kind == CellKind::WideTrailing ||
+                    cell.kind == CellKind::CombiningContinuation)
+                {
+                    continue;
+                }
+
+                TerminalArtStyleInfo styleInfo;
+                if (!resolveTerminalArtStyle(cell.style, options, false, styleInfo))
+                {
+                    result.hasEncodingFailure = true;
+                    result.firstFailingCodePoint = cell.glyph;
+                    result.firstFailingPosition = { x, y };
+                    result.errorMessage =
+                        "ANSI export could not represent one or more authored colors without approximation, and approximation was disabled.";
+                    return false;
+                }
+
+                approximatedColor = approximatedColor || styleInfo.approximatedColor;
+                approximatedThemeColor = approximatedThemeColor || styleInfo.approximatedThemeColor;
+                droppedUnsupportedStyle = droppedUnsupportedStyle || styleInfo.droppedUnsupportedStyle;
+                approximatedReverse = approximatedReverse || styleInfo.approximatedReverse;
+                approximatedBold = approximatedBold || styleInfo.approximatedBold;
+                usedIceColors = usedIceColors || styleInfo.usedIceColors;
+
+                emitter.appendTransitionTo(output, styleInfo.emittedStyle);
+
+                const char32_t glyph = (cell.kind == CellKind::Empty)
+                    ? U' '
+                    : UnicodeConversion::sanitizeCodePoint(cell.glyph);
+
+                char encodedGlyph = ' ';
+                bool lossyForGlyph = false;
+                if (!tryEncodeCp437Glyph(glyph, options, encodedGlyph, lossyForGlyph))
+                {
+                    result.hasEncodingFailure = true;
+                    result.firstFailingCodePoint = glyph;
+                    result.firstFailingPosition = { x, y };
+                    result.errorMessage =
+                        "ANSI export failed because at least one glyph is not representable as a single CP437 byte.";
+                    return false;
+                }
+
+                output.push_back(encodedGlyph);
+
+                if (lossyForGlyph)
+                {
+                    hadLossyConversion = true;
+                    ++lossyCount;
+                }
+            }
+
+            if (y + 1 < object.getHeight())
+            {
+                if (options.lineEnding == TextObjectExporter::LineEnding::CrLf)
+                {
+                    output += "\r\n";
+                }
+                else
+                {
+                    output.push_back('\n');
+                }
+            }
+        }
+
+        if (options.ansiEmitFinalReset)
+        {
+            emitter.appendReset(output);
+        }
+
+        result.bytes = output;
+        result.hadLossyConversion = hadLossyConversion;
+        result.lossyCodePointCount = lossyCount;
+
+        if (result.hadLossyConversion)
+        {
+            std::ostringstream warning;
+            warning << "Lossy conversion occurred for "
+                << result.lossyCodePointCount
+                << " code point(s).";
+
+            addWarning(
+                result,
+                TextObjectExporter::SaveWarningCode::LossyConversionOccurred,
+                warning.str());
+        }
+
+        appendTerminalArtWarnings(
+            result,
+            approximatedColor,
+            approximatedThemeColor,
+            droppedUnsupportedStyle,
+            approximatedReverse,
+            approximatedBold,
+            usedIceColors,
+            true,
+            false);
+
+        result.success = true;
+        return true;
+    }
+
+    bool exportBin(
+        const TextObject& object,
+        const TextObjectExporter::SaveOptions& options,
+        TextObjectExporter::SaveResult& result)
+    {
+        if (!validateTerminalArtCells(object, result))
+        {
+            return false;
+        }
+
+        std::string output;
+        output.reserve(static_cast<std::size_t>(object.getWidth()) * static_cast<std::size_t>(object.getHeight()) * 2u);
+
+        bool approximatedColor = false;
+        bool approximatedThemeColor = false;
+        bool droppedUnsupportedStyle = false;
+        bool approximatedReverse = false;
+        bool approximatedBold = false;
+        bool usedIceColors = false;
+        bool hadLossyConversion = false;
+        std::size_t lossyCount = 0;
+
+        for (int y = 0; y < object.getHeight(); ++y)
+        {
+            for (int x = 0; x < object.getWidth(); ++x)
+            {
+                const TextObjectCell& cell = object.getCell(x, y);
+
+                TerminalArtStyleInfo styleInfo;
+                if (!resolveTerminalArtStyle(cell.style, options, true, styleInfo))
+                {
+                    result.hasEncodingFailure = true;
+                    result.firstFailingCodePoint = cell.glyph;
+                    result.firstFailingPosition = { x, y };
+                    result.errorMessage =
+                        "BIN export could not represent one or more authored colors without approximation, and approximation was disabled.";
+                    return false;
+                }
+
+                approximatedColor = approximatedColor || styleInfo.approximatedColor;
+                approximatedThemeColor = approximatedThemeColor || styleInfo.approximatedThemeColor;
+                droppedUnsupportedStyle = droppedUnsupportedStyle || styleInfo.droppedUnsupportedStyle;
+                approximatedReverse = approximatedReverse || styleInfo.approximatedReverse;
+                approximatedBold = approximatedBold || styleInfo.approximatedBold;
+                usedIceColors = usedIceColors || styleInfo.usedIceColors;
+
+                const char32_t glyph = (cell.kind == CellKind::Empty)
+                    ? U' '
+                    : UnicodeConversion::sanitizeCodePoint(cell.glyph);
+
+                char encodedGlyph = ' ';
+                bool lossyForGlyph = false;
+                if (!tryEncodeCp437Glyph(glyph, options, encodedGlyph, lossyForGlyph))
+                {
+                    result.hasEncodingFailure = true;
+                    result.firstFailingCodePoint = glyph;
+                    result.firstFailingPosition = { x, y };
+                    result.errorMessage =
+                        "BIN export failed because at least one glyph is not representable as a single CP437 byte.";
+                    return false;
+                }
+
+                output.push_back(encodedGlyph);
+                output.push_back(static_cast<char>(styleInfo.dosAttribute));
+
+                if (lossyForGlyph)
+                {
+                    hadLossyConversion = true;
+                    ++lossyCount;
+                }
+            }
+        }
+
+        result.bytes = output;
+        result.hadLossyConversion = hadLossyConversion;
+        result.lossyCodePointCount = lossyCount;
+
+        if (result.hadLossyConversion)
+        {
+            std::ostringstream warning;
+            warning << "Lossy conversion occurred for "
+                << result.lossyCodePointCount
+                << " code point(s).";
+
+            addWarning(
+                result,
+                TextObjectExporter::SaveWarningCode::LossyConversionOccurred,
+                warning.str());
+        }
+
+        appendTerminalArtWarnings(
+            result,
+            approximatedColor,
+            approximatedThemeColor,
+            droppedUnsupportedStyle,
+            approximatedReverse,
+            approximatedBold,
+            usedIceColors,
+            true,
+            !options.preserveTrailingSpaces);
+
+        result.success = true;
+        return true;
+    }
 }
 
 namespace TextObjectExporter
@@ -424,6 +1162,16 @@ namespace TextObjectExporter
         if (ext == ".nfo")
         {
             return FileType::Nfo;
+        }
+
+        if (ext == ".ans")
+        {
+            return FileType::Ans;
+        }
+
+        if (ext == ".bin")
+        {
+            return FileType::Bin;
         }
 
         return FileType::Unknown;
@@ -523,11 +1271,28 @@ namespace TextObjectExporter
             addWarning(
                 result,
                 SaveWarningCode::NonCp437NfoEncodingOverride,
-                "NFO export is using a non-CP437 encoding by explicit override. "
-                "Compatibility with traditional NFO viewers may be reduced.");
+                "NFO export is using a non-CP437 encoding by explicit override. Compatibility with traditional NFO viewers may be reduced.");
         }
 
-        const std::vector<ExportCodePoint> codePoints = buildExportCodePoints(object, options);
+        switch (result.resolvedFileType)
+        {
+        case FileType::Ans:
+            return exportAnsi(object, options, result) ? result : result;
+
+        case FileType::Bin:
+            return exportBin(object, options, result) ? result : result;
+
+        case FileType::Auto:
+        case FileType::Unknown:
+        case FileType::Txt:
+        case FileType::Asc:
+        case FileType::Diz:
+        case FileType::Nfo:
+        default:
+            break;
+        }
+
+        const std::vector<ExportCodePoint> codePoints = buildPlainTextExportCodePoints(object, options);
 
         std::string encodedBytes;
         std::size_t lossyCount = 0;
@@ -547,8 +1312,7 @@ namespace TextObjectExporter
             result.firstFailingCodePoint = firstFailingCodePoint;
             result.firstFailingPosition = firstFailingPosition;
             result.errorMessage =
-                "Export failed because the TextObject contains code points that cannot be represented "
-                "in the selected encoding without lossy conversion.";
+                "Export failed because the TextObject contains code points that cannot be represented in the selected encoding without lossy conversion.";
             return result;
         }
 
@@ -761,6 +1525,10 @@ namespace TextObjectExporter
             return "DIZ";
         case FileType::Nfo:
             return "NFO";
+        case FileType::Ans:
+            return "ANS";
+        case FileType::Bin:
+            return "BIN";
         default:
             return "Unknown";
         }
@@ -810,6 +1578,22 @@ namespace TextObjectExporter
             return "LossyConversionOccurred";
         case SaveWarningCode::Utf8BomIncluded:
             return "Utf8BomIncluded";
+        case SaveWarningCode::TerminalArtColorApproximationOccurred:
+            return "TerminalArtColorApproximationOccurred";
+        case SaveWarningCode::TerminalArtThemeColorApproximationOccurred:
+            return "TerminalArtThemeColorApproximationOccurred";
+        case SaveWarningCode::TerminalArtUnsupportedStyleDropped:
+            return "TerminalArtUnsupportedStyleDropped";
+        case SaveWarningCode::TerminalArtReverseApproximated:
+            return "TerminalArtReverseApproximated";
+        case SaveWarningCode::TerminalArtBoldApproximated:
+            return "TerminalArtBoldApproximated";
+        case SaveWarningCode::TerminalArtIceColorExportUsed:
+            return "TerminalArtIceColorExportUsed";
+        case SaveWarningCode::TerminalArtTrailingSpacesForced:
+            return "TerminalArtTrailingSpacesForced";
+        case SaveWarningCode::TerminalArtEncodingForcedToCp437:
+            return "TerminalArtEncodingForcedToCp437";
         default:
             return "Unknown";
         }

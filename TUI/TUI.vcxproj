@@ -161,7 +161,9 @@
     </ClInclude>
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
+    <ClInclude Include="Rendering\Objects\AnsiArtExporter.h" />
     <ClInclude Include="Rendering\Objects\AnsiLoader.h" />
+    <ClInclude Include="Rendering\Objects\BinaryArtExporter.h" />
     <ClInclude Include="Rendering\Objects\BinaryArtLoader.h" />
     <ClInclude Include="Rendering\Objects\ObjectFactory.h" />
     <ClInclude Include="Rendering\Objects\PlainTextLoader.h" />

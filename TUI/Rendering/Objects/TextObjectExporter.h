@@ -16,7 +16,9 @@ namespace TextObjectExporter
         Txt,
         Asc,
         Diz,
-        Nfo
+        Nfo,
+        Ans,
+        Bin
     };
 
     enum class Encoding
@@ -39,7 +41,16 @@ namespace TextObjectExporter
         None,
         NonCp437NfoEncodingOverride,
         LossyConversionOccurred,
-        Utf8BomIncluded
+        Utf8BomIncluded,
+
+        TerminalArtColorApproximationOccurred,
+        TerminalArtThemeColorApproximationOccurred,
+        TerminalArtUnsupportedStyleDropped,
+        TerminalArtReverseApproximated,
+        TerminalArtBoldApproximated,
+        TerminalArtIceColorExportUsed,
+        TerminalArtTrailingSpacesForced,
+        TerminalArtEncodingForcedToCp437
     };
 
     struct SourcePosition
@@ -78,6 +89,10 @@ namespace TextObjectExporter
         char replacementChar = '?';
 
         bool allowNonCp437NfoEncoding = false;
+
+        bool enableIceColors = false;
+        bool ansiEmitFinalReset = true;
+        bool allowTerminalArtApproximation = true;
     };
 
     struct SaveResult
