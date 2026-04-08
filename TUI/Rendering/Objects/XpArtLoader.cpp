@@ -1,3 +1,12 @@
+#if defined(__has_include)
+#   if __has_include(<zlib.h>)
+#       pragma message("ZLIB FOUND")
+#   else
+#       pragma message("ZLIB NOT FOUND")
+#   endif
+#endif
+
+
 #include "Rendering/Objects/XpArtLoader.h"
 
 #include <algorithm>
@@ -161,12 +170,34 @@ namespace
 
     char32_t decodeRexPaintGlyph(std::uint32_t glyph)
     {
+        if (glyph == 0u)
+        {
+            return U' ';
+        }
+
         if (glyph <= 0xFFu)
         {
             return decodeCp437Byte(static_cast<unsigned char>(glyph));
         }
 
-        return UnicodeConversion::sanitizeCodePoint(static_cast<char32_t>(glyph));
+        const char32_t codePoint = UnicodeConversion::sanitizeCodePoint(static_cast<char32_t>(glyph));
+
+        if (codePoint == U'\0')
+        {
+            return U' ';
+        }
+
+        if (codePoint > 0x10FFFFu)
+        {
+            return U' ';
+        }
+
+        if (codePoint >= 0xD800u && codePoint <= 0xDFFFu)
+        {
+            return U' ';
+        }
+
+        return codePoint;
     }
 
     bool hasVisibleGlyph(char32_t glyph)
@@ -903,7 +934,7 @@ namespace XpArtLoader
                 }
                 else if (cell.hasBackground)
                 {
-                    builder.setEmpty(x, y, style);
+                    builder.setGlyph(x, y, U' ', style);
                 }
                 else if (options.baseStyle.has_value())
                 {

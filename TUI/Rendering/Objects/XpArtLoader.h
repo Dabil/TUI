@@ -1,4 +1,3 @@
-// Rendering/Objects/XpArtLoader.h
 #pragma once
 
 #include <cstddef>
