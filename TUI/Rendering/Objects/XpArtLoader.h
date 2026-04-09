@@ -296,6 +296,28 @@ namespace XpArtLoader
         std::optional<Style> baseStyle;
     };
 
+    struct XpFrameConversionOptions
+    {
+        LoadOptions loadOptions;
+        std::optional<XpCompositeMode> compositeModeOverride;
+        std::optional<XpVisibleLayerMode> visibleLayerModeOverride;
+        std::vector<int> explicitVisibleLayerIndicesOverride;
+
+        bool isEmpty() const;
+        bool usesExplicitVisibleLayerListOverride() const;
+    };
+
+    struct ResolvedXpFrameConversion
+    {
+        std::optional<int> durationMilliseconds;
+        XpCompositeMode compositeMode = XpCompositeMode::Phase45BCompatible;
+        XpVisibleLayerMode visibleLayerMode = XpVisibleLayerMode::UseDocumentVisibility;
+        std::vector<int> explicitVisibleLayerIndices;
+
+        bool usesExplicitVisibleLayerList() const;
+        bool isValidForDocument(const XpDocument* document) const;
+    };
+
     struct LoadResult
     {
         TextObject object;
@@ -359,6 +381,32 @@ namespace XpArtLoader
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const Style& style);
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options = {});
+
+    ResolvedXpFrameConversion resolveFrameConversion(
+        const XpFrame& frame,
+        const XpSequenceMetadata* sequenceMetadata = nullptr,
+        const XpFrameConversionOptions& options = {});
+
+    LoadResult buildTextObjectFromXpDocument(
+        const ParsedDocument& document,
+        const LoadOptions& options = {});
+
+    LoadResult buildTextObjectFromXpDocument(
+        const XpDocument& document,
+        const LoadOptions& options = {});
+
+    LoadResult buildTextObjectFromXpFrame(
+        const XpFrame& frame,
+        const XpFrameConversionOptions& options = {});
+
+    LoadResult buildTextObjectFromXpFrame(
+        const XpFrame& frame,
+        const XpSequenceMetadata& sequenceMetadata,
+        const XpFrameConversionOptions& options = {});
+
+    LoadResult buildTextObjectFromXpSequence(
+        const XpSequence& sequence,
+        const XpFrameConversionOptions& options = {});
 
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options = {});
     LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options = {});
