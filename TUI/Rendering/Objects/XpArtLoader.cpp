@@ -15,11 +15,11 @@
 #include <fstream>
 #include <iterator>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
-#include <memory>
 
 #include "Rendering/Objects/TextObjectBuilder.h"
 #include "Rendering/Styles/Color.h"
