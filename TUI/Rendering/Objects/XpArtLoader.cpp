@@ -427,7 +427,7 @@ namespace
 
     XpArtLoader::XpDocument resolveFrameDocumentForFlattening(
         const XpArtLoader::XpFrame& frame,
-        const XpArtLoader::XpSequenceMetadata* sequenceMetadata)
+        const XpArtLoader::ResolvedXpFrameConversion& conversion)
     {
         const XpArtLoader::XpDocument* document = frame.getDocument();
         if (document == nullptr)
@@ -435,31 +435,42 @@ namespace
             return {};
         }
 
-        XpArtLoader::XpSequenceMetadata emptyMetadata;
-        const XpArtLoader::XpSequenceMetadata& metadata =
-            sequenceMetadata != nullptr ? *sequenceMetadata : emptyMetadata;
-
-        const XpArtLoader::XpVisibleLayerMode visibleLayerMode =
-            frame.resolveVisibleLayerMode(metadata);
-
         return applyVisibleLayerOverride(
             *document,
-            visibleLayerMode,
-            frame.overrides.explicitVisibleLayerIndices);
+            conversion.visibleLayerMode,
+            conversion.explicitVisibleLayerIndices);
     }
 
     XpArtLoader::LoadOptions resolveFrameLoadOptions(
         const XpArtLoader::LoadOptions& options,
-        const XpArtLoader::XpFrame& frame,
-        const XpArtLoader::XpSequenceMetadata* sequenceMetadata)
+        const XpArtLoader::ResolvedXpFrameConversion& conversion)
     {
         XpArtLoader::LoadOptions resolved = options;
+        resolved.compositeMode = conversion.compositeMode;
+        return resolved;
+    }
 
+    XpArtLoader::ResolvedXpFrameConversion resolveFrameConversionInternal(
+        const XpArtLoader::XpFrame& frame,
+        const XpArtLoader::XpSequenceMetadata* sequenceMetadata,
+        const XpArtLoader::XpFrameConversionOptions& options)
+    {
         XpArtLoader::XpSequenceMetadata emptyMetadata;
         const XpArtLoader::XpSequenceMetadata& metadata =
             sequenceMetadata != nullptr ? *sequenceMetadata : emptyMetadata;
 
-        resolved.compositeMode = frame.resolveCompositeMode(metadata);
+        XpArtLoader::ResolvedXpFrameConversion resolved;
+        resolved.durationMilliseconds = frame.resolveDurationMilliseconds(metadata);
+        resolved.compositeMode = options.compositeModeOverride.has_value()
+            ? *options.compositeModeOverride
+            : frame.resolveCompositeMode(metadata);
+        resolved.visibleLayerMode = options.visibleLayerModeOverride.has_value()
+            ? *options.visibleLayerModeOverride
+            : frame.resolveVisibleLayerMode(metadata);
+        resolved.explicitVisibleLayerIndices =
+            !options.explicitVisibleLayerIndicesOverride.empty()
+            ? options.explicitVisibleLayerIndicesOverride
+            : frame.resolveExplicitVisibleLayerIndices(metadata);
         return resolved;
     }
 
@@ -921,15 +932,19 @@ namespace XpArtLoader
         return sequence;
     }
 
-    LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options)
+    LoadResult buildTextObjectFromXpDocument(
+        const ParsedDocument& document,
+        const LoadOptions& options)
     {
         const XpDocument retained = buildRetainedDocument(document);
-        LoadResult result = buildTextObject(retained, options);
+        LoadResult result = buildTextObjectFromXpDocument(retained, options);
         result.parsedFormatVersion = document.formatVersion;
         return result;
     }
 
-    LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options)
+    LoadResult buildTextObjectFromXpDocument(
+        const XpDocument& document,
+        const LoadOptions& options)
     {
         LoadResult result;
         result.detectedFileType = FileType::Xp;
@@ -1064,7 +1079,26 @@ namespace XpArtLoader
         return result;
     }
 
-    LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options)
+    ResolvedXpFrameConversion resolveFrameConversion(
+        const XpFrame& frame,
+        const XpSequenceMetadata* sequenceMetadata,
+        const XpFrameConversionOptions& options)
+    {
+        return resolveFrameConversionInternal(frame, sequenceMetadata, options);
+    }
+
+    LoadResult buildTextObjectFromXpFrame(
+        const XpFrame& frame,
+        const XpFrameConversionOptions& options)
+    {
+        XpSequenceMetadata emptyMetadata;
+        return buildTextObjectFromXpFrame(frame, emptyMetadata, options);
+    }
+
+    LoadResult buildTextObjectFromXpFrame(
+        const XpFrame& frame,
+        const XpSequenceMetadata& sequenceMetadata,
+        const XpFrameConversionOptions& options)
     {
         if (!frame.isValid())
         {
@@ -1075,17 +1109,34 @@ namespace XpArtLoader
             return result;
         }
 
-        const XpDocument resolvedDocument = resolveFrameDocumentForFlattening(frame, nullptr);
-        const LoadOptions resolvedOptions = resolveFrameLoadOptions(options, frame, nullptr);
+        const ResolvedXpFrameConversion conversion =
+            resolveFrameConversion(frame, &sequenceMetadata, options);
 
-        LoadResult result = buildTextObject(resolvedDocument, resolvedOptions);
+        if (!conversion.isValidForDocument(frame.getDocument()))
+        {
+            LoadResult result;
+            result.success = false;
+            result.detectedFileType = FileType::Xp;
+            result.errorMessage = "Resolved XP frame conversion policy is invalid for the retained XP document.";
+            return result;
+        }
+
+        const XpDocument resolvedDocument =
+            resolveFrameDocumentForFlattening(frame, conversion);
+        const LoadOptions resolvedOptions =
+            resolveFrameLoadOptions(options.loadOptions, conversion);
+
+        LoadResult result = buildTextObjectFromXpDocument(resolvedDocument, resolvedOptions);
         result.retainedSequence = buildRetainedSequence(frame);
         result.hasRetainedSequence = result.retainedSequence.isValid();
         result.resolvedFrameCount = result.retainedSequence.getFrameCount();
+        result.compositeModeUsed = conversion.compositeMode;
         return result;
     }
 
-    LoadResult buildTextObject(const XpSequence& sequence, const LoadOptions& options)
+    LoadResult buildTextObjectFromXpSequence(
+        const XpSequence& sequence,
+        const XpFrameConversionOptions& options)
     {
         if (!sequence.isValid())
         {
@@ -1106,16 +1157,38 @@ namespace XpArtLoader
             return result;
         }
 
-        const XpDocument resolvedDocument =
-            resolveFrameDocumentForFlattening(*frame, &sequence.metadata);
-        const LoadOptions resolvedOptions =
-            resolveFrameLoadOptions(options, *frame, &sequence.metadata);
-
-        LoadResult result = buildTextObject(resolvedDocument, resolvedOptions);
+        LoadResult result = buildTextObjectFromXpFrame(
+            *frame,
+            sequence.metadata,
+            options);
         result.retainedSequence = sequence;
         result.hasRetainedSequence = result.retainedSequence.isValid();
         result.resolvedFrameCount = result.retainedSequence.getFrameCount();
         return result;
+    }
+
+    LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options)
+    {
+        return buildTextObjectFromXpDocument(document, options);
+    }
+
+    LoadResult buildTextObject(const XpDocument& document, const LoadOptions& options)
+    {
+        return buildTextObjectFromXpDocument(document, options);
+    }
+
+    LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options)
+    {
+        XpFrameConversionOptions conversionOptions;
+        conversionOptions.loadOptions = options;
+        return buildTextObjectFromXpFrame(frame, conversionOptions);
+    }
+
+    LoadResult buildTextObject(const XpSequence& sequence, const LoadOptions& options)
+    {
+        XpFrameConversionOptions conversionOptions;
+        conversionOptions.loadOptions = options;
+        return buildTextObjectFromXpSequence(sequence, conversionOptions);
     }
 
     LoadResult loadFromBytes(std::string_view bytes, const LoadOptions& options)
@@ -1528,6 +1601,46 @@ namespace XpArtLoader
 
             return true;
         }
+    }
+
+    bool XpFrameConversionOptions::isEmpty() const
+    {
+        return !compositeModeOverride.has_value() &&
+            !visibleLayerModeOverride.has_value() &&
+            explicitVisibleLayerIndicesOverride.empty();
+    }
+
+    bool XpFrameConversionOptions::usesExplicitVisibleLayerListOverride() const
+    {
+        return visibleLayerModeOverride.has_value() &&
+            *visibleLayerModeOverride == XpVisibleLayerMode::UseExplicitVisibleLayerList;
+    }
+
+    bool ResolvedXpFrameConversion::usesExplicitVisibleLayerList() const
+    {
+        return visibleLayerMode == XpVisibleLayerMode::UseExplicitVisibleLayerList;
+    }
+
+    bool ResolvedXpFrameConversion::isValidForDocument(const XpDocument* document) const
+    {
+        if (durationMilliseconds.has_value() && *durationMilliseconds < 0)
+        {
+            return false;
+        }
+
+        if (!explicitVisibleLayerIndices.empty() &&
+            !areVisibleLayerIndicesValid(explicitVisibleLayerIndices, document))
+        {
+            return false;
+        }
+
+        if (usesExplicitVisibleLayerList() &&
+            !areVisibleLayerIndicesValid(explicitVisibleLayerIndices, document))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     bool XpFrameOverrides::isEmpty() const
