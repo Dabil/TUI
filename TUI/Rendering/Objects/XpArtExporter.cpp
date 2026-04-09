@@ -795,13 +795,20 @@ namespace
                 return false;
             }
 
+            const XpArtLoader::XpDocument* frameDocument = frame.getDocument();
+            if (frameDocument == nullptr)
+            {
+                ioResult.errorMessage = "Retained XP sequence contains a frame with no document.";
+                return false;
+            }
+
             XpArtExporter::RetainedExportOptions frameOptions = options;
             frameOptions.mode = XpArtExporter::RetainedExportMode::LayeredXp;
             frameOptions.includeHiddenLayers = true;
             frameOptions.allowHiddenLayerVisibilityLoss = true;
 
             SaveResult frameSaveResult;
-            if (!XpArtExporter::exportToBytes(frame.document, frameOptions, frameSaveResult))
+            if (!XpArtExporter::exportToBytes(*frameDocument, frameOptions, frameSaveResult))
             {
                 ioResult.errorMessage = frameSaveResult.errorMessage.empty()
                     ? "Failed to serialize an XP frame while building the sequence container."
@@ -812,17 +819,17 @@ namespace
             const std::string labelBytes = frame.label;
             const std::uint32_t flags =
                 (labelBytes.empty() ? 0u : kFrameFlagHasLabel) |
-                (documentHasHiddenLayers(frame.document) ? kFrameFlagHasHiddenLayers : 0u);
+                (documentHasHiddenLayers(*frameDocument) ? kFrameFlagHasHiddenLayers : 0u);
 
             appendLe32(outBytes, static_cast<std::uint32_t>(frame.frameIndex));
-            appendLe32(outBytes, static_cast<std::uint32_t>(frame.document.width));
-            appendLe32(outBytes, static_cast<std::uint32_t>(frame.document.height));
-            appendLe32(outBytes, static_cast<std::uint32_t>(frame.document.layers.size()));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frameDocument->width));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frameDocument->height));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frameDocument->layers.size()));
             appendLe32(outBytes, static_cast<std::uint32_t>(labelBytes.size()));
             appendLe32(outBytes, static_cast<std::uint32_t>(frameSaveResult.bytes.size()));
             appendLe32(outBytes, flags);
 
-            for (const XpArtLoader::XpLayer& layer : frame.document.layers)
+            for (const XpArtLoader::XpLayer& layer : frameDocument->layers)
             {
                 outBytes.push_back(static_cast<char>(layer.visible ? 1 : 0));
             }
@@ -1219,7 +1226,14 @@ namespace XpArtExporter
                 return false;
             }
 
-            return exportToBytes(sequence.frames.front().document, options, ioResult);
+            const XpArtLoader::XpDocument* frameDocument = sequence.frames.front().getDocument();
+            if (frameDocument == nullptr)
+            {
+                ioResult.errorMessage = "Retained XP sequence contains a frame with no document.";
+                return false;
+            }
+
+            return exportToBytes(*frameDocument, options, ioResult);
         }
 
         if (options.mode == RetainedExportMode::FramePerFile)
@@ -1349,9 +1363,16 @@ namespace XpArtExporter
 
         for (const XpArtLoader::XpFrame& frame : sequence.frames)
         {
+            const XpArtLoader::XpDocument* frameDocument = frame.getDocument();
+            if (frameDocument == nullptr)
+            {
+                outResult.saveResult.errorMessage = "Retained XP sequence contains a frame with no document.";
+                return false;
+            }
+
             TextObjectExporter::SaveResult frameResult;
             const std::string framePath = buildFrameFilePath(baseFilePath, options, frame.frameIndex);
-            if (!saveToFile(frame.document, framePath, perFrameOptions, frameResult))
+            if (!saveToFile(*frameDocument, framePath, perFrameOptions, frameResult))
             {
                 outResult.saveResult = frameResult;
                 outResult.saveResult.outputPath = framePath;
