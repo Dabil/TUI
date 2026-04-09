@@ -7,6 +7,11 @@
 
 namespace XpSequenceLoader
 {
+    /*
+        .xpseq is the manifest-first retained XP sequence format for the
+        current roadmap stage. The manifest is UTF-8 text and each frame
+        continues to load through the existing .xp retained-document loader.
+    */
     enum class DiagnosticCode
     {
         None,

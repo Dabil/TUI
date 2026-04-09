@@ -1,7 +1,9 @@
 #include "Rendering/Objects/XpArtExporter.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cstdint>
+#include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <limits>
@@ -37,6 +39,7 @@ namespace
     constexpr std::uint32_t kSequenceFormatVersion = 1u;
     constexpr std::uint32_t kFrameFlagHasLabel = 0x01u;
     constexpr std::uint32_t kFrameFlagHasHiddenLayers = 0x02u;
+    constexpr int kXpSeqManifestVersion = 1;
 
     XpArtExporter::XpColor makeColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
     {
@@ -694,26 +697,192 @@ namespace
         const XpArtExporter::RetainedExportOptions& options,
         int frameIndex)
     {
-        std::string stem = baseFilePath;
-        const std::size_t dot = stem.find_last_of('.');
-        if (dot != std::string::npos)
-        {
-            const std::string ext = stem.substr(dot);
-            if (ext == ".xp")
-            {
-                stem.erase(dot);
-            }
-        }
+        const std::filesystem::path basePath(baseFilePath);
+        const std::filesystem::path parentPath = basePath.has_parent_path()
+            ? basePath.parent_path()
+            : std::filesystem::path();
+        const std::string stem = basePath.stem().string();
 
-        std::ostringstream stream;
-        stream
+        std::ostringstream fileName;
+        fileName
             << stem
             << options.frameFileSeparator
             << std::setw(std::max(1, options.frameNumberWidth))
             << std::setfill('0')
             << frameIndex
             << ".xp";
-        return stream.str();
+
+        return (parentPath / fileName.str()).lexically_normal().string();
+    }
+
+    bool hasXpSeqExtension(const std::string& filePath)
+    {
+        return std::filesystem::path(filePath).extension() == ".xpseq";
+    }
+
+    std::string quoteManifestValue(const std::string& value)
+    {
+        bool needsQuotes = value.empty();
+        for (char ch : value)
+        {
+            if (std::isspace(static_cast<unsigned char>(ch)) || ch == '"')
+            {
+                needsQuotes = true;
+                break;
+            }
+        }
+
+        if (!needsQuotes)
+        {
+            return value;
+        }
+
+        std::string sanitized = value;
+        std::replace(sanitized.begin(), sanitized.end(), '"', '\'');
+        return std::string("\"") + sanitized + "\"";
+    }
+
+    std::string makeManifestSourcePath(
+        const std::filesystem::path& manifestPath,
+        const std::filesystem::path& framePath)
+    {
+        std::error_code error;
+        const std::filesystem::path relative =
+            std::filesystem::relative(framePath, manifestPath.parent_path(), error);
+
+        if (!error && !relative.empty())
+        {
+            return relative.generic_string();
+        }
+
+        return framePath.lexically_normal().generic_string();
+    }
+
+    void appendManifestDefaults(
+        std::ostringstream& stream,
+        const XpArtLoader::XpSequenceMetadata& metadata)
+    {
+        if (!metadata.sequenceLabel.empty())
+        {
+            stream << "sequence_label=" << quoteManifestValue(metadata.sequenceLabel) << "\n";
+        }
+
+        if (metadata.defaultFrameDurationMilliseconds.has_value())
+        {
+            stream << "default_duration_ms="
+                << *metadata.defaultFrameDurationMilliseconds
+                << "\n";
+        }
+
+        if (metadata.defaultCompositeMode.has_value())
+        {
+            stream << "default_composite="
+                << XpArtLoader::toString(*metadata.defaultCompositeMode)
+                << "\n";
+        }
+
+        if (metadata.defaultVisibleLayerMode.has_value())
+        {
+            stream << "default_visible_layers="
+                << XpArtLoader::toString(*metadata.defaultVisibleLayerMode)
+                << "\n";
+        }
+    }
+
+    bool serializeSequenceManifest(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const XpArtExporter::RetainedExportOptions& options,
+        SaveResult& ioResult,
+        std::string& outBytes)
+    {
+        outBytes.clear();
+
+        if (!sequence.isValid())
+        {
+            ioResult.errorMessage = "Cannot export an invalid retained XP sequence.";
+            return false;
+        }
+
+        if (manifestFilePath.empty())
+        {
+            ioResult.errorMessage = "Manifest-first sequence export requires a concrete .xpseq file path.";
+            return false;
+        }
+
+        if (!hasXpSeqExtension(manifestFilePath))
+        {
+            ioResult.errorMessage = "Manifest-first sequence export requires a .xpseq output path.";
+            return false;
+        }
+
+        const std::filesystem::path manifestPath =
+            std::filesystem::path(manifestFilePath).lexically_normal();
+
+        std::ostringstream stream;
+        stream << "xpseq " << kXpSeqManifestVersion << "\n";
+        appendManifestDefaults(stream, sequence.metadata);
+
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            if (!frame.isValid())
+            {
+                ioResult.errorMessage = "Retained XP sequence contains an invalid frame.";
+                return false;
+            }
+
+            const std::string frameFilePath =
+                buildFrameFilePath(manifestPath.string(), options, frame.frameIndex);
+            const std::string manifestSourcePath =
+                makeManifestSourcePath(manifestPath, std::filesystem::path(frameFilePath));
+
+            stream << "frame"
+                << " index=" << frame.frameIndex
+                << " source=" << quoteManifestValue(manifestSourcePath);
+
+            if (!frame.label.empty())
+            {
+                stream << " label=" << quoteManifestValue(frame.label);
+            }
+
+            if (frame.overrides.durationMilliseconds.has_value())
+            {
+                stream << " duration_ms=" << *frame.overrides.durationMilliseconds;
+            }
+
+            if (frame.overrides.compositeMode.has_value())
+            {
+                stream << " composite="
+                    << XpArtLoader::toString(*frame.overrides.compositeMode);
+            }
+
+            if (frame.overrides.visibleLayerMode.has_value())
+            {
+                stream << " visible_layers="
+                    << XpArtLoader::toString(*frame.overrides.visibleLayerMode);
+            }
+
+            if (!frame.overrides.explicitVisibleLayerIndices.empty())
+            {
+                stream << " explicit_visible_layers=";
+                for (std::size_t index = 0; index < frame.overrides.explicitVisibleLayerIndices.size(); ++index)
+                {
+                    if (index > 0)
+                    {
+                        stream << ',';
+                    }
+                    stream << frame.overrides.explicitVisibleLayerIndices[index];
+                }
+            }
+
+            stream << "\n";
+        }
+
+        outBytes = stream.str();
+        ioResult.resolvedEncoding = Encoding::Utf8;
+        ioResult.usedUtf8Bom = false;
+        ioResult.success = true;
+        return true;
     }
 
     bool validateRetainedDocumentForLayeredXp(
@@ -738,7 +907,7 @@ namespace
             !options.allowHiddenLayerVisibilityLoss)
         {
             ioResult.errorMessage =
-                "Layered .xp export cannot preserve retained hidden-layer visibility. Set allowHiddenLayerVisibilityLoss to true to export hidden layers as ordinary visible XP layers, or choose FlattenedXp / SequenceContainer instead.";
+                "Layered .xp export cannot preserve retained hidden-layer visibility. Set allowHiddenLayerVisibilityLoss to true to export hidden layers as ordinary visible XP layers, or choose FlattenedXp / XpSequenceManifest instead.";
             return false;
         }
 
@@ -1215,14 +1384,14 @@ namespace XpArtExporter
             if (sequence.getFrameCount() != 1)
             {
                 ioResult.errorMessage =
-                    "Single-document XP export cannot represent more than one frame. Use SequenceContainer or FramePerFile for multi-frame retained XP content.";
+                    "Single-document XP export cannot represent more than one frame. Use XpSequenceManifest or FramePerFile for multi-frame retained XP content.";
                 return false;
             }
 
             if (sequenceHasAnyFrameLabels(sequence) && !options.allowFrameMetadataLoss)
             {
                 ioResult.errorMessage =
-                    "Single-document XP export would drop retained frame labels or sequence metadata. Set allowFrameMetadataLoss to true or use SequenceContainer instead.";
+                    "Single-document XP export would drop retained frame labels or sequence metadata. Set allowFrameMetadataLoss to true or use XpSequenceManifest instead.";
                 return false;
             }
 
@@ -1242,6 +1411,21 @@ namespace XpArtExporter
             return false;
         }
 
+        if (options.mode == RetainedExportMode::XpSequenceManifest)
+        {
+            ioResult.errorMessage =
+                "Manifest-first .xpseq export writes a UTF-8 manifest plus external .xp frame files and must use saveSequenceToManifestFile() or saveSequenceToFile() with a .xpseq path.";
+            return false;
+        }
+
+        if (options.mode != RetainedExportMode::ExperimentalBinarySequenceContainerInternal ||
+            !options.allowExperimentalBinarySequenceContainer)
+        {
+            ioResult.errorMessage =
+                "Binary sequence container export is deferred. The active source-sequence architecture is manifest-first .xpseq.";
+            return false;
+        }
+
         if (!serializeSequenceContainer(sequence, options, ioResult, ioResult.bytes))
         {
             return false;
@@ -1249,6 +1433,27 @@ namespace XpArtExporter
 
         ioResult.resolvedEncoding = TextObjectExporter::Encoding::Binary;
         ioResult.success = true;
+        return true;
+    }
+
+    bool exportSequenceManifestToBytes(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& ioResult)
+    {
+        if (options.mode != RetainedExportMode::XpSequenceManifest)
+        {
+            ioResult.errorMessage = "exportSequenceManifestToBytes() requires RetainedExportMode::XpSequenceManifest.";
+            return false;
+        }
+
+        if (!serializeSequenceManifest(sequence, manifestFilePath, options, ioResult, ioResult.bytes))
+        {
+            return false;
+        }
+
+        ioResult.outputPath = manifestFilePath;
         return true;
     }
 
@@ -1296,6 +1501,16 @@ namespace XpArtExporter
         TextObjectExporter::SaveResult& outResult)
     {
         outResult = TextObjectExporter::SaveResult{};
+
+        if (options.mode == RetainedExportMode::XpSequenceManifest)
+        {
+            RetainedExportResult manifestResult;
+            const bool success = saveSequenceToManifestFile(sequence, filePath, options, manifestResult);
+            outResult = manifestResult.saveResult;
+            outResult.outputPath = filePath;
+            return success;
+        }
+
         if (!exportSequenceToBytes(sequence, options, outResult))
         {
             outResult.outputPath = filePath;
@@ -1323,6 +1538,106 @@ namespace XpArtExporter
         }
 
         outResult.outputPath = filePath;
+        return true;
+    }
+
+    bool saveSequenceToManifestFile(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const RetainedExportOptions& options,
+        RetainedExportResult& outResult)
+    {
+        outResult = RetainedExportResult{};
+
+        if (options.mode != RetainedExportMode::XpSequenceManifest)
+        {
+            outResult.saveResult.errorMessage =
+                "saveSequenceToManifestFile() requires RetainedExportMode::XpSequenceManifest.";
+            outResult.saveResult.outputPath = manifestFilePath;
+            return false;
+        }
+
+        if (!sequence.isValid())
+        {
+            outResult.saveResult.errorMessage = "Cannot export an invalid retained XP sequence.";
+            outResult.saveResult.outputPath = manifestFilePath;
+            return false;
+        }
+
+        if (!hasXpSeqExtension(manifestFilePath))
+        {
+            outResult.saveResult.errorMessage = "Manifest-first sequence export requires a .xpseq output path.";
+            outResult.saveResult.outputPath = manifestFilePath;
+            return false;
+        }
+
+        RetainedExportOptions perFrameOptions = options;
+        perFrameOptions.mode = RetainedExportMode::LayeredXp;
+        perFrameOptions.includeHiddenLayers = true;
+        perFrameOptions.allowHiddenLayerVisibilityLoss = true;
+
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            const XpArtLoader::XpDocument* frameDocument = frame.getDocument();
+            if (frameDocument == nullptr)
+            {
+                outResult.saveResult.errorMessage = "Retained XP sequence contains a frame with no document.";
+                outResult.saveResult.outputPath = manifestFilePath;
+                return false;
+            }
+
+            const std::string framePath = buildFrameFilePath(manifestFilePath, options, frame.frameIndex);
+
+            TextObjectExporter::SaveResult frameResult;
+            if (!saveToFile(*frameDocument, framePath, perFrameOptions, frameResult))
+            {
+                outResult.saveResult = frameResult;
+                outResult.saveResult.outputPath = framePath;
+                return false;
+            }
+
+            FrameFileRecord record;
+            record.frameIndex = frame.frameIndex;
+            record.label = frame.label;
+            record.path = framePath;
+            outResult.frameFiles.push_back(std::move(record));
+        }
+
+        TextObjectExporter::SaveResult manifestSaveResult;
+        if (!exportSequenceManifestToBytes(sequence, manifestFilePath, options, manifestSaveResult))
+        {
+            outResult.saveResult = manifestSaveResult;
+            outResult.saveResult.outputPath = manifestFilePath;
+            return false;
+        }
+
+        std::ofstream file(manifestFilePath, std::ios::binary);
+        if (!file)
+        {
+            outResult.saveResult = manifestSaveResult;
+            outResult.saveResult.success = false;
+            outResult.saveResult.errorMessage = "Failed to open .xpseq manifest output file for writing.";
+            outResult.saveResult.outputPath = manifestFilePath;
+            outResult.saveResult.bytes.clear();
+            return false;
+        }
+
+        file.write(
+            manifestSaveResult.bytes.data(),
+            static_cast<std::streamsize>(manifestSaveResult.bytes.size()));
+        if (!file)
+        {
+            outResult.saveResult = manifestSaveResult;
+            outResult.saveResult.success = false;
+            outResult.saveResult.errorMessage = "Failed while writing .xpseq manifest output bytes.";
+            outResult.saveResult.outputPath = manifestFilePath;
+            outResult.saveResult.bytes.clear();
+            return false;
+        }
+
+        outResult.saveResult = manifestSaveResult;
+        outResult.saveResult.outputPath = manifestFilePath;
+        outResult.saveResult.success = true;
         return true;
     }
 
@@ -1401,10 +1716,12 @@ namespace XpArtExporter
             return "LayeredXp";
         case RetainedExportMode::FlattenedXp:
             return "FlattenedXp";
-        case RetainedExportMode::SequenceContainer:
-            return "SequenceContainer";
+        case RetainedExportMode::XpSequenceManifest:
+            return "XpSequenceManifest";
         case RetainedExportMode::FramePerFile:
             return "FramePerFile";
+        case RetainedExportMode::ExperimentalBinarySequenceContainerInternal:
+            return "ExperimentalBinarySequenceContainerInternal";
         default:
             return "Unknown";
         }

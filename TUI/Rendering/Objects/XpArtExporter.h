@@ -43,17 +43,30 @@ namespace XpArtExporter
         bool isValid() const;
     };
 
+    /*
+        Manifest-first retained XP export policy:
+
+        - XpSequenceManifest is the canonical source-sequence format for the
+          current roadmap stage.
+        - A .xpseq file is UTF-8 manifest text that references external .xp
+          frame files.
+        - Single-file binary sequence containers are deferred future work.
+          They remain available only behind an explicit internal/experimental
+          mode so the public architecture stays aligned with manifest-first
+          development.
+    */
     enum class RetainedExportMode
     {
         LayeredXp,
         FlattenedXp,
-        SequenceContainer,
-        FramePerFile
+        XpSequenceManifest,
+        FramePerFile,
+        ExperimentalBinarySequenceContainerInternal
     };
 
     struct RetainedExportOptions
     {
-        RetainedExportMode mode = RetainedExportMode::SequenceContainer;
+        RetainedExportMode mode = RetainedExportMode::XpSequenceManifest;
         TextObjectExporter::SaveOptions xpSaveOptions;
 
         XpArtLoader::XpCompositeMode flattenCompositeMode =
@@ -65,6 +78,12 @@ namespace XpArtExporter
 
         std::string frameFileSeparator = "_frame_";
         int frameNumberWidth = 4;
+
+        /*
+            Non-default quarantine switch for deferred experimental work.
+            Do not enable this in the active manifest-first pipeline.
+        */
+        bool allowExperimentalBinarySequenceContainer = false;
     };
 
     struct FrameFileRecord
@@ -117,6 +136,12 @@ namespace XpArtExporter
         const RetainedExportOptions& options,
         TextObjectExporter::SaveResult& ioResult);
 
+    bool exportSequenceManifestToBytes(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& ioResult);
+
     bool saveToFile(
         const XpArtLoader::XpDocument& document,
         const std::string& filePath,
@@ -128,6 +153,12 @@ namespace XpArtExporter
         const std::string& filePath,
         const RetainedExportOptions& options,
         TextObjectExporter::SaveResult& outResult);
+
+    bool saveSequenceToManifestFile(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const RetainedExportOptions& options,
+        RetainedExportResult& outResult);
 
     bool saveSequenceToFrameFiles(
         const XpArtLoader::XpSequence& sequence,
