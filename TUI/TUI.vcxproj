@@ -212,7 +212,6 @@
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
-    <ClInclude Include="Screens\PffFieldScreen.h" />
     <ClInclude Include="Screens\RendererDiagnosticsScreen.h" />
     <ClInclude Include="Screens\Screen.h" />
     <ClInclude Include="Screens\ShowcaseScreen.h" />
@@ -294,7 +293,6 @@
     </ClCompile>
     <ClCompile Include="Screens\Donut3DScreen.cpp" />
     <ClCompile Include="Screens\FireScreen.cpp" />
-    <ClCompile Include="Screens\PffFieldScreen.cpp" />
     <ClCompile Include="Screens\RendererDiagnosticsScreen.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
     <ClCompile Include="Screens\TerminalCapabilitiesScreen.cpp" />
