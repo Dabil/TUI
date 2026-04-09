@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <fstream>
 #include <iomanip>
 #include <limits>
 #include <optional>
@@ -31,6 +32,11 @@
 namespace
 {
     using namespace TextObjectExporter;
+
+    constexpr char kSequenceMagic[8] = { 'T', 'U', 'I', 'X', 'P', 'S', 'Q', '1' };
+    constexpr std::uint32_t kSequenceFormatVersion = 1u;
+    constexpr std::uint32_t kFrameFlagHasLabel = 0x01u;
+    constexpr std::uint32_t kFrameFlagHasHiddenLayers = 0x02u;
 
     XpArtExporter::XpColor makeColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
     {
@@ -70,7 +76,7 @@ namespace
     {
         for (const SaveWarning& warning : result.warnings)
         {
-            if (warning.code == code)
+            if (warning.code == code && warning.message == message)
             {
                 return;
             }
@@ -132,6 +138,11 @@ namespace
         bytes.push_back(static_cast<char>((value >> 8) & 0xFF));
         bytes.push_back(static_cast<char>((value >> 16) & 0xFF));
         bytes.push_back(static_cast<char>((value >> 24) & 0xFF));
+    }
+
+    void appendBytes(std::string& bytes, const char* data, std::size_t size)
+    {
+        bytes.append(data, size);
     }
 
     XpArtExporter::XpColor colorToXpColor(const Color& color)
@@ -579,6 +590,250 @@ namespace
         }
     }
 
+    bool convertRetainedLayerCell(
+        const XpArtLoader::XpLayerCell& sourceCell,
+        XpArtExporter::XpCell& outCell)
+    {
+        outCell.glyph = sourceCell.glyph;
+        outCell.foreground = makeColor(
+            sourceCell.foreground.red,
+            sourceCell.foreground.green,
+            sourceCell.foreground.blue);
+        outCell.background = makeColor(
+            sourceCell.background.red,
+            sourceCell.background.green,
+            sourceCell.background.blue);
+        return true;
+    }
+
+    bool buildLayerFromRetainedLayer(
+        const XpArtLoader::XpLayer& sourceLayer,
+        XpArtExporter::XpLayer& outLayer)
+    {
+        if (!sourceLayer.isValid())
+        {
+            return false;
+        }
+
+        bool countOk = false;
+        const std::size_t cellCount = checkedCellCount(sourceLayer.width, sourceLayer.height, countOk);
+        if (!countOk)
+        {
+            return false;
+        }
+
+        outLayer = XpArtExporter::XpLayer{};
+        outLayer.width = sourceLayer.width;
+        outLayer.height = sourceLayer.height;
+        outLayer.cells.resize(cellCount);
+
+        for (int y = 0; y < sourceLayer.height; ++y)
+        {
+            for (int x = 0; x < sourceLayer.width; ++x)
+            {
+                const XpArtLoader::XpLayerCell* cell = sourceLayer.tryGetCell(x, y);
+                if (cell == nullptr)
+                {
+                    return false;
+                }
+
+                XpArtExporter::XpCell converted;
+                if (!convertRetainedLayerCell(*cell, converted))
+                {
+                    return false;
+                }
+
+                outLayer.cells[static_cast<std::size_t>(layerIndex(x, y, outLayer.height))] = converted;
+            }
+        }
+
+        return outLayer.isValid();
+    }
+
+    bool sequenceHasAnyFrameLabels(const XpArtLoader::XpSequence& sequence)
+    {
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            if (!frame.label.empty())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    bool documentHasHiddenLayers(const XpArtLoader::XpDocument& document)
+    {
+        for (const XpArtLoader::XpLayer& layer : document.layers)
+        {
+            if (!layer.visible)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    int countVisibleLayers(const XpArtLoader::XpDocument& document)
+    {
+        int count = 0;
+        for (const XpArtLoader::XpLayer& layer : document.layers)
+        {
+            if (layer.visible)
+            {
+                ++count;
+            }
+        }
+        return count;
+    }
+
+    std::string buildFrameFilePath(
+        const std::string& baseFilePath,
+        const XpArtExporter::RetainedExportOptions& options,
+        int frameIndex)
+    {
+        std::string stem = baseFilePath;
+        const std::size_t dot = stem.find_last_of('.');
+        if (dot != std::string::npos)
+        {
+            const std::string ext = stem.substr(dot);
+            if (ext == ".xp")
+            {
+                stem.erase(dot);
+            }
+        }
+
+        std::ostringstream stream;
+        stream
+            << stem
+            << options.frameFileSeparator
+            << std::setw(std::max(1, options.frameNumberWidth))
+            << std::setfill('0')
+            << frameIndex
+            << ".xp";
+        return stream.str();
+    }
+
+    bool validateRetainedDocumentForLayeredXp(
+        const XpArtLoader::XpDocument& document,
+        const XpArtExporter::RetainedExportOptions& options,
+        SaveResult& ioResult)
+    {
+        if (!document.isValid())
+        {
+            ioResult.errorMessage = "Cannot export an invalid retained XP document.";
+            return false;
+        }
+
+        if (document.layers.empty())
+        {
+            ioResult.errorMessage = "Cannot export a retained XP document with no layers.";
+            return false;
+        }
+
+        if (documentHasHiddenLayers(document) &&
+            options.includeHiddenLayers &&
+            !options.allowHiddenLayerVisibilityLoss)
+        {
+            ioResult.errorMessage =
+                "Layered .xp export cannot preserve retained hidden-layer visibility. Set allowHiddenLayerVisibilityLoss to true to export hidden layers as ordinary visible XP layers, or choose FlattenedXp / SequenceContainer instead.";
+            return false;
+        }
+
+        return true;
+    }
+
+    bool flattenRetainedDocumentToTextObject(
+        const XpArtLoader::XpDocument& document,
+        const XpArtExporter::RetainedExportOptions& options,
+        SaveResult& ioResult,
+        TextObject& outObject)
+    {
+        XpArtLoader::LoadOptions loadOptions;
+        loadOptions.flattenLayers = true;
+        loadOptions.compositeMode = options.flattenCompositeMode;
+
+        XpArtLoader::LoadResult flattened = XpArtLoader::buildTextObject(document, loadOptions);
+        if (!flattened.success)
+        {
+            ioResult.errorMessage = flattened.errorMessage.empty()
+                ? "Failed to flatten retained XP document before export."
+                : flattened.errorMessage;
+            return false;
+        }
+
+        outObject = flattened.object;
+        return true;
+    }
+
+    bool serializeSequenceContainer(
+        const XpArtLoader::XpSequence& sequence,
+        const XpArtExporter::RetainedExportOptions& options,
+        SaveResult& ioResult,
+        std::string& outBytes)
+    {
+        outBytes.clear();
+
+        if (!sequence.isValid())
+        {
+            ioResult.errorMessage = "Cannot export an invalid retained XP sequence.";
+            return false;
+        }
+
+        appendBytes(outBytes, kSequenceMagic, sizeof(kSequenceMagic));
+        appendLe32(outBytes, kSequenceFormatVersion);
+        appendLe32(outBytes, static_cast<std::uint32_t>(sequence.frames.size()));
+        appendLe32(outBytes, static_cast<std::uint32_t>(options.flattenCompositeMode));
+
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            if (!frame.isValid())
+            {
+                ioResult.errorMessage = "Retained XP sequence contains an invalid frame.";
+                return false;
+            }
+
+            XpArtExporter::RetainedExportOptions frameOptions = options;
+            frameOptions.mode = XpArtExporter::RetainedExportMode::LayeredXp;
+            frameOptions.includeHiddenLayers = true;
+            frameOptions.allowHiddenLayerVisibilityLoss = true;
+
+            SaveResult frameSaveResult;
+            if (!XpArtExporter::exportToBytes(frame.document, frameOptions, frameSaveResult))
+            {
+                ioResult.errorMessage = frameSaveResult.errorMessage.empty()
+                    ? "Failed to serialize an XP frame while building the sequence container."
+                    : frameSaveResult.errorMessage;
+                return false;
+            }
+
+            const std::string labelBytes = frame.label;
+            const std::uint32_t flags =
+                (labelBytes.empty() ? 0u : kFrameFlagHasLabel) |
+                (documentHasHiddenLayers(frame.document) ? kFrameFlagHasHiddenLayers : 0u);
+
+            appendLe32(outBytes, static_cast<std::uint32_t>(frame.frameIndex));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frame.document.width));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frame.document.height));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frame.document.layers.size()));
+            appendLe32(outBytes, static_cast<std::uint32_t>(labelBytes.size()));
+            appendLe32(outBytes, static_cast<std::uint32_t>(frameSaveResult.bytes.size()));
+            appendLe32(outBytes, flags);
+
+            for (const XpArtLoader::XpLayer& layer : frame.document.layers)
+            {
+                outBytes.push_back(static_cast<char>(layer.visible ? 1 : 0));
+            }
+
+            outBytes.append(labelBytes);
+            outBytes.append(frameSaveResult.bytes);
+        }
+
+        return true;
+    }
+
 #if TUI_XP_ART_EXPORTER_HAS_ZLIB
     bool gzipCompress(std::string_view payloadBytes, std::string& outCompressedBytes)
     {
@@ -719,6 +974,87 @@ namespace XpArtExporter
         return outDocument.isValid();
     }
 
+    bool buildDocument(
+        const XpArtLoader::XpDocument& document,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& ioResult,
+        XpDocument& outDocument)
+    {
+        outDocument = XpDocument{};
+
+        if (options.mode == RetainedExportMode::FlattenedXp)
+        {
+            TextObject flattened;
+            if (!flattenRetainedDocumentToTextObject(document, options, ioResult, flattened))
+            {
+                return false;
+            }
+
+            if (document.layers.size() > 1)
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::LossyConversionOccurred,
+                    "Flattened XP export collapsed retained layer structure into one visible XP layer by explicit request.");
+            }
+
+            return buildDocument(flattened, options.xpSaveOptions, ioResult, outDocument);
+        }
+
+        if (!validateRetainedDocumentForLayeredXp(document, options, ioResult))
+        {
+            return false;
+        }
+
+        outDocument.formatVersion = document.formatVersion > 0 ? document.formatVersion : 1;
+        outDocument.canvasWidth = document.width;
+        outDocument.canvasHeight = document.height;
+
+        for (const XpArtLoader::XpLayer& sourceLayer : document.layers)
+        {
+            if (!sourceLayer.visible && !options.includeHiddenLayers)
+            {
+                continue;
+            }
+
+            XpLayer exportedLayer;
+            if (!buildLayerFromRetainedLayer(sourceLayer, exportedLayer))
+            {
+                ioResult.errorMessage = "Retained XP document contains an invalid layer that could not be exported.";
+                return false;
+            }
+
+            outDocument.layers.push_back(std::move(exportedLayer));
+        }
+
+        if (outDocument.layers.empty())
+        {
+            ioResult.errorMessage =
+                options.includeHiddenLayers
+                ? "Retained XP export produced no layers."
+                : "Retained XP export excluded all layers because they were hidden.";
+            return false;
+        }
+
+        if (!options.includeHiddenLayers && countVisibleLayers(document) != static_cast<int>(outDocument.layers.size()))
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "Layered XP export omitted one or more hidden retained layers by explicit request.");
+        }
+
+        if (documentHasHiddenLayers(document) && options.includeHiddenLayers)
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "Layered .xp export wrote hidden retained layers as ordinary XP layers because native .xp does not preserve visibility state.");
+        }
+
+        return outDocument.isValid();
+    }
+
     bool serializeDocument(
         const XpDocument& document,
         TextObjectExporter::SaveResult& ioResult,
@@ -825,5 +1161,231 @@ namespace XpArtExporter
 
         ioResult.success = true;
         return true;
+    }
+
+    bool exportToBytes(
+        const XpArtLoader::XpDocument& document,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& ioResult)
+    {
+        XpDocument exported;
+        if (!buildDocument(document, options, ioResult, exported))
+        {
+            return false;
+        }
+
+        std::string payloadBytes;
+        if (!serializeDocument(exported, ioResult, payloadBytes))
+        {
+            return false;
+        }
+
+        if (!compressSerializedDocument(payloadBytes, ioResult, ioResult.bytes))
+        {
+            return false;
+        }
+
+        ioResult.resolvedFileType = TextObjectExporter::FileType::Xp;
+        ioResult.resolvedEncoding = TextObjectExporter::Encoding::Binary;
+        ioResult.success = true;
+        return true;
+    }
+
+    bool exportSequenceToBytes(
+        const XpArtLoader::XpSequence& sequence,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& ioResult)
+    {
+        if (!sequence.isValid())
+        {
+            ioResult.errorMessage = "Cannot export an invalid retained XP sequence.";
+            return false;
+        }
+
+        if (options.mode == RetainedExportMode::LayeredXp ||
+            options.mode == RetainedExportMode::FlattenedXp)
+        {
+            if (sequence.getFrameCount() != 1)
+            {
+                ioResult.errorMessage =
+                    "Single-document XP export cannot represent more than one frame. Use SequenceContainer or FramePerFile for multi-frame retained XP content.";
+                return false;
+            }
+
+            if (sequenceHasAnyFrameLabels(sequence) && !options.allowFrameMetadataLoss)
+            {
+                ioResult.errorMessage =
+                    "Single-document XP export would drop retained frame labels or sequence metadata. Set allowFrameMetadataLoss to true or use SequenceContainer instead.";
+                return false;
+            }
+
+            return exportToBytes(sequence.frames.front().document, options, ioResult);
+        }
+
+        if (options.mode == RetainedExportMode::FramePerFile)
+        {
+            ioResult.errorMessage = "FramePerFile export writes multiple files and must use saveSequenceToFrameFiles().";
+            return false;
+        }
+
+        if (!serializeSequenceContainer(sequence, options, ioResult, ioResult.bytes))
+        {
+            return false;
+        }
+
+        ioResult.resolvedEncoding = TextObjectExporter::Encoding::Binary;
+        ioResult.success = true;
+        return true;
+    }
+
+    bool saveToFile(
+        const XpArtLoader::XpDocument& document,
+        const std::string& filePath,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& outResult)
+    {
+        outResult = TextObjectExporter::SaveResult{};
+        if (!exportToBytes(document, options, outResult))
+        {
+            outResult.outputPath = filePath;
+            return false;
+        }
+
+        std::ofstream file(filePath, std::ios::binary);
+        if (!file)
+        {
+            outResult.success = false;
+            outResult.errorMessage = "Failed to open retained XP output file for writing.";
+            outResult.outputPath = filePath;
+            outResult.bytes.clear();
+            return false;
+        }
+
+        file.write(outResult.bytes.data(), static_cast<std::streamsize>(outResult.bytes.size()));
+        if (!file)
+        {
+            outResult.success = false;
+            outResult.errorMessage = "Failed while writing retained XP output bytes.";
+            outResult.outputPath = filePath;
+            outResult.bytes.clear();
+            return false;
+        }
+
+        outResult.outputPath = filePath;
+        return true;
+    }
+
+    bool saveSequenceToFile(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& filePath,
+        const RetainedExportOptions& options,
+        TextObjectExporter::SaveResult& outResult)
+    {
+        outResult = TextObjectExporter::SaveResult{};
+        if (!exportSequenceToBytes(sequence, options, outResult))
+        {
+            outResult.outputPath = filePath;
+            return false;
+        }
+
+        std::ofstream file(filePath, std::ios::binary);
+        if (!file)
+        {
+            outResult.success = false;
+            outResult.errorMessage = "Failed to open retained XP sequence output file for writing.";
+            outResult.outputPath = filePath;
+            outResult.bytes.clear();
+            return false;
+        }
+
+        file.write(outResult.bytes.data(), static_cast<std::streamsize>(outResult.bytes.size()));
+        if (!file)
+        {
+            outResult.success = false;
+            outResult.errorMessage = "Failed while writing retained XP sequence output bytes.";
+            outResult.outputPath = filePath;
+            outResult.bytes.clear();
+            return false;
+        }
+
+        outResult.outputPath = filePath;
+        return true;
+    }
+
+    bool saveSequenceToFrameFiles(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& baseFilePath,
+        const RetainedExportOptions& options,
+        RetainedExportResult& outResult)
+    {
+        outResult = RetainedExportResult{};
+
+        if (!sequence.isValid())
+        {
+            outResult.saveResult.errorMessage = "Cannot export an invalid retained XP sequence.";
+            return false;
+        }
+
+        if (sequence.getFrameCount() > 1)
+        {
+            addWarningOnce(
+                outResult.saveResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "Frame-per-file XP export writes each retained frame as a separate .xp file and does not preserve sequence membership in a single file.");
+        }
+
+        if (sequenceHasAnyFrameLabels(sequence))
+        {
+            addWarningOnce(
+                outResult.saveResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "Frame-per-file XP export does not embed frame labels unless your caller preserves them externally (for example in file naming or a manifest).");
+        }
+
+        RetainedExportOptions perFrameOptions = options;
+        perFrameOptions.mode = (options.mode == RetainedExportMode::FlattenedXp)
+            ? RetainedExportMode::FlattenedXp
+            : RetainedExportMode::LayeredXp;
+
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            TextObjectExporter::SaveResult frameResult;
+            const std::string framePath = buildFrameFilePath(baseFilePath, options, frame.frameIndex);
+            if (!saveToFile(frame.document, framePath, perFrameOptions, frameResult))
+            {
+                outResult.saveResult = frameResult;
+                outResult.saveResult.outputPath = framePath;
+                return false;
+            }
+
+            FrameFileRecord record;
+            record.frameIndex = frame.frameIndex;
+            record.label = frame.label;
+            record.path = framePath;
+            outResult.frameFiles.push_back(record);
+        }
+
+        outResult.saveResult.success = true;
+        outResult.saveResult.outputPath = baseFilePath;
+        outResult.saveResult.resolvedEncoding = TextObjectExporter::Encoding::Binary;
+        outResult.saveResult.resolvedFileType = TextObjectExporter::FileType::Xp;
+        return true;
+    }
+
+    const char* toString(RetainedExportMode mode)
+    {
+        switch (mode)
+        {
+        case RetainedExportMode::LayeredXp:
+            return "LayeredXp";
+        case RetainedExportMode::FlattenedXp:
+            return "FlattenedXp";
+        case RetainedExportMode::SequenceContainer:
+            return "SequenceContainer";
+        case RetainedExportMode::FramePerFile:
+            return "FramePerFile";
+        default:
+            return "Unknown";
+        }
     }
 }
