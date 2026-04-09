@@ -177,6 +177,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="Rendering\Objects\XpArtLoaderTests.h" />
+    <ClInclude Include="Rendering\Objects\XpSequenceLoader.h" />
     <ClInclude Include="Rendering\ScreenBuffer.h" />
     <ClInclude Include="Rendering\ScreenCell.h" />
     <ClInclude Include="Rendering\SgrEmitter.h" />
@@ -264,6 +265,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\XpArtLoaderTests.cpp" />
+    <ClCompile Include="Rendering\Objects\XpSequenceLoader.cpp" />
     <ClCompile Include="Rendering\ScreenBuffer.cpp" />
     <ClCompile Include="Rendering\SgrEmitter.cpp" />
     <ClCompile Include="Rendering\Styles\Color.cpp" />

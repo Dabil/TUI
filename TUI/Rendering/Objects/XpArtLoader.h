@@ -266,7 +266,6 @@ namespace XpArtLoader
 
         bool allowCompressedInput = true;
         bool allowAlreadyDecompressedInput = true;
-
         bool flattenLayers = true;
 
         bool treatMagentaBackgroundAsTransparent = true;
