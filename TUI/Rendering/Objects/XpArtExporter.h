@@ -80,6 +80,15 @@ namespace XpArtExporter
         int frameNumberWidth = 4;
 
         /*
+            Manifest-first export can either emit new per-frame .xp files or,
+            when a retained frame already references an .xp asset path, link the
+            manifest back to that existing file.
+        */
+        bool preferLinkedFrameSourcePaths = true;
+        bool rewriteMissingLinkedFrames = true;
+        bool allowAbsoluteFrameSourcePaths = true;
+
+        /*
             Non-default quarantine switch for deferred experimental work.
             Do not enable this in the active manifest-first pipeline.
         */
