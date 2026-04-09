@@ -41,6 +41,14 @@ namespace
     constexpr std::uint32_t kFrameFlagHasHiddenLayers = 0x02u;
     constexpr int kXpSeqManifestVersion = 1;
 
+    struct SequenceFramePlan
+    {
+        const XpArtLoader::XpFrame* frame = nullptr;
+        std::filesystem::path resolvedFramePath;
+        std::string manifestSourcePath;
+        bool linksExistingSource = false;
+    };
+
     XpArtExporter::XpColor makeColor(std::uint8_t red, std::uint8_t green, std::uint8_t blue)
     {
         XpArtExporter::XpColor color;
@@ -758,19 +766,154 @@ namespace
         return framePath.lexically_normal().generic_string();
     }
 
+    void appendIntegerList(std::ostringstream& stream, const std::vector<int>& values)
+    {
+        for (std::size_t index = 0; index < values.size(); ++index)
+        {
+            if (index > 0)
+            {
+                stream << ',';
+            }
+
+            stream << values[index];
+        }
+    }
+
+    bool canReuseExistingFrameSourcePath(
+        const XpArtLoader::XpFrame& frame,
+        const XpArtExporter::RetainedExportOptions& options,
+        const std::filesystem::path& manifestPath,
+        std::filesystem::path& outFramePath,
+        std::string& outManifestSourcePath)
+    {
+        outFramePath.clear();
+        outManifestSourcePath.clear();
+
+        if (!options.preferLinkedFrameSourcePaths || !frame.hasSourcePath())
+        {
+            return false;
+        }
+
+        const std::filesystem::path sourcePath(frame.sourcePath);
+        if (sourcePath.extension() != ".xp")
+        {
+            return false;
+        }
+
+        std::error_code ec;
+        std::filesystem::path resolved = sourcePath;
+        if (resolved.is_relative())
+        {
+            const std::filesystem::path manifestParent =
+                manifestPath.has_parent_path()
+                ? manifestPath.parent_path()
+                : std::filesystem::current_path();
+            resolved = (manifestParent / resolved).lexically_normal();
+        }
+        else
+        {
+            resolved = resolved.lexically_normal();
+        }
+
+        if (!std::filesystem::exists(resolved, ec) || ec)
+        {
+            return false;
+        }
+
+        const std::string manifestRelativePath = makeManifestSourcePath(manifestPath, resolved);
+        const bool isAbsolutePath = std::filesystem::path(manifestRelativePath).is_absolute();
+        if (isAbsolutePath && !options.allowAbsoluteFrameSourcePaths)
+        {
+            return false;
+        }
+
+        outFramePath = resolved;
+        outManifestSourcePath = manifestRelativePath;
+        return true;
+    }
+
+    bool buildSequenceFramePlans(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const XpArtExporter::RetainedExportOptions& options,
+        SaveResult& ioResult,
+        std::vector<SequenceFramePlan>& outPlans)
+    {
+        outPlans.clear();
+
+        const std::filesystem::path manifestPath =
+            std::filesystem::path(manifestFilePath).lexically_normal();
+
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            if (!frame.isValid())
+            {
+                ioResult.errorMessage = "Retained XP sequence contains an invalid frame.";
+                return false;
+            }
+
+            SequenceFramePlan plan;
+            plan.frame = &frame;
+
+            if (canReuseExistingFrameSourcePath(
+                frame,
+                options,
+                manifestPath,
+                plan.resolvedFramePath,
+                plan.manifestSourcePath))
+            {
+                plan.linksExistingSource = true;
+            }
+            else
+            {
+                if (options.preferLinkedFrameSourcePaths &&
+                    frame.hasSourcePath() &&
+                    !options.rewriteMissingLinkedFrames)
+                {
+                    ioResult.errorMessage =
+                        "Sequence frame source path could not be linked as an existing .xp asset and rewriteMissingLinkedFrames is disabled.";
+                    return false;
+                }
+
+                plan.resolvedFramePath = buildFrameFilePath(manifestPath.string(), options, frame.frameIndex);
+                plan.manifestSourcePath = makeManifestSourcePath(manifestPath, plan.resolvedFramePath);
+                plan.linksExistingSource = false;
+            }
+
+            outPlans.push_back(std::move(plan));
+        }
+
+        return true;
+    }
+
     void appendManifestDefaults(
         std::ostringstream& stream,
         const XpArtLoader::XpSequenceMetadata& metadata)
     {
-        if (!metadata.sequenceLabel.empty())
+        const std::string sequenceName = !metadata.name.empty()
+            ? metadata.name
+            : metadata.sequenceLabel;
+        if (!sequenceName.empty())
         {
-            stream << "sequence_label=" << quoteManifestValue(metadata.sequenceLabel) << "\n";
+            stream << "name=" << quoteManifestValue(sequenceName) << "\n";
+        }
+
+        if (metadata.loop.has_value())
+        {
+            stream << "loop=" << (*metadata.loop ? "true" : "false") << "\n";
         }
 
         if (metadata.defaultFrameDurationMilliseconds.has_value())
         {
-            stream << "default_duration_ms="
+            stream << "default_frame_duration_ms="
                 << *metadata.defaultFrameDurationMilliseconds
+                << "\n";
+        }
+
+        if (metadata.defaultFramesPerSecond.has_value())
+        {
+            stream << "default_fps="
+                << *metadata.defaultFramesPerSecond
                 << "\n";
         }
 
@@ -786,6 +929,13 @@ namespace
             stream << "default_visible_layers="
                 << XpArtLoader::toString(*metadata.defaultVisibleLayerMode)
                 << "\n";
+        }
+
+        if (!metadata.defaultExplicitVisibleLayerIndices.empty())
+        {
+            stream << "default_explicit_visible_layers=";
+            appendIntegerList(stream, metadata.defaultExplicitVisibleLayerIndices);
+            stream << "\n";
         }
     }
 
@@ -816,29 +966,23 @@ namespace
             return false;
         }
 
-        const std::filesystem::path manifestPath =
-            std::filesystem::path(manifestFilePath).lexically_normal();
+        std::vector<SequenceFramePlan> framePlans;
+        if (!buildSequenceFramePlans(sequence, manifestFilePath, options, ioResult, framePlans))
+        {
+            return false;
+        }
 
         std::ostringstream stream;
         stream << "xpseq " << kXpSeqManifestVersion << "\n";
         appendManifestDefaults(stream, sequence.metadata);
 
-        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        for (const SequenceFramePlan& framePlan : framePlans)
         {
-            if (!frame.isValid())
-            {
-                ioResult.errorMessage = "Retained XP sequence contains an invalid frame.";
-                return false;
-            }
-
-            const std::string frameFilePath =
-                buildFrameFilePath(manifestPath.string(), options, frame.frameIndex);
-            const std::string manifestSourcePath =
-                makeManifestSourcePath(manifestPath, std::filesystem::path(frameFilePath));
+            const XpArtLoader::XpFrame& frame = *framePlan.frame;
 
             stream << "frame"
                 << " index=" << frame.frameIndex
-                << " source=" << quoteManifestValue(manifestSourcePath);
+                << " source=" << quoteManifestValue(framePlan.manifestSourcePath);
 
             if (!frame.label.empty())
             {
@@ -865,14 +1009,7 @@ namespace
             if (!frame.overrides.explicitVisibleLayerIndices.empty())
             {
                 stream << " explicit_visible_layers=";
-                for (std::size_t index = 0; index < frame.overrides.explicitVisibleLayerIndices.size(); ++index)
-                {
-                    if (index > 0)
-                    {
-                        stream << ',';
-                    }
-                    stream << frame.overrides.explicitVisibleLayerIndices[index];
-                }
+                appendIntegerList(stream, frame.overrides.explicitVisibleLayerIndices);
             }
 
             stream << "\n";
@@ -1576,8 +1713,16 @@ namespace XpArtExporter
         perFrameOptions.includeHiddenLayers = true;
         perFrameOptions.allowHiddenLayerVisibilityLoss = true;
 
-        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        std::vector<SequenceFramePlan> framePlans;
+        if (!buildSequenceFramePlans(sequence, manifestFilePath, options, outResult.saveResult, framePlans))
         {
+            outResult.saveResult.outputPath = manifestFilePath;
+            return false;
+        }
+
+        for (const SequenceFramePlan& framePlan : framePlans)
+        {
+            const XpArtLoader::XpFrame& frame = *framePlan.frame;
             const XpArtLoader::XpDocument* frameDocument = frame.getDocument();
             if (frameDocument == nullptr)
             {
@@ -1586,20 +1731,21 @@ namespace XpArtExporter
                 return false;
             }
 
-            const std::string framePath = buildFrameFilePath(manifestFilePath, options, frame.frameIndex);
-
-            TextObjectExporter::SaveResult frameResult;
-            if (!saveToFile(*frameDocument, framePath, perFrameOptions, frameResult))
+            if (!framePlan.linksExistingSource)
             {
-                outResult.saveResult = frameResult;
-                outResult.saveResult.outputPath = framePath;
-                return false;
+                TextObjectExporter::SaveResult frameResult;
+                if (!saveToFile(*frameDocument, framePlan.resolvedFramePath.string(), perFrameOptions, frameResult))
+                {
+                    outResult.saveResult = frameResult;
+                    outResult.saveResult.outputPath = framePlan.resolvedFramePath.string();
+                    return false;
+                }
             }
 
             FrameFileRecord record;
             record.frameIndex = frame.frameIndex;
             record.label = frame.label;
-            record.path = framePath;
+            record.path = framePlan.resolvedFramePath.string();
             outResult.frameFiles.push_back(std::move(record));
         }
 
@@ -1637,6 +1783,46 @@ namespace XpArtExporter
 
         outResult.saveResult = manifestSaveResult;
         outResult.saveResult.outputPath = manifestFilePath;
+
+        bool linkedExistingFrames = false;
+        bool wroteNewFrameFiles = false;
+        for (const FrameFileRecord& record : outResult.frameFiles)
+        {
+            std::error_code ec;
+            const std::filesystem::path expectedGeneratedPath =
+                std::filesystem::path(buildFrameFilePath(manifestFilePath, options, record.frameIndex)).lexically_normal();
+            const std::filesystem::path actualPath = std::filesystem::path(record.path).lexically_normal();
+            if (actualPath == expectedGeneratedPath)
+            {
+                wroteNewFrameFiles = true;
+            }
+            else
+            {
+                linkedExistingFrames = true;
+            }
+
+            if (actualPath.is_absolute() && options.allowAbsoluteFrameSourcePaths)
+            {
+                linkedExistingFrames = true;
+            }
+        }
+
+        if (linkedExistingFrames)
+        {
+            addWarningOnce(
+                outResult.saveResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "Manifest-first .xpseq export linked one or more existing external .xp frame assets instead of rewriting every frame.");
+        }
+
+        if (wroteNewFrameFiles && linkedExistingFrames)
+        {
+            addWarningOnce(
+                outResult.saveResult,
+                SaveWarningCode::LossyConversionOccurred,
+                "Manifest-first .xpseq export used a mixed strategy: some frames were linked to existing .xp assets while others were emitted as new external .xp files.");
+        }
+
         outResult.saveResult.success = true;
         return true;
     }
