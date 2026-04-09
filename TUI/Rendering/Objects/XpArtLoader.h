@@ -217,11 +217,14 @@ namespace XpArtLoader
     struct XpSequenceMetadata
     {
         std::optional<int> defaultFrameDurationMilliseconds;
+        std::optional<int> defaultFramesPerSecond;
+        std::optional<bool> loop;
         std::optional<XpCompositeMode> defaultCompositeMode;
         std::optional<XpVisibleLayerMode> defaultVisibleLayerMode;
         std::vector<int> defaultExplicitVisibleLayerIndices;
 
         std::string sourceManifestPath;
+        std::string name;
         std::string sequenceLabel;
 
         bool isEmpty() const;

@@ -2,21 +2,25 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cerrno>
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
-#include <map>
 #include <memory>
 #include <optional>
 #include <set>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
 namespace
 {
     using namespace XpSequenceLoader;
+
+    constexpr int kSupportedManifestVersion = 1;
 
     struct ParsedFrameLine
     {
@@ -27,18 +31,24 @@ namespace
         XpArtLoader::XpFrameOverrides overrides;
     };
 
+    struct FrameBlockState
+    {
+        ParsedFrameLine frame;
+        bool active = false;
+    };
+
     std::string trimCopy(std::string_view value)
     {
         std::size_t begin = 0;
         while (begin < value.size() &&
-            std::isspace(static_cast<unsigned char>(value[begin])))
+            std::isspace(static_cast<unsigned char>(value[begin])) != 0)
         {
             ++begin;
         }
 
         std::size_t end = value.size();
         while (end > begin &&
-            std::isspace(static_cast<unsigned char>(value[end - 1])))
+            std::isspace(static_cast<unsigned char>(value[end - 1])) != 0)
         {
             --end;
         }
@@ -52,6 +62,88 @@ namespace
             value.substr(0, prefix.size()) == prefix;
     }
 
+    std::string stripUtf8Bom(std::string_view text)
+    {
+        if (text.size() >= 3 &&
+            static_cast<unsigned char>(text[0]) == 0xEF &&
+            static_cast<unsigned char>(text[1]) == 0xBB &&
+            static_cast<unsigned char>(text[2]) == 0xBF)
+        {
+            return std::string(text.substr(3));
+        }
+
+        return std::string(text);
+    }
+
+    bool isValidUtf8(std::string_view text)
+    {
+        std::size_t index = 0;
+        while (index < text.size())
+        {
+            const unsigned char byte = static_cast<unsigned char>(text[index]);
+            if (byte <= 0x7F)
+            {
+                ++index;
+                continue;
+            }
+
+            int continuationCount = 0;
+            std::uint32_t codePoint = 0;
+            std::uint32_t minimumCodePoint = 0;
+
+            if ((byte & 0xE0u) == 0xC0u)
+            {
+                continuationCount = 1;
+                codePoint = byte & 0x1Fu;
+                minimumCodePoint = 0x80u;
+            }
+            else if ((byte & 0xF0u) == 0xE0u)
+            {
+                continuationCount = 2;
+                codePoint = byte & 0x0Fu;
+                minimumCodePoint = 0x800u;
+            }
+            else if ((byte & 0xF8u) == 0xF0u)
+            {
+                continuationCount = 3;
+                codePoint = byte & 0x07u;
+                minimumCodePoint = 0x10000u;
+            }
+            else
+            {
+                return false;
+            }
+
+            if (index + static_cast<std::size_t>(continuationCount) >= text.size())
+            {
+                return false;
+            }
+
+            for (int offset = 1; offset <= continuationCount; ++offset)
+            {
+                const unsigned char continuation =
+                    static_cast<unsigned char>(text[index + static_cast<std::size_t>(offset)]);
+                if ((continuation & 0xC0u) != 0x80u)
+                {
+                    return false;
+                }
+
+                codePoint = (codePoint << 6) | (continuation & 0x3Fu);
+            }
+
+            if (codePoint < minimumCodePoint ||
+                codePoint > 0x10FFFFu ||
+                (codePoint >= 0xD800u && codePoint <= 0xDFFFu))
+            {
+                return false;
+            }
+
+            index += static_cast<std::size_t>(continuationCount + 1);
+        }
+
+        return true;
+    }
+
     std::string unquote(std::string value)
     {
         if (value.size() >= 2 &&
@@ -61,6 +153,7 @@ namespace
             value.erase(value.begin());
             value.pop_back();
         }
+
         return value;
     }
 
@@ -79,13 +172,14 @@ namespace
                 continue;
             }
 
-            if (!inQuotes && std::isspace(static_cast<unsigned char>(ch)))
+            if (!inQuotes && std::isspace(static_cast<unsigned char>(ch)) != 0)
             {
                 if (!current.empty())
                 {
                     tokens.push_back(current);
                     current.clear();
                 }
+
                 continue;
             }
 
@@ -101,7 +195,7 @@ namespace
     }
 
     void addDiagnostic(
-        XpSequenceLoader::LoadResult& result,
+        LoadResult& result,
         DiagnosticCode code,
         const std::string& message,
         int lineNumber,
@@ -120,7 +214,7 @@ namespace
         result.diagnostics.push_back(std::move(diagnostic));
     }
 
-    XpSequenceLoader::LoadResult failResult(
+    LoadResult failResult(
         const std::string& manifestPath,
         DiagnosticCode code,
         const std::string& message,
@@ -128,11 +222,25 @@ namespace
         int frameIndex,
         const std::string& sourcePath = std::string())
     {
-        XpSequenceLoader::LoadResult result;
+        LoadResult result;
         result.manifestPath = manifestPath;
         result.errorMessage = message;
         addDiagnostic(result, code, message, lineNumber, frameIndex, sourcePath, true);
         return result;
+    }
+
+    bool readAllText(const std::string& filePath, std::string& outText)
+    {
+        std::ifstream file(filePath, std::ios::binary);
+        if (!file)
+        {
+            return false;
+        }
+
+        std::ostringstream stream;
+        stream << file.rdbuf();
+        outText = stream.str();
+        return file.good() || file.eof();
     }
 
     bool tryParseInt(const std::string& text, int& outValue)
@@ -153,6 +261,23 @@ namespace
         {
             return false;
         }
+    }
+
+    bool tryParseBool(const std::string& text, bool& outValue)
+    {
+        if (text == "true" || text == "1" || text == "yes")
+        {
+            outValue = true;
+            return true;
+        }
+
+        if (text == "false" || text == "0" || text == "no")
+        {
+            outValue = false;
+            return true;
+        }
+
+        return false;
     }
 
     bool tryParseCompositeMode(
@@ -204,6 +329,7 @@ namespace
         std::vector<int>& outIndices)
     {
         outIndices.clear();
+
         const std::string trimmed = trimCopy(text);
         if (trimmed.empty())
         {
@@ -226,20 +352,6 @@ namespace
         }
 
         return !outIndices.empty();
-    }
-
-    bool readAllText(const std::string& filePath, std::string& outText)
-    {
-        std::ifstream file(filePath, std::ios::binary);
-        if (!file)
-        {
-            return false;
-        }
-
-        std::ostringstream stream;
-        stream << file.rdbuf();
-        outText = stream.str();
-        return file.good() || file.eof();
     }
 
     std::filesystem::path resolveFramePath(
@@ -272,15 +384,173 @@ namespace
         }
 
         outKey = trimCopy(line.substr(0, eq));
-        outValue = trimCopy(line.substr(eq + 1));
-        outValue = unquote(outValue);
+        outValue = unquote(trimCopy(line.substr(eq + 1)));
         return !outKey.empty();
     }
 
-    bool parseFrameLine(
+    bool parseFrameField(
+        const std::string& key,
+        const std::string& value,
+        int lineNumber,
+        LoadResult& ioResult,
+        ParsedFrameLine& ioFrame)
+    {
+        if (key == "index")
+        {
+            if (!tryParseInt(value, ioFrame.frameIndex) || ioFrame.frameIndex < 0)
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidFrameIndex,
+                    "Frame index must be a non-negative integer.",
+                    lineNumber,
+                    ioFrame.frameIndex);
+                return false;
+            }
+
+            return true;
+        }
+
+        if (key == "source")
+        {
+            ioFrame.sourcePath = value;
+            return true;
+        }
+
+        if (key == "label")
+        {
+            ioFrame.label = value;
+            return true;
+        }
+
+        if (key == "duration_ms" || key == "frame_duration_ms")
+        {
+            int duration = 0;
+            if (!tryParseInt(value, duration) || duration < 0)
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidDurationMilliseconds,
+                    "Frame duration must be a non-negative integer.",
+                    lineNumber,
+                    ioFrame.frameIndex);
+                return false;
+            }
+
+            ioFrame.overrides.durationMilliseconds = duration;
+            return true;
+        }
+
+        if (key == "composite")
+        {
+            XpArtLoader::XpCompositeMode compositeMode;
+            if (!tryParseCompositeMode(value, compositeMode))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidCompositeMode,
+                    "Invalid frame composite value: " + value,
+                    lineNumber,
+                    ioFrame.frameIndex);
+                return false;
+            }
+
+            ioFrame.overrides.compositeMode = compositeMode;
+            return true;
+        }
+
+        if (key == "visible_layers")
+        {
+            XpArtLoader::XpVisibleLayerMode visibleLayerMode;
+            if (!tryParseVisibleLayerMode(value, visibleLayerMode))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidVisibleLayerMode,
+                    "Invalid frame visible_layers value: " + value,
+                    lineNumber,
+                    ioFrame.frameIndex);
+                return false;
+            }
+
+            ioFrame.overrides.visibleLayerMode = visibleLayerMode;
+            return true;
+        }
+
+        if (key == "explicit_visible_layers")
+        {
+            if (!tryParseExplicitVisibleLayerList(
+                value,
+                ioFrame.overrides.explicitVisibleLayerIndices))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidExplicitVisibleLayerList,
+                    "Frame explicit_visible_layers must be a comma-separated list of non-negative integers.",
+                    lineNumber,
+                    ioFrame.frameIndex);
+                return false;
+            }
+
+            return true;
+        }
+
+        addDiagnostic(
+            ioResult,
+            DiagnosticCode::InvalidFrameDirective,
+            "Unknown frame field: " + key,
+            lineNumber,
+            ioFrame.frameIndex);
+        return false;
+    }
+
+    bool finalizeFrame(
+        LoadResult& ioResult,
+        ParsedFrameLine& ioFrame)
+    {
+        if (ioFrame.frameIndex < 0)
+        {
+            addDiagnostic(
+                ioResult,
+                DiagnosticCode::MissingFrameIndex,
+                "Frame block is missing index=...",
+                ioFrame.lineNumber,
+                -1);
+            return false;
+        }
+
+        if (ioFrame.sourcePath.empty())
+        {
+            addDiagnostic(
+                ioResult,
+                DiagnosticCode::MissingFrameSource,
+                "Frame block is missing source=...",
+                ioFrame.lineNumber,
+                ioFrame.frameIndex);
+            return false;
+        }
+
+        if (ioFrame.overrides.visibleLayerMode.has_value() &&
+            *ioFrame.overrides.visibleLayerMode ==
+            XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList &&
+            ioFrame.overrides.explicitVisibleLayerIndices.empty())
+        {
+            addDiagnostic(
+                ioResult,
+                DiagnosticCode::InvalidExplicitVisibleLayerList,
+                "Frame uses visible_layers=UseExplicitVisibleLayerList but does not define explicit_visible_layers.",
+                ioFrame.lineNumber,
+                ioFrame.frameIndex);
+            return false;
+        }
+
+        return true;
+    }
+
+    bool parseLegacyFrameLine(
         const std::string& line,
         int lineNumber,
-        XpSequenceLoader::LoadResult& ioResult,
+        LoadResult& ioResult,
         ParsedFrameLine& outFrame)
     {
         outFrame = ParsedFrameLine{};
@@ -313,147 +583,22 @@ namespace
                 return false;
             }
 
-            const std::string key = trimCopy(token.substr(0, eq));
-            std::string value = trimCopy(token.substr(eq + 1));
-            value = unquote(value);
-
-            if (key == "index")
+            if (!parseFrameField(
+                trimCopy(token.substr(0, eq)),
+                unquote(trimCopy(token.substr(eq + 1))),
+                lineNumber,
+                ioResult,
+                outFrame))
             {
-                if (!tryParseInt(value, outFrame.frameIndex) || outFrame.frameIndex < 0)
-                {
-                    addDiagnostic(
-                        ioResult,
-                        DiagnosticCode::InvalidFrameIndex,
-                        "Frame index must be a non-negative integer.",
-                        lineNumber,
-                        outFrame.frameIndex);
-                    return false;
-                }
-            }
-            else if (key == "source")
-            {
-                outFrame.sourcePath = value;
-            }
-            else if (key == "label")
-            {
-                outFrame.label = value;
-            }
-            else if (key == "duration_ms")
-            {
-                int duration = 0;
-                if (!tryParseInt(value, duration) || duration < 0)
-                {
-                    addDiagnostic(
-                        ioResult,
-                        DiagnosticCode::InvalidDurationMilliseconds,
-                        "Frame duration_ms must be a non-negative integer.",
-                        lineNumber,
-                        outFrame.frameIndex);
-                    return false;
-                }
-
-                outFrame.overrides.durationMilliseconds = duration;
-            }
-            else if (key == "composite")
-            {
-                XpArtLoader::XpCompositeMode compositeMode;
-                if (!tryParseCompositeMode(value, compositeMode))
-                {
-                    addDiagnostic(
-                        ioResult,
-                        DiagnosticCode::InvalidCompositeMode,
-                        "Invalid frame composite value: " + value,
-                        lineNumber,
-                        outFrame.frameIndex);
-                    return false;
-                }
-
-                outFrame.overrides.compositeMode = compositeMode;
-            }
-            else if (key == "visible_layers")
-            {
-                XpArtLoader::XpVisibleLayerMode visibleLayerMode;
-                if (!tryParseVisibleLayerMode(value, visibleLayerMode))
-                {
-                    addDiagnostic(
-                        ioResult,
-                        DiagnosticCode::InvalidVisibleLayerMode,
-                        "Invalid frame visible_layers value: " + value,
-                        lineNumber,
-                        outFrame.frameIndex);
-                    return false;
-                }
-
-                outFrame.overrides.visibleLayerMode = visibleLayerMode;
-            }
-            else if (key == "explicit_visible_layers")
-            {
-                if (!tryParseExplicitVisibleLayerList(
-                    value,
-                    outFrame.overrides.explicitVisibleLayerIndices))
-                {
-                    addDiagnostic(
-                        ioResult,
-                        DiagnosticCode::InvalidExplicitVisibleLayerList,
-                        "Frame explicit_visible_layers must be a comma-separated list of non-negative integers.",
-                        lineNumber,
-                        outFrame.frameIndex);
-                    return false;
-                }
-            }
-            else
-            {
-                addDiagnostic(
-                    ioResult,
-                    DiagnosticCode::InvalidFrameDirective,
-                    "Unknown frame field: " + key,
-                    lineNumber,
-                    outFrame.frameIndex);
                 return false;
             }
         }
 
-        if (outFrame.frameIndex < 0)
-        {
-            addDiagnostic(
-                ioResult,
-                DiagnosticCode::InvalidFrameIndex,
-                "Frame directive is missing index=...",
-                lineNumber,
-                -1);
-            return false;
-        }
-
-        if (outFrame.sourcePath.empty())
-        {
-            addDiagnostic(
-                ioResult,
-                DiagnosticCode::MissingFrameSource,
-                "Frame directive is missing source=...",
-                lineNumber,
-                outFrame.frameIndex);
-            return false;
-        }
-
-        if (outFrame.overrides.visibleLayerMode.has_value() &&
-            *outFrame.overrides.visibleLayerMode ==
-            XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList &&
-            outFrame.overrides.explicitVisibleLayerIndices.empty())
-        {
-            addDiagnostic(
-                ioResult,
-                DiagnosticCode::InvalidExplicitVisibleLayerList,
-                "Frame uses visible_layers=UseExplicitVisibleLayerList but does not define explicit_visible_layers.",
-                lineNumber,
-                outFrame.frameIndex);
-            return false;
-        }
-
-        return true;
+        return finalizeFrame(ioResult, outFrame);
     }
 
     bool finalizeContiguousFrameValidation(
-        XpSequenceLoader::LoadResult& ioResult,
+        LoadResult& ioResult,
         const std::vector<ParsedFrameLine>& frames)
     {
         if (frames.empty())
@@ -512,6 +657,152 @@ namespace
 
         return true;
     }
+
+    bool parseSequenceField(
+        const std::string& key,
+        const std::string& value,
+        int lineNumber,
+        LoadResult& ioResult)
+    {
+        XpArtLoader::XpSequenceMetadata& metadata = ioResult.sequence.metadata;
+
+        if (key == "name" || key == "sequence_label")
+        {
+            metadata.name = value;
+            metadata.sequenceLabel = value;
+            return true;
+        }
+
+        if (key == "loop")
+        {
+            bool loop = false;
+            if (!tryParseBool(value, loop))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidBooleanValue,
+                    "loop must be true/false, yes/no, or 1/0.",
+                    lineNumber,
+                    -1);
+                return false;
+            }
+
+            metadata.loop = loop;
+            return true;
+        }
+
+        if (key == "default_frame_duration_ms" || key == "default_duration_ms")
+        {
+            int duration = 0;
+            if (!tryParseInt(value, duration) || duration < 0)
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidDurationMilliseconds,
+                    "default_frame_duration_ms must be a non-negative integer.",
+                    lineNumber,
+                    -1);
+                return false;
+            }
+
+            metadata.defaultFrameDurationMilliseconds = duration;
+            return true;
+        }
+
+        if (key == "default_fps")
+        {
+            int fps = 0;
+            if (!tryParseInt(value, fps) || fps <= 0)
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidFramesPerSecond,
+                    "default_fps must be a positive integer.",
+                    lineNumber,
+                    -1);
+                return false;
+            }
+
+            metadata.defaultFramesPerSecond = fps;
+            return true;
+        }
+
+        if (key == "default_composite")
+        {
+            XpArtLoader::XpCompositeMode compositeMode;
+            if (!tryParseCompositeMode(value, compositeMode))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidCompositeMode,
+                    "Invalid default_composite value: " + value,
+                    lineNumber,
+                    -1);
+                return false;
+            }
+
+            metadata.defaultCompositeMode = compositeMode;
+            return true;
+        }
+
+        if (key == "default_visible_layers")
+        {
+            XpArtLoader::XpVisibleLayerMode visibleLayerMode;
+            if (!tryParseVisibleLayerMode(value, visibleLayerMode))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidVisibleLayerMode,
+                    "Invalid default_visible_layers value: " + value,
+                    lineNumber,
+                    -1);
+                return false;
+            }
+
+            metadata.defaultVisibleLayerMode = visibleLayerMode;
+            return true;
+        }
+
+        if (key == "default_explicit_visible_layers")
+        {
+            if (!tryParseExplicitVisibleLayerList(
+                value,
+                metadata.defaultExplicitVisibleLayerIndices))
+            {
+                addDiagnostic(
+                    ioResult,
+                    DiagnosticCode::InvalidExplicitVisibleLayerList,
+                    "default_explicit_visible_layers must be a comma-separated list of non-negative integers.",
+                    lineNumber,
+                    -1);
+                return false;
+            }
+
+            return true;
+        }
+
+        addDiagnostic(
+            ioResult,
+            DiagnosticCode::InvalidDirective,
+            "Unknown manifest directive: " + key,
+            lineNumber,
+            -1);
+        return false;
+    }
+
+    bool tryCanonicalPath(
+        const std::filesystem::path& path,
+        std::filesystem::path& outPath)
+    {
+        std::error_code error;
+        outPath = std::filesystem::weakly_canonical(path, error);
+        if (error)
+        {
+            return false;
+        }
+
+        return true;
+    }
 }
 
 namespace XpSequenceLoader
@@ -540,11 +831,25 @@ namespace XpSequenceLoader
         LoadResult result;
         result.manifestPath = manifestPath;
 
-        std::istringstream stream{ std::string(manifestUtf8) };
+        const std::string manifestText = stripUtf8Bom(manifestUtf8);
+        if (!isValidUtf8(manifestText))
+        {
+            addDiagnostic(
+                result,
+                DiagnosticCode::InvalidUtf8,
+                "Manifest is not valid UTF-8.",
+                0,
+                -1);
+            result.errorMessage = "Invalid UTF-8 in .xpseq manifest.";
+            return result;
+        }
+
+        std::istringstream stream(manifestText);
         std::string line;
         int lineNumber = 0;
         bool sawHeader = false;
         std::vector<ParsedFrameLine> parsedFrames;
+        FrameBlockState currentFrame;
 
         while (std::getline(stream, line))
         {
@@ -558,7 +863,13 @@ namespace XpSequenceLoader
 
             if (!sawHeader)
             {
-                if (!startsWith(trimmed, "xpseq"))
+                std::stringstream headerStream(trimmed);
+                std::string magic;
+                std::string versionText;
+                headerStream >> magic >> versionText;
+
+                int version = 0;
+                if (magic != "xpseq")
                 {
                     addDiagnostic(
                         result,
@@ -570,13 +881,7 @@ namespace XpSequenceLoader
                     return result;
                 }
 
-                std::stringstream headerStream(trimmed);
-                std::string magic;
-                std::string versionText;
-                headerStream >> magic >> versionText;
-
-                int version = 0;
-                if (magic != "xpseq" || !tryParseInt(versionText, version))
+                if (!tryParseInt(versionText, version))
                 {
                     addDiagnostic(
                         result,
@@ -588,7 +893,7 @@ namespace XpSequenceLoader
                     return result;
                 }
 
-                if (version != 1)
+                if (version != kSupportedManifestVersion)
                 {
                     addDiagnostic(
                         result,
@@ -605,10 +910,68 @@ namespace XpSequenceLoader
                 continue;
             }
 
-            if (startsWith(trimmed, "frame"))
+            if (currentFrame.active)
+            {
+                if (trimmed == "}")
+                {
+                    if (!finalizeFrame(result, currentFrame.frame))
+                    {
+                        result.errorMessage = "Invalid .xpseq frame block.";
+                        return result;
+                    }
+
+                    parsedFrames.push_back(std::move(currentFrame.frame));
+                    currentFrame = FrameBlockState{};
+                    continue;
+                }
+
+                std::string key;
+                std::string value;
+                if (!parseAssignment(trimmed, key, value))
+                {
+                    addDiagnostic(
+                        result,
+                        DiagnosticCode::InvalidFrameBlock,
+                        "Frame block directives must be key=value assignments.",
+                        lineNumber,
+                        currentFrame.frame.frameIndex);
+                    result.errorMessage = "Invalid .xpseq frame block.";
+                    return result;
+                }
+
+                if (!parseFrameField(key, value, lineNumber, result, currentFrame.frame))
+                {
+                    result.errorMessage = "Invalid .xpseq frame block.";
+                    return result;
+                }
+
+                continue;
+            }
+
+            if (trimmed == "frame" || trimmed == "frame{")
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::InvalidFrameBlock,
+                    "Frame blocks must use 'frame {' on a single line.",
+                    lineNumber,
+                    -1);
+                result.errorMessage = "Invalid .xpseq frame block.";
+                return result;
+            }
+
+            if (trimmed == "frame {" || trimmed == "frame{")
+            {
+                currentFrame = FrameBlockState{};
+                currentFrame.active = true;
+                currentFrame.frame.lineNumber = lineNumber;
+                continue;
+            }
+
+            if (startsWith(trimmed, "frame "))
             {
                 ParsedFrameLine frame;
-                if (!parseFrameLine(trimmed, lineNumber, result, frame))
+                if (!parseLegacyFrameLine(trimmed, lineNumber, result, frame))
                 {
                     result.errorMessage = "Invalid .xpseq frame directive.";
                     return result;
@@ -632,86 +995,9 @@ namespace XpSequenceLoader
                 return result;
             }
 
-            if (key == "sequence_label")
+            if (!parseSequenceField(key, value, lineNumber, result))
             {
-                result.sequence.metadata.sequenceLabel = value;
-            }
-            else if (key == "default_duration_ms")
-            {
-                int duration = 0;
-                if (!tryParseInt(value, duration) || duration < 0)
-                {
-                    addDiagnostic(
-                        result,
-                        DiagnosticCode::InvalidDurationMilliseconds,
-                        "default_duration_ms must be a non-negative integer.",
-                        lineNumber,
-                        -1);
-                    result.errorMessage = "Invalid default_duration_ms.";
-                    return result;
-                }
-
-                result.sequence.metadata.defaultFrameDurationMilliseconds = duration;
-            }
-            else if (key == "default_composite")
-            {
-                XpArtLoader::XpCompositeMode compositeMode;
-                if (!tryParseCompositeMode(value, compositeMode))
-                {
-                    addDiagnostic(
-                        result,
-                        DiagnosticCode::InvalidCompositeMode,
-                        "Invalid default_composite value: " + value,
-                        lineNumber,
-                        -1);
-                    result.errorMessage = "Invalid default_composite.";
-                    return result;
-                }
-
-                result.sequence.metadata.defaultCompositeMode = compositeMode;
-            }
-            else if (key == "default_visible_layers")
-            {
-                XpArtLoader::XpVisibleLayerMode visibleLayerMode;
-                if (!tryParseVisibleLayerMode(value, visibleLayerMode))
-                {
-                    addDiagnostic(
-                        result,
-                        DiagnosticCode::InvalidVisibleLayerMode,
-                        "Invalid default_visible_layers value: " + value,
-                        lineNumber,
-                        -1);
-                    result.errorMessage = "Invalid default_visible_layers.";
-                    return result;
-                }
-
-                result.sequence.metadata.defaultVisibleLayerMode = visibleLayerMode;
-            }
-            else if (key == "default_explicit_visible_layers")
-            {
-                if (!tryParseExplicitVisibleLayerList(
-                    value,
-                    result.sequence.metadata.defaultExplicitVisibleLayerIndices))
-                {
-                    addDiagnostic(
-                        result,
-                        DiagnosticCode::InvalidExplicitVisibleLayerList,
-                        "default_explicit_visible_layers must be a comma-separated list of non-negative integers.",
-                        lineNumber,
-                        -1);
-                    result.errorMessage = "Invalid default_explicit_visible_layers.";
-                    return result;
-                }
-            }
-            else
-            {
-                addDiagnostic(
-                    result,
-                    DiagnosticCode::InvalidDirective,
-                    "Unknown manifest directive: " + key,
-                    lineNumber,
-                    -1);
-                result.errorMessage = "Unknown .xpseq directive.";
+                result.errorMessage = "Invalid .xpseq directive.";
                 return result;
             }
         }
@@ -728,6 +1014,18 @@ namespace XpSequenceLoader
             return result;
         }
 
+        if (currentFrame.active)
+        {
+            addDiagnostic(
+                result,
+                DiagnosticCode::UnterminatedFrameBlock,
+                "Frame block was not closed with '}'.",
+                currentFrame.frame.lineNumber,
+                currentFrame.frame.frameIndex);
+            result.errorMessage = "Unterminated .xpseq frame block.";
+            return result;
+        }
+
         if (options.requireContiguousFrameIndices &&
             !finalizeContiguousFrameValidation(result, parsedFrames))
         {
@@ -735,91 +1033,12 @@ namespace XpSequenceLoader
             return result;
         }
 
-        std::filesystem::path manifestFsPath = manifestPath.empty()
-            ? std::filesystem::current_path() / "in_memory.xpseq"
+        std::filesystem::path manifestFsPath =
+            manifestPath.empty()
+            ? (std::filesystem::current_path() / "in_memory.xpseq")
             : std::filesystem::path(manifestPath);
 
         result.sequence.metadata.sourceManifestPath = manifestFsPath.lexically_normal().string();
-
-        for (const ParsedFrameLine& parsedFrame : parsedFrames)
-        {
-            const std::filesystem::path resolvedPath =
-                resolveFramePath(manifestFsPath, parsedFrame.sourcePath);
-
-            if (parsedFrame.sourcePath.empty())
-            {
-                addDiagnostic(
-                    result,
-                    DiagnosticCode::MissingFrameSource,
-                    "Frame source path is empty.",
-                    parsedFrame.lineNumber,
-                    parsedFrame.frameIndex);
-                result.errorMessage = "Missing frame source path.";
-                return result;
-            }
-
-            if (!std::filesystem::exists(resolvedPath))
-            {
-                addDiagnostic(
-                    result,
-                    DiagnosticCode::BadRelativePath,
-                    "Resolved frame source does not exist: " + resolvedPath.string(),
-                    parsedFrame.lineNumber,
-                    parsedFrame.frameIndex,
-                    resolvedPath.string());
-                result.errorMessage = "Resolved frame source path does not exist.";
-                return result;
-            }
-
-            XpArtLoader::LoadOptions xpOptions = options.xpLoadOptions;
-            xpOptions.flattenLayers = false;
-
-            const XpArtLoader::LoadResult xpLoadResult =
-                XpArtLoader::loadFromFile(resolvedPath.string(), xpOptions);
-
-            if (!xpLoadResult.success || !xpLoadResult.hasRetainedDocument)
-            {
-                addDiagnostic(
-                    result,
-                    DiagnosticCode::XpFrameLoadFailed,
-                    xpLoadResult.errorMessage.empty()
-                    ? "Failed to load referenced XP frame."
-                    : xpLoadResult.errorMessage,
-                    parsedFrame.lineNumber,
-                    parsedFrame.frameIndex,
-                    resolvedPath.string());
-                result.errorMessage = "Failed to load referenced XP frame.";
-                return result;
-            }
-
-            XpArtLoader::XpFrame frame;
-            frame.frameIndex = parsedFrame.frameIndex;
-            frame.label = parsedFrame.label;
-            frame.sourcePath = resolvedPath.lexically_normal().string();
-            frame.document = std::make_shared<XpArtLoader::XpDocument>(
-                xpLoadResult.retainedDocument);
-            frame.overrides = parsedFrame.overrides;
-
-            if (!frame.isValid())
-            {
-                addDiagnostic(
-                    result,
-                    DiagnosticCode::InvalidFrameDirective,
-                    "Loaded frame overrides are invalid for the referenced XP document.",
-                    parsedFrame.lineNumber,
-                    parsedFrame.frameIndex,
-                    resolvedPath.string());
-                result.errorMessage = "Invalid frame overrides for referenced XP document.";
-                return result;
-            }
-
-            result.sequence.frames.push_back(std::move(frame));
-        }
-
-        if (options.sortFramesByFrameIndex)
-        {
-            result.sequence.sortFramesByFrameIndex();
-        }
 
         if (result.sequence.metadata.usesExplicitVisibleLayerList() &&
             result.sequence.metadata.defaultExplicitVisibleLayerIndices.empty())
@@ -832,6 +1051,115 @@ namespace XpSequenceLoader
                 -1);
             result.errorMessage = "Missing default_explicit_visible_layers for explicit sequence default.";
             return result;
+        }
+
+        for (const ParsedFrameLine& parsedFrame : parsedFrames)
+        {
+            if (parsedFrame.sourcePath.empty())
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::MissingFrameSource,
+                    "Frame source path is empty.",
+                    parsedFrame.lineNumber,
+                    parsedFrame.frameIndex);
+                result.errorMessage = "Missing frame source path.";
+                return result;
+            }
+
+            const std::filesystem::path resolvedPath =
+                resolveFramePath(manifestFsPath, parsedFrame.sourcePath);
+
+            std::filesystem::path canonicalPath;
+            if (!tryCanonicalPath(resolvedPath, canonicalPath))
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::BadRelativePath,
+                    "Failed to resolve frame source path: " + resolvedPath.string(),
+                    parsedFrame.lineNumber,
+                    parsedFrame.frameIndex,
+                    resolvedPath.string());
+                result.errorMessage = "Failed to resolve frame source path.";
+                return result;
+            }
+
+            std::error_code existsError;
+            const bool exists = std::filesystem::exists(canonicalPath, existsError);
+            if (existsError || !exists)
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::BadRelativePath,
+                    "Resolved frame source does not exist: " + canonicalPath.string(),
+                    parsedFrame.lineNumber,
+                    parsedFrame.frameIndex,
+                    canonicalPath.string());
+                result.errorMessage = "Resolved frame source path does not exist.";
+                return result;
+            }
+
+            XpArtLoader::LoadOptions xpOptions = options.xpLoadOptions;
+            xpOptions.flattenLayers = false;
+
+            const XpArtLoader::LoadResult xpLoadResult =
+                XpArtLoader::loadFromFile(canonicalPath.string(), xpOptions);
+
+            if (!xpLoadResult.success || !xpLoadResult.hasRetainedDocument)
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::XpFrameLoadFailed,
+                    xpLoadResult.errorMessage.empty()
+                    ? "Failed to load referenced XP frame."
+                    : xpLoadResult.errorMessage,
+                    parsedFrame.lineNumber,
+                    parsedFrame.frameIndex,
+                    canonicalPath.string());
+                result.errorMessage = "Failed to load referenced XP frame.";
+                return result;
+            }
+
+            XpArtLoader::XpFrame frame;
+            frame.frameIndex = parsedFrame.frameIndex;
+            frame.label = parsedFrame.label;
+            frame.sourcePath = canonicalPath.string();
+            frame.document = std::make_shared<XpArtLoader::XpDocument>(
+                xpLoadResult.retainedDocument);
+            frame.overrides = parsedFrame.overrides;
+
+            if (!frame.isValid())
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::InvalidFrameDirective,
+                    "Loaded frame overrides are invalid for the referenced XP document.",
+                    parsedFrame.lineNumber,
+                    parsedFrame.frameIndex,
+                    canonicalPath.string());
+                result.errorMessage = "Invalid frame overrides for referenced XP document.";
+                return result;
+            }
+
+            if (!result.sequence.metadata.isValidForDocument(frame.getDocument()))
+            {
+                addDiagnostic(
+                    result,
+                    DiagnosticCode::InvalidExplicitVisibleLayerList,
+                    "Sequence default visible-layer overrides are invalid for a referenced XP document.",
+                    parsedFrame.lineNumber,
+                    parsedFrame.frameIndex,
+                    canonicalPath.string());
+                result.errorMessage = "Invalid sequence default visible-layer overrides.";
+                return result;
+            }
+
+            result.sequence.frames.push_back(std::move(frame));
+        }
+
+        if (options.sortFramesByFrameIndex)
+        {
+            result.sequence.sortFramesByFrameIndex();
         }
 
         if (!result.sequence.isValid())
@@ -894,9 +1222,18 @@ namespace XpSequenceLoader
             << "frames=" << result.resolvedFrameCount
             << ", version=" << result.resolvedVersion;
 
-        if (!result.sequence.metadata.sequenceLabel.empty())
+        if (!result.sequence.metadata.name.empty())
         {
-            stream << ", label=" << result.sequence.metadata.sequenceLabel;
+            stream << ", name=" << result.sequence.metadata.name;
+        }
+        else if (!result.sequence.metadata.sequenceLabel.empty())
+        {
+            stream << ", name=" << result.sequence.metadata.sequenceLabel;
+        }
+
+        if (result.sequence.metadata.loop.has_value())
+        {
+            stream << ", loop=" << (*result.sequence.metadata.loop ? "true" : "false");
         }
 
         if (!result.sequence.metadata.sourceManifestPath.empty())
@@ -915,14 +1252,26 @@ namespace XpSequenceLoader
             return "None";
         case DiagnosticCode::EmptyManifest:
             return "EmptyManifest";
+        case DiagnosticCode::InvalidUtf8:
+            return "InvalidUtf8";
         case DiagnosticCode::InvalidHeader:
             return "InvalidHeader";
         case DiagnosticCode::UnsupportedVersion:
             return "UnsupportedVersion";
         case DiagnosticCode::InvalidDirective:
             return "InvalidDirective";
+        case DiagnosticCode::InvalidBooleanValue:
+            return "InvalidBooleanValue";
+        case DiagnosticCode::InvalidFramesPerSecond:
+            return "InvalidFramesPerSecond";
         case DiagnosticCode::InvalidFrameDirective:
             return "InvalidFrameDirective";
+        case DiagnosticCode::InvalidFrameBlock:
+            return "InvalidFrameBlock";
+        case DiagnosticCode::UnterminatedFrameBlock:
+            return "UnterminatedFrameBlock";
+        case DiagnosticCode::MissingFrameIndex:
+            return "MissingFrameIndex";
         case DiagnosticCode::InvalidFrameIndex:
             return "InvalidFrameIndex";
         case DiagnosticCode::DuplicateFrameIndex:

@@ -1569,10 +1569,13 @@ namespace XpArtLoader
     bool XpSequenceMetadata::isEmpty() const
     {
         return !defaultFrameDurationMilliseconds.has_value() &&
+            !defaultFramesPerSecond.has_value() &&
+            !loop.has_value() &&
             !defaultCompositeMode.has_value() &&
             !defaultVisibleLayerMode.has_value() &&
             defaultExplicitVisibleLayerIndices.empty() &&
             sourceManifestPath.empty() &&
+            name.empty() &&
             sequenceLabel.empty();
     }
 
