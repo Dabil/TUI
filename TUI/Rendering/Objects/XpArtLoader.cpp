@@ -19,6 +19,7 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <memory>
 
 #include "Rendering/Objects/TextObjectBuilder.h"
 #include "Rendering/Styles/Color.h"
@@ -378,9 +379,88 @@ namespace
         XpArtLoader::XpFrame frame;
         frame.frameIndex = frameIndex;
         frame.label = label;
-        frame.document = document;
+        frame.document = std::make_shared<XpArtLoader::XpDocument>(document);
         sequence.frames.push_back(std::move(frame));
         return sequence;
+    }
+
+    XpArtLoader::XpDocument applyVisibleLayerOverride(
+        const XpArtLoader::XpDocument& sourceDocument,
+        XpArtLoader::XpVisibleLayerMode visibleLayerMode,
+        const std::vector<int>& explicitVisibleLayerIndices)
+    {
+        XpArtLoader::XpDocument resolved = sourceDocument;
+
+        if (visibleLayerMode == XpArtLoader::XpVisibleLayerMode::UseDocumentVisibility)
+        {
+            return resolved;
+        }
+
+        if (visibleLayerMode == XpArtLoader::XpVisibleLayerMode::ForceAllLayersVisible)
+        {
+            for (XpArtLoader::XpLayer& layer : resolved.layers)
+            {
+                layer.visible = true;
+                layer.metadata.visibilityUsedForFlattening = true;
+            }
+
+            return resolved;
+        }
+
+        std::vector<bool> visibleMask(resolved.layers.size(), false);
+        for (int index : explicitVisibleLayerIndices)
+        {
+            if (index >= 0 && index < static_cast<int>(visibleMask.size()))
+            {
+                visibleMask[static_cast<std::size_t>(index)] = true;
+            }
+        }
+
+        for (std::size_t i = 0; i < resolved.layers.size(); ++i)
+        {
+            resolved.layers[i].visible = visibleMask[i];
+            resolved.layers[i].metadata.visibilityUsedForFlattening = visibleMask[i];
+        }
+
+        return resolved;
+    }
+
+    XpArtLoader::XpDocument resolveFrameDocumentForFlattening(
+        const XpArtLoader::XpFrame& frame,
+        const XpArtLoader::XpSequenceMetadata* sequenceMetadata)
+    {
+        const XpArtLoader::XpDocument* document = frame.getDocument();
+        if (document == nullptr)
+        {
+            return {};
+        }
+
+        XpArtLoader::XpSequenceMetadata emptyMetadata;
+        const XpArtLoader::XpSequenceMetadata& metadata =
+            sequenceMetadata != nullptr ? *sequenceMetadata : emptyMetadata;
+
+        const XpArtLoader::XpVisibleLayerMode visibleLayerMode =
+            frame.resolveVisibleLayerMode(metadata);
+
+        return applyVisibleLayerOverride(
+            *document,
+            visibleLayerMode,
+            frame.overrides.explicitVisibleLayerIndices);
+    }
+
+    XpArtLoader::LoadOptions resolveFrameLoadOptions(
+        const XpArtLoader::LoadOptions& options,
+        const XpArtLoader::XpFrame& frame,
+        const XpArtLoader::XpSequenceMetadata* sequenceMetadata)
+    {
+        XpArtLoader::LoadOptions resolved = options;
+
+        XpArtLoader::XpSequenceMetadata emptyMetadata;
+        const XpArtLoader::XpSequenceMetadata& metadata =
+            sequenceMetadata != nullptr ? *sequenceMetadata : emptyMetadata;
+
+        resolved.compositeMode = frame.resolveCompositeMode(metadata);
+        return resolved;
     }
 
     void applyTransparentGlyphOnlyCell(
@@ -815,7 +895,7 @@ namespace XpArtLoader
         XpFrame frame;
         frame.frameIndex = frameIndex;
         frame.label = label;
-        frame.document = buildRetainedDocument(document);
+        frame.document = std::make_shared<XpDocument>(buildRetainedDocument(document));
         return frame;
     }
 
@@ -832,6 +912,13 @@ namespace XpArtLoader
         const std::string& label)
     {
         return makeSingleFrameSequence(document, frameIndex, label);
+    }
+
+    XpSequence buildRetainedSequence(const XpFrame& frame)
+    {
+        XpSequence sequence;
+        sequence.frames.push_back(frame);
+        return sequence;
     }
 
     LoadResult buildTextObject(const ParsedDocument& document, const LoadOptions& options)
@@ -979,8 +1066,20 @@ namespace XpArtLoader
 
     LoadResult buildTextObject(const XpFrame& frame, const LoadOptions& options)
     {
-        LoadResult result = buildTextObject(frame.document, options);
-        result.retainedSequence = buildRetainedSequence(frame.document, frame.frameIndex, frame.label);
+        if (!frame.isValid())
+        {
+            LoadResult result;
+            result.success = false;
+            result.detectedFileType = FileType::Xp;
+            result.errorMessage = "Invalid retained XP frame.";
+            return result;
+        }
+
+        const XpDocument resolvedDocument = resolveFrameDocumentForFlattening(frame, nullptr);
+        const LoadOptions resolvedOptions = resolveFrameLoadOptions(options, frame, nullptr);
+
+        LoadResult result = buildTextObject(resolvedDocument, resolvedOptions);
+        result.retainedSequence = buildRetainedSequence(frame);
         result.hasRetainedSequence = result.retainedSequence.isValid();
         result.resolvedFrameCount = result.retainedSequence.getFrameCount();
         return result;
@@ -1007,10 +1106,15 @@ namespace XpArtLoader
             return result;
         }
 
-        LoadResult result = buildTextObject(frame->document, options);
+        const XpDocument resolvedDocument =
+            resolveFrameDocumentForFlattening(*frame, &sequence.metadata);
+        const LoadOptions resolvedOptions =
+            resolveFrameLoadOptions(options, *frame, &sequence.metadata);
+
+        LoadResult result = buildTextObject(resolvedDocument, resolvedOptions);
         result.retainedSequence = sequence;
-        result.hasRetainedSequence = true;
-        result.resolvedFrameCount = sequence.getFrameCount();
+        result.hasRetainedSequence = result.retainedSequence.isValid();
+        result.resolvedFrameCount = result.retainedSequence.getFrameCount();
         return result;
     }
 
@@ -1395,9 +1499,114 @@ namespace XpArtLoader
         return false;
     }
 
+    bool XpFrameOverrides::isEmpty() const
+    {
+        return !durationMilliseconds.has_value() &&
+            !compositeMode.has_value() &&
+            !visibleLayerMode.has_value() &&
+            explicitVisibleLayerIndices.empty();
+    }
+
+    bool XpFrameOverrides::isValidForDocument(const XpDocument* document) const
+    {
+        if (durationMilliseconds.has_value() && *durationMilliseconds < 0)
+        {
+            return false;
+        }
+
+        if (visibleLayerMode.has_value() &&
+            *visibleLayerMode == XpVisibleLayerMode::UseExplicitVisibleLayerList)
+        {
+            if (document == nullptr || !document->isValid())
+            {
+                return false;
+            }
+
+            for (int index : explicitVisibleLayerIndices)
+            {
+                if (index < 0 || index >= static_cast<int>(document->layers.size()))
+                {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    bool XpSequenceMetadata::isEmpty() const
+    {
+        return !defaultFrameDurationMilliseconds.has_value() &&
+            !defaultCompositeMode.has_value() &&
+            !defaultVisibleLayerMode.has_value() &&
+            sourceManifestPath.empty() &&
+            sequenceLabel.empty();
+    }
+
     bool XpFrame::isValid() const
     {
-        return frameIndex >= 0 && document.isValid();
+        return frameIndex >= 0 &&
+            hasDocument() &&
+            document->isValid() &&
+            overrides.isValidForDocument(document.get());
+    }
+
+    bool XpFrame::hasDocument() const
+    {
+        return document != nullptr;
+    }
+
+    const XpDocument* XpFrame::getDocument() const
+    {
+        return document.get();
+    }
+
+    XpDocument* XpFrame::getDocument()
+    {
+        return document.get();
+    }
+
+    std::optional<int> XpFrame::resolveDurationMilliseconds(
+        const XpSequenceMetadata& sequenceMetadata) const
+    {
+        if (overrides.durationMilliseconds.has_value())
+        {
+            return overrides.durationMilliseconds;
+        }
+
+        return sequenceMetadata.defaultFrameDurationMilliseconds;
+    }
+
+    XpCompositeMode XpFrame::resolveCompositeMode(
+        const XpSequenceMetadata& sequenceMetadata) const
+    {
+        if (overrides.compositeMode.has_value())
+        {
+            return *overrides.compositeMode;
+        }
+
+        if (sequenceMetadata.defaultCompositeMode.has_value())
+        {
+            return *sequenceMetadata.defaultCompositeMode;
+        }
+
+        return XpCompositeMode::Phase45BCompatible;
+    }
+
+    XpVisibleLayerMode XpFrame::resolveVisibleLayerMode(
+        const XpSequenceMetadata& sequenceMetadata) const
+    {
+        if (overrides.visibleLayerMode.has_value())
+        {
+            return *overrides.visibleLayerMode;
+        }
+
+        if (sequenceMetadata.defaultVisibleLayerMode.has_value())
+        {
+            return *sequenceMetadata.defaultVisibleLayerMode;
+        }
+
+        return XpVisibleLayerMode::UseDocumentVisibility;
     }
 
     bool XpSequence::isValid() const
@@ -1423,17 +1632,32 @@ namespace XpArtLoader
         return static_cast<int>(frames.size());
     }
 
-    const XpFrame* XpSequence::tryGetFrame(int frameIndexValue) const
+    const XpFrame* XpSequence::tryGetFrame(int frameOrdinal) const
     {
-        if (frameIndexValue < 0 || frameIndexValue >= static_cast<int>(frames.size()))
+        if (frameOrdinal < 0 || frameOrdinal >= static_cast<int>(frames.size()))
         {
             return nullptr;
         }
 
-        return &frames[static_cast<std::size_t>(frameIndexValue)];
+        return &frames[static_cast<std::size_t>(frameOrdinal)];
+    }
+
+    XpFrame* XpSequence::tryGetFrame(int frameOrdinal)
+    {
+        if (frameOrdinal < 0 || frameOrdinal >= static_cast<int>(frames.size()))
+        {
+            return nullptr;
+        }
+
+        return &frames[static_cast<std::size_t>(frameOrdinal)];
     }
 
     const XpFrame* XpSequence::getDefaultFrame() const
+    {
+        return tryGetFrame(0);
+    }
+
+    XpFrame* XpSequence::getDefaultFrame()
     {
         return tryGetFrame(0);
     }
@@ -1583,6 +1807,34 @@ namespace XpArtLoader
         stream << "XP retained sequence: "
             << "frames=" << result.retainedSequence.getFrameCount();
 
+        if (!result.retainedSequence.metadata.sequenceLabel.empty())
+        {
+            stream << ", label=" << result.retainedSequence.metadata.sequenceLabel;
+        }
+
+        if (!result.retainedSequence.metadata.sourceManifestPath.empty())
+        {
+            stream << ", manifest=" << result.retainedSequence.metadata.sourceManifestPath;
+        }
+
+        if (result.retainedSequence.metadata.defaultFrameDurationMilliseconds.has_value())
+        {
+            stream << ", defaultDurationMs="
+                << *result.retainedSequence.metadata.defaultFrameDurationMilliseconds;
+        }
+
+        if (result.retainedSequence.metadata.defaultCompositeMode.has_value())
+        {
+            stream << ", defaultCompositeMode="
+                << toString(*result.retainedSequence.metadata.defaultCompositeMode);
+        }
+
+        if (result.retainedSequence.metadata.defaultVisibleLayerMode.has_value())
+        {
+            stream << ", defaultVisibleLayerMode="
+                << toString(*result.retainedSequence.metadata.defaultVisibleLayerMode);
+        }
+
         if (firstFrame != nullptr)
         {
             stream << ", defaultFrameIndex=" << firstFrame->frameIndex;
@@ -1592,8 +1844,24 @@ namespace XpArtLoader
                 stream << ", defaultFrameLabel=" << firstFrame->label;
             }
 
-            stream << ", defaultFrameCanvas="
-                << firstFrame->document.width << 'x' << firstFrame->document.height;
+            if (const XpDocument* document = firstFrame->getDocument())
+            {
+                stream << ", defaultFrameCanvas="
+                    << document->width << 'x' << document->height;
+            }
+
+            if (const std::optional<int> durationMs =
+                firstFrame->resolveDurationMilliseconds(result.retainedSequence.metadata);
+                durationMs.has_value())
+            {
+                stream << ", defaultFrameDurationMs=" << *durationMs;
+            }
+
+            stream << ", defaultFrameCompositeMode="
+                << toString(firstFrame->resolveCompositeMode(result.retainedSequence.metadata));
+
+            stream << ", defaultFrameVisibleLayerMode="
+                << toString(firstFrame->resolveVisibleLayerMode(result.retainedSequence.metadata));
         }
 
         return stream.str();
@@ -1649,6 +1917,21 @@ namespace XpArtLoader
             return "Phase45BCompatible";
         case XpCompositeMode::StrictOpaqueOverwrite:
             return "StrictOpaqueOverwrite";
+        default:
+            return "Unknown";
+        }
+    }
+
+    const char* toString(XpVisibleLayerMode visibleLayerMode)
+    {
+        switch (visibleLayerMode)
+        {
+        case XpVisibleLayerMode::UseDocumentVisibility:
+            return "UseDocumentVisibility";
+        case XpVisibleLayerMode::ForceAllLayersVisible:
+            return "ForceAllLayersVisible";
+        case XpVisibleLayerMode::UseExplicitVisibleLayerList:
+            return "UseExplicitVisibleLayerList";
         default:
             return "Unknown";
         }
