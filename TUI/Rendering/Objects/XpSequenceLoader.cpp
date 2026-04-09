@@ -687,6 +687,22 @@ namespace XpSequenceLoader
 
                 result.sequence.metadata.defaultVisibleLayerMode = visibleLayerMode;
             }
+            else if (key == "default_explicit_visible_layers")
+            {
+                if (!tryParseExplicitVisibleLayerList(
+                    value,
+                    result.sequence.metadata.defaultExplicitVisibleLayerIndices))
+                {
+                    addDiagnostic(
+                        result,
+                        DiagnosticCode::InvalidExplicitVisibleLayerList,
+                        "default_explicit_visible_layers must be a comma-separated list of non-negative integers.",
+                        lineNumber,
+                        -1);
+                    result.errorMessage = "Invalid default_explicit_visible_layers.";
+                    return result;
+                }
+            }
             else
             {
                 addDiagnostic(
@@ -779,6 +795,7 @@ namespace XpSequenceLoader
             XpArtLoader::XpFrame frame;
             frame.frameIndex = parsedFrame.frameIndex;
             frame.label = parsedFrame.label;
+            frame.sourcePath = resolvedPath.lexically_normal().string();
             frame.document = std::make_shared<XpArtLoader::XpDocument>(
                 xpLoadResult.retainedDocument);
             frame.overrides = parsedFrame.overrides;
@@ -801,13 +818,20 @@ namespace XpSequenceLoader
 
         if (options.sortFramesByFrameIndex)
         {
-            std::sort(
-                result.sequence.frames.begin(),
-                result.sequence.frames.end(),
-                [](const XpArtLoader::XpFrame& left, const XpArtLoader::XpFrame& right)
-                {
-                    return left.frameIndex < right.frameIndex;
-                });
+            result.sequence.sortFramesByFrameIndex();
+        }
+
+        if (result.sequence.metadata.usesExplicitVisibleLayerList() &&
+            result.sequence.metadata.defaultExplicitVisibleLayerIndices.empty())
+        {
+            addDiagnostic(
+                result,
+                DiagnosticCode::InvalidExplicitVisibleLayerList,
+                "Manifest uses default_visible_layers=UseExplicitVisibleLayerList but does not define default_explicit_visible_layers.",
+                0,
+                -1);
+            result.errorMessage = "Missing default_explicit_visible_layers for explicit sequence default.";
+            return result;
         }
 
         if (!result.sequence.isValid())

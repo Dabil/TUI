@@ -210,6 +210,7 @@ namespace XpArtLoader
         std::vector<int> explicitVisibleLayerIndices;
 
         bool isEmpty() const;
+        bool usesExplicitVisibleLayerList() const;
         bool isValidForDocument(const XpDocument* document) const;
     };
 
@@ -218,22 +219,28 @@ namespace XpArtLoader
         std::optional<int> defaultFrameDurationMilliseconds;
         std::optional<XpCompositeMode> defaultCompositeMode;
         std::optional<XpVisibleLayerMode> defaultVisibleLayerMode;
+        std::vector<int> defaultExplicitVisibleLayerIndices;
 
         std::string sourceManifestPath;
         std::string sequenceLabel;
 
         bool isEmpty() const;
+        bool usesExplicitVisibleLayerList() const;
+        bool isValidForDocument(const XpDocument* document) const;
     };
 
     struct XpFrame
     {
         int frameIndex = 0;
         std::string label;
+        std::string sourcePath;
         std::shared_ptr<XpDocument> document;
         XpFrameOverrides overrides;
 
         bool isValid() const;
         bool hasDocument() const;
+        bool hasLabel() const;
+        bool hasSourcePath() const;
         const XpDocument* getDocument() const;
         XpDocument* getDocument();
 
@@ -245,6 +252,9 @@ namespace XpArtLoader
 
         XpVisibleLayerMode resolveVisibleLayerMode(
             const XpSequenceMetadata& sequenceMetadata) const;
+
+        std::vector<int> resolveExplicitVisibleLayerIndices(
+            const XpSequenceMetadata& sequenceMetadata) const;
     };
 
     struct XpSequence
@@ -254,8 +264,14 @@ namespace XpArtLoader
 
         bool isValid() const;
         int getFrameCount() const;
+        bool hasUniqueFrameIndices() const;
+        bool hasContiguousFrameIndicesStartingAtZero() const;
+        bool areFramesStoredInFrameIndexOrder() const;
+        void sortFramesByFrameIndex();
         const XpFrame* tryGetFrame(int frameOrdinal) const;
         XpFrame* tryGetFrame(int frameOrdinal);
+        const XpFrame* findFrameByIndex(int frameIndex) const;
+        XpFrame* findFrameByIndex(int frameIndex);
         const XpFrame* getDefaultFrame() const;
         XpFrame* getDefaultFrame();
     };

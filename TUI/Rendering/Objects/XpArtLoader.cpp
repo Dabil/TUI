@@ -1499,12 +1499,49 @@ namespace XpArtLoader
         return false;
     }
 
+    namespace
+    {
+        bool areVisibleLayerIndicesValid(
+            const std::vector<int>& visibleLayerIndices,
+            const XpDocument* document)
+        {
+            if (document == nullptr || !document->isValid())
+            {
+                return false;
+            }
+
+            std::vector<bool> seen(document->layers.size(), false);
+            for (int index : visibleLayerIndices)
+            {
+                if (index < 0 || index >= static_cast<int>(document->layers.size()))
+                {
+                    return false;
+                }
+
+                if (seen[static_cast<std::size_t>(index)])
+                {
+                    return false;
+                }
+
+                seen[static_cast<std::size_t>(index)] = true;
+            }
+
+            return true;
+        }
+    }
+
     bool XpFrameOverrides::isEmpty() const
     {
         return !durationMilliseconds.has_value() &&
             !compositeMode.has_value() &&
             !visibleLayerMode.has_value() &&
             explicitVisibleLayerIndices.empty();
+    }
+
+    bool XpFrameOverrides::usesExplicitVisibleLayerList() const
+    {
+        return visibleLayerMode.has_value() &&
+            *visibleLayerMode == XpVisibleLayerMode::UseExplicitVisibleLayerList;
     }
 
     bool XpFrameOverrides::isValidForDocument(const XpDocument* document) const
@@ -1514,21 +1551,16 @@ namespace XpArtLoader
             return false;
         }
 
-        if (visibleLayerMode.has_value() &&
-            *visibleLayerMode == XpVisibleLayerMode::UseExplicitVisibleLayerList)
+        if (!explicitVisibleLayerIndices.empty() &&
+            !areVisibleLayerIndicesValid(explicitVisibleLayerIndices, document))
         {
-            if (document == nullptr || !document->isValid())
-            {
-                return false;
-            }
+            return false;
+        }
 
-            for (int index : explicitVisibleLayerIndices)
-            {
-                if (index < 0 || index >= static_cast<int>(document->layers.size()))
-                {
-                    return false;
-                }
-            }
+        if (usesExplicitVisibleLayerList() &&
+            !areVisibleLayerIndicesValid(explicitVisibleLayerIndices, document))
+        {
+            return false;
         }
 
         return true;
@@ -1539,8 +1571,38 @@ namespace XpArtLoader
         return !defaultFrameDurationMilliseconds.has_value() &&
             !defaultCompositeMode.has_value() &&
             !defaultVisibleLayerMode.has_value() &&
+            defaultExplicitVisibleLayerIndices.empty() &&
             sourceManifestPath.empty() &&
             sequenceLabel.empty();
+    }
+
+    bool XpSequenceMetadata::usesExplicitVisibleLayerList() const
+    {
+        return defaultVisibleLayerMode.has_value() &&
+            *defaultVisibleLayerMode == XpVisibleLayerMode::UseExplicitVisibleLayerList;
+    }
+
+    bool XpSequenceMetadata::isValidForDocument(const XpDocument* document) const
+    {
+        if (defaultFrameDurationMilliseconds.has_value() &&
+            *defaultFrameDurationMilliseconds < 0)
+        {
+            return false;
+        }
+
+        if (!defaultExplicitVisibleLayerIndices.empty() &&
+            !areVisibleLayerIndicesValid(defaultExplicitVisibleLayerIndices, document))
+        {
+            return false;
+        }
+
+        if (usesExplicitVisibleLayerList() &&
+            !areVisibleLayerIndicesValid(defaultExplicitVisibleLayerIndices, document))
+        {
+            return false;
+        }
+
+        return true;
     }
 
     bool XpFrame::isValid() const
@@ -1554,6 +1616,16 @@ namespace XpArtLoader
     bool XpFrame::hasDocument() const
     {
         return document != nullptr;
+    }
+
+    bool XpFrame::hasLabel() const
+    {
+        return !label.empty();
+    }
+
+    bool XpFrame::hasSourcePath() const
+    {
+        return !sourcePath.empty();
     }
 
     const XpDocument* XpFrame::getDocument() const
@@ -1609,6 +1681,17 @@ namespace XpArtLoader
         return XpVisibleLayerMode::UseDocumentVisibility;
     }
 
+    std::vector<int> XpFrame::resolveExplicitVisibleLayerIndices(
+        const XpSequenceMetadata& sequenceMetadata) const
+    {
+        if (!overrides.explicitVisibleLayerIndices.empty())
+        {
+            return overrides.explicitVisibleLayerIndices;
+        }
+
+        return sequenceMetadata.defaultExplicitVisibleLayerIndices;
+    }
+
     bool XpSequence::isValid() const
     {
         if (frames.empty())
@@ -1616,11 +1699,27 @@ namespace XpArtLoader
             return false;
         }
 
+        if (!hasUniqueFrameIndices() || !areFramesStoredInFrameIndexOrder())
+        {
+            return false;
+        }
+
         for (const XpFrame& frame : frames)
         {
-            if (!frame.isValid())
+            if (!frame.isValid() || !metadata.isValidForDocument(frame.getDocument()))
             {
                 return false;
+            }
+
+            if (frame.resolveVisibleLayerMode(metadata) ==
+                XpVisibleLayerMode::UseExplicitVisibleLayerList)
+            {
+                const std::vector<int> visibleLayerIndices =
+                    frame.resolveExplicitVisibleLayerIndices(metadata);
+                if (!areVisibleLayerIndicesValid(visibleLayerIndices, frame.getDocument()))
+                {
+                    return false;
+                }
             }
         }
 
@@ -1630,6 +1729,56 @@ namespace XpArtLoader
     int XpSequence::getFrameCount() const
     {
         return static_cast<int>(frames.size());
+    }
+
+    bool XpSequence::hasUniqueFrameIndices() const
+    {
+        for (std::size_t index = 1; index < frames.size(); ++index)
+        {
+            if (frames[index - 1].frameIndex == frames[index].frameIndex)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool XpSequence::hasContiguousFrameIndicesStartingAtZero() const
+    {
+        for (std::size_t index = 0; index < frames.size(); ++index)
+        {
+            if (frames[index].frameIndex != static_cast<int>(index))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool XpSequence::areFramesStoredInFrameIndexOrder() const
+    {
+        for (std::size_t index = 1; index < frames.size(); ++index)
+        {
+            if (frames[index - 1].frameIndex >= frames[index].frameIndex)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    void XpSequence::sortFramesByFrameIndex()
+    {
+        std::sort(
+            frames.begin(),
+            frames.end(),
+            [](const XpFrame& left, const XpFrame& right)
+            {
+                return left.frameIndex < right.frameIndex;
+            });
     }
 
     const XpFrame* XpSequence::tryGetFrame(int frameOrdinal) const
@@ -1650,6 +1799,32 @@ namespace XpArtLoader
         }
 
         return &frames[static_cast<std::size_t>(frameOrdinal)];
+    }
+
+    const XpFrame* XpSequence::findFrameByIndex(int frameIndex) const
+    {
+        for (const XpFrame& frame : frames)
+        {
+            if (frame.frameIndex == frameIndex)
+            {
+                return &frame;
+            }
+        }
+
+        return nullptr;
+    }
+
+    XpFrame* XpSequence::findFrameByIndex(int frameIndex)
+    {
+        for (XpFrame& frame : frames)
+        {
+            if (frame.frameIndex == frameIndex)
+            {
+                return &frame;
+            }
+        }
+
+        return nullptr;
     }
 
     const XpFrame* XpSequence::getDefaultFrame() const
