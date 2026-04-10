@@ -1,7 +1,6 @@
 ﻿#include "Screens/Developer/XpSequenceDiagnosticsScreen.h"
 
 #include <algorithm>
-#include <sstream>
 #include <string>
 
 #include "Core/Rect.h"
@@ -15,9 +14,9 @@
 namespace
 {
     constexpr int MinimumWidth = 120;
-    constexpr int MinimumHeight = 34;
+    constexpr int MinimumHeight = 36;
 
-    std::string clipText(const std::string& text, int width)
+    std::string clipText(const std::string& text, const int width)
     {
         if (width <= 0)
         {
@@ -39,9 +38,9 @@ namespace
 
     void writeClipped(
         ScreenBuffer& buffer,
-        int x,
-        int y,
-        int width,
+        const int x,
+        const int y,
+        const int width,
         const std::string& text,
         const Style& style)
     {
@@ -55,10 +54,10 @@ namespace
 
     void drawPanel(
         ScreenBuffer& buffer,
-        int x,
-        int y,
-        int width,
-        int height,
+        const int x,
+        const int y,
+        const int width,
+        const int height,
         const std::string& title)
     {
         if (width < 4 || height < 3)
@@ -106,7 +105,7 @@ void XpSequenceDiagnosticsScreen::draw(Surface& surface)
 
     if (screenWidth < MinimumWidth || screenHeight < MinimumHeight)
     {
-        buffer.writeString(2, 2, "XpSequenceDiagnosticsScreen needs at least 120x34.", Themes::Warning);
+        buffer.writeString(2, 2, "XpSequenceDiagnosticsScreen needs at least 120x36.", Themes::Warning);
         return;
     }
 
@@ -128,15 +127,16 @@ void XpSequenceDiagnosticsScreen::draw(Surface& surface)
     drawManifestPanel(buffer, halfWidth, 2, screenWidth - halfWidth - 1, 9);
     drawPlaybackPanel(buffer, 1, 11, halfWidth - 1, 7);
     drawDiagnosticsPanel(buffer, halfWidth, 11, screenWidth - halfWidth - 1, 7);
-    drawFramesPanel(buffer, 1, 18, screenWidth - 2, screenHeight - 19);
+    drawFramesPanel(buffer, 1, 18, halfWidth - 1, screenHeight - 19);
+    drawRetainedDocumentPanel(buffer, halfWidth, 18, screenWidth - halfWidth - 1, screenHeight - 19);
 }
 
 void XpSequenceDiagnosticsScreen::drawSummaryPanel(
     ScreenBuffer& buffer,
-    int x,
-    int y,
-    int width,
-    int height) const
+    const int x,
+    const int y,
+    const int width,
+    const int height) const
 {
     drawPanel(buffer, x, y, width, height, "Sequence Summary");
 
@@ -150,21 +150,16 @@ void XpSequenceDiagnosticsScreen::drawSummaryPanel(
 
 void XpSequenceDiagnosticsScreen::drawManifestPanel(
     ScreenBuffer& buffer,
-    int x,
-    int y,
-    int width,
-    int height) const
+    const int x,
+    const int y,
+    const int width,
+    const int height) const
 {
     drawPanel(buffer, x, y, width, height, "Manifest Fields / Defaults");
 
     writeClipped(buffer, x + 2, y + 1, width - 4, XpSequenceInspection::formatManifestFieldSummary(m_report), Themes::Text);
     writeClipped(buffer, x + 2, y + 3, width - 4, "Manifest path: " + m_report.manifestPath, Themes::Text);
     writeClipped(buffer, x + 2, y + 4, width - 4, "Manifest dir:  " + m_report.manifestDirectory, Themes::Text);
-
-    const std::string explicitLayers = m_report.defaultExplicitVisibleLayerIndices.empty()
-        ? std::string("<none>")
-        : XpSequenceInspection::formatFrameSummary(m_report, -1);
-
     writeClipped(
         buffer,
         x + 2,
@@ -179,16 +174,14 @@ void XpSequenceDiagnosticsScreen::drawManifestPanel(
         width - 4,
         "Validation diagnostics: " + std::to_string(m_report.validationDiagnostics.size()),
         Themes::Text);
-
-    (void)explicitLayers;
 }
 
 void XpSequenceDiagnosticsScreen::drawPlaybackPanel(
     ScreenBuffer& buffer,
-    int x,
-    int y,
-    int width,
-    int height) const
+    const int x,
+    const int y,
+    const int width,
+    const int height) const
 {
     drawPanel(buffer, x, y, width, height, "Future Playback Hooks");
 
@@ -199,10 +192,10 @@ void XpSequenceDiagnosticsScreen::drawPlaybackPanel(
 
 void XpSequenceDiagnosticsScreen::drawDiagnosticsPanel(
     ScreenBuffer& buffer,
-    int x,
-    int y,
-    int width,
-    int height) const
+    const int x,
+    const int y,
+    const int width,
+    const int height) const
 {
     drawPanel(buffer, x, y, width, height, "Diagnostic Snapshot");
 
@@ -251,10 +244,10 @@ void XpSequenceDiagnosticsScreen::drawDiagnosticsPanel(
 
 void XpSequenceDiagnosticsScreen::drawFramesPanel(
     ScreenBuffer& buffer,
-    int x,
-    int y,
-    int width,
-    int height) const
+    const int x,
+    const int y,
+    const int width,
+    const int height) const
 {
     drawPanel(buffer, x, y, width, height, "Frames / Resolved Overrides");
 
@@ -268,6 +261,7 @@ void XpSequenceDiagnosticsScreen::drawFramesPanel(
             break;
         }
 
+        const XpSequenceInspection::FrameInspection& frame = m_report.frames[ordinal];
         writeClipped(
             buffer,
             x + 2,
@@ -276,10 +270,97 @@ void XpSequenceDiagnosticsScreen::drawFramesPanel(
             XpSequenceInspection::formatFrameSummary(m_report, ordinal),
             Themes::Text);
         ++rowY;
+
+        if (rowY > maxRowY)
+        {
+            break;
+        }
+
+        writeClipped(
+            buffer,
+            x + 4,
+            rowY,
+            width - 6,
+            "resolvedVisibleLayers=" + std::to_string(frame.resolvedVisibleLayerCount)
+            + ", resolvedHiddenLayers=" + std::to_string(frame.resolvedHiddenLayerCount),
+            Themes::Info);
+        ++rowY;
     }
 
     if (m_report.frames.empty())
     {
         writeClipped(buffer, x + 2, rowY, width - 4, "No retained frames are available for inspection.", Themes::Warning);
+    }
+}
+
+void XpSequenceDiagnosticsScreen::drawRetainedDocumentPanel(
+    ScreenBuffer& buffer,
+    const int x,
+    const int y,
+    const int width,
+    const int height) const
+{
+    drawPanel(buffer, x, y, width, height, "Retained XP Details (Default Frame)");
+
+    int rowY = y + 1;
+    const int maxRowY = y + height - 2;
+
+    if (m_report.frames.empty())
+    {
+        writeClipped(buffer, x + 2, rowY, width - 4, "No retained frame details are available.", Themes::Warning);
+        return;
+    }
+
+    const XpSequenceInspection::FrameInspection* selectedFrame = nullptr;
+    for (const XpSequenceInspection::FrameInspection& frame : m_report.frames)
+    {
+        if (frame.frameIndex == m_report.playbackMetadata.initialFrameIndex)
+        {
+            selectedFrame = &frame;
+            break;
+        }
+    }
+
+    if (selectedFrame == nullptr)
+    {
+        selectedFrame = &m_report.frames.front();
+    }
+
+    writeClipped(
+        buffer,
+        x + 2,
+        rowY,
+        width - 4,
+        "Frame " + std::to_string(selectedFrame->ordinal)
+        + " / frameIndex=" + std::to_string(selectedFrame->frameIndex),
+        Themes::SectionHeader);
+    ++rowY;
+
+    if (rowY <= maxRowY)
+    {
+        writeClipped(buffer, x + 2, rowY, width - 4, selectedFrame->documentSummary, Themes::Text);
+        ++rowY;
+    }
+
+    if (rowY <= maxRowY)
+    {
+        writeClipped(buffer, x + 2, rowY, width - 4, selectedFrame->visibilityCompositeSummary, Themes::Info);
+        ++rowY;
+    }
+
+    for (const std::string& layerDetail : selectedFrame->layerDetails)
+    {
+        if (rowY > maxRowY)
+        {
+            break;
+        }
+
+        writeClipped(buffer, x + 2, rowY, width - 4, layerDetail, Themes::Text);
+        ++rowY;
+    }
+
+    if (selectedFrame->layerDetails.empty() && rowY <= maxRowY)
+    {
+        writeClipped(buffer, x + 2, rowY, width - 4, "No retained XP layer details are available for the selected frame.", Themes::Warning);
     }
 }

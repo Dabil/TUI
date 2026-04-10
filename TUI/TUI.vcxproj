@@ -177,6 +177,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
     <ClInclude Include="Rendering\Objects\XpArtLoaderTests.h" />
+    <ClInclude Include="Rendering\Objects\XpDiagnosticsFormatting.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceAccess.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceAnimationAdapter.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceInspection.h" />
@@ -270,6 +271,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\XpArtLoaderTests.cpp" />
+    <ClCompile Include="Rendering\Objects\XpDiagnosticsFormatting.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceAccess.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceAnimationAdapter.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceInspection.cpp" />

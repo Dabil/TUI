@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "Rendering/Objects/XpArtLoader.h"
+#include "Rendering/Objects/XpDiagnosticsFormatting.h"
 #include "Rendering/Objects/XpSequenceLoader.h"
 #include "Rendering/Objects/XpSequenceValidation.h"
 
@@ -41,6 +42,12 @@ namespace XpSequenceInspection
         bool hasExplicitVisibleLayerOverride = false;
         std::vector<int> explicitVisibleLayerIndices;
         std::vector<int> resolvedExplicitVisibleLayerIndices;
+
+        std::string documentSummary;
+        std::string visibilityCompositeSummary;
+        std::vector<std::string> layerDetails;
+        int resolvedVisibleLayerCount = 0;
+        int resolvedHiddenLayerCount = 0;
     };
 
     struct SequencePlaybackMetadata

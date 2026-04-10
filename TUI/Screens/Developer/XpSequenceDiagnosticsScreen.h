@@ -24,6 +24,7 @@ private:
     void drawPlaybackPanel(ScreenBuffer& buffer, int x, int y, int width, int height) const;
     void drawDiagnosticsPanel(ScreenBuffer& buffer, int x, int y, int width, int height) const;
     void drawFramesPanel(ScreenBuffer& buffer, int x, int y, int width, int height) const;
+    void drawRetainedDocumentPanel(ScreenBuffer& buffer, int x, int y, int width, int height) const;
 
 private:
     XpSequenceInspection::InspectionReport m_report;

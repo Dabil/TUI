@@ -131,6 +131,42 @@ namespace
         inspection.resolvedExplicitVisibleLayerIndices =
             frame.resolveExplicitVisibleLayerIndices(sequence.metadata);
 
+        if (const XpArtLoader::XpDocument* document = frame.getDocument())
+        {
+            inspection.documentSummary =
+                XpDiagnosticsFormatting::formatXpDocumentSummary(*document);
+            inspection.visibilityCompositeSummary =
+                XpDiagnosticsFormatting::formatXpVisibilityCompositeSummary(
+                    frame,
+                    sequence.metadata);
+
+            const std::vector<XpDiagnosticsFormatting::LayerInspection> layerInspections =
+                XpDiagnosticsFormatting::inspectLayers(
+                    *document,
+                    frame,
+                    sequence.metadata);
+
+            inspection.layerDetails.reserve(layerInspections.size());
+            for (const XpDiagnosticsFormatting::LayerInspection& layerInspection : layerInspections)
+            {
+                inspection.layerDetails.push_back(
+                    XpDiagnosticsFormatting::formatXpLayerDetails(
+                        *document,
+                        frame,
+                        sequence.metadata,
+                        layerInspection.layerIndex));
+
+                if (layerInspection.resolvedVisible)
+                {
+                    ++inspection.resolvedVisibleLayerCount;
+                }
+                else
+                {
+                    ++inspection.resolvedHiddenLayerCount;
+                }
+            }
+        }
+
         return inspection;
     }
 }
