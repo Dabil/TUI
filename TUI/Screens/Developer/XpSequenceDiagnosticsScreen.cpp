@@ -1,4 +1,4 @@
-﻿#include "Screens/XpSequenceDiagnosticsScreen.h"
+﻿#include "Screens/Developer/XpSequenceDiagnosticsScreen.h"
 
 #include <algorithm>
 #include <sstream>
