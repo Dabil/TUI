@@ -264,6 +264,9 @@
     <ClInclude Include="Screens\Developer\XpSequenceDiagnosticsScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rendering\Objects\XpSequenceAnimationAdapter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -477,6 +480,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\Developer\XpSequenceDiagnosticsScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\Objects\XpSequenceAnimationAdapter.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

@@ -178,6 +178,7 @@
     </ClInclude>
     <ClInclude Include="Rendering\Objects\XpArtLoaderTests.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceAccess.h" />
+    <ClInclude Include="Rendering\Objects\XpSequenceAnimationAdapter.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceInspection.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceLoader.h" />
     <ClInclude Include="Rendering\Objects\XpSequenceValidation.h" />
@@ -270,6 +271,7 @@
     </ClCompile>
     <ClCompile Include="Rendering\Objects\XpArtLoaderTests.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceAccess.cpp" />
+    <ClCompile Include="Rendering\Objects\XpSequenceAnimationAdapter.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceInspection.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceLoader.cpp" />
     <ClCompile Include="Rendering\Objects\XpSequenceValidation.cpp" />
