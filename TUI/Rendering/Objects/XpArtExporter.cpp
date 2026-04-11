@@ -116,6 +116,56 @@ namespace
         result.warnings.push_back(warning);
     }
 
+    bool areWarningsEquivalent(
+        const SaveWarning& lhs,
+        const SaveWarning& rhs)
+    {
+        return lhs.code == rhs.code &&
+            lhs.message == rhs.message &&
+            lhs.sourcePosition.x == rhs.sourcePosition.x &&
+            lhs.sourcePosition.y == rhs.sourcePosition.y &&
+            lhs.sourceCodePoint == rhs.sourceCodePoint &&
+            lhs.replacementCodePoint == rhs.replacementCodePoint;
+    }
+
+    void addWarningIfMissing(
+        SaveResult& result,
+        const SaveWarning& warning)
+    {
+        for (const SaveWarning& existing : result.warnings)
+        {
+            if (areWarningsEquivalent(existing, warning))
+            {
+                return;
+            }
+        }
+
+        result.warnings.push_back(warning);
+    }
+
+    void appendFrameWarningsToTopLevel(
+        SaveResult& topLevelResult,
+        const SaveResult& frameResult,
+        const std::string& frameOutputPath)
+    {
+        if (frameResult.warnings.empty())
+        {
+            return;
+        }
+
+        for (const SaveWarning& frameWarning : frameResult.warnings)
+        {
+            SaveWarning mergedWarning = frameWarning;
+            if (!frameOutputPath.empty())
+            {
+                mergedWarning.message =
+                    "Frame export warning [" + frameOutputPath + "]: " + frameWarning.message;
+            }
+
+            addWarningIfMissing(topLevelResult, mergedWarning);
+        }
+    }
+
     std::size_t checkedCellCount(int width, int height, bool& ok)
     {
         ok = false;
@@ -1740,6 +1790,11 @@ namespace XpArtExporter
                     outResult.saveResult.outputPath = framePlan.resolvedFramePath.string();
                     return false;
                 }
+
+                appendFrameWarningsToTopLevel(
+                    outResult.saveResult,
+                    frameResult,
+                    framePlan.resolvedFramePath.string());
             }
 
             FrameFileRecord record;
@@ -1879,6 +1934,11 @@ namespace XpArtExporter
                 outResult.saveResult.outputPath = framePath;
                 return false;
             }
+
+            appendFrameWarningsToTopLevel(
+                outResult.saveResult,
+                frameResult,
+                framePath);
 
             FrameFileRecord record;
             record.frameIndex = frame.frameIndex;
