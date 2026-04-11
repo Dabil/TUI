@@ -388,10 +388,76 @@ namespace
         return !outKey.empty();
     }
 
+    bool handleUnknownField(
+        const std::string& key,
+        const std::string& value,
+        int lineNumber,
+        int frameIndex,
+        bool frameField,
+        const LoadOptions& options,
+        LoadResult& ioResult)
+    {
+        const DiagnosticCode strictCode =
+            frameField ? DiagnosticCode::InvalidFrameDirective : DiagnosticCode::InvalidDirective;
+        const DiagnosticCode ignoredCode =
+            frameField ? DiagnosticCode::UnknownFrameDirectiveIgnored : DiagnosticCode::UnknownDirectiveIgnored;
+        const DiagnosticCode preservedCode =
+            frameField ? DiagnosticCode::UnknownFrameDirectivePreserved : DiagnosticCode::UnknownDirectivePreserved;
+        const std::string fieldLabel = frameField ? "frame field" : "manifest directive";
+        const std::string message = "Unknown " + fieldLabel + ": " + key;
+
+        if (options.unknownFieldPolicy == UnknownFieldPolicy::StrictError)
+        {
+            addDiagnostic(ioResult, strictCode, message, lineNumber, frameIndex);
+            return false;
+        }
+
+        if (options.unknownFieldPolicy == UnknownFieldPolicy::WarnAndIgnore)
+        {
+            addDiagnostic(
+                ioResult,
+                ignoredCode,
+                "Ignoring unknown " + fieldLabel + ": " + key,
+                lineNumber,
+                frameIndex,
+                std::string(),
+                false);
+            return true;
+        }
+
+        std::string extensionKey = frameField
+            ? ("manifest.frame." + std::to_string(frameIndex) + "." + key)
+            : ("manifest.sequence." + key);
+
+        if (!ioResult.sequence.metadata.extensionFields.trySet(extensionKey, value))
+        {
+            addDiagnostic(
+                ioResult,
+                ignoredCode,
+                "Ignoring unknown " + fieldLabel + " because extension storage is full: " + key,
+                lineNumber,
+                frameIndex,
+                std::string(),
+                false);
+            return true;
+        }
+
+        addDiagnostic(
+            ioResult,
+            preservedCode,
+            "Preserved unknown " + fieldLabel + ": " + key,
+            lineNumber,
+            frameIndex,
+            std::string(),
+            false);
+        return true;
+    }
+
     bool parseFrameField(
         const std::string& key,
         const std::string& value,
         int lineNumber,
+        const LoadOptions& options,
         LoadResult& ioResult,
         ParsedFrameLine& ioFrame)
     {
@@ -495,13 +561,14 @@ namespace
             return true;
         }
 
-        addDiagnostic(
-            ioResult,
-            DiagnosticCode::InvalidFrameDirective,
-            "Unknown frame field: " + key,
+        return handleUnknownField(
+            key,
+            value,
             lineNumber,
-            ioFrame.frameIndex);
-        return false;
+            ioFrame.frameIndex,
+            true,
+            options,
+            ioResult);
     }
 
     bool finalizeFrame(
@@ -550,6 +617,7 @@ namespace
     bool parseLegacyFrameLine(
         const std::string& line,
         int lineNumber,
+        const LoadOptions& options,
         LoadResult& ioResult,
         ParsedFrameLine& outFrame)
     {
@@ -587,6 +655,7 @@ namespace
                 trimCopy(token.substr(0, eq)),
                 unquote(trimCopy(token.substr(eq + 1))),
                 lineNumber,
+                options,
                 ioResult,
                 outFrame))
             {
@@ -662,6 +731,7 @@ namespace
         const std::string& key,
         const std::string& value,
         int lineNumber,
+        const LoadOptions& options,
         LoadResult& ioResult)
     {
         XpArtLoader::XpSequenceMetadata& metadata = ioResult.sequence.metadata;
@@ -781,13 +851,14 @@ namespace
             return true;
         }
 
-        addDiagnostic(
-            ioResult,
-            DiagnosticCode::InvalidDirective,
-            "Unknown manifest directive: " + key,
+        return handleUnknownField(
+            key,
+            value,
             lineNumber,
-            -1);
-        return false;
+            -1,
+            false,
+            options,
+            ioResult);
     }
 
     bool tryCanonicalPath(
@@ -939,7 +1010,7 @@ namespace XpSequenceLoader
                     return result;
                 }
 
-                if (!parseFrameField(key, value, lineNumber, result, currentFrame.frame))
+                if (!parseFrameField(key, value, lineNumber, options, result, currentFrame.frame))
                 {
                     result.errorMessage = "Invalid .xpseq frame block.";
                     return result;
@@ -971,7 +1042,7 @@ namespace XpSequenceLoader
             if (startsWith(trimmed, "frame "))
             {
                 ParsedFrameLine frame;
-                if (!parseLegacyFrameLine(trimmed, lineNumber, result, frame))
+                if (!parseLegacyFrameLine(trimmed, lineNumber, options, result, frame))
                 {
                     result.errorMessage = "Invalid .xpseq frame directive.";
                     return result;
@@ -995,7 +1066,7 @@ namespace XpSequenceLoader
                 return result;
             }
 
-            if (!parseSequenceField(key, value, lineNumber, result))
+            if (!parseSequenceField(key, value, lineNumber, options, result))
             {
                 result.errorMessage = "Invalid .xpseq directive.";
                 return result;
@@ -1292,6 +1363,29 @@ namespace XpSequenceLoader
             return "InvalidExplicitVisibleLayerList";
         case DiagnosticCode::XpFrameLoadFailed:
             return "XpFrameLoadFailed";
+        case DiagnosticCode::UnknownDirectiveIgnored:
+            return "UnknownDirectiveIgnored";
+        case DiagnosticCode::UnknownFrameDirectiveIgnored:
+            return "UnknownFrameDirectiveIgnored";
+        case DiagnosticCode::UnknownDirectivePreserved:
+            return "UnknownDirectivePreserved";
+        case DiagnosticCode::UnknownFrameDirectivePreserved:
+            return "UnknownFrameDirectivePreserved";
+        default:
+            return "Unknown";
+        }
+    }
+
+    const char* toString(UnknownFieldPolicy policy)
+    {
+        switch (policy)
+        {
+        case UnknownFieldPolicy::StrictError:
+            return "StrictError";
+        case UnknownFieldPolicy::WarnAndIgnore:
+            return "WarnAndIgnore";
+        case UnknownFieldPolicy::PreserveInMetadata:
+            return "PreserveInMetadata";
         default:
             return "Unknown";
         }

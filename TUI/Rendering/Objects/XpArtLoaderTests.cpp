@@ -9,6 +9,7 @@
 
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Objects/XpArtLoader.h"
+#include "Rendering/Objects/XpSequenceLoader.h"
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
 
@@ -850,6 +851,79 @@ namespace
     }
 #endif
 
+    void testTransparencyPolicyDefaultsMatchLegacyBehavior(TestContext& context)
+    {
+        LoadOptions options;
+        const XpTransparencyPolicy policy = resolveTransparencyPolicy(options);
+
+        expectTrue(context,
+            policy.mode == XpTransparencyMode::RexPaintMagentaBackground,
+            "default transparency mode");
+        expectTrue(context,
+            policy.treatsBackgroundAsTransparent(rgb(255, 0, 255)),
+            "magenta treated as transparent");
+        expectFalse(context,
+            policy.treatsBackgroundAsTransparent(rgb(0, 0, 0)),
+            "black treated as opaque");
+        expectTrue(context,
+            policy.visibleTransparentBaseCellsUseBlackBackground,
+            "transparent base cells default black background");
+    }
+
+    void testUnknownManifestDirectiveCanBePreserved(TestContext& context)
+    {
+        const std::string manifest = R"(xpseq 1
+future_sequence_flag = "enabled"
+frame {
+  index = 0
+  source = "frame0.xp"
+  future_frame_flag = "beta"
+}
+)";
+
+        XpSequenceLoader::LoadOptions options;
+        options.requireContiguousFrameIndices = false;
+        options.unknownFieldPolicy = XpSequenceLoader::UnknownFieldPolicy::PreserveInMetadata;
+        options.xpLoadOptions.flattenLayers = false;
+
+        const XpSequenceLoader::LoadResult result =
+            XpSequenceLoader::loadFromString(manifest, "in_memory.xpseq", options);
+
+        expectFalse(context, result.success, "preserve unknown manifest load success without frame file");
+
+        const XpArtLoader::XpExtensionField* sequenceField =
+            result.sequence.metadata.extensionFields.find("manifest.sequence.future_sequence_flag");
+        if (sequenceField == nullptr || sequenceField->value != "enabled")
+        {
+            context.fail("Expected preserved sequence-level unknown manifest field.");
+        }
+
+        const XpArtLoader::XpExtensionField* frameField =
+            result.sequence.metadata.extensionFields.find("manifest.frame.0.future_frame_flag");
+        if (frameField == nullptr || frameField->value != "beta")
+        {
+            context.fail("Expected preserved frame-level unknown manifest field.");
+        }
+
+        const XpSequenceLoader::Diagnostic* preservedSequence =
+            XpSequenceLoader::getFirstDiagnosticByCode(
+                result,
+                XpSequenceLoader::DiagnosticCode::UnknownDirectivePreserved);
+        if (preservedSequence == nullptr)
+        {
+            context.fail("Expected UnknownDirectivePreserved diagnostic.");
+        }
+
+        const XpSequenceLoader::Diagnostic* preservedFrame =
+            XpSequenceLoader::getFirstDiagnosticByCode(
+                result,
+                XpSequenceLoader::DiagnosticCode::UnknownFrameDirectivePreserved);
+        if (preservedFrame == nullptr)
+        {
+            context.fail("Expected UnknownFrameDirectivePreserved diagnostic.");
+        }
+    }
+
     std::vector<TestCase> buildTestCases()
     {
         std::vector<TestCase> cases =
@@ -865,7 +939,9 @@ namespace
             { "MutableCellEditAndDirtyTracking", &testMutableCellEditAndDirtyTracking },
             { "LayerVisibilityToggleAndFrameDirtyPropagation", &testLayerVisibilityToggleAndFrameDirtyPropagation },
             { "LayerReorderAndSequenceDirtyPropagation", &testLayerReorderAndSequenceDirtyPropagation },
-            { "MutationFailurePaths", &testMutationFailurePaths }
+            { "MutationFailurePaths", &testMutationFailurePaths },
+            { "TransparencyPolicyDefaultsMatchLegacyBehavior", &testTransparencyPolicyDefaultsMatchLegacyBehavior },
+            { "UnknownManifestDirectiveCanBePreserved", &testUnknownManifestDirectiveCanBePreserved }
         };
 
 #if TUI_XP_ART_LOADER_TESTS_HAS_ZLIB

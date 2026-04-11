@@ -1532,7 +1532,7 @@ namespace XpArtExporter
         XpDocument& outDocument)
     {
         outDocument = XpDocument{};
-        outDocument.formatVersion = 1;
+        outDocument.formatVersion = XpArtLoader::XpRulesConfig::rexPaintDefaults().defaultFormatVersion;
         outDocument.canvasWidth = object.getWidth();
         outDocument.canvasHeight = object.getHeight();
 
@@ -1620,7 +1620,7 @@ namespace XpArtExporter
             return false;
         }
 
-        outDocument.formatVersion = document.formatVersion > 0 ? document.formatVersion : 1;
+        outDocument.formatVersion = document.formatVersion > 0 ? document.formatVersion : XpArtLoader::XpRulesConfig::rexPaintDefaults().defaultFormatVersion;
         outDocument.canvasWidth = document.width;
         outDocument.canvasHeight = document.height;
 

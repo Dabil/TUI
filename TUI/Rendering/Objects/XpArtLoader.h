@@ -98,6 +98,56 @@ namespace XpArtLoader
         }
     };
 
+    enum class XpTransparencyMode
+    {
+        RexPaintMagentaBackground,
+        Disabled,
+        ExplicitColorKey
+    };
+
+    struct XpRulesConfig
+    {
+        int defaultFormatVersion = 1;
+        RgbColor transparentBackgroundColor{ 255, 0, 255 };
+        RgbColor opaqueFallbackBackgroundColor{ 0, 0, 0 };
+        XpCompositeMode defaultCompositeMode = XpCompositeMode::Phase45BCompatible;
+
+        static XpRulesConfig rexPaintDefaults();
+    };
+
+    struct XpTransparencyPolicy
+    {
+        XpTransparencyMode mode = XpTransparencyMode::RexPaintMagentaBackground;
+        RgbColor transparentBackgroundColor{ 255, 0, 255 };
+        bool visibleTransparentBaseCellsUseBlackBackground = true;
+
+        bool treatsBackgroundAsTransparent(const RgbColor& color) const;
+
+        static XpTransparencyPolicy rexPaintDefaults();
+    };
+
+    struct XpExtensionField
+    {
+        std::string key;
+        std::string value;
+
+        bool isValid() const
+        {
+            return !key.empty();
+        }
+    };
+
+    struct XpExtensionFields
+    {
+        std::vector<XpExtensionField> fields;
+        std::size_t maxFieldCount = 16;
+
+        bool empty() const;
+        bool exceedsBounds() const;
+        const XpExtensionField* find(std::string_view key) const;
+        bool trySet(std::string key, std::string value);
+    };
+
     struct CellData
     {
         std::uint32_t glyph = 0;
@@ -158,6 +208,7 @@ namespace XpArtLoader
 
         bool visibilityUsedForFlattening = true;
         XpCompositeMode compositeModeUsed = XpCompositeMode::Phase45BCompatible;
+        XpExtensionFields extensionFields;
     };
 
     struct XpDocumentMetadata
@@ -174,6 +225,7 @@ namespace XpArtLoader
         bool inputWasAlreadyDecompressed = false;
 
         XpCompositeMode compositeModeUsed = XpCompositeMode::Phase45BCompatible;
+        XpExtensionFields extensionFields;
     };
 
     struct XpLayerCell
@@ -257,6 +309,7 @@ namespace XpArtLoader
         std::string sourceManifestPath;
         std::string name;
         std::string sequenceLabel;
+        XpExtensionFields extensionFields;
 
         bool isEmpty() const;
         bool usesExplicitVisibleLayerList() const;
@@ -325,6 +378,9 @@ namespace XpArtLoader
         bool treatMagentaBackgroundAsTransparent = true;
         bool visibleTransparentBaseCellsUseBlackBackground = true;
         bool strictLayerSizeValidation = true;
+
+        std::optional<XpRulesConfig> xpRulesOverride;
+        std::optional<XpTransparencyPolicy> transparencyPolicyOverride;
 
         XpCompositeMode compositeMode = XpCompositeMode::Phase45BCompatible;
 
@@ -461,8 +517,12 @@ namespace XpArtLoader
     std::string formatRetainedLayerSummary(const LoadResult& result, int layerIndex);
     std::string formatRetainedSequenceSummary(const LoadResult& result);
 
+    XpRulesConfig resolveXpRules(const LoadOptions& options);
+    XpTransparencyPolicy resolveTransparencyPolicy(const LoadOptions& options);
+
     const char* toString(FileType fileType);
     const char* toString(LoadWarningCode warningCode);
     const char* toString(XpCompositeMode compositeMode);
     const char* toString(XpVisibleLayerMode visibleLayerMode);
+    const char* toString(XpTransparencyMode transparencyMode);
 }

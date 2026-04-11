@@ -63,8 +63,6 @@ namespace
         kForegroundRgbBytes +
         kBackgroundRgbBytes;
 
-    const XpArtLoader::RgbColor kTransparentBackground{ 255, 0, 255 };
-    const XpArtLoader::RgbColor kOpaqueBlack{ 0, 0, 0 };
 
     struct CompositedCell
     {
@@ -88,6 +86,20 @@ namespace
         std::vector<CompositedCell> cells;
         FlattenStats stats;
     };
+
+    const XpArtLoader::XpRulesConfig& defaultXpRules()
+    {
+        static const XpArtLoader::XpRulesConfig rules =
+            XpArtLoader::XpRulesConfig::rexPaintDefaults();
+        return rules;
+    }
+
+    const XpArtLoader::XpTransparencyPolicy& defaultTransparencyPolicy()
+    {
+        static const XpArtLoader::XpTransparencyPolicy policy =
+            XpArtLoader::XpTransparencyPolicy::rexPaintDefaults();
+        return policy;
+    }
 
     std::string toLowerCopy(std::string value)
     {
@@ -221,8 +233,7 @@ namespace
 
     bool isTransparentBackground(const XpArtLoader::RgbColor& color, const XpArtLoader::LoadOptions& options)
     {
-        return options.treatMagentaBackgroundAsTransparent &&
-            color == kTransparentBackground;
+        return XpArtLoader::resolveTransparencyPolicy(options).treatsBackgroundAsTransparent(color);
     }
 
     int layerIndex(int x, int y, int height)
@@ -243,7 +254,7 @@ namespace
 
         for (const XpArtLoader::XpLayerCell& cell : layer.cells)
         {
-            if (cell.background == kTransparentBackground)
+            if (defaultTransparencyPolicy().treatsBackgroundAsTransparent(cell.background))
             {
                 layer.metadata.encounteredTransparentBackgroundCells = true;
 
@@ -546,9 +557,9 @@ namespace
         destination.hasForeground = true;
 
         if (!destination.hasBackground &&
-            options.visibleTransparentBaseCellsUseBlackBackground)
+            XpArtLoader::resolveTransparencyPolicy(options).visibleTransparentBaseCellsUseBlackBackground)
         {
-            destination.background = kOpaqueBlack;
+            destination.background = XpArtLoader::resolveXpRules(options).opaqueFallbackBackgroundColor;
             destination.hasBackground = true;
         }
     }
@@ -933,7 +944,7 @@ namespace XpArtLoader
                 retainedCell.background = parsedCell.background;
                 retainedLayer.cells.push_back(retainedCell);
 
-                if (parsedCell.background == kTransparentBackground)
+                if (defaultTransparencyPolicy().treatsBackgroundAsTransparent(parsedCell.background))
                 {
                     retainedLayer.metadata.encounteredTransparentBackgroundCells = true;
 
@@ -1492,9 +1503,124 @@ namespace XpArtLoader
         return FileType::Unknown;
     }
 
+    XpRulesConfig XpRulesConfig::rexPaintDefaults()
+    {
+        XpRulesConfig rules;
+        rules.defaultFormatVersion = 1;
+        rules.transparentBackgroundColor = { 255, 0, 255 };
+        rules.opaqueFallbackBackgroundColor = { 0, 0, 0 };
+        rules.defaultCompositeMode = XpCompositeMode::Phase45BCompatible;
+        return rules;
+    }
+
+    bool XpTransparencyPolicy::treatsBackgroundAsTransparent(const RgbColor& color) const
+    {
+        switch (mode)
+        {
+        case XpTransparencyMode::Disabled:
+            return false;
+
+        case XpTransparencyMode::RexPaintMagentaBackground:
+        case XpTransparencyMode::ExplicitColorKey:
+            return color == transparentBackgroundColor;
+        }
+
+        return false;
+    }
+
+    XpTransparencyPolicy XpTransparencyPolicy::rexPaintDefaults()
+    {
+        XpTransparencyPolicy policy;
+        policy.mode = XpTransparencyMode::RexPaintMagentaBackground;
+        policy.transparentBackgroundColor = XpRulesConfig::rexPaintDefaults().transparentBackgroundColor;
+        policy.visibleTransparentBaseCellsUseBlackBackground = true;
+        return policy;
+    }
+
+    bool XpExtensionFields::empty() const
+    {
+        return fields.empty();
+    }
+
+    bool XpExtensionFields::exceedsBounds() const
+    {
+        return fields.size() > maxFieldCount;
+    }
+
+    const XpExtensionField* XpExtensionFields::find(std::string_view key) const
+    {
+        for (const XpExtensionField& field : fields)
+        {
+            if (field.key == key)
+            {
+                return &field;
+            }
+        }
+
+        return nullptr;
+    }
+
+    bool XpExtensionFields::trySet(std::string key, std::string value)
+    {
+        if (key.empty())
+        {
+            return false;
+        }
+
+        for (XpExtensionField& field : fields)
+        {
+            if (field.key == key)
+            {
+                field.value = std::move(value);
+                return true;
+            }
+        }
+
+        if (fields.size() >= maxFieldCount)
+        {
+            return false;
+        }
+
+        XpExtensionField field;
+        field.key = std::move(key);
+        field.value = std::move(value);
+        fields.push_back(std::move(field));
+        return true;
+    }
+
+    XpRulesConfig resolveXpRules(const LoadOptions& options)
+    {
+        if (options.xpRulesOverride.has_value())
+        {
+            return *options.xpRulesOverride;
+        }
+
+        return XpRulesConfig::rexPaintDefaults();
+    }
+
+    XpTransparencyPolicy resolveTransparencyPolicy(const LoadOptions& options)
+    {
+        XpTransparencyPolicy policy =
+            options.transparencyPolicyOverride.has_value()
+            ? *options.transparencyPolicyOverride
+            : XpTransparencyPolicy::rexPaintDefaults();
+
+        if (!options.transparencyPolicyOverride.has_value())
+        {
+            policy.visibleTransparentBaseCellsUseBlackBackground =
+                options.visibleTransparentBaseCellsUseBlackBackground;
+
+            policy.mode = options.treatMagentaBackgroundAsTransparent
+                ? XpTransparencyMode::RexPaintMagentaBackground
+                : XpTransparencyMode::Disabled;
+        }
+
+        return policy;
+    }
+
     bool CellData::hasTransparentBackground() const
     {
-        return background == kTransparentBackground;
+        return defaultTransparencyPolicy().treatsBackgroundAsTransparent(background);
     }
 
     bool LayerData::isValid() const
@@ -1555,7 +1681,7 @@ namespace XpArtLoader
 
     bool XpLayerCell::hasTransparentBackground() const
     {
-        return background == kTransparentBackground;
+        return defaultTransparencyPolicy().treatsBackgroundAsTransparent(background);
     }
 
     bool XpLayer::isValid() const
@@ -1882,7 +2008,8 @@ namespace XpArtLoader
             defaultExplicitVisibleLayerIndices.empty() &&
             sourceManifestPath.empty() &&
             name.empty() &&
-            sequenceLabel.empty();
+            sequenceLabel.empty() &&
+            extensionFields.empty();
     }
 
     bool XpSequenceMetadata::usesExplicitVisibleLayerList() const
