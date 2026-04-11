@@ -9,12 +9,12 @@ namespace
         return std::make_shared<TextObject>(std::move(object));
     }
 
-    Data::Assets::LoadTextAssetResult makeFailure(
+    Assets::LoadTextAssetResult makeFailure(
         const std::string& requestedPath,
         const AssetPaths::ResolutionResult& resolution,
         const std::string& errorMessage)
     {
-        Data::Assets::LoadTextAssetResult result;
+        Assets::LoadTextAssetResult result;
         result.success = false;
         result.asset.requestedPath = requestedPath;
         result.asset.assetType = resolution.assetType;
@@ -24,12 +24,12 @@ namespace
         return result;
     }
 
-    Data::Assets::LoadTextAssetResult makeSuccess(
+    Assets::LoadTextAssetResult makeSuccess(
         const std::string& requestedPath,
         const AssetPaths::ResolutionResult& resolution,
         std::shared_ptr<TextObject> object)
     {
-        Data::Assets::LoadTextAssetResult result;
+        Assets::LoadTextAssetResult result;
         result.success = true;
         result.asset.object = std::move(object);
         result.asset.assetType = resolution.assetType;
@@ -40,7 +40,7 @@ namespace
     }
 }
 
-namespace Data::Assets
+namespace Assets
 {
     AssetLibrary::AssetLibrary(AssetLibraryOptions options)
         : m_options(std::move(options))

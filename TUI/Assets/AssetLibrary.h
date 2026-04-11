@@ -14,7 +14,7 @@
 #include "Rendering/Objects/XpSequenceAccess.h"
 #include "Utilities/AssetPaths.h"
 
-namespace Data::Assets
+namespace Assets
 {
     struct AssetLibraryOptions
     {
