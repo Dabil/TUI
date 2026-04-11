@@ -123,12 +123,12 @@ void XpSequenceDiagnosticsScreen::draw(Surface& surface)
     buffer.writeString(screenWidth - 40, 0, "[ manifest-first inspection ]", Themes::Info);
 
     const int halfWidth = screenWidth / 2;
-    drawSummaryPanel(buffer, 1, 2, halfWidth - 1, 9);
-    drawManifestPanel(buffer, halfWidth, 2, screenWidth - halfWidth - 1, 9);
-    drawPlaybackPanel(buffer, 1, 11, halfWidth - 1, 7);
-    drawDiagnosticsPanel(buffer, halfWidth, 11, screenWidth - halfWidth - 1, 7);
-    drawFramesPanel(buffer, 1, 18, halfWidth - 1, screenHeight - 19);
-    drawRetainedDocumentPanel(buffer, halfWidth, 18, screenWidth - halfWidth - 1, screenHeight - 19);
+    drawSummaryPanel(buffer, 1, 2, halfWidth - 1, 10);
+    drawManifestPanel(buffer, halfWidth, 2, screenWidth - halfWidth - 1, 10);
+    drawPlaybackPanel(buffer, 1, 12, halfWidth - 1, 7);
+    drawDiagnosticsPanel(buffer, halfWidth, 12, screenWidth - halfWidth - 1, 7);
+    drawFramesPanel(buffer, 1, 19, halfWidth - 1, screenHeight - 20);
+    drawRetainedDocumentPanel(buffer, halfWidth, 19, screenWidth - halfWidth - 1, screenHeight - 20);
 }
 
 void XpSequenceDiagnosticsScreen::drawSummaryPanel(
@@ -146,6 +146,7 @@ void XpSequenceDiagnosticsScreen::drawSummaryPanel(
     writeClipped(buffer, x + 2, y + 5, width - 4, "Unique indices: " + std::string(m_report.hasUniqueFrameIndices ? "true" : "false"), Themes::Text);
     writeClipped(buffer, x + 2, y + 6, width - 4, "Contiguous from zero: " + std::string(m_report.hasContiguousFrameIndicesStartingAtZero ? "true" : "false"), Themes::Text);
     writeClipped(buffer, x + 2, y + 7, width - 4, "Stored in frame-index order: " + std::string(m_report.framesStoredInFrameIndexOrder ? "true" : "false"), Themes::Text);
+    writeClipped(buffer, x + 2, y + 8, width - 4, XpSequenceInspection::formatOverrideSummary(m_report), Themes::Info);
 }
 
 void XpSequenceDiagnosticsScreen::drawManifestPanel(
@@ -155,22 +156,23 @@ void XpSequenceDiagnosticsScreen::drawManifestPanel(
     const int width,
     const int height) const
 {
-    drawPanel(buffer, x, y, width, height, "Manifest Fields / Defaults");
+    drawPanel(buffer, x, y, width, height, "Manifest Fields / Sources");
 
     writeClipped(buffer, x + 2, y + 1, width - 4, XpSequenceInspection::formatManifestFieldSummary(m_report), Themes::Text);
-    writeClipped(buffer, x + 2, y + 3, width - 4, "Manifest path: " + m_report.manifestPath, Themes::Text);
-    writeClipped(buffer, x + 2, y + 4, width - 4, "Manifest dir:  " + m_report.manifestDirectory, Themes::Text);
+    writeClipped(buffer, x + 2, y + 3, width - 4, XpSequenceInspection::formatSourceResolutionSummary(m_report), Themes::Info);
+    writeClipped(buffer, x + 2, y + 5, width - 4, "Manifest path: " + m_report.manifestPath, Themes::Text);
+    writeClipped(buffer, x + 2, y + 6, width - 4, "Manifest dir:  " + m_report.manifestDirectory, Themes::Text);
     writeClipped(
         buffer,
         x + 2,
-        y + 6,
+        y + 7,
         width - 4,
         "Load diagnostics: " + std::to_string(m_report.loadDiagnostics.size()),
         Themes::Text);
     writeClipped(
         buffer,
         x + 2,
-        y + 7,
+        y + 8,
         width - 4,
         "Validation diagnostics: " + std::to_string(m_report.validationDiagnostics.size()),
         Themes::Text);
@@ -186,8 +188,8 @@ void XpSequenceDiagnosticsScreen::drawPlaybackPanel(
     drawPanel(buffer, x, y, width, height, "Future Playback Hooks");
 
     writeClipped(buffer, x + 2, y + 1, width - 4, XpSequenceInspection::formatPlaybackHookSummary(m_report), Themes::Text);
-    writeClipped(buffer, x + 2, y + 3, width - 4, "This metadata is inspection-only and does not schedule or render frames.", Themes::Info);
-    writeClipped(buffer, x + 2, y + 4, width - 4, "Use it later to seed animation state without changing the existing XP pipeline.", Themes::Info);
+    writeClipped(buffer, x + 2, y + 3, width - 4, "This metadata is inspection-only and does not schedule, interpolate, or render frames.", Themes::Info);
+    writeClipped(buffer, x + 2, y + 4, width - 4, "Use it later to seed animation state while preserving XpSequence -> XpFrame -> TextObject.", Themes::Info);
 }
 
 void XpSequenceDiagnosticsScreen::drawDiagnosticsPanel(
@@ -282,7 +284,8 @@ void XpSequenceDiagnosticsScreen::drawFramesPanel(
             rowY,
             width - 6,
             "resolvedVisibleLayers=" + std::to_string(frame.resolvedVisibleLayerCount)
-            + ", resolvedHiddenLayers=" + std::to_string(frame.resolvedHiddenLayerCount),
+            + ", resolvedHiddenLayers=" + std::to_string(frame.resolvedHiddenLayerCount)
+            + ", hasOverrides=" + std::string(frame.hasAnyRetainedOverride() ? "true" : "false"),
             Themes::Info);
         ++rowY;
     }
@@ -300,7 +303,7 @@ void XpSequenceDiagnosticsScreen::drawRetainedDocumentPanel(
     const int width,
     const int height) const
 {
-    drawPanel(buffer, x, y, width, height, "Retained XP Details (Default Frame)");
+    drawPanel(buffer, x, y, width, height, "Retained XP Details (Initial Frame)");
 
     int rowY = y + 1;
     const int maxRowY = y + height - 2;
@@ -348,6 +351,18 @@ void XpSequenceDiagnosticsScreen::drawRetainedDocumentPanel(
         ++rowY;
     }
 
+    if (rowY <= maxRowY && selectedFrame->hasSourcePath)
+    {
+        writeClipped(
+            buffer,
+            x + 2,
+            rowY,
+            width - 4,
+            "Source: " + selectedFrame->sourcePath + " -> " + selectedFrame->resolvedSourcePath,
+            Themes::Text);
+        ++rowY;
+    }
+
     for (const std::string& layerDetail : selectedFrame->layerDetails)
     {
         if (rowY > maxRowY)
@@ -357,10 +372,5 @@ void XpSequenceDiagnosticsScreen::drawRetainedDocumentPanel(
 
         writeClipped(buffer, x + 2, rowY, width - 4, layerDetail, Themes::Text);
         ++rowY;
-    }
-
-    if (selectedFrame->layerDetails.empty() && rowY <= maxRowY)
-    {
-        writeClipped(buffer, x + 2, rowY, width - 4, "No retained XP layer details are available for the selected frame.", Themes::Warning);
     }
 }

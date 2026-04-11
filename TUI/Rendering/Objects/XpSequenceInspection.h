@@ -48,16 +48,25 @@ namespace XpSequenceInspection
         std::vector<std::string> layerDetails;
         int resolvedVisibleLayerCount = 0;
         int resolvedHiddenLayerCount = 0;
+
+        bool hasAnyRetainedOverride() const;
     };
 
     struct SequencePlaybackMetadata
     {
         bool isInspectable = false;
+        int initialFrameOrdinal = -1;
         int initialFrameIndex = -1;
         int frameCount = 0;
         std::optional<bool> loop;
         std::optional<int> defaultFrameDurationMilliseconds;
         std::optional<int> defaultFramesPerSecond;
+        std::optional<XpArtLoader::XpCompositeMode> defaultCompositeMode;
+        std::optional<XpArtLoader::XpVisibleLayerMode> defaultVisibleLayerMode;
+        bool hasFrameTimingOverrides = false;
+        bool hasFrameVisibilityOrCompositeOverrides = false;
+        bool hasLinkedFrameSources = false;
+        bool hasRetainedFrameDocuments = false;
         std::vector<int> orderedFrameIndices;
     };
 
@@ -84,6 +93,12 @@ namespace XpSequenceInspection
         std::optional<XpArtLoader::XpVisibleLayerMode> defaultVisibleLayerMode;
         std::vector<int> defaultExplicitVisibleLayerIndices;
 
+        int framesWithDocuments = 0;
+        int framesWithSourcePaths = 0;
+        int framesWithAnyOverrides = 0;
+        int framesMissingResolvedSources = 0;
+        int framesEscapingManifestDirectory = 0;
+
         std::vector<FrameInspection> frames;
         std::vector<XpSequenceLoader::Diagnostic> loadDiagnostics;
         std::vector<XpSequenceValidation::Diagnostic> validationDiagnostics;
@@ -106,6 +121,8 @@ namespace XpSequenceInspection
 
     std::string formatInspectionSummary(const InspectionReport& report);
     std::string formatManifestFieldSummary(const InspectionReport& report);
+    std::string formatSourceResolutionSummary(const InspectionReport& report);
+    std::string formatOverrideSummary(const InspectionReport& report);
     std::string formatFrameSummary(const InspectionReport& report, int ordinal);
     std::string formatPlaybackHookSummary(const InspectionReport& report);
 }
