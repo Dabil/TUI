@@ -197,6 +197,229 @@ namespace
             });
     }
 
+    bool hasDuplicateValues(const std::vector<int>& values)
+    {
+        std::vector<int> sorted = values;
+        std::sort(sorted.begin(), sorted.end());
+        return std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end();
+    }
+
+    bool containsParentDirectoryEscape(const std::filesystem::path& relativePath)
+    {
+        const std::filesystem::path normalized = relativePath.lexically_normal();
+        return !normalized.empty() &&
+            !normalized.is_absolute() &&
+            *normalized.begin() == "..";
+    }
+
+    void appendSequenceMetadataWarnings(
+        ValidationResult& result,
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestPath)
+    {
+        if (!sequence.metadata.name.empty() && !sequence.metadata.sequenceLabel.empty())
+        {
+            appendDiagnostic(
+                result,
+                sequence.metadata.name == sequence.metadata.sequenceLabel
+                ? DiagnosticCode::LoadedRedundantMetadata
+                : DiagnosticCode::LoadedConflictingMetadata,
+                sequence.metadata.name == sequence.metadata.sequenceLabel
+                ? "Loaded XP sequence contains both name and sequenceLabel with the same value."
+                : "Loaded XP sequence contains both name and sequenceLabel with different values.",
+                -1,
+                manifestPath,
+                std::string(),
+                false);
+        }
+
+        if (!sequence.metadata.defaultExplicitVisibleLayerIndices.empty())
+        {
+            if (sequence.metadata.defaultVisibleLayerMode != XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList)
+            {
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::LoadedRedundantMetadata,
+                    "Loaded XP sequence contains default explicit visible-layer indices without default_visible_layers=UseExplicitVisibleLayerList.",
+                    -1,
+                    manifestPath,
+                    std::string(),
+                    false);
+            }
+
+            if (hasDuplicateValues(sequence.metadata.defaultExplicitVisibleLayerIndices))
+            {
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::LoadedConflictingMetadata,
+                    "Loaded XP sequence contains duplicate sequence-level explicit visible-layer indices.",
+                    -1,
+                    manifestPath,
+                    std::string(),
+                    false);
+            }
+        }
+
+        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        {
+            if (!frame.sourcePath.empty())
+            {
+                const std::filesystem::path sourcePath(frame.sourcePath);
+                if (sourcePath.is_absolute() || containsParentDirectoryEscape(sourcePath))
+                {
+                    appendDiagnostic(
+                        result,
+                        DiagnosticCode::LoadedSourcePathPortabilityRisk,
+                        sourcePath.is_absolute()
+                        ? "Loaded XP frame source path is absolute and may not be portable."
+                        : "Loaded XP frame source path escapes the manifest directory using '..'.",
+                        frame.frameIndex,
+                        manifestPath,
+                        frame.sourcePath,
+                        false);
+                }
+            }
+
+            if (frame.overrides.durationMilliseconds.has_value() &&
+                sequence.metadata.defaultFrameDurationMilliseconds.has_value() &&
+                frame.overrides.durationMilliseconds == sequence.metadata.defaultFrameDurationMilliseconds)
+            {
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::LoadedRedundantMetadata,
+                    "Loaded XP frame contains a duration override that matches the sequence default.",
+                    frame.frameIndex,
+                    manifestPath,
+                    frame.sourcePath,
+                    false);
+            }
+
+            if (frame.overrides.compositeMode.has_value() &&
+                sequence.metadata.defaultCompositeMode.has_value() &&
+                frame.overrides.compositeMode == sequence.metadata.defaultCompositeMode)
+            {
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::LoadedRedundantMetadata,
+                    "Loaded XP frame contains a composite override that matches the sequence default.",
+                    frame.frameIndex,
+                    manifestPath,
+                    frame.sourcePath,
+                    false);
+            }
+
+            if (frame.overrides.visibleLayerMode.has_value() &&
+                sequence.metadata.defaultVisibleLayerMode.has_value() &&
+                frame.overrides.visibleLayerMode == sequence.metadata.defaultVisibleLayerMode)
+            {
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::LoadedRedundantMetadata,
+                    "Loaded XP frame contains a visible-layer override that matches the sequence default.",
+                    frame.frameIndex,
+                    manifestPath,
+                    frame.sourcePath,
+                    false);
+            }
+
+            if (!frame.overrides.explicitVisibleLayerIndices.empty())
+            {
+                if (frame.overrides.visibleLayerMode != XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList)
+                {
+                    appendDiagnostic(
+                        result,
+                        DiagnosticCode::LoadedRedundantMetadata,
+                        "Loaded XP frame contains explicit visible-layer indices without visible_layers=UseExplicitVisibleLayerList.",
+                        frame.frameIndex,
+                        manifestPath,
+                        frame.sourcePath,
+                        false);
+                }
+
+                if (hasDuplicateValues(frame.overrides.explicitVisibleLayerIndices))
+                {
+                    appendDiagnostic(
+                        result,
+                        DiagnosticCode::LoadedConflictingMetadata,
+                        "Loaded XP frame contains duplicate explicit visible-layer indices.",
+                        frame.frameIndex,
+                        manifestPath,
+                        frame.sourcePath,
+                        false);
+                }
+            }
+        }
+    }
+
+    void appendExportWarningDiagnostics(
+        ValidationResult& result,
+        const TextObjectExporter::SaveResult& saveResult)
+    {
+        for (const TextObjectExporter::SaveWarning& warning : saveResult.warnings)
+        {
+            switch (warning.code)
+            {
+            case TextObjectExporter::SaveWarningCode::XpSequenceMixedLinkedAndGeneratedFrames:
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::ExportMixedLinkedAndGeneratedFrames,
+                    warning.message,
+                    -1,
+                    result.manifestPath,
+                    std::string(),
+                    false);
+                break;
+
+            case TextObjectExporter::SaveWarningCode::XpSequenceSourcePathPortabilityRisk:
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::ExportSourcePathPortabilityRisk,
+                    warning.message,
+                    -1,
+                    result.manifestPath,
+                    std::string(),
+                    false);
+                break;
+
+            case TextObjectExporter::SaveWarningCode::XpSequenceSuspiciousFrameIndexing:
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::ExportSuspiciousFrameIndexing,
+                    warning.message,
+                    -1,
+                    result.manifestPath,
+                    std::string(),
+                    false);
+                break;
+
+            case TextObjectExporter::SaveWarningCode::XpSequenceRedundantMetadata:
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::ExportRedundantMetadata,
+                    warning.message,
+                    -1,
+                    result.manifestPath,
+                    std::string(),
+                    false);
+                break;
+
+            case TextObjectExporter::SaveWarningCode::XpSequenceConflictingMetadata:
+                appendDiagnostic(
+                    result,
+                    DiagnosticCode::ExportConflictingMetadata,
+                    warning.message,
+                    -1,
+                    result.manifestPath,
+                    std::string(),
+                    false);
+                break;
+
+            default:
+                break;
+            }
+        }
+    }
+
     std::string joinIntegers(const std::vector<int>& values)
     {
         std::ostringstream stream;
@@ -462,6 +685,8 @@ namespace
                 options.treatExportLossyWarningsAsErrors);
         }
 
+        appendExportWarningDiagnostics(result, exportResult.saveResult);
+
         bool linkedExistingFrames = false;
         bool generatedFrames = false;
         const std::filesystem::path manifestPath = std::filesystem::path(result.manifestPath).lexically_normal();
@@ -504,7 +729,10 @@ namespace
             }
         }
 
-        if (linkedExistingFrames && generatedFrames)
+        if (linkedExistingFrames && generatedFrames &&
+            !TextObjectExporter::hasWarning(
+                exportResult.saveResult,
+                TextObjectExporter::SaveWarningCode::XpSequenceMixedLinkedAndGeneratedFrames))
         {
             appendDiagnostic(
                 result,
@@ -716,6 +944,8 @@ namespace XpSequenceValidation
                 }
             }
         }
+
+        appendSequenceMetadataWarnings(result, sequence, manifestPath);
 
         result.success = !hasErrors(result.diagnostics);
         if (!result.success && result.errorMessage.empty())
@@ -1178,6 +1408,14 @@ namespace XpSequenceValidation
             return "ExportLossyWarning";
         case DiagnosticCode::ExportMixedLinkedAndGeneratedFrames:
             return "ExportMixedLinkedAndGeneratedFrames";
+        case DiagnosticCode::ExportSourcePathPortabilityRisk:
+            return "ExportSourcePathPortabilityRisk";
+        case DiagnosticCode::ExportSuspiciousFrameIndexing:
+            return "ExportSuspiciousFrameIndexing";
+        case DiagnosticCode::ExportRedundantMetadata:
+            return "ExportRedundantMetadata";
+        case DiagnosticCode::ExportConflictingMetadata:
+            return "ExportConflictingMetadata";
         case DiagnosticCode::ManifestFrameCountMismatch:
             return "ManifestFrameCountMismatch";
         case DiagnosticCode::ManifestFrameIndexMismatch:
@@ -1228,6 +1466,12 @@ namespace XpSequenceValidation
             return "FrameExplicitVisibleLayersMismatch";
         case DiagnosticCode::ReloadedFrameDocumentMissing:
             return "ReloadedFrameDocumentMissing";
+        case DiagnosticCode::LoadedSourcePathPortabilityRisk:
+            return "LoadedSourcePathPortabilityRisk";
+        case DiagnosticCode::LoadedRedundantMetadata:
+            return "LoadedRedundantMetadata";
+        case DiagnosticCode::LoadedConflictingMetadata:
+            return "LoadedConflictingMetadata";
         default:
             return "Unknown";
         }

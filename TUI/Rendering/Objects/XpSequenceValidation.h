@@ -24,6 +24,10 @@ namespace XpSequenceValidation
         ExportFailed,
         ExportLossyWarning,
         ExportMixedLinkedAndGeneratedFrames,
+        ExportSourcePathPortabilityRisk,
+        ExportSuspiciousFrameIndexing,
+        ExportRedundantMetadata,
+        ExportConflictingMetadata,
         ManifestFrameCountMismatch,
         ManifestFrameIndexMismatch,
         ManifestFrameSourceMissing,
@@ -48,7 +52,10 @@ namespace XpSequenceValidation
         FrameCompositeMismatch,
         FrameVisibleLayerModeMismatch,
         FrameExplicitVisibleLayersMismatch,
-        ReloadedFrameDocumentMissing
+        ReloadedFrameDocumentMissing,
+        LoadedSourcePathPortabilityRisk,
+        LoadedRedundantMetadata,
+        LoadedConflictingMetadata
     };
 
     struct Diagnostic

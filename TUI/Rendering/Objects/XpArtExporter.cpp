@@ -143,27 +143,83 @@ namespace
         result.warnings.push_back(warning);
     }
 
+    void appendSaveResultWarnings(
+        SaveResult& topLevelResult,
+        const SaveResult& nestedResult,
+        const std::string& warningContextPrefix)
+    {
+        if (nestedResult.warnings.empty())
+        {
+            return;
+        }
+
+        for (const SaveWarning& nestedWarning : nestedResult.warnings)
+        {
+            SaveWarning mergedWarning = nestedWarning;
+            if (!warningContextPrefix.empty())
+            {
+                mergedWarning.message = warningContextPrefix + nestedWarning.message;
+            }
+
+            addWarningIfMissing(topLevelResult, mergedWarning);
+        }
+    }
+
     void appendFrameWarningsToTopLevel(
         SaveResult& topLevelResult,
         const SaveResult& frameResult,
         const std::string& frameOutputPath)
     {
-        if (frameResult.warnings.empty())
+        if (frameResult.hadLossyConversion)
         {
-            return;
+            topLevelResult.hadLossyConversion = true;
+            topLevelResult.lossyCodePointCount += frameResult.lossyCodePointCount;
         }
 
-        for (const SaveWarning& frameWarning : frameResult.warnings)
+        if (!topLevelResult.hasEncodingFailure && frameResult.hasEncodingFailure)
         {
-            SaveWarning mergedWarning = frameWarning;
-            if (!frameOutputPath.empty())
-            {
-                mergedWarning.message =
-                    "Frame export warning [" + frameOutputPath + "]: " + frameWarning.message;
-            }
-
-            addWarningIfMissing(topLevelResult, mergedWarning);
+            topLevelResult.hasEncodingFailure = true;
+            topLevelResult.firstFailingCodePoint = frameResult.firstFailingCodePoint;
+            topLevelResult.firstFailingPosition = frameResult.firstFailingPosition;
         }
+
+        const std::string warningPrefix = frameOutputPath.empty()
+            ? std::string()
+            : std::string("Frame export warning [") + frameOutputPath + "]: ";
+        appendSaveResultWarnings(topLevelResult, frameResult, warningPrefix);
+    }
+
+    void mergeManifestSaveResultIntoTopLevel(
+        SaveResult& topLevelResult,
+        const SaveResult& manifestSaveResult)
+    {
+        topLevelResult.success = manifestSaveResult.success;
+        topLevelResult.outputPath = manifestSaveResult.outputPath;
+        topLevelResult.resolvedFileType = manifestSaveResult.resolvedFileType;
+        topLevelResult.resolvedEncoding = manifestSaveResult.resolvedEncoding;
+        topLevelResult.resolvedLineEnding = manifestSaveResult.resolvedLineEnding;
+        topLevelResult.usedUtf8Bom = manifestSaveResult.usedUtf8Bom;
+        topLevelResult.bytes = manifestSaveResult.bytes;
+
+        if (manifestSaveResult.hadLossyConversion)
+        {
+            topLevelResult.hadLossyConversion = true;
+            topLevelResult.lossyCodePointCount += manifestSaveResult.lossyCodePointCount;
+        }
+
+        if (!topLevelResult.hasEncodingFailure && manifestSaveResult.hasEncodingFailure)
+        {
+            topLevelResult.hasEncodingFailure = true;
+            topLevelResult.firstFailingCodePoint = manifestSaveResult.firstFailingCodePoint;
+            topLevelResult.firstFailingPosition = manifestSaveResult.firstFailingPosition;
+        }
+
+        if (!manifestSaveResult.errorMessage.empty())
+        {
+            topLevelResult.errorMessage = manifestSaveResult.errorMessage;
+        }
+
+        appendSaveResultWarnings(topLevelResult, manifestSaveResult, std::string());
     }
 
     std::size_t checkedCellCount(int width, int height, bool& ok)
@@ -936,6 +992,194 @@ namespace
         return true;
     }
 
+    bool containsParentDirectoryEscape(const std::filesystem::path& relativePath)
+    {
+        const std::filesystem::path normalized = relativePath.lexically_normal();
+        return !normalized.empty() &&
+            !normalized.is_absolute() &&
+            *normalized.begin() == "..";
+    }
+
+    bool hasDuplicateValues(const std::vector<int>& values)
+    {
+        std::vector<int> sorted = values;
+        std::sort(sorted.begin(), sorted.end());
+        return std::adjacent_find(sorted.begin(), sorted.end()) != sorted.end();
+    }
+
+    void appendManifestLevelWarnings(
+        const XpArtLoader::XpSequence& sequence,
+        const std::string& manifestFilePath,
+        const XpArtExporter::RetainedExportOptions& options,
+        const std::vector<SequenceFramePlan>& framePlans,
+        SaveResult& ioResult)
+    {
+        bool linkedExistingFrames = false;
+        bool wroteNewFrameFiles = false;
+        bool wroteAbsoluteFrameSources = false;
+        bool wroteEscapingRelativeFrameSources = false;
+
+        const std::filesystem::path manifestPath =
+            std::filesystem::path(manifestFilePath).lexically_normal();
+
+        if (!sequence.areFramesStoredInFrameIndexOrder() ||
+            !sequence.hasContiguousFrameIndicesStartingAtZero())
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::XpSequenceSuspiciousFrameIndexing,
+                "Manifest-first .xpseq export is writing frames whose stored order or frame indices are non-contiguous/surprising. Reload remains deterministic, but callers should verify intended playback order.");
+        }
+
+        if (!sequence.metadata.name.empty() && !sequence.metadata.sequenceLabel.empty())
+        {
+            if (sequence.metadata.name == sequence.metadata.sequenceLabel)
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceRedundantMetadata,
+                    "Manifest-first .xpseq export found both sequence name and sequenceLabel with the same value. The manifest will preserve a single name field.");
+            }
+            else
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceConflictingMetadata,
+                    "Manifest-first .xpseq export found both sequence name and sequenceLabel with different values. The manifest writes the name field first, which may hide the older label value on reload.");
+            }
+        }
+
+        if (!sequence.metadata.defaultExplicitVisibleLayerIndices.empty())
+        {
+            if (sequence.metadata.defaultVisibleLayerMode != XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList)
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceRedundantMetadata,
+                    "Manifest-first .xpseq export found default_explicit_visible_layers metadata without default_visible_layers=UseExplicitVisibleLayerList. The explicit layer list is likely redundant or misleading.");
+            }
+
+            if (hasDuplicateValues(sequence.metadata.defaultExplicitVisibleLayerIndices))
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceConflictingMetadata,
+                    "Manifest-first .xpseq export found duplicate sequence-level explicit visible-layer indices. The manifest preserves them, but callers should verify the intended layer list.");
+            }
+        }
+
+        for (std::size_t index = 0; index < framePlans.size(); ++index)
+        {
+            const SequenceFramePlan& framePlan = framePlans[index];
+            const XpArtLoader::XpFrame& frame = *framePlan.frame;
+
+            const std::filesystem::path generatedPath =
+                std::filesystem::path(
+                    buildFrameFilePath(manifestPath.string(), options, frame.frameIndex)).lexically_normal();
+            if (framePlan.resolvedFramePath.lexically_normal() == generatedPath)
+            {
+                wroteNewFrameFiles = true;
+            }
+            else
+            {
+                linkedExistingFrames = true;
+            }
+
+            const std::filesystem::path manifestSourcePath(framePlan.manifestSourcePath);
+            if (manifestSourcePath.is_absolute())
+            {
+                wroteAbsoluteFrameSources = true;
+            }
+            else if (containsParentDirectoryEscape(manifestSourcePath))
+            {
+                wroteEscapingRelativeFrameSources = true;
+            }
+
+            if (frame.overrides.durationMilliseconds.has_value() &&
+                sequence.metadata.defaultFrameDurationMilliseconds.has_value() &&
+                frame.overrides.durationMilliseconds == sequence.metadata.defaultFrameDurationMilliseconds)
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceRedundantMetadata,
+                    "Manifest-first .xpseq export found one or more frame duration overrides that exactly match the sequence default duration.");
+            }
+
+            if (frame.overrides.compositeMode.has_value() &&
+                sequence.metadata.defaultCompositeMode.has_value() &&
+                frame.overrides.compositeMode == sequence.metadata.defaultCompositeMode)
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceRedundantMetadata,
+                    "Manifest-first .xpseq export found one or more frame composite overrides that exactly match the sequence default composite mode.");
+            }
+
+            if (frame.overrides.visibleLayerMode.has_value() &&
+                sequence.metadata.defaultVisibleLayerMode.has_value() &&
+                frame.overrides.visibleLayerMode == sequence.metadata.defaultVisibleLayerMode)
+            {
+                addWarningOnce(
+                    ioResult,
+                    SaveWarningCode::XpSequenceRedundantMetadata,
+                    "Manifest-first .xpseq export found one or more frame visible-layer overrides that exactly match the sequence default visible-layer mode.");
+            }
+
+            if (!frame.overrides.explicitVisibleLayerIndices.empty())
+            {
+                if (frame.overrides.visibleLayerMode != XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList)
+                {
+                    addWarningOnce(
+                        ioResult,
+                        SaveWarningCode::XpSequenceRedundantMetadata,
+                        "Manifest-first .xpseq export found one or more frame explicit_visible_layers lists without visible_layers=UseExplicitVisibleLayerList. The explicit list is likely redundant or misleading.");
+                }
+
+                if (sequence.metadata.defaultVisibleLayerMode == XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList &&
+                    frame.overrides.visibleLayerMode == XpArtLoader::XpVisibleLayerMode::UseExplicitVisibleLayerList &&
+                    frame.overrides.explicitVisibleLayerIndices == sequence.metadata.defaultExplicitVisibleLayerIndices)
+                {
+                    addWarningOnce(
+                        ioResult,
+                        SaveWarningCode::XpSequenceRedundantMetadata,
+                        "Manifest-first .xpseq export found one or more frame explicit visible-layer lists that exactly match the sequence default explicit list.");
+                }
+
+                if (hasDuplicateValues(frame.overrides.explicitVisibleLayerIndices))
+                {
+                    addWarningOnce(
+                        ioResult,
+                        SaveWarningCode::XpSequenceConflictingMetadata,
+                        "Manifest-first .xpseq export found duplicate frame explicit visible-layer indices. The manifest preserves them, but callers should verify the intended frame override.");
+                }
+            }
+        }
+
+        if (wroteAbsoluteFrameSources)
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::XpSequenceSourcePathPortabilityRisk,
+                "Manifest-first .xpseq export wrote one or more absolute frame source paths. The manifest may not be portable across machines or folders.");
+        }
+
+        if (wroteEscapingRelativeFrameSources)
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::XpSequenceSourcePathPortabilityRisk,
+                "Manifest-first .xpseq export wrote one or more relative frame source paths that escape the manifest directory using '..'.");
+        }
+
+        if (wroteNewFrameFiles && linkedExistingFrames)
+        {
+            addWarningOnce(
+                ioResult,
+                SaveWarningCode::XpSequenceMixedLinkedAndGeneratedFrames,
+                "Manifest-first .xpseq export used a mixed strategy: some frames were linked to existing .xp assets while others were emitted as new external .xp files.");
+        }
+    }
+
     void appendManifestDefaults(
         std::ostringstream& stream,
         const XpArtLoader::XpSequenceMetadata& metadata)
@@ -1021,6 +1265,13 @@ namespace
         {
             return false;
         }
+
+        appendManifestLevelWarnings(
+            sequence,
+            manifestFilePath,
+            options,
+            framePlans,
+            ioResult);
 
         std::ostringstream stream;
         stream << "xpseq " << kXpSeqManifestVersion << "\n";
@@ -1807,7 +2058,7 @@ namespace XpArtExporter
         TextObjectExporter::SaveResult manifestSaveResult;
         if (!exportSequenceManifestToBytes(sequence, manifestFilePath, options, manifestSaveResult))
         {
-            outResult.saveResult = manifestSaveResult;
+            mergeManifestSaveResultIntoTopLevel(outResult.saveResult, manifestSaveResult);
             outResult.saveResult.outputPath = manifestFilePath;
             return false;
         }
@@ -1815,7 +2066,7 @@ namespace XpArtExporter
         std::ofstream file(manifestFilePath, std::ios::binary);
         if (!file)
         {
-            outResult.saveResult = manifestSaveResult;
+            mergeManifestSaveResultIntoTopLevel(outResult.saveResult, manifestSaveResult);
             outResult.saveResult.success = false;
             outResult.saveResult.errorMessage = "Failed to open .xpseq manifest output file for writing.";
             outResult.saveResult.outputPath = manifestFilePath;
@@ -1828,7 +2079,7 @@ namespace XpArtExporter
             static_cast<std::streamsize>(manifestSaveResult.bytes.size()));
         if (!file)
         {
-            outResult.saveResult = manifestSaveResult;
+            mergeManifestSaveResultIntoTopLevel(outResult.saveResult, manifestSaveResult);
             outResult.saveResult.success = false;
             outResult.saveResult.errorMessage = "Failed while writing .xpseq manifest output bytes.";
             outResult.saveResult.outputPath = manifestFilePath;
@@ -1836,7 +2087,7 @@ namespace XpArtExporter
             return false;
         }
 
-        outResult.saveResult = manifestSaveResult;
+        mergeManifestSaveResultIntoTopLevel(outResult.saveResult, manifestSaveResult);
         outResult.saveResult.outputPath = manifestFilePath;
 
         bool linkedExistingFrames = false;
@@ -1868,14 +2119,6 @@ namespace XpArtExporter
                 outResult.saveResult,
                 SaveWarningCode::LossyConversionOccurred,
                 "Manifest-first .xpseq export linked one or more existing external .xp frame assets instead of rewriting every frame.");
-        }
-
-        if (wroteNewFrameFiles && linkedExistingFrames)
-        {
-            addWarningOnce(
-                outResult.saveResult,
-                SaveWarningCode::LossyConversionOccurred,
-                "Manifest-first .xpseq export used a mixed strategy: some frames were linked to existing .xp assets while others were emitted as new external .xp files.");
         }
 
         outResult.saveResult.success = true;
