@@ -235,6 +235,66 @@ namespace
         return (y * width) + x;
     }
 
+    void refreshLayerDerivedMetadata(XpArtLoader::XpLayer& layer)
+    {
+        layer.metadata.encounteredTransparentBackgroundCells = false;
+        layer.metadata.encounteredVisibleGlyphsOnTransparentBackground = false;
+        layer.metadata.visibilityUsedForFlattening = layer.visible;
+
+        for (const XpArtLoader::XpLayerCell& cell : layer.cells)
+        {
+            if (cell.background == kTransparentBackground)
+            {
+                layer.metadata.encounteredTransparentBackgroundCells = true;
+
+                if (cell.glyph != 0u && cell.glyph != static_cast<std::uint32_t>(U' '))
+                {
+                    layer.metadata.encounteredVisibleGlyphsOnTransparentBackground = true;
+                }
+            }
+        }
+    }
+
+    void refreshDocumentDerivedMetadata(XpArtLoader::XpDocument& document)
+    {
+        document.metadata.canvasWidth = document.width;
+        document.metadata.canvasHeight = document.height;
+        document.metadata.layerCount = static_cast<int>(document.layers.size());
+        document.metadata.parsedFormatVersion = document.formatVersion;
+        document.metadata.retainedPathAvailable = document.isValid();
+
+        for (std::size_t index = 0; index < document.layers.size(); ++index)
+        {
+            XpArtLoader::XpLayer& layer = document.layers[index];
+            layer.metadata.sourceWidth = layer.width;
+            layer.metadata.sourceHeight = layer.height;
+            layer.metadata.matchedCanvasSize =
+                layer.width == document.width && layer.height == document.height;
+            refreshLayerDerivedMetadata(layer);
+        }
+    }
+
+    XpArtLoader::MutationResult makeMutationFailure(
+        XpArtLoader::MutationErrorCode code,
+        const std::string& message)
+    {
+        XpArtLoader::MutationResult result;
+        result.code = code;
+        result.success = false;
+        result.changed = false;
+        result.message = message;
+        return result;
+    }
+
+    XpArtLoader::MutationResult makeMutationSuccess(bool changed)
+    {
+        XpArtLoader::MutationResult result;
+        result.code = XpArtLoader::MutationErrorCode::None;
+        result.success = true;
+        result.changed = changed;
+        return result;
+    }
+
     std::size_t checkedCellCount(int width, int height, bool& ok)
     {
         ok = false;
@@ -1536,6 +1596,22 @@ namespace XpArtLoader
         return &cells[index];
     }
 
+    XpLayerCell* XpLayer::tryGetCell(int x, int y)
+    {
+        if (!inBounds(x, y))
+        {
+            return nullptr;
+        }
+
+        const std::size_t index = static_cast<std::size_t>(layerIndex(x, y, height));
+        if (index >= cells.size())
+        {
+            return nullptr;
+        }
+
+        return &cells[index];
+    }
+
     bool XpDocument::isValid() const
     {
         if (layers.empty() || width <= 0 || height <= 0)
@@ -1557,6 +1633,123 @@ namespace XpArtLoader
     int XpDocument::getLayerCount() const
     {
         return static_cast<int>(layers.size());
+    }
+
+    bool XpDocument::isDirty() const
+    {
+        return dirty;
+    }
+
+    std::uint64_t XpDocument::getMutationRevision() const
+    {
+        return mutationRevision;
+    }
+
+    void XpDocument::clearDirty()
+    {
+        dirty = false;
+    }
+
+    MutationResult XpDocument::setCell(int layerIndexValue, int x, int y, const XpLayerCell& cell)
+    {
+        if (!isValid())
+        {
+            return makeMutationFailure(
+                MutationErrorCode::InvalidDocument,
+                "Cannot mutate an invalid XP document.");
+        }
+
+        if (layerIndexValue < 0 || layerIndexValue >= static_cast<int>(layers.size()))
+        {
+            return makeMutationFailure(
+                MutationErrorCode::LayerIndexOutOfRange,
+                "Layer index was out of range for setCell().");
+        }
+
+        XpLayer& layer = layers[static_cast<std::size_t>(layerIndexValue)];
+        XpLayerCell* existingCell = layer.tryGetCell(x, y);
+        if (existingCell == nullptr)
+        {
+            return makeMutationFailure(
+                MutationErrorCode::CellOutOfBounds,
+                "Cell coordinates were out of bounds for setCell().");
+        }
+
+        const bool changed =
+            existingCell->glyph != cell.glyph ||
+            existingCell->foreground != cell.foreground ||
+            existingCell->background != cell.background;
+
+        if (!changed)
+        {
+            return makeMutationSuccess(false);
+        }
+
+        *existingCell = cell;
+        refreshLayerDerivedMetadata(layer);
+        dirty = true;
+        ++mutationRevision;
+        return makeMutationSuccess(true);
+    }
+
+    MutationResult XpDocument::setLayerVisibility(int layerIndexValue, bool visibleValue)
+    {
+        if (!isValid())
+        {
+            return makeMutationFailure(
+                MutationErrorCode::InvalidDocument,
+                "Cannot mutate an invalid XP document.");
+        }
+
+        if (layerIndexValue < 0 || layerIndexValue >= static_cast<int>(layers.size()))
+        {
+            return makeMutationFailure(
+                MutationErrorCode::LayerIndexOutOfRange,
+                "Layer index was out of range for setLayerVisibility().");
+        }
+
+        XpLayer& layer = layers[static_cast<std::size_t>(layerIndexValue)];
+        if (layer.visible == visibleValue)
+        {
+            return makeMutationSuccess(false);
+        }
+
+        layer.visible = visibleValue;
+        layer.metadata.visibilityUsedForFlattening = visibleValue;
+        dirty = true;
+        ++mutationRevision;
+        return makeMutationSuccess(true);
+    }
+
+    MutationResult XpDocument::reorderLayer(int fromIndex, int toIndex)
+    {
+        if (!isValid())
+        {
+            return makeMutationFailure(
+                MutationErrorCode::InvalidDocument,
+                "Cannot mutate an invalid XP document.");
+        }
+
+        if (fromIndex < 0 || fromIndex >= static_cast<int>(layers.size()) ||
+            toIndex < 0 || toIndex >= static_cast<int>(layers.size()))
+        {
+            return makeMutationFailure(
+                MutationErrorCode::ReorderIndexOutOfRange,
+                "Layer indices were out of range for reorderLayer().");
+        }
+
+        if (fromIndex == toIndex)
+        {
+            return makeMutationSuccess(false);
+        }
+
+        XpLayer movedLayer = layers[static_cast<std::size_t>(fromIndex)];
+        layers.erase(layers.begin() + fromIndex);
+        layers.insert(layers.begin() + toIndex, std::move(movedLayer));
+        refreshDocumentDerivedMetadata(*this);
+        dirty = true;
+        ++mutationRevision;
+        return makeMutationSuccess(true);
     }
 
     bool hasWarning(const LoadResult& result, LoadWarningCode code)
@@ -1744,6 +1937,19 @@ namespace XpArtLoader
         return !sourcePath.empty();
     }
 
+    bool XpFrame::isDirty() const
+    {
+        return document != nullptr && document->isDirty();
+    }
+
+    void XpFrame::clearDirty()
+    {
+        if (document != nullptr)
+        {
+            document->clearDirty();
+        }
+    }
+
     const XpDocument* XpFrame::getDocument() const
     {
         return document.get();
@@ -1845,6 +2051,27 @@ namespace XpArtLoader
     int XpSequence::getFrameCount() const
     {
         return static_cast<int>(frames.size());
+    }
+
+    bool XpSequence::isDirty() const
+    {
+        for (const XpFrame& frame : frames)
+        {
+            if (frame.isDirty())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    void XpSequence::clearDirty()
+    {
+        for (XpFrame& frame : frames)
+        {
+            frame.clearDirty();
+        }
     }
 
     bool XpSequence::hasUniqueFrameIndices() const

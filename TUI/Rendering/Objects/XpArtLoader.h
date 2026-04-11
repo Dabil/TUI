@@ -46,6 +46,15 @@ namespace XpArtLoader
         UseExplicitVisibleLayerList
     };
 
+    enum class MutationErrorCode
+    {
+        None,
+        InvalidDocument,
+        LayerIndexOutOfRange,
+        CellOutOfBounds,
+        ReorderIndexOutOfRange
+    };
+
     struct SourcePosition
     {
         int x = -1;
@@ -187,6 +196,20 @@ namespace XpArtLoader
         bool isValid() const;
         bool inBounds(int x, int y) const;
         const XpLayerCell* tryGetCell(int x, int y) const;
+        XpLayerCell* tryGetCell(int x, int y);
+    };
+
+    struct MutationResult
+    {
+        MutationErrorCode code = MutationErrorCode::None;
+        bool success = false;
+        bool changed = false;
+        std::string message;
+
+        bool isValid() const
+        {
+            return success && code == MutationErrorCode::None;
+        }
     };
 
     struct XpDocument
@@ -197,9 +220,17 @@ namespace XpArtLoader
         bool usesLegacyLayerCountHeader = false;
         std::vector<XpLayer> layers;
         XpDocumentMetadata metadata;
+        bool dirty = false;
+        std::uint64_t mutationRevision = 0;
 
         bool isValid() const;
         int getLayerCount() const;
+        bool isDirty() const;
+        std::uint64_t getMutationRevision() const;
+        void clearDirty();
+        MutationResult setCell(int layerIndex, int x, int y, const XpLayerCell& cell);
+        MutationResult setLayerVisibility(int layerIndex, bool visible);
+        MutationResult reorderLayer(int fromIndex, int toIndex);
     };
 
     struct XpFrameOverrides
@@ -244,6 +275,8 @@ namespace XpArtLoader
         bool hasDocument() const;
         bool hasLabel() const;
         bool hasSourcePath() const;
+        bool isDirty() const;
+        void clearDirty();
         const XpDocument* getDocument() const;
         XpDocument* getDocument();
 
@@ -267,6 +300,8 @@ namespace XpArtLoader
 
         bool isValid() const;
         int getFrameCount() const;
+        bool isDirty() const;
+        void clearDirty();
         bool hasUniqueFrameIndices() const;
         bool hasContiguousFrameIndicesStartingAtZero() const;
         bool areFramesStoredInFrameIndexOrder() const;
