@@ -270,6 +270,12 @@
     <ClInclude Include="Rendering\Objects\XpDiagnosticsFormatting.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Assets\AssetLibrary.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\AssetPaths.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -489,6 +495,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\XpDiagnosticsFormatting.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Assets\AssetLibrary.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\AssetPaths.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
