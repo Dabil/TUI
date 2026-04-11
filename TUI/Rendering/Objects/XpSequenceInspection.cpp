@@ -173,6 +173,14 @@ namespace
 
 namespace XpSequenceInspection
 {
+    bool FrameInspection::hasAnyRetainedOverride() const
+    {
+        return hasDurationOverride ||
+            hasCompositeOverride ||
+            hasVisibleLayerModeOverride ||
+            hasExplicitVisibleLayerOverride;
+    }
+
     InspectionReport inspectSequence(
         const XpArtLoader::XpSequence& sequence,
         const std::string& manifestPath,
@@ -208,12 +216,38 @@ namespace XpSequenceInspection
         report.frames.reserve(sequence.frames.size());
         for (std::size_t ordinal = 0; ordinal < sequence.frames.size(); ++ordinal)
         {
-            report.frames.push_back(
-                buildFrameInspection(
-                    sequence,
-                    manifestPath,
-                    static_cast<int>(ordinal),
-                    sequence.frames[ordinal]));
+            FrameInspection inspection = buildFrameInspection(
+                sequence,
+                manifestPath,
+                static_cast<int>(ordinal),
+                sequence.frames[ordinal]);
+
+            if (inspection.hasDocument)
+            {
+                ++report.framesWithDocuments;
+            }
+
+            if (inspection.hasSourcePath)
+            {
+                ++report.framesWithSourcePaths;
+            }
+
+            if (inspection.hasAnyRetainedOverride())
+            {
+                ++report.framesWithAnyOverrides;
+            }
+
+            if (inspection.hasSourcePath && !inspection.sourceExistsOnDisk)
+            {
+                ++report.framesMissingResolvedSources;
+            }
+
+            if (inspection.sourcePathEscapesManifestDirectory)
+            {
+                ++report.framesEscapingManifestDirectory;
+            }
+
+            report.frames.push_back(std::move(inspection));
         }
 
         if (loadDiagnostics != nullptr)
@@ -252,16 +286,38 @@ namespace XpSequenceInspection
         metadata.defaultFrameDurationMilliseconds =
             sequence.metadata.defaultFrameDurationMilliseconds;
         metadata.defaultFramesPerSecond = sequence.metadata.defaultFramesPerSecond;
+        metadata.defaultCompositeMode = sequence.metadata.defaultCompositeMode;
+        metadata.defaultVisibleLayerMode = sequence.metadata.defaultVisibleLayerMode;
 
         metadata.orderedFrameIndices.reserve(sequence.frames.size());
-        for (const XpArtLoader::XpFrame& frame : sequence.frames)
+        for (std::size_t ordinal = 0; ordinal < sequence.frames.size(); ++ordinal)
         {
+            const XpArtLoader::XpFrame& frame = sequence.frames[ordinal];
             metadata.orderedFrameIndices.push_back(frame.frameIndex);
+            metadata.hasFrameTimingOverrides =
+                metadata.hasFrameTimingOverrides || frame.overrides.durationMilliseconds.has_value();
+            metadata.hasFrameVisibilityOrCompositeOverrides =
+                metadata.hasFrameVisibilityOrCompositeOverrides ||
+                frame.overrides.compositeMode.has_value() ||
+                frame.overrides.visibleLayerMode.has_value() ||
+                frame.overrides.usesExplicitVisibleLayerList();
+            metadata.hasLinkedFrameSources =
+                metadata.hasLinkedFrameSources || frame.hasSourcePath();
+            metadata.hasRetainedFrameDocuments =
+                metadata.hasRetainedFrameDocuments || frame.hasDocument();
         }
 
         if (const XpArtLoader::XpFrame* defaultFrame = sequence.getDefaultFrame())
         {
             metadata.initialFrameIndex = defaultFrame->frameIndex;
+            for (std::size_t ordinal = 0; ordinal < sequence.frames.size(); ++ordinal)
+            {
+                if (&sequence.frames[ordinal] == defaultFrame)
+                {
+                    metadata.initialFrameOrdinal = static_cast<int>(ordinal);
+                    break;
+                }
+            }
         }
 
         return metadata;
@@ -279,6 +335,9 @@ namespace XpSequenceInspection
             << ", uniqueIndices=" << (report.hasUniqueFrameIndices ? "true" : "false")
             << ", contiguous=" << (report.hasContiguousFrameIndicesStartingAtZero ? "true" : "false")
             << ", storedInOrder=" << (report.framesStoredInFrameIndexOrder ? "true" : "false")
+            << ", retainedDocs=" << report.framesWithDocuments << '/' << report.frameCount
+            << ", sourcePaths=" << report.framesWithSourcePaths << '/' << report.frameCount
+            << ", overrideFrames=" << report.framesWithAnyOverrides
             << ", loadDiagnostics=" << report.loadDiagnostics.size()
             << ", validationDiagnostics=" << report.validationDiagnostics.size();
 
@@ -347,6 +406,61 @@ namespace XpSequenceInspection
         return stream.str();
     }
 
+    std::string formatSourceResolutionSummary(const InspectionReport& report)
+    {
+        if (!report.hasSequence)
+        {
+            return "Source resolution: unavailable";
+        }
+
+        std::ostringstream stream;
+        stream << "Source resolution: manifestDir=";
+        if (report.manifestDirectory.empty())
+        {
+            stream << "<none>";
+        }
+        else
+        {
+            stream << report.manifestDirectory;
+        }
+
+        stream << ", linkedFrames=" << report.framesWithSourcePaths
+            << ", retainedFrames=" << report.framesWithDocuments
+            << ", missingResolvedSources=" << report.framesMissingResolvedSources
+            << ", manifestEscapes=" << report.framesEscapingManifestDirectory;
+
+        return stream.str();
+    }
+
+    std::string formatOverrideSummary(const InspectionReport& report)
+    {
+        if (!report.hasSequence)
+        {
+            return "Resolved overrides: unavailable";
+        }
+
+        int durationOverrideCount = 0;
+        int compositeOverrideCount = 0;
+        int visibilityOverrideCount = 0;
+        int explicitLayerOverrideCount = 0;
+
+        for (const FrameInspection& frame : report.frames)
+        {
+            durationOverrideCount += frame.hasDurationOverride ? 1 : 0;
+            compositeOverrideCount += frame.hasCompositeOverride ? 1 : 0;
+            visibilityOverrideCount += frame.hasVisibleLayerModeOverride ? 1 : 0;
+            explicitLayerOverrideCount += frame.hasExplicitVisibleLayerOverride ? 1 : 0;
+        }
+
+        std::ostringstream stream;
+        stream << "Resolved overrides: duration=" << durationOverrideCount
+            << ", composite=" << compositeOverrideCount
+            << ", visibilityMode=" << visibilityOverrideCount
+            << ", explicitVisibleLayers=" << explicitLayerOverrideCount;
+
+        return stream.str();
+    }
+
     std::string formatFrameSummary(const InspectionReport& report, const int ordinal)
     {
         if (ordinal < 0 || ordinal >= static_cast<int>(report.frames.size()))
@@ -391,7 +505,8 @@ namespace XpSequenceInspection
         }
 
         stream << ", composite=" << XpArtLoader::toString(frame.resolvedCompositeMode)
-            << ", visibleLayers=" << XpArtLoader::toString(frame.resolvedVisibleLayerMode);
+            << ", visibleLayers=" << XpArtLoader::toString(frame.resolvedVisibleLayerMode)
+            << ", hasOverrides=" << (frame.hasAnyRetainedOverride() ? "true" : "false");
 
         if (!frame.resolvedExplicitVisibleLayerIndices.empty())
         {
@@ -411,7 +526,8 @@ namespace XpSequenceInspection
         }
 
         std::ostringstream stream;
-        stream << "Playback hook metadata: initialFrameIndex=" << playback.initialFrameIndex
+        stream << "Playback hook metadata: initialFrameOrdinal=" << playback.initialFrameOrdinal
+            << ", initialFrameIndex=" << playback.initialFrameIndex
             << ", frameCount=" << playback.frameCount;
 
         if (playback.loop.has_value())
@@ -429,6 +545,27 @@ namespace XpSequenceInspection
         {
             stream << ", defaultFps=" << *playback.defaultFramesPerSecond;
         }
+
+        if (playback.defaultCompositeMode.has_value())
+        {
+            stream << ", defaultComposite="
+                << XpArtLoader::toString(*playback.defaultCompositeMode);
+        }
+
+        if (playback.defaultVisibleLayerMode.has_value())
+        {
+            stream << ", defaultVisibleLayers="
+                << XpArtLoader::toString(*playback.defaultVisibleLayerMode);
+        }
+
+        stream << ", frameTimingOverrides="
+            << (playback.hasFrameTimingOverrides ? "true" : "false")
+            << ", visibilityOrCompositeOverrides="
+            << (playback.hasFrameVisibilityOrCompositeOverrides ? "true" : "false")
+            << ", linkedFrameSources="
+            << (playback.hasLinkedFrameSources ? "true" : "false")
+            << ", retainedFrameDocuments="
+            << (playback.hasRetainedFrameDocuments ? "true" : "false");
 
         if (!playback.orderedFrameIndices.empty())
         {
