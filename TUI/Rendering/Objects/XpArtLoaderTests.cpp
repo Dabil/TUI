@@ -279,6 +279,24 @@ namespace
         }
     }
 
+    void expectMutationSuccess(
+        TestContext& context,
+        const MutationResult& result,
+        bool expectedChanged,
+        const std::string& label)
+    {
+        if (!result.success)
+        {
+            context.fail(label + " expected success but failed: " + result.message);
+            return;
+        }
+
+        if (result.changed != expectedChanged)
+        {
+            context.fail(label + " changed flag mismatch.");
+        }
+    }
+
     void expectRgbForeground(
         TestContext& context,
         const TextObjectCell& cell,
@@ -670,6 +688,139 @@ namespace
         }
     }
 
+    void testMutableCellEditAndDirtyTracking(TestContext& context)
+    {
+        const RgbColor fg = rgb(200, 200, 200);
+        const RgbColor bg = rgb(10, 10, 10);
+        const RgbColor newFg = rgb(10, 240, 60);
+        const RgbColor newBg = rgb(0, 0, 120);
+
+        XpDocument document = makeDocument(1, 1, {
+            makeLayer(1, 1, { makeLayerCell(static_cast<std::uint32_t>(U'A'), fg, bg) })
+            });
+
+        expectFalse(context, document.isDirty(), "document dirty before edit");
+        expectEqualInt(context, static_cast<int>(document.getMutationRevision()), 0, "document mutationRevision before edit");
+
+        MutationResult result = document.setCell(
+            0,
+            0,
+            0,
+            makeLayerCell(static_cast<std::uint32_t>(U'Z'), newFg, newBg));
+
+        expectMutationSuccess(context, result, true, "setCell result");
+        expectTrue(context, document.isDirty(), "document dirty after edit");
+        expectEqualInt(context, static_cast<int>(document.getMutationRevision()), 1, "document mutationRevision after edit");
+
+        LoadOptions options;
+        options.flattenLayers = true;
+
+        const LoadResult loadResult = buildTextObjectFromXpDocument(document, options);
+        expectTrue(context, loadResult.success, "recompose after setCell success");
+
+        const TextObjectCell& cell = requireCell(context, loadResult.object, 0, 0, "mutated cell");
+        expectEqualChar(context, cell.glyph, U'Z', "mutated glyph");
+
+        document.clearDirty();
+        expectFalse(context, document.isDirty(), "document dirty after clearDirty");
+
+        MutationResult noOpResult = document.setCell(
+            0,
+            0,
+            0,
+            makeLayerCell(static_cast<std::uint32_t>(U'Z'), newFg, newBg));
+        expectMutationSuccess(context, noOpResult, false, "setCell no-op result");
+        expectEqualInt(context, static_cast<int>(document.getMutationRevision()), 1, "document mutationRevision after no-op");
+    }
+
+    void testLayerVisibilityToggleAndFrameDirtyPropagation(TestContext& context)
+    {
+        const RgbColor fg = rgb(220, 220, 220);
+        const RgbColor bg = rgb(20, 20, 20);
+
+        XpDocument document = makeDocument(1, 1, {
+            makeLayer(1, 1, { makeLayerCell(static_cast<std::uint32_t>(U'B'), fg, bg) }, true),
+            makeLayer(1, 1, { makeLayerCell(static_cast<std::uint32_t>(U'T'), fg, bg) }, true)
+            });
+
+        XpFrame frame;
+        frame.frameIndex = 0;
+        frame.document = std::make_shared<XpDocument>(document);
+
+        MutationResult visibilityResult = frame.getDocument()->setLayerVisibility(1, false);
+        expectMutationSuccess(context, visibilityResult, true, "setLayerVisibility result");
+        expectTrue(context, frame.isDirty(), "frame dirty after visibility edit");
+
+        const LoadResult loadResult = buildTextObjectFromXpFrame(frame);
+        expectTrue(context, loadResult.success, "recompose after visibility edit success");
+        expectHasWarning(context, loadResult, LoadWarningCode::HiddenLayersSkipped);
+
+        const TextObjectCell& cell = requireCell(context, loadResult.object, 0, 0, "visible toggle cell");
+        expectEqualChar(context, cell.glyph, U'B', "visible toggle glyph");
+
+        frame.clearDirty();
+        expectFalse(context, frame.isDirty(), "frame dirty after clearDirty");
+    }
+
+    void testLayerReorderAndSequenceDirtyPropagation(TestContext& context)
+    {
+        const RgbColor fg = rgb(255, 255, 255);
+        const RgbColor bg = rgb(0, 0, 0);
+
+        XpDocument document = makeDocument(1, 1, {
+            makeLayer(1, 1, { makeLayerCell(static_cast<std::uint32_t>(U'B'), fg, bg) }, true),
+            makeLayer(1, 1, { makeLayerCell(static_cast<std::uint32_t>(U'T'), fg, bg) }, true)
+            });
+
+        XpSequence sequence = buildRetainedSequence(document, 0, "frame0");
+        expectFalse(context, sequence.isDirty(), "sequence dirty before reorder");
+
+        XpFrame* frame = sequence.getDefaultFrame();
+        if (frame == nullptr || frame->getDocument() == nullptr)
+        {
+            context.fail("Default frame should be available for reorder test.");
+            return;
+        }
+
+        MutationResult reorderResult = frame->getDocument()->reorderLayer(1, 0);
+        expectMutationSuccess(context, reorderResult, true, "reorderLayer result");
+        expectTrue(context, sequence.isDirty(), "sequence dirty after reorder");
+        expectEqualInt(context, static_cast<int>(frame->getDocument()->getMutationRevision()), 1, "mutationRevision after reorder");
+
+        const LoadResult loadResult = buildTextObjectFromXpSequence(sequence);
+        expectTrue(context, loadResult.success, "recompose after reorder success");
+
+        const TextObjectCell& cell = requireCell(context, loadResult.object, 0, 0, "reordered cell");
+        expectEqualChar(context, cell.glyph, U'B', "reordered glyph");
+
+        sequence.clearDirty();
+        expectFalse(context, sequence.isDirty(), "sequence dirty after clearDirty");
+    }
+
+    void testMutationFailurePaths(TestContext& context)
+    {
+        const RgbColor fg = rgb(200, 200, 200);
+        const RgbColor bg = rgb(10, 10, 10);
+
+        XpDocument document = makeDocument(1, 1, {
+            makeLayer(1, 1, { makeLayerCell(static_cast<std::uint32_t>(U'A'), fg, bg) })
+            });
+
+        MutationResult badLayerResult = document.setLayerVisibility(5, false);
+        expectFalse(context, badLayerResult.success, "bad layer mutation success");
+        expectFalse(context, badLayerResult.changed, "bad layer mutation changed");
+        expectFalse(context, document.isDirty(), "document dirty after failed layer mutation");
+
+        MutationResult badCellResult = document.setCell(
+            0,
+            5,
+            0,
+            makeLayerCell(static_cast<std::uint32_t>(U'Q'), fg, bg));
+        expectFalse(context, badCellResult.success, "bad cell mutation success");
+        expectFalse(context, badCellResult.changed, "bad cell mutation changed");
+        expectFalse(context, document.isDirty(), "document dirty after failed cell mutation");
+    }
+
 #if TUI_XP_ART_LOADER_TESTS_HAS_ZLIB
     void testCompressedInputFlagsWhenZlibIsAvailable(TestContext& context)
     {
@@ -710,7 +861,11 @@ namespace
             { "BottomToTopLayerOrder", &testBottomToTopLayerOrder },
             { "HiddenLayerSkippedDuringFlattening", &testHiddenLayerSkippedDuringFlattening },
             { "StrictVsNonStrictLayerSizeValidation", &testStrictVsNonStrictLayerSizeValidation },
-            { "LoadFromBytesMetadataAndTrailingBytes", &testLoadFromBytesMetadataAndTrailingBytes }
+            { "LoadFromBytesMetadataAndTrailingBytes", &testLoadFromBytesMetadataAndTrailingBytes },
+            { "MutableCellEditAndDirtyTracking", &testMutableCellEditAndDirtyTracking },
+            { "LayerVisibilityToggleAndFrameDirtyPropagation", &testLayerVisibilityToggleAndFrameDirtyPropagation },
+            { "LayerReorderAndSequenceDirtyPropagation", &testLayerReorderAndSequenceDirtyPropagation },
+            { "MutationFailurePaths", &testMutationFailurePaths }
         };
 
 #if TUI_XP_ART_LOADER_TESTS_HAS_ZLIB
