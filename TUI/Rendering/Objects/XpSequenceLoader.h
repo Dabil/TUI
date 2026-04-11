@@ -60,7 +60,11 @@ namespace XpSequenceLoader
         InvalidCompositeMode,
         InvalidVisibleLayerMode,
         InvalidExplicitVisibleLayerList,
-        XpFrameLoadFailed
+        XpFrameLoadFailed,
+        UnknownDirectiveIgnored,
+        UnknownFrameDirectiveIgnored,
+        UnknownDirectivePreserved,
+        UnknownFrameDirectivePreserved
     };
 
     struct Diagnostic
@@ -79,11 +83,19 @@ namespace XpSequenceLoader
         }
     };
 
+    enum class UnknownFieldPolicy
+    {
+        StrictError,
+        WarnAndIgnore,
+        PreserveInMetadata
+    };
+
     struct LoadOptions
     {
         XpArtLoader::LoadOptions xpLoadOptions;
         bool requireContiguousFrameIndices = true;
         bool sortFramesByFrameIndex = true;
+        UnknownFieldPolicy unknownFieldPolicy = UnknownFieldPolicy::StrictError;
     };
 
     struct LoadResult
@@ -111,4 +123,5 @@ namespace XpSequenceLoader
     std::string formatLoadSuccess(const LoadResult& result);
 
     const char* toString(DiagnosticCode code);
+    const char* toString(UnknownFieldPolicy policy);
 }
