@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <string_view>
 
 #include "Assets/Models/AsciiBannerFont.h"
@@ -9,23 +10,104 @@
 
 namespace BannerFactory
 {
-    TextObject makeBannerText(
+    struct LayeredBanner
+    {
+        TextObject main;
+        TextObject shadow;
+
+        bool empty() const
+        {
+            return main.getWidth() <= 0 || main.getHeight() <= 0;
+        }
+    };
+
+    // -------------------------------------------------------------------------
+    // Render option presets
+    // -------------------------------------------------------------------------
+
+    AsciiBanner::RenderOptions defaultOptions();
+    AsciiBanner::RenderOptions kernOptions();
+    AsciiBanner::RenderOptions fullWidthOptions();
+    AsciiBanner::RenderOptions centeredOptions(std::size_t targetWidth);
+    AsciiBanner::RenderOptions centeredKernOptions(std::size_t targetWidth);
+
+    // -------------------------------------------------------------------------
+    // Preferred API: makeBanner(...)
+    // UTF-8 overloads
+    // -------------------------------------------------------------------------
+
+    TextObject makeBanner(
         const AsciiBannerFont& font,
         std::string_view text);
 
-    TextObject makeBannerText(
+    TextObject makeBanner(
         const AsciiBannerFont& font,
         std::string_view text,
         const AsciiBanner::RenderOptions& options);
 
-    TextObject makeBannerText(
+    TextObject makeBanner(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& style);
 
-    TextObject makeBannerText(
+    TextObject makeBanner(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& style,
+        const AsciiBanner::RenderOptions& options);
+
+    // -------------------------------------------------------------------------
+    // Preferred API: makeBanner(...)
+    // UTF-32 overloads
+    // -------------------------------------------------------------------------
+
+    TextObject makeBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text);
+
+    TextObject makeBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const AsciiBanner::RenderOptions& options);
+
+    TextObject makeBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& style);
+
+    TextObject makeBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& style,
+        const AsciiBanner::RenderOptions& options);
+
+    // -------------------------------------------------------------------------
+    // Layered / shadowed helpers
+    // -------------------------------------------------------------------------
+
+    LayeredBanner makeLayeredBanner(
+        const AsciiBannerFont& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle);
+
+    LayeredBanner makeLayeredBanner(
+        const AsciiBannerFont& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const AsciiBanner::RenderOptions& options);
+
+    LayeredBanner makeLayeredBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle);
+
+    LayeredBanner makeLayeredBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
         const AsciiBanner::RenderOptions& options);
 }
