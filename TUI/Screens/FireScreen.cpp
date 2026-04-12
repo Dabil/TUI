@@ -10,7 +10,7 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
-#include "Rendering/Objects/AsciiBanner.h"
+#include "Rendering/Objects/BannerFactory.h"
 
 namespace
 {
@@ -57,14 +57,16 @@ void FireScreen::onEnter()
     options.composeMode = AsciiBanner::ComposeMode::Kern;
     options.transparentSpaces = true;
 
-    m_tuiFireLogoObject = AsciiBanner::generateTextObject(
-        *m_fontResult.asset.font,
+    const AsciiBannerFont& fireFont = *m_fontResult.asset.font;
+
+    m_tuiFireLogoObject = BannerFactory::makeBannerText(
+        fireFont,
         "TUI",
         m_bannerStyle1,
         options);
 
-    m_tuiFireLogoObjectShadow = AsciiBanner::generateTextObject(
-        *m_fontResult.asset.font,
+    m_tuiFireLogoObjectShadow = BannerFactory::makeBannerText(
+        fireFont,
         "TUI",
         m_bannerStyle2,
         options);
