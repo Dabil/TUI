@@ -10,6 +10,8 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
+#include "Rendering/Objects/AsciiBanner.h"
+#include "Rendering/Objects/TextObject.h"
 
 namespace
 {
@@ -67,6 +69,25 @@ void FireScreen::draw(Surface& surface)
         return;
     }
 
+    AsciiBanner banner;
+    banner.setFigletFontDirectory("Assets/Fonts/Figlet");
+    banner.loadFont(AsciiBanner::FontKind::FIGlet, "Fire Font-k");
+
+    const Style bannerStyle = style::Fg(Color::FromBasic(Color::Basic::Red))
+                            + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    AsciiBanner::RenderOptions options;
+    options.composeMode = AsciiBanner::ComposeMode::Kern;
+    options.transparentSpaces = true;
+
+    TextObject titleObject = banner.generateTextObject("TUI", bannerStyle, options);
+
+    const int bannerWidth = titleObject.getWidth();
+    const int bannerHeight = titleObject.getHeight();
+
+    const int bannerX = (screenWidth - bannerWidth) / 2;
+    const int bannerY = (screenHeight - bannerHeight) / 4;
+
     m_fireLeft = 2;
     m_fireTop = 3;
 
@@ -113,6 +134,9 @@ void FireScreen::draw(Surface& surface)
     buffer.writeString(5, 0, " Fire Simulation ", borderText);
     buffer.writeString(4, screenHeight - 1, "[                 ]", frameStyle);
     buffer.writeString(5, screenHeight - 1, " Buffered Flames ", borderText);
+
+    titleObject.draw(buffer, bannerX, bannerY);
+
 }
 
 void FireScreen::ensureSimulationSize(int width, int height)
