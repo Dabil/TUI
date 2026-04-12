@@ -53,23 +53,18 @@ void FireScreen::onEnter()
         return;
     }
 
-    AsciiBanner::RenderOptions options;
-    options.composeMode = AsciiBanner::ComposeMode::Kern;
+    AsciiBanner::RenderOptions options = BannerFactory::kernOptions();
     options.transparentSpaces = true;
 
-    const AsciiBannerFont& fireFont = *m_fontResult.asset.font;
-
-    m_tuiFireLogoObject = BannerFactory::makeBannerText(
-        fireFont,
+    const BannerFactory::LayeredBanner layered = BannerFactory::makeLayeredBanner(
+        *m_fontResult.asset.font,
         "TUI",
-        m_bannerStyle1,
+        m_bannerStyle,
+        m_bannerStyleShadow,
         options);
 
-    m_tuiFireLogoObjectShadow = BannerFactory::makeBannerText(
-        fireFont,
-        "TUI",
-        m_bannerStyle2,
-        options);
+    m_tuiFireLogoObject = layered.main;
+    m_tuiFireLogoObjectShadow = layered.shadow;
 }
 
 void FireScreen::onExit()
