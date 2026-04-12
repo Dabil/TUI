@@ -168,6 +168,7 @@
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\Objects\AnsiLoader.h" />
     <ClInclude Include="Rendering\Objects\AsciiBanner.h" />
+    <ClInclude Include="Rendering\Objects\BannerFactory.h" />
     <ClInclude Include="Rendering\Objects\BinaryArtLoader.h" />
     <ClInclude Include="Rendering\Objects\Cp437Encoding.h" />
     <ClInclude Include="Rendering\Objects\ObjectFactory.h" />
@@ -265,6 +266,7 @@
     <ClCompile Include="Rendering\FrameDiff.cpp" />
     <ClCompile Include="Rendering\Objects\AnsiLoader.cpp" />
     <ClCompile Include="Rendering\Objects\AsciiBanner.cpp" />
+    <ClCompile Include="Rendering\Objects\BannerFactory.cpp" />
     <ClCompile Include="Rendering\Objects\BinaryArtLoader.cpp" />
     <ClCompile Include="Rendering\Objects\Cp437Encoding.cpp" />
     <ClCompile Include="Rendering\Objects\ObjectFactory.cpp" />
