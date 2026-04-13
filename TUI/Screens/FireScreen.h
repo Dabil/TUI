@@ -43,7 +43,6 @@ private:
 
     std::string m_tuiFireLogoKey = "banner.fireFontK";
     TextObject m_tuiFireLogoObject;
-    TextObject m_tuiFireLogoObjectShadow;
     Assets::LoadBannerFontResult m_fontResult;
 
     int m_fireLeft = 0;

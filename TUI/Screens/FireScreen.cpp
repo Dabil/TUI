@@ -44,7 +44,6 @@ void FireScreen::onEnter()
     m_fireBuffer.clear();
     m_nextFireBuffer.clear();
     m_tuiFireLogoObject.clear();
-    m_tuiFireLogoObjectShadow.clear();
 
     m_fontResult = m_assetLibrary.loadBannerFont(m_tuiFireLogoKey);
 
@@ -56,21 +55,19 @@ void FireScreen::onEnter()
     AsciiBanner::RenderOptions options = BannerFactory::kernOptions();
     options.transparentSpaces = true;
 
-    const BannerFactory::LayeredBanner layered = BannerFactory::makeLayeredBanner(
+    m_tuiFireLogoObject = BannerFactory::makeShadowBanner(
         *m_fontResult.asset.font,
         "TUI",
         m_bannerStyle,
         m_bannerStyleShadow,
-        options);
-
-    m_tuiFireLogoObject = layered.main;
-    m_tuiFireLogoObjectShadow = layered.shadow;
+        options,
+        1,
+        1);
 }
 
 void FireScreen::onExit()
 {
     m_tuiFireLogoObject.clear();
-    m_tuiFireLogoObjectShadow.clear();
 }
 
 void FireScreen::update(double deltaTime)
@@ -162,7 +159,6 @@ void FireScreen::draw(Surface& surface)
     const int bannerX = (screenWidth - bannerWidth) / 2;
     const int bannerY = (screenHeight - bannerHeight) / 4;
 
-    m_tuiFireLogoObjectShadow.draw(buffer, bannerX, bannerY);
     m_tuiFireLogoObject.draw(buffer, bannerX - 1, bannerY - 1);
 }
 
