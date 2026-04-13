@@ -12,12 +12,14 @@ namespace BannerFactory
 {
     struct LayeredBanner
     {
-        TextObject main;
-        TextObject shadow;
+        TextObject layerOne;
+        TextObject layerTwo;
+        int layerOffsetX = 0;
+        int layerOffsetY = 0;
 
         bool empty() const
         {
-            return main.getWidth() <= 0 || main.getHeight() <= 0;
+            return layerOne.getWidth() <= 0 || layerOne.getHeight() <= 0;
         }
     };
 
@@ -82,32 +84,106 @@ namespace BannerFactory
         const AsciiBanner::RenderOptions& options);
 
     // -------------------------------------------------------------------------
-    // Layered / shadowed helpers
+    // Generic layered helpers
     // -------------------------------------------------------------------------
 
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle);
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle);
 
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle,
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle,
         const AsciiBanner::RenderOptions& options);
 
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::u32string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle);
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle);
 
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::u32string_view text,
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle,
+        const AsciiBanner::RenderOptions& options);
+
+    // -------------------------------------------------------------------------
+    // Shadow effects
+    // Flattened helpers return a single composited TextObject.
+    // Layered helpers preserve independent layers and carry shadow offsets.
+    // -------------------------------------------------------------------------
+
+    TextObject makeShadowBanner(
+        const AsciiBannerFont& font,
+        std::string_view text,
         const Style& mainStyle,
         const Style& shadowStyle,
-        const AsciiBanner::RenderOptions& options);
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    TextObject makeShadowBanner(
+        const AsciiBannerFont& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const AsciiBanner::RenderOptions& options,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    TextObject makeShadowBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    TextObject makeShadowBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const AsciiBanner::RenderOptions& options,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    LayeredBanner makeLayeredShadowBanner(
+        const AsciiBannerFont& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    LayeredBanner makeLayeredShadowBanner(
+        const AsciiBannerFont& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const AsciiBanner::RenderOptions& options,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    LayeredBanner makeLayeredShadowBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    LayeredBanner makeLayeredShadowBanner(
+        const AsciiBannerFont& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const AsciiBanner::RenderOptions& options,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
 }
