@@ -123,6 +123,8 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
+    configureAssetLibrary();
+
     if (m_validationScreenStart == StartupValidationScreenPreference::ValidationStartTrue)
     {
         m_currentScreenType = ScreenType::TerminalCapabilities;
@@ -231,7 +233,7 @@ void Application::switchToScreen(ScreenType screenType)
         break;
 
     case ScreenType::Fire:
-        m_screenManager->pushScreen(std::make_unique<FireScreen>());
+        m_screenManager->pushScreen(std::make_unique<FireScreen>(m_assetLibrary));
         break;
     }
 
@@ -277,4 +279,10 @@ void Application::updateScreenCycle(double deltaTime)
         m_screenCycleElapsedSeconds -= m_screenCycleIntervalSeconds;
         advanceScreen();
     }
+}
+
+void Application::configureAssetLibrary()
+{
+    m_assetLibrary.setAssetsRoot("Assets");
+    m_assetLibrary.registerAlias("banner.fireFontK", "Fonts/FIGlet/Fire Font-k.flf");
 }

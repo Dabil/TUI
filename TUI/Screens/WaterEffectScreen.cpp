@@ -10,6 +10,7 @@
 #include "Rendering/Styles/BannerThemes.h"
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/Styles/StyleBuilder.h"
+#include "Rendering/Objects/ObjectFactory.h"
 
 namespace
 {
@@ -60,11 +61,44 @@ namespace
     }
 }
 
+namespace WaterColors
+{
+    inline const Style TitleColor =
+        style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+
+    inline const Style TitleColorUnderlined =
+          style::Bold
+        + style::Underline
+        + style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+
+    inline const Style BorderColor =
+          style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+
+    inline const Style SprinkleColor =
+        style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::Green))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style LightRainColor =
+        style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::Blue))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style PouringColor =
+        style::SlowBlink
+        + style::Fg(Color::FromBasic(Color::Basic::Red))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+}
+
 WaterEffectScreen::WaterEffectScreen()
 {
-    m_modeColor[0] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Green)) + style::Bg(Color::FromBasic(Color::Basic::Black));
-    m_modeColor[1] = style::Bold + style::Fg(Color::FromBasic(Color::Basic::Blue)) + style::Bg(Color::FromBasic(Color::Basic::Black));
-    m_modeColor[2] = style::SlowBlink + style::Fg(Color::FromBasic(Color::Basic::Red)) + style::Bg(Color::FromBasic(Color::Basic::Black));
+    m_modeColor[0] = WaterColors::SprinkleColor;
+    m_modeColor[1] = WaterColors::LightRainColor;
+    m_modeColor[2] = WaterColors::PouringColor;
 }
 
 void WaterEffectScreen::onEnter()
@@ -103,23 +137,26 @@ void WaterEffectScreen::draw(Surface& surface)
         return;
     }
 
-    m_waveLeft = 1;
-    m_waveTop = 1;
-    m_waveWidth = std::max(0, screenWidth - 2);
-    m_waveHeight = std::max(0, screenHeight - 2);
+    TextObject outerFrame = ObjectFactory::makeFrame(screenWidth, screenHeight, ObjectFactory::roundedBorder());
+    TextObject innerFrame = ObjectFactory::makeFrame(screenWidth - 4, screenHeight - 2, ObjectFactory::roundedBorder());
+
+    outerFrame.draw(buffer, 0, 0, WaterColors::BorderColor);
+    innerFrame.draw(buffer, 2, 1, WaterColors::BorderColor);
+
+    m_waveLeft = 3;
+    m_waveTop = 2;
+    m_waveWidth = std::max(0, screenWidth - 6);
+    m_waveHeight = std::max(0, screenHeight - 4);
 
     ensureSimulationSize(m_waveWidth, m_waveHeight);
     renderWaveField(surface);
-
-    buffer.drawFrame(
-        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        style::Fg(Color::FromBasic(Color::Basic::White)) + style::Bg(Color::FromBasic(Color::Basic::Black)));
-
-    buffer.writeString(4, 0, "[ Rain Drops Water Effect ]", Themes::Subtitle);
+    
+    buffer.writeString(4, 0, "[                         ]", WaterColors::TitleColor);
+    buffer.writeString(5, 0, " Rain Drops Water Effect "  , WaterColors::TitleColorUnderlined);
 
     int startModeXpos = 4;
 
-    buffer.writeString(startModeXpos, screenHeight - 1, "[ Mode:", Themes::Subtitle);
+    buffer.writeString(startModeXpos, screenHeight - 1, "[ Mode:", WaterColors::TitleColor);
     startModeXpos += 7;
 
     switch (m_rainMode)
@@ -140,7 +177,7 @@ void WaterEffectScreen::draw(Surface& surface)
         break;
     }
 
-    buffer.writeChar(startModeXpos, screenHeight - 1, U']', Themes::Subtitle);
+    buffer.writeChar(startModeXpos, screenHeight - 1, U']', WaterColors::TitleColor);
 }
 
 void WaterEffectScreen::ensureSimulationSize(int width, int height)
@@ -415,15 +452,15 @@ Style WaterEffectScreen::selectWaveStyle(int amplitude, char32_t sourceGlyph) co
     if (magnitude >= 24)
     {
         return style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
-            + style::Bg(Color::FromBasic(Color::Basic::Blue));
+             + style::Bg(Color::FromBasic(Color::Basic::Blue));
     }
 
     if (magnitude >= 10)
     {
         return style::Fg(Color::FromBasic(Color::Basic::Cyan))
-            + style::Bg(Color::FromBasic(Color::Basic::Blue));
+             + style::Bg(Color::FromBasic(Color::Basic::Blue));
     }
 
     return style::Fg(Color::FromBasic(Color::Basic::BrightBlue))
-        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 }

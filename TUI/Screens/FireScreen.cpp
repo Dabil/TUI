@@ -10,6 +10,7 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
+#include "Rendering/Objects/BannerFactory.h"
 
 namespace
 {
@@ -31,7 +32,10 @@ namespace
     }
 }
 
-FireScreen::FireScreen() = default;
+FireScreen::FireScreen(Assets::AssetLibrary& assetLibrary)
+    : m_assetLibrary(assetLibrary)
+{
+}
 
 void FireScreen::onEnter()
 {
@@ -39,6 +43,31 @@ void FireScreen::onEnter()
     m_sourceFlickerTimer = 0.0;
     m_fireBuffer.clear();
     m_nextFireBuffer.clear();
+    m_tuiFireLogoObject.clear();
+
+    m_fontResult = m_assetLibrary.loadBannerFont(m_tuiFireLogoKey);
+
+    if (!m_fontResult.success || !m_fontResult.hasFont())
+    {
+        return;
+    }
+
+    AsciiBanner::RenderOptions options = BannerFactory::kernOptions();
+    options.transparentSpaces = true;
+
+    m_tuiFireLogoObject = BannerFactory::makeShadowBanner(
+        *m_fontResult.asset.font,
+        "TUI",
+        m_bannerStyle,
+        m_bannerStyleShadow,
+        options,
+        0,
+        -1);
+}
+
+void FireScreen::onExit()
+{
+    m_tuiFireLogoObject.clear();
 }
 
 void FireScreen::update(double deltaTime)
@@ -94,10 +123,10 @@ void FireScreen::draw(Surface& surface)
     }
 
     const Style frameStyle = style::Fg(Color::FromBasic(Color::Basic::Red))
-                           + style::Bg(Color::FromBasic(Color::Basic::Black));
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     const Style borderText = style::Fg(Color::FromBasic(Color::Basic::Yellow))
-                           + style::Bg(Color::FromBasic(Color::Basic::Black));
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     buffer.drawFrame(
         Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
@@ -113,6 +142,24 @@ void FireScreen::draw(Surface& surface)
     buffer.writeString(5, 0, " Fire Simulation ", borderText);
     buffer.writeString(4, screenHeight - 1, "[                 ]", frameStyle);
     buffer.writeString(5, screenHeight - 1, " Buffered Flames ", borderText);
+
+    if (!m_fontResult.success || !m_fontResult.hasFont())
+    {
+        const int errorX = (screenWidth - strlen("Failed to load banner font.")) / 2;
+        const int errorY = screenHeight / 4;
+
+        buffer.writeString(errorX, errorY, "Failed to load banner font.", Themes::Warning);
+        return;
+    }
+
+
+    const int bannerWidth = m_tuiFireLogoObject.getWidth();
+    const int bannerHeight = m_tuiFireLogoObject.getHeight();
+
+    const int bannerX = (screenWidth - bannerWidth) / 2;
+    const int bannerY = (screenHeight - bannerHeight) / 4;
+
+    m_tuiFireLogoObject.draw(buffer, bannerX - 1, bannerY - 1);
 }
 
 void FireScreen::ensureSimulationSize(int width, int height)
@@ -292,27 +339,31 @@ Style FireScreen::styleForIntensity(int intensity) const
     if (intensity <= 4)
     {
         return style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
-            + style::Bg(black);
+             + style::Bg(black);
     }
 
     if (intensity <= 9)
     {
         return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::Red))
-            + style::Bg(black);
+             + style::Fg(Color::FromBasic(Color::Basic::Red))
+             + style::Bg(black);
     }
 
     if (intensity <= 15)
     {
         return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::Yellow))
-            + style::Bg(black);
+             + style::Fg(Color::FromBasic(Color::Basic::Yellow))
+             + style::Bg(black);
     }
 
     if (intensity <= 50)
     {
         return style::Bold
-            + style::Fg(Color::FromBasic(Color::Basic::White))
-            + style::Bg(black);
+             + style::Fg(Color::FromBasic(Color::Basic::White))
+             + style::Bg(black);
     }
+
+    return style::Bold
+         + style::Fg(Color::FromBasic(Color::Basic::White))
+         + style::Bg(black);
 }
