@@ -235,22 +235,22 @@ namespace BannerFactory
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle)
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle)
     {
-        return makeLayeredBanner(font, text, mainStyle, shadowStyle, defaultOptions());
+        return makeLayeredBanner(font, text, layerOneStyle, layerTwoStyle, defaultOptions());
     }
 
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle,
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle,
         const AsciiBanner::RenderOptions& options)
     {
         LayeredBanner layered;
-        layered.layerOne = makeBanner(font, text, mainStyle, options);
-        layered.layerTwo = makeBanner(font, text, shadowStyle, options);
+        layered.layerOne = makeBanner(font, text, layerOneStyle, options);
+        layered.layerTwo = makeBanner(font, text, layerTwoStyle, options);
         layered.layerOffsetX = 0;
         layered.layerOffsetY = 0;
         return layered;
@@ -259,20 +259,20 @@ namespace BannerFactory
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::u32string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle)
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle)
     {
-        return makeLayeredBanner(font, text, mainStyle, shadowStyle, defaultOptions());
+        return makeLayeredBanner(font, text, layerOneStyle, layerTwoStyle, defaultOptions());
     }
 
     LayeredBanner makeLayeredBanner(
         const AsciiBannerFont& font,
         std::u32string_view text,
-        const Style& mainStyle,
-        const Style& shadowStyle,
+        const Style& layerOneStyle,
+        const Style& layerTwoStyle,
         const AsciiBanner::RenderOptions& options)
     {
-        return makeLayeredBanner(font, toUtf8(text), mainStyle, shadowStyle, options);
+        return makeLayeredBanner(font, toUtf8(text), layerOneStyle, layerTwoStyle, options);
     }
 
     // -------------------------------------------------------------------------
