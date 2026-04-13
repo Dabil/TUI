@@ -1,11 +1,13 @@
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <unordered_map>
 #include <vector>
 
+#include "Rendering/Objects/LayeredTextObject.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"
 
@@ -25,45 +27,54 @@ namespace PseudoFont
         std::optional<Style> style;
     };
 
-    struct GlyphPattern
+    struct GlyphLayer
     {
+        std::string name;
+        int zIndex = 0;
+        bool visibleByDefault = true;
+        int offsetX = 0;
+        int offsetY = 0;
+
         int width = 0;
         int height = 0;
         std::vector<GlyphCell> cells;
+
         std::optional<Style> defaultStyle;
 
-        bool isValid() const
-        {
-            return width > 0 &&
-                height > 0 &&
-                static_cast<int>(cells.size()) == width * height;
-        }
+        bool isValid() const;
+        const GlyphCell* tryGetCell(int x, int y) const;
+    };
 
-        const GlyphCell& getCell(int x, int y) const
-        {
-            return cells[static_cast<std::size_t>(y * width + x)];
-        }
+    struct LayeredGlyph
+    {
+        char32_t codePoint = U'\0';
+        int width = 0;
+        int height = 0;
+        std::vector<GlyphLayer> layers;
+        std::optional<Style> defaultStyle;
+
+        bool isValid() const;
+        const GlyphLayer* findLayer(std::string_view name) const;
     };
 
     struct SpacingRules
     {
         int letterSpacing = 1;
-        int wordSpacing = 1;
+        int wordSpacing = 3;
         int lineSpacing = 0;
     };
 
     struct FontDefinition
     {
-        using GlyphMap = std::unordered_map<char32_t, GlyphPattern>;
+        using GlyphMap = std::unordered_map<char32_t, LayeredGlyph>;
 
         std::string name;
         std::string sourcePath;
-
         GlyphMap glyphs;
 
         int glyphWidth = 0;
         int glyphHeight = 0;
-        bool hasUniformGlyphSize = false;
+        bool requiresUniformGlyphSize = true;
 
         SpacingRules spacing;
         std::optional<Style> defaultStyle;
@@ -71,53 +82,35 @@ namespace PseudoFont
         char32_t transparentMarker = U'.';
         char32_t fallbackCodePoint = U'?';
 
-        bool isLoaded() const
-        {
-            return !glyphs.empty();
-        }
-
-        const GlyphPattern* findGlyph(char32_t codePoint) const
-        {
-            const auto it = glyphs.find(codePoint);
-            if (it == glyphs.end())
-            {
-                return nullptr;
-            }
-
-            return &it->second;
-        }
-
-        const GlyphPattern* findFallbackGlyph() const
-        {
-            return findGlyph(fallbackCodePoint);
-        }
+        bool isLoaded() const;
+        const LayeredGlyph* findGlyph(char32_t codePoint) const;
+        const LayeredGlyph* findFallbackGlyph() const;
     };
 
     enum class LoadWarningCode
     {
         None,
-        MissingOptionalPropertyIgnored,
         DuplicateGlyphReplaced,
+        DuplicateLayerReplaced,
         MissingFallbackGlyph,
-        NonUniformGlyphSize
+        MissingBaseLayer,
+        NonUniformGlyphSize,
+        UnknownPropertyIgnored,
+        ConflictingLayerMetadata
     };
 
     struct LoadWarning
     {
         LoadWarningCode code = LoadWarningCode::None;
         std::string message;
-
-        bool isValid() const
-        {
-            return code != LoadWarningCode::None;
-        }
     };
 
     struct LoadOptions
     {
         bool requireUniformGlyphSize = true;
-        bool allowGlyphStyleOverrides = true;
+        bool requireAtLeastOneLayerPerGlyph = true;
         bool trimTrailingCarriageReturn = true;
+        bool treatUnknownPropertiesAsWarnings = true;
     };
 
     struct LoadResult
@@ -126,11 +119,20 @@ namespace PseudoFont
         bool success = false;
         std::vector<LoadWarning> warnings;
         std::string errorMessage;
+    };
 
-        bool hasFont() const
-        {
-            return font.isLoaded();
-        }
+    enum class StyleMode
+    {
+        PreserveAuthored,
+        ApplyOverrideWhereMissing,
+        ForceOverride
+    };
+
+    enum class LayerSelectionMode
+    {
+        VisibleByDefaultOnly,
+        AllLayers,
+        NamedLayerSet
     };
 
     struct RenderOptions
@@ -140,8 +142,31 @@ namespace PseudoFont
 
         bool useFallbackGlyphForUnknownChars = true;
         bool transparentSpaces = true;
-        bool preserveGlyphStyles = true;
-        bool trimTrailingTransparentColumns = true;
+
+        LayerSelectionMode layerSelectionMode = LayerSelectionMode::VisibleByDefaultOnly;
+        std::vector<std::string> enabledLayerNames;
+
+        StyleMode styleMode = StyleMode::PreserveAuthored;
+        std::optional<Style> overrideStyle;
+    };
+
+    struct LayeredRenderOptions
+    {
+        Alignment alignment = Alignment::Left;
+        std::size_t targetWidth = 0;
+
+        bool useFallbackGlyphForUnknownChars = true;
+        bool transparentSpaces = true;
+
+        enum class InitialVisibilityMode
+        {
+            UseFontDefaults,
+            AllVisible,
+            AllHidden
+        } initialVisibilityMode = InitialVisibilityMode::UseFontDefaults;
+
+        StyleMode styleMode = StyleMode::PreserveAuthored;
+        std::optional<Style> overrideStyle;
     };
 
     LoadResult loadFromFile(const std::string& filePath);
@@ -150,7 +175,6 @@ namespace PseudoFont
     bool tryLoadFromFile(const std::string& filePath, FontDefinition& outFont);
     bool tryLoadFromFile(const std::string& filePath, FontDefinition& outFont, const LoadOptions& options);
 
-    std::string formatLoadError(const LoadResult& result);
     const char* toString(LoadWarningCode code);
 
     TextObject generateTextObject(
@@ -172,4 +196,24 @@ namespace PseudoFont
         std::string_view utf8Text,
         const Style& overrideStyle,
         const RenderOptions& options);
+
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text);
+
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text,
+        const LayeredRenderOptions& options);
+
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text,
+        const Style& overrideStyle);
+
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text,
+        const Style& overrideStyle,
+        const LayeredRenderOptions& options);
 }

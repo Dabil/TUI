@@ -1,45 +1,40 @@
 #include "Rendering/Objects/pFontLoader.h"
+#include "Rendering/Styles/StyleBuilder.h"
+#include "Rendering/Styles/StyleMerge.h"
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <fstream>
 #include <sstream>
+#include <string>
+#include <unordered_set>
 #include <utility>
 
 #include "Rendering/Objects/TextObjectBuilder.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
-/*
-    Keep this pseudo-font path parallel to AsciiBannerFont rather than 
-    trying to force it into the FIGlet model. 
-
-    AsciiBannerFont is fundamentally row-based banner art from FLF/TLF 
-    sources, while pseudo-graphical authored fonts want richer per-cell 
-    semantics and simpler deterministic mapping assets. 
-
-    Parallel models with a shared TextObject output are the cleaner 
-    long-term design.
-*/
-
 namespace
 {
     using namespace PseudoFont;
 
-    std::string trim(const std::string& input)
+    std::string trim(const std::string& value)
     {
         std::size_t begin = 0;
-        while (begin < input.size() && std::isspace(static_cast<unsigned char>(input[begin])))
+        while (begin < value.size() &&
+            std::isspace(static_cast<unsigned char>(value[begin])))
         {
             ++begin;
         }
 
-        std::size_t end = input.size();
-        while (end > begin && std::isspace(static_cast<unsigned char>(input[end - 1])))
+        std::size_t end = value.size();
+        while (end > begin &&
+            std::isspace(static_cast<unsigned char>(value[end - 1])))
         {
             --end;
         }
 
-        return input.substr(begin, end - begin);
+        return value.substr(begin, end - begin);
     }
 
     bool startsWith(const std::string& value, const std::string& prefix)
@@ -48,7 +43,7 @@ namespace
             value.compare(0, prefix.size(), prefix) == 0;
     }
 
-    bool iequals(const std::string& a, const std::string& b)
+    bool equalsIgnoreCase(const std::string& a, const std::string& b)
     {
         if (a.size() != b.size())
         {
@@ -67,30 +62,13 @@ namespace
         return true;
     }
 
-    bool parseBool(const std::string& value, bool& outValue)
-    {
-        if (iequals(value, "true") || iequals(value, "1") || iequals(value, "yes"))
-        {
-            outValue = true;
-            return true;
-        }
-
-        if (iequals(value, "false") || iequals(value, "0") || iequals(value, "no"))
-        {
-            outValue = false;
-            return true;
-        }
-
-        return false;
-    }
-
     bool parseInt(const std::string& value, int& outValue)
     {
         try
         {
-            std::size_t pos = 0;
-            const int parsed = std::stoi(value, &pos, 10);
-            if (pos != value.size())
+            std::size_t consumed = 0;
+            const int parsed = std::stoi(value, &consumed, 10);
+            if (consumed != value.size())
             {
                 return false;
             }
@@ -102,6 +80,27 @@ namespace
         {
             return false;
         }
+    }
+
+    bool parseBool(const std::string& value, bool& outValue)
+    {
+        if (equalsIgnoreCase(value, "true") ||
+            equalsIgnoreCase(value, "yes") ||
+            value == "1")
+        {
+            outValue = true;
+            return true;
+        }
+
+        if (equalsIgnoreCase(value, "false") ||
+            equalsIgnoreCase(value, "no") ||
+            value == "0")
+        {
+            outValue = false;
+            return true;
+        }
+
+        return false;
     }
 
     std::optional<Color> parseBasicColor(const std::string& value)
@@ -132,7 +131,7 @@ namespace
 
         for (const Entry& entry : table)
         {
-            if (iequals(value, entry.name))
+            if (equalsIgnoreCase(value, entry.name))
             {
                 return Color::FromBasic(entry.basic);
             }
@@ -141,23 +140,23 @@ namespace
         return std::nullopt;
     }
 
-    bool hexNibble(const char ch, std::uint8_t& out)
+    bool parseHexNibble(char ch, std::uint8_t& outValue)
     {
         if (ch >= '0' && ch <= '9')
         {
-            out = static_cast<std::uint8_t>(ch - '0');
+            outValue = static_cast<std::uint8_t>(ch - '0');
             return true;
         }
 
         if (ch >= 'a' && ch <= 'f')
         {
-            out = static_cast<std::uint8_t>(10 + (ch - 'a'));
+            outValue = static_cast<std::uint8_t>(10 + (ch - 'a'));
             return true;
         }
 
         if (ch >= 'A' && ch <= 'F')
         {
-            out = static_cast<std::uint8_t>(10 + (ch - 'A'));
+            outValue = static_cast<std::uint8_t>(10 + (ch - 'A'));
             return true;
         }
 
@@ -178,28 +177,27 @@ namespace
         std::uint8_t n4 = 0;
         std::uint8_t n5 = 0;
 
-        if (!hexNibble(value[1], n0) || !hexNibble(value[2], n1) ||
-            !hexNibble(value[3], n2) || !hexNibble(value[4], n3) ||
-            !hexNibble(value[5], n4) || !hexNibble(value[6], n5))
+        if (!parseHexNibble(value[1], n0) ||
+            !parseHexNibble(value[2], n1) ||
+            !parseHexNibble(value[3], n2) ||
+            !parseHexNibble(value[4], n3) ||
+            !parseHexNibble(value[5], n4) ||
+            !parseHexNibble(value[6], n5))
         {
             return std::nullopt;
         }
 
-        const std::uint8_t r = static_cast<std::uint8_t>((n0 << 4) | n1);
-        const std::uint8_t g = static_cast<std::uint8_t>((n2 << 4) | n3);
-        const std::uint8_t b = static_cast<std::uint8_t>((n4 << 4) | n5);
-
-        return Color::FromRgb(r, g, b);
+        return Color::FromRgb(
+            static_cast<std::uint8_t>((n0 << 4) | n1),
+            static_cast<std::uint8_t>((n2 << 4) | n3),
+            static_cast<std::uint8_t>((n4 << 4) | n5));
     }
 
-    bool applyStyleProperty(
-        Style& style,
-        const std::string& key,
-        const std::string& value)
+    bool applyStyleProperty(Style& style, const std::string& key, const std::string& value)
     {
-        if (iequals(key, "foreground"))
+        if (equalsIgnoreCase(key, "foreground"))
         {
-            if (iequals(value, "none") || iequals(value, "default"))
+            if (equalsIgnoreCase(value, "none") || equalsIgnoreCase(value, "default"))
             {
                 style = style.withoutForeground();
                 return true;
@@ -220,9 +218,9 @@ namespace
             return false;
         }
 
-        if (iequals(key, "background"))
+        if (equalsIgnoreCase(key, "background"))
         {
-            if (iequals(value, "none") || iequals(value, "default"))
+            if (equalsIgnoreCase(value, "none") || equalsIgnoreCase(value, "default"))
             {
                 style = style.withoutBackground();
                 return true;
@@ -249,51 +247,51 @@ namespace
             return false;
         }
 
-        if (iequals(key, "bold"))
+        if (equalsIgnoreCase(key, "bold"))
         {
             style = style.withBold(boolValue);
             return true;
         }
 
-        if (iequals(key, "dim"))
+        if (equalsIgnoreCase(key, "dim"))
         {
             style = style.withDim(boolValue);
             return true;
         }
 
-        if (iequals(key, "underline"))
+        if (equalsIgnoreCase(key, "underline"))
         {
             style = style.withUnderline(boolValue);
             return true;
         }
 
-        if (iequals(key, "reverse"))
-        {
-            style = style.withReverse(boolValue);
-            return true;
-        }
-
-        if (iequals(key, "strike"))
-        {
-            style = style.withStrike(boolValue);
-            return true;
-        }
-
-        if (iequals(key, "slowblink"))
+        if (equalsIgnoreCase(key, "slowblink"))
         {
             style = style.withSlowBlink(boolValue);
             return true;
         }
 
-        if (iequals(key, "fastblink"))
+        if (equalsIgnoreCase(key, "fastblink"))
         {
             style = style.withFastBlink(boolValue);
             return true;
         }
 
-        if (iequals(key, "invisible"))
+        if (equalsIgnoreCase(key, "reverse"))
+        {
+            style = style.withReverse(boolValue);
+            return true;
+        }
+
+        if (equalsIgnoreCase(key, "invisible"))
         {
             style = style.withInvisible(boolValue);
+            return true;
+        }
+
+        if (equalsIgnoreCase(key, "strike"))
+        {
+            style = style.withStrike(boolValue);
             return true;
         }
 
@@ -302,19 +300,19 @@ namespace
 
     bool parseCodePointToken(const std::string& token, char32_t& outCodePoint)
     {
-        if (iequals(token, "space"))
+        if (equalsIgnoreCase(token, "space"))
         {
             outCodePoint = U' ';
             return true;
         }
 
-        if (iequals(token, "tab"))
+        if (equalsIgnoreCase(token, "tab"))
         {
             outCodePoint = U'\t';
             return true;
         }
 
-        if (iequals(token, "question"))
+        if (equalsIgnoreCase(token, "question"))
         {
             outCodePoint = U'?';
             return true;
@@ -381,46 +379,214 @@ namespace
         return lines;
     }
 
-    std::vector<int> computeOpaqueColumnBounds(
-        const GlyphPattern& glyph,
-        const bool trimTransparentColumns)
+    std::vector<std::u32string> splitTextLinesUtf32(std::string_view utf8Text)
     {
-        if (!trimTransparentColumns || !glyph.isValid())
-        {
-            return { 0, glyph.width };
-        }
+        const std::u32string decoded = UnicodeConversion::utf8ToU32(utf8Text);
 
-        int minX = glyph.width;
-        int maxX = -1;
+        std::vector<std::u32string> lines;
+        std::u32string current;
 
-        for (int y = 0; y < glyph.height; ++y)
+        for (char32_t cp : decoded)
         {
-            for (int x = 0; x < glyph.width; ++x)
+            if (cp == U'\r')
             {
-                const GlyphCell& cell = glyph.getCell(x, y);
-                if (!cell.transparent)
-                {
-                    minX = std::min(minX, x);
-                    maxX = std::max(maxX, x);
-                }
+                continue;
             }
+
+            if (cp == U'\n')
+            {
+                lines.push_back(current);
+                current.clear();
+                continue;
+            }
+
+            current.push_back(cp);
         }
 
-        if (maxX < minX)
+        lines.push_back(current);
+        return lines;
+    }
+
+    bool layerNameEnabled(
+        const std::string& layerName,
+        const RenderOptions& options)
+    {
+        switch (options.layerSelectionMode)
         {
-            return { 0, glyph.width };
+        case LayerSelectionMode::VisibleByDefaultOnly:
+            return true;
+
+        case LayerSelectionMode::AllLayers:
+            return true;
+
+        case LayerSelectionMode::NamedLayerSet:
+            return std::find(
+                options.enabledLayerNames.begin(),
+                options.enabledLayerNames.end(),
+                layerName) != options.enabledLayerNames.end();
         }
 
-        return { minX, maxX + 1 };
+        return false;
+    }
+
+    bool includeLayer(
+        const GlyphLayer& layer,
+        const RenderOptions& options)
+    {
+        switch (options.layerSelectionMode)
+        {
+        case LayerSelectionMode::VisibleByDefaultOnly:
+            return layer.visibleByDefault;
+
+        case LayerSelectionMode::AllLayers:
+            return true;
+
+        case LayerSelectionMode::NamedLayerSet:
+            return layerNameEnabled(layer.name, options);
+        }
+
+        return false;
+    }
+
+    std::optional<Style> resolveCellStyle(
+        const FontDefinition& font,
+        const LayeredGlyph& glyph,
+        const GlyphLayer& layer,
+        const GlyphCell& cell,
+        const StyleMode styleMode,
+        const std::optional<Style>& overrideStyle)
+    {
+        auto overlayStyle = [](Style base, const Style& overlay) -> Style
+            {
+                if (overlay.hasForeground())
+                {
+                    base = base.withForeground(*overlay.foreground());
+                }
+
+                if (overlay.hasBackground())
+                {
+                    base = base.withBackground(*overlay.background());
+                }
+
+                if (overlay.hasBold())
+                {
+                    base = base.withBold(overlay.bold());
+                }
+
+                if (overlay.hasDim())
+                {
+                    base = base.withDim(overlay.dim());
+                }
+
+                if (overlay.hasUnderline())
+                {
+                    base = base.withUnderline(overlay.underline());
+                }
+
+                if (overlay.hasSlowBlink())
+                {
+                    base = base.withSlowBlink(overlay.slowBlink());
+                }
+
+                if (overlay.hasFastBlink())
+                {
+                    base = base.withFastBlink(overlay.fastBlink());
+                }
+
+                if (overlay.hasReverse())
+                {
+                    base = base.withReverse(overlay.reverse());
+                }
+
+                if (overlay.hasInvisible())
+                {
+                    base = base.withInvisible(overlay.invisible());
+                }
+
+                if (overlay.hasStrike())
+                {
+                    base = base.withStrike(overlay.strike());
+                }
+
+                return base;
+            };
+
+        auto composeAuthoredStyle = [&]() -> std::optional<Style>
+            {
+                Style composed;
+                bool hasAny = false;
+
+                auto applyIfPresent = [&](const std::optional<Style>& candidate)
+                    {
+                        if (!candidate.has_value())
+                        {
+                            return;
+                        }
+
+                        if (!hasAny)
+                        {
+                            composed = *candidate;
+                            hasAny = true;
+                            return;
+                        }
+
+                        composed = overlayStyle(composed, *candidate);
+                    };
+
+                applyIfPresent(font.defaultStyle);
+                applyIfPresent(glyph.defaultStyle);
+                applyIfPresent(layer.defaultStyle);
+                applyIfPresent(cell.style);
+
+                if (!hasAny)
+                {
+                    return std::nullopt;
+                }
+
+                return composed;
+            };
+
+        switch (styleMode)
+        {
+        case StyleMode::ForceOverride:
+            return overrideStyle;
+
+        case StyleMode::PreserveAuthored:
+            return composeAuthoredStyle();
+
+        case StyleMode::ApplyOverrideWhereMissing:
+        {
+            const std::optional<Style> authored = composeAuthoredStyle();
+
+            if (!authored.has_value())
+            {
+                return overrideStyle;
+            }
+
+            if (!overrideStyle.has_value())
+            {
+                return authored;
+            }
+
+            return overlayStyle(*authored, *overrideStyle);
+        }
+        }
+
+        return std::nullopt;
+    }
+
+    int spacingForCodePoint(const FontDefinition& font, char32_t codePoint)
+    {
+        return (codePoint == U' ') ? font.spacing.wordSpacing : font.spacing.letterSpacing;
     }
 
     int measureLineWidth(
         const FontDefinition& font,
         const std::u32string& line,
-        const RenderOptions& options)
+        const bool useFallbackGlyphForUnknownChars)
     {
         int width = 0;
-        bool firstGlyph = true;
+        bool first = true;
 
         for (char32_t cp : line)
         {
@@ -429,8 +595,8 @@ namespace
                 cp = U' ';
             }
 
-            const GlyphPattern* glyph = font.findGlyph(cp);
-            if (glyph == nullptr && options.useFallbackGlyphForUnknownChars)
+            const LayeredGlyph* glyph = font.findGlyph(cp);
+            if (glyph == nullptr && useFallbackGlyphForUnknownChars)
             {
                 glyph = font.findFallbackGlyph();
             }
@@ -440,222 +606,283 @@ namespace
                 continue;
             }
 
-            if (!firstGlyph)
+            if (!first)
             {
-                width += (cp == U' ') ? font.spacing.wordSpacing : font.spacing.letterSpacing;
+                width += spacingForCodePoint(font, cp);
             }
 
-            const std::vector<int> bounds = computeOpaqueColumnBounds(
-                *glyph,
-                options.trimTrailingTransparentColumns);
-
-            width += std::max(0, bounds[1] - bounds[0]);
-            firstGlyph = false;
+            width += glyph->width;
+            first = false;
         }
 
         return width;
     }
 
-    std::optional<Style> chooseCellStyle(
-        const GlyphCell& cell,
-        const GlyphPattern& glyph,
-        const FontDefinition& font,
-        const std::optional<Style>& overrideStyle,
-        const RenderOptions& options)
-    {
-        if (overrideStyle.has_value())
-        {
-            return overrideStyle;
-        }
-
-        if (options.preserveGlyphStyles)
-        {
-            if (cell.style.has_value())
-            {
-                return cell.style;
-            }
-
-            if (glyph.defaultStyle.has_value())
-            {
-                return glyph.defaultStyle;
-            }
-
-            if (font.defaultStyle.has_value())
-            {
-                return font.defaultStyle;
-            }
-        }
-
-        return std::nullopt;
-    }
-
-    TextObject buildTextObject(
+    int computeOutputWidth(
         const FontDefinition& font,
         const std::vector<std::u32string>& lines,
-        const std::optional<Style>& overrideStyle,
-        const RenderOptions& options)
+        const Alignment alignment,
+        const std::size_t targetWidth,
+        const bool useFallbackGlyphForUnknownChars)
     {
-        if (!font.isLoaded())
-        {
-            return {};
-        }
-
-        int contentHeight = 0;
-        for (std::size_t i = 0; i < lines.size(); ++i)
-        {
-            contentHeight += font.glyphHeight;
-            if (i + 1 < lines.size())
-            {
-                contentHeight += font.spacing.lineSpacing;
-            }
-        }
+        (void)alignment;
 
         int measuredWidth = 0;
         for (const std::u32string& line : lines)
         {
-            measuredWidth = std::max(measuredWidth, measureLineWidth(font, line, options));
+            measuredWidth = std::max(
+                measuredWidth,
+                measureLineWidth(font, line, useFallbackGlyphForUnknownChars));
         }
 
-        int outputWidth = measuredWidth;
-        if (options.targetWidth > 0)
+        if (targetWidth > 0)
         {
-            outputWidth = std::max(outputWidth, static_cast<int>(options.targetWidth));
+            measuredWidth = std::max(measuredWidth, static_cast<int>(targetWidth));
         }
 
-        if (outputWidth <= 0 || contentHeight <= 0)
+        return measuredWidth;
+    }
+
+    int computeOutputHeight(
+        const FontDefinition& font,
+        const std::size_t lineCount)
+    {
+        if (lineCount == 0)
         {
-            return {};
+            return 0;
         }
 
-        TextObjectBuilder builder(outputWidth, contentHeight);
+        return static_cast<int>(lineCount) * font.glyphHeight +
+            static_cast<int>(lineCount > 0 ? lineCount - 1 : 0) * font.spacing.lineSpacing;
+    }
 
-        int yBase = 0;
-        for (std::size_t lineIndex = 0; lineIndex < lines.size(); ++lineIndex)
+    int computeAlignedLineStartX(
+        const FontDefinition& font,
+        const std::u32string& line,
+        const int outputWidth,
+        const Alignment alignment,
+        const bool useFallbackGlyphForUnknownChars)
+    {
+        const int lineWidth = measureLineWidth(font, line, useFallbackGlyphForUnknownChars);
+
+        switch (alignment)
         {
-            const std::u32string& line = lines[lineIndex];
-            const int lineWidth = measureLineWidth(font, line, options);
+        case Alignment::Center:
+            return std::max(0, (outputWidth - lineWidth) / 2);
 
-            int xCursor = 0;
-            if (options.alignment == Alignment::Center && outputWidth > lineWidth)
+        case Alignment::Right:
+            return std::max(0, outputWidth - lineWidth);
+
+        case Alignment::Left:
+        default:
+            return 0;
+        }
+    }
+
+    void stampGlyphLayerToBuilder(
+        TextObjectBuilder& builder,
+        const FontDefinition& font,
+        const LayeredGlyph& glyph,
+        const GlyphLayer& layer,
+        const int destX,
+        const int destY,
+        const StyleMode styleMode,
+        const std::optional<Style>& overrideStyle,
+        const bool transparentSpaces)
+    {
+        for (int y = 0; y < layer.height; ++y)
+        {
+            for (int x = 0; x < layer.width; ++x)
             {
-                xCursor = (outputWidth - lineWidth) / 2;
-            }
-            else if (options.alignment == Alignment::Right && outputWidth > lineWidth)
-            {
-                xCursor = outputWidth - lineWidth;
-            }
-
-            bool firstGlyph = true;
-            for (char32_t cp : line)
-            {
-                if (cp == U'\t')
-                {
-                    cp = U' ';
-                }
-
-                const GlyphPattern* glyph = font.findGlyph(cp);
-                if (glyph == nullptr && options.useFallbackGlyphForUnknownChars)
-                {
-                    glyph = font.findFallbackGlyph();
-                }
-
-                if (glyph == nullptr)
+                const GlyphCell* cell = layer.tryGetCell(x, y);
+                if (cell == nullptr)
                 {
                     continue;
                 }
 
-                if (!firstGlyph)
+                const int outX = destX + layer.offsetX + x;
+                const int outY = destY + layer.offsetY + y;
+
+                if (!builder.inBounds(outX, outY))
                 {
-                    xCursor += (cp == U' ') ? font.spacing.wordSpacing : font.spacing.letterSpacing;
+                    continue;
                 }
 
-                const std::vector<int> bounds = computeOpaqueColumnBounds(
-                    *glyph,
-                    options.trimTrailingTransparentColumns);
+                const std::optional<Style> styleToApply = resolveCellStyle(
+                    font,
+                    glyph,
+                    layer,
+                    *cell,
+                    styleMode,
+                    overrideStyle);
 
-                const int xStart = bounds[0];
-                const int xEnd = bounds[1];
-
-                for (int gy = 0; gy < glyph->height; ++gy)
+                if (cell->transparent)
                 {
-                    for (int gx = xStart; gx < xEnd; ++gx)
+                    if (!transparentSpaces)
                     {
-                        const GlyphCell& cell = glyph->getCell(gx, gy);
-                        const int outX = xCursor + (gx - xStart);
-                        const int outY = yBase + gy;
-
-                        if (cell.transparent)
-                        {
-                            if (!options.transparentSpaces)
-                            {
-                                builder.setEmpty(outX, outY, chooseCellStyle(
-                                    cell,
-                                    *glyph,
-                                    font,
-                                    overrideStyle,
-                                    options));
-                            }
-
-                            continue;
-                        }
-
-                        builder.setGlyph(
-                            outX,
-                            outY,
-                            cell.glyph,
-                            chooseCellStyle(cell, *glyph, font, overrideStyle, options));
+                        builder.setEmpty(outX, outY, styleToApply);
                     }
+                    continue;
                 }
 
-                xCursor += std::max(0, xEnd - xStart);
-                firstGlyph = false;
-            }
-
-            yBase += font.glyphHeight;
-            if (lineIndex + 1 < lines.size())
-            {
-                yBase += font.spacing.lineSpacing;
+                builder.setGlyph(outX, outY, cell->glyph, styleToApply);
             }
         }
+    }
 
-        return builder.build();
+    Rendering::TextObjectLayer* findOutputLayer(
+        Rendering::LayeredTextObject& layered,
+        std::string_view layerName)
+    {
+        return layered.findLayer(layerName);
+    }
+
+    bool ensureOutputLayer(
+        Rendering::LayeredTextObject& layered,
+        const GlyphLayer& sourceLayer,
+        const LayeredRenderOptions& options)
+    {
+        if (findOutputLayer(layered, sourceLayer.name) != nullptr)
+        {
+            return true;
+        }
+
+        Rendering::TextObjectLayer outputLayer;
+        outputLayer.name = sourceLayer.name;
+        outputLayer.zIndex = sourceLayer.zIndex;
+        outputLayer.offsetX = sourceLayer.offsetX;
+        outputLayer.offsetY = sourceLayer.offsetY;
+
+        switch (options.initialVisibilityMode)
+        {
+        case LayeredRenderOptions::InitialVisibilityMode::UseFontDefaults:
+            outputLayer.visible = sourceLayer.visibleByDefault;
+            break;
+
+        case LayeredRenderOptions::InitialVisibilityMode::AllVisible:
+            outputLayer.visible = true;
+            break;
+
+        case LayeredRenderOptions::InitialVisibilityMode::AllHidden:
+            outputLayer.visible = false;
+            break;
+        }
+
+        outputLayer.object = TextObjectBuilder(
+            layered.getWidth(),
+            layered.getHeight()).build();
+
+        return layered.addLayer(std::move(outputLayer));
+    }
+
+    void stampGlyphLayerToOutputLayer(
+        TextObjectBuilder& builder,
+        const FontDefinition& font,
+        const LayeredGlyph& glyph,
+        const GlyphLayer& layer,
+        const int glyphOriginX,
+        const int glyphOriginY,
+        const StyleMode styleMode,
+        const std::optional<Style>& overrideStyle,
+        const bool transparentSpaces)
+    {
+        stampGlyphLayerToBuilder(
+            builder,
+            font,
+            glyph,
+            layer,
+            glyphOriginX,
+            glyphOriginY,
+            styleMode,
+            overrideStyle,
+            transparentSpaces);
     }
 }
 
 namespace PseudoFont
 {
+    bool GlyphLayer::isValid() const
+    {
+        return width > 0 &&
+            height > 0 &&
+            static_cast<int>(cells.size()) == width * height;
+    }
+
+    const GlyphCell* GlyphLayer::tryGetCell(int x, int y) const
+    {
+        if (x < 0 || x >= width || y < 0 || y >= height)
+        {
+            return nullptr;
+        }
+
+        return &cells[static_cast<std::size_t>(y * width + x)];
+    }
+
+    bool LayeredGlyph::isValid() const
+    {
+        return codePoint != U'\0' &&
+            width > 0 &&
+            height > 0 &&
+            !layers.empty();
+    }
+
+    const GlyphLayer* LayeredGlyph::findLayer(std::string_view name) const
+    {
+        const auto it = std::find_if(
+            layers.begin(),
+            layers.end(),
+            [&](const GlyphLayer& layer)
+            {
+                return layer.name == name;
+            });
+
+        return (it != layers.end()) ? &(*it) : nullptr;
+    }
+
+    bool FontDefinition::isLoaded() const
+    {
+        return !glyphs.empty() && glyphWidth > 0 && glyphHeight > 0;
+    }
+
+    const LayeredGlyph* FontDefinition::findGlyph(char32_t codePoint) const
+    {
+        const auto it = glyphs.find(codePoint);
+        return (it != glyphs.end()) ? &it->second : nullptr;
+    }
+
+    const LayeredGlyph* FontDefinition::findFallbackGlyph() const
+    {
+        return findGlyph(fallbackCodePoint);
+    }
+
     const char* toString(const LoadWarningCode code)
     {
         switch (code)
         {
         case LoadWarningCode::None:
             return "None";
-        case LoadWarningCode::MissingOptionalPropertyIgnored:
-            return "MissingOptionalPropertyIgnored";
         case LoadWarningCode::DuplicateGlyphReplaced:
             return "DuplicateGlyphReplaced";
+        case LoadWarningCode::DuplicateLayerReplaced:
+            return "DuplicateLayerReplaced";
         case LoadWarningCode::MissingFallbackGlyph:
             return "MissingFallbackGlyph";
+        case LoadWarningCode::MissingBaseLayer:
+            return "MissingBaseLayer";
         case LoadWarningCode::NonUniformGlyphSize:
             return "NonUniformGlyphSize";
+        case LoadWarningCode::UnknownPropertyIgnored:
+            return "UnknownPropertyIgnored";
+        case LoadWarningCode::ConflictingLayerMetadata:
+            return "ConflictingLayerMetadata";
         default:
             return "Unknown";
         }
     }
 
-    std::string formatLoadError(const LoadResult& result)
-    {
-        if (result.success)
-        {
-            return {};
-        }
-
-        return result.errorMessage;
-    }
-
     LoadResult loadFromFile(const std::string& filePath)
     {
-        return loadFromFile(filePath, {});
+        return loadFromFile(filePath, LoadOptions{});
     }
 
     LoadResult loadFromFile(const std::string& filePath, const LoadOptions& options)
@@ -671,16 +898,13 @@ namespace PseudoFont
 
         std::stringstream buffer;
         buffer << file.rdbuf();
-
         const std::vector<std::string> lines = splitLogicalLines(buffer.str());
+
         if (lines.empty())
         {
             result.errorMessage = "Pseudo font file is empty: " + filePath;
             return result;
         }
-
-        FontDefinition font;
-        font.sourcePath = filePath;
 
         std::size_t lineIndex = 0;
         while (lineIndex < lines.size() && trim(lines[lineIndex]).empty())
@@ -688,146 +912,188 @@ namespace PseudoFont
             ++lineIndex;
         }
 
-        if (lineIndex >= lines.size() || !iequals(trim(lines[lineIndex]), "pfont1"))
+        if (lineIndex >= lines.size() || !equalsIgnoreCase(trim(lines[lineIndex]), "pfont2"))
         {
-            result.errorMessage = "Pseudo font file must begin with header line: pfont1";
+            result.errorMessage = "Pseudo font file must begin with header line: pfont2";
             return result;
         }
 
         ++lineIndex;
 
-        bool inGlyph = false;
-        char32_t currentCodePoint = U'\0';
-        std::vector<std::u32string> currentRows;
-        std::optional<Style> currentGlyphStyle;
+        FontDefinition font;
+        font.sourcePath = filePath;
+        font.requiresUniformGlyphSize = options.requireUniformGlyphSize;
 
-        auto flushGlyph = [&]() -> bool
+        enum class ParseState
+        {
+            TopLevel,
+            InGlyph,
+            InLayer
+        };
+
+        ParseState state = ParseState::TopLevel;
+
+        LayeredGlyph currentGlyph;
+        GlyphLayer currentLayer;
+        bool glyphHasLayer = false;
+
+        std::unordered_map<std::string, std::pair<int, bool>> globalLayerMetadata;
+
+        auto finalizeLayer = [&]() -> bool
             {
-                if (!inGlyph)
+                if (state != ParseState::InLayer)
                 {
                     return true;
                 }
 
-                if (currentRows.empty())
+                if (currentLayer.name.empty())
                 {
-                    result.errorMessage = "Glyph block has no rows.";
+                    result.errorMessage = "Layer name may not be empty.";
                     return false;
                 }
 
-                GlyphPattern glyph;
-                glyph.height = static_cast<int>(currentRows.size());
-                glyph.width = 0;
-
-                for (const std::u32string& row : currentRows)
+                if (currentLayer.height <= 0 || currentLayer.width <= 0)
                 {
-                    glyph.width = std::max(glyph.width, static_cast<int>(row.size()));
-                }
-
-                if (glyph.width <= 0 || glyph.height <= 0)
-                {
-                    result.errorMessage = "Glyph block has invalid dimensions.";
+                    result.errorMessage = "Layer '" + currentLayer.name + "' has invalid dimensions.";
                     return false;
                 }
 
-                glyph.defaultStyle = currentGlyphStyle;
-                glyph.cells.resize(static_cast<std::size_t>(glyph.width * glyph.height));
-
-                for (int y = 0; y < glyph.height; ++y)
+                if (!currentLayer.isValid())
                 {
-                    const std::u32string& row = currentRows[static_cast<std::size_t>(y)];
-                    for (int x = 0; x < glyph.width; ++x)
+                    result.errorMessage = "Layer '" + currentLayer.name + "' cell data is invalid.";
+                    return false;
+                }
+
+                const auto existingLayerIt = std::find_if(
+                    currentGlyph.layers.begin(),
+                    currentGlyph.layers.end(),
+                    [&](const GlyphLayer& layer)
                     {
-                        GlyphCell cell;
-                        if (x < static_cast<int>(row.size()))
-                        {
-                            const char32_t cp = row[static_cast<std::size_t>(x)];
-                            if (cp == font.transparentMarker)
-                            {
-                                cell.transparent = true;
-                                cell.glyph = U' ';
-                            }
-                            else
-                            {
-                                cell.transparent = false;
-                                cell.glyph = cp;
-                            }
-                        }
-                        else
-                        {
-                            cell.transparent = true;
-                            cell.glyph = U' ';
-                        }
+                        return layer.name == currentLayer.name;
+                    });
 
-                        glyph.cells[static_cast<std::size_t>(y * glyph.width + x)] = std::move(cell);
+                if (existingLayerIt != currentGlyph.layers.end())
+                {
+                    *existingLayerIt = currentLayer;
+                    addWarning(
+                        result,
+                        LoadWarningCode::DuplicateLayerReplaced,
+                        "Duplicate layer replaced in glyph.");
+                }
+                else
+                {
+                    currentGlyph.layers.push_back(currentLayer);
+                }
+
+                const auto globalMetaIt = globalLayerMetadata.find(currentLayer.name);
+                if (globalMetaIt == globalLayerMetadata.end())
+                {
+                    globalLayerMetadata[currentLayer.name] =
+                        std::make_pair(currentLayer.zIndex, currentLayer.visibleByDefault);
+                }
+                else
+                {
+                    if (globalMetaIt->second.first != currentLayer.zIndex ||
+                        globalMetaIt->second.second != currentLayer.visibleByDefault)
+                    {
+                        addWarning(
+                            result,
+                            LoadWarningCode::ConflictingLayerMetadata,
+                            "Layer '" + currentLayer.name + "' uses conflicting z/visibility metadata across glyphs.");
                     }
                 }
 
-                const auto existing = font.glyphs.find(currentCodePoint);
-                if (existing != font.glyphs.end())
+                glyphHasLayer = true;
+                currentLayer = GlyphLayer{};
+                state = ParseState::InGlyph;
+                return true;
+            };
+
+        auto finalizeGlyph = [&]() -> bool
+            {
+                if (state == ParseState::InLayer)
+                {
+                    if (!finalizeLayer())
+                    {
+                        return false;
+                    }
+                }
+
+                if (state != ParseState::InGlyph)
+                {
+                    return true;
+                }
+
+                if (options.requireAtLeastOneLayerPerGlyph && !glyphHasLayer)
+                {
+                    result.errorMessage = "Glyph has no layers.";
+                    return false;
+                }
+
+                if (font.glyphWidth <= 0 || font.glyphHeight <= 0)
+                {
+                    result.errorMessage = "glyph_width and glyph_height must be defined before glyph data.";
+                    return false;
+                }
+
+                currentGlyph.width = font.glyphWidth;
+                currentGlyph.height = font.glyphHeight;
+
+                if (!currentGlyph.isValid())
+                {
+                    result.errorMessage = "Glyph definition is invalid.";
+                    return false;
+                }
+
+                if (currentGlyph.findLayer("base") == nullptr)
+                {
+                    addWarning(
+                        result,
+                        LoadWarningCode::MissingBaseLayer,
+                        "Glyph is missing a 'base' layer.");
+                }
+
+                const auto existingGlyphIt = font.glyphs.find(currentGlyph.codePoint);
+                if (existingGlyphIt != font.glyphs.end())
                 {
                     addWarning(
                         result,
                         LoadWarningCode::DuplicateGlyphReplaced,
-                        "Duplicate glyph definition replaced for code point.");
+                        "Duplicate glyph definition replaced.");
                 }
 
-                font.glyphs[currentCodePoint] = std::move(glyph);
+                font.glyphs[currentGlyph.codePoint] = currentGlyph;
 
-                if (!font.hasUniformGlyphSize)
-                {
-                    font.glyphWidth = font.glyphs[currentCodePoint].width;
-                    font.glyphHeight = font.glyphs[currentCodePoint].height;
-                    font.hasUniformGlyphSize = true;
-                }
-                else
-                {
-                    const GlyphPattern& stored = font.glyphs[currentCodePoint];
-                    if ((stored.width != font.glyphWidth || stored.height != font.glyphHeight) &&
-                        options.requireUniformGlyphSize)
-                    {
-                        result.errorMessage = "Pseudo font contains non-uniform glyph sizes while uniform sizing is required.";
-                        return false;
-                    }
-
-                    if (stored.width != font.glyphWidth || stored.height != font.glyphHeight)
-                    {
-                        addWarning(
-                            result,
-                            LoadWarningCode::NonUniformGlyphSize,
-                            "Pseudo font contains non-uniform glyph sizes.");
-                    }
-                }
-
-                inGlyph = false;
-                currentCodePoint = U'\0';
-                currentRows.clear();
-                currentGlyphStyle.reset();
+                currentGlyph = LayeredGlyph{};
+                glyphHasLayer = false;
+                state = ParseState::TopLevel;
                 return true;
             };
 
         for (; lineIndex < lines.size(); ++lineIndex)
         {
-            std::string line = lines[lineIndex];
-            if (options.trimTrailingCarriageReturn && !line.empty() && line.back() == '\r')
+            std::string rawLine = lines[lineIndex];
+            if (options.trimTrailingCarriageReturn &&
+                !rawLine.empty() &&
+                rawLine.back() == '\r')
             {
-                line.pop_back();
+                rawLine.pop_back();
             }
 
-            line = trim(line);
-            if (line.empty() || startsWith(line, "#"))
+            const std::string stripped = trim(rawLine);
+            if (stripped.empty() || startsWith(stripped, "#"))
             {
                 continue;
             }
 
-            if (startsWith(line, "[glyph ") && line.back() == ']')
+            if (startsWith(stripped, "[glyph ") && stripped.back() == ']')
             {
-                if (!flushGlyph())
+                if (!finalizeGlyph())
                 {
                     return result;
                 }
 
-                std::string token = line.substr(7, line.size() - 8);
-                token = trim(token);
+                const std::string token = trim(stripped.substr(7, stripped.size() - 8));
 
                 char32_t codePoint = U'\0';
                 if (!parseCodePointToken(token, codePoint))
@@ -836,178 +1102,320 @@ namespace PseudoFont
                     return result;
                 }
 
-                inGlyph = true;
-                currentCodePoint = codePoint;
-                currentRows.clear();
-                currentGlyphStyle.reset();
+                currentGlyph = LayeredGlyph{};
+                currentGlyph.codePoint = codePoint;
+                glyphHasLayer = false;
+                state = ParseState::InGlyph;
                 continue;
             }
 
-            if (iequals(line, "[endglyph]"))
+            if (equalsIgnoreCase(stripped, "[endglyph]"))
             {
-                if (!flushGlyph())
+                if (!finalizeGlyph())
                 {
                     return result;
                 }
-
                 continue;
             }
 
-            const std::size_t equalsPos = line.find('=');
+            if (startsWith(stripped, "[layer ") && stripped.back() == ']')
+            {
+                if (state != ParseState::InGlyph)
+                {
+                    result.errorMessage = "Layer block encountered outside glyph block.";
+                    return result;
+                }
+
+                const std::string layerName = trim(stripped.substr(7, stripped.size() - 8));
+                if (layerName.empty())
+                {
+                    result.errorMessage = "Layer name may not be empty.";
+                    return result;
+                }
+
+                currentLayer = GlyphLayer{};
+                currentLayer.name = layerName;
+                currentLayer.width = font.glyphWidth;
+                currentLayer.height = font.glyphHeight;
+                currentLayer.cells.resize(
+                    static_cast<std::size_t>(currentLayer.width * currentLayer.height));
+
+                for (GlyphCell& cell : currentLayer.cells)
+                {
+                    cell.glyph = U' ';
+                    cell.transparent = true;
+                }
+
+                state = ParseState::InLayer;
+                continue;
+            }
+
+            if (equalsIgnoreCase(stripped, "[endlayer]"))
+            {
+                if (!finalizeLayer())
+                {
+                    return result;
+                }
+                continue;
+            }
+
+            const std::size_t equalsPos = stripped.find('=');
             if (equalsPos == std::string::npos)
             {
-                result.errorMessage = "Invalid pseudo font line (expected key=value): " + line;
+                result.errorMessage = "Expected key=value line: " + stripped;
                 return result;
             }
 
-            const std::string key = trim(line.substr(0, equalsPos));
-            const std::string value = trim(line.substr(equalsPos + 1));
+            const std::string key = trim(stripped.substr(0, equalsPos));
+            const std::string value = stripped.substr(equalsPos + 1);
 
-            if (inGlyph)
+            if (state == ParseState::TopLevel)
             {
-                if (iequals(key, "row"))
+                if (equalsIgnoreCase(key, "name"))
                 {
-                    currentRows.push_back(UnicodeConversion::utf8ToU32(value));
+                    font.name = trim(value);
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "glyph_width"))
+                {
+                    if (!parseInt(trim(value), font.glyphWidth) || font.glyphWidth <= 0)
+                    {
+                        result.errorMessage = "Invalid glyph_width value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "glyph_height"))
+                {
+                    if (!parseInt(trim(value), font.glyphHeight) || font.glyphHeight <= 0)
+                    {
+                        result.errorMessage = "Invalid glyph_height value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "letter_spacing"))
+                {
+                    if (!parseInt(trim(value), font.spacing.letterSpacing))
+                    {
+                        result.errorMessage = "Invalid letter_spacing value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "word_spacing"))
+                {
+                    if (!parseInt(trim(value), font.spacing.wordSpacing))
+                    {
+                        result.errorMessage = "Invalid word_spacing value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "line_spacing"))
+                {
+                    if (!parseInt(trim(value), font.spacing.lineSpacing))
+                    {
+                        result.errorMessage = "Invalid line_spacing value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "fallback"))
+                {
+                    if (!parseCodePointToken(trim(value), font.fallbackCodePoint))
+                    {
+                        result.errorMessage = "Invalid fallback value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "transparent"))
+                {
+                    if (!parseCodePointToken(trim(value), font.transparentMarker))
+                    {
+                        result.errorMessage = "Invalid transparent marker: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (startsWith(key, "default_style."))
+                {
+                    Style style = font.defaultStyle.value_or(Style{});
+                    if (!applyStyleProperty(style, key.substr(14), trim(value)))
+                    {
+                        result.errorMessage = "Invalid default_style property: " + key;
+                        return result;
+                    }
+                    font.defaultStyle = style;
+                    continue;
+                }
+
+                if (options.treatUnknownPropertiesAsWarnings)
+                {
+                    addWarning(
+                        result,
+                        LoadWarningCode::UnknownPropertyIgnored,
+                        "Unknown top-level property ignored: " + key);
+                    continue;
+                }
+
+                result.errorMessage = "Unknown top-level property: " + key;
+                return result;
+            }
+
+            if (state == ParseState::InGlyph)
+            {
+                if (startsWith(key, "glyph_style."))
+                {
+                    Style style = currentGlyph.defaultStyle.value_or(Style{});
+                    if (!applyStyleProperty(style, key.substr(12), trim(value)))
+                    {
+                        result.errorMessage = "Invalid glyph_style property: " + key;
+                        return result;
+                    }
+                    currentGlyph.defaultStyle = style;
+                    continue;
+                }
+
+                result.errorMessage = "Unsupported glyph-level property: " + key;
+                return result;
+            }
+
+            if (state == ParseState::InLayer)
+            {
+                if (equalsIgnoreCase(key, "z"))
+                {
+                    if (!parseInt(trim(value), currentLayer.zIndex))
+                    {
+                        result.errorMessage = "Invalid z value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "visible"))
+                {
+                    if (!parseBool(trim(value), currentLayer.visibleByDefault))
+                    {
+                        result.errorMessage = "Invalid visible value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "offset_x"))
+                {
+                    if (!parseInt(trim(value), currentLayer.offsetX))
+                    {
+                        result.errorMessage = "Invalid offset_x value: " + trim(value);
+                        return result;
+                    }
+                    continue;
+                }
+
+                if (equalsIgnoreCase(key, "offset_y"))
+                {
+                    if (!parseInt(trim(value), currentLayer.offsetY))
+                    {
+                        result.errorMessage = "Invalid offset_y value: " + trim(value);
+                        return result;
+                    }
                     continue;
                 }
 
                 if (startsWith(key, "style."))
                 {
-                    if (!options.allowGlyphStyleOverrides)
+                    Style style = currentLayer.defaultStyle.value_or(Style{});
+                    if (!applyStyleProperty(style, key.substr(6), trim(value)))
                     {
-                        continue;
-                    }
-
-                    Style style = currentGlyphStyle.value_or(Style{});
-                    if (!applyStyleProperty(style, key.substr(6), value))
-                    {
-                        result.errorMessage = "Invalid glyph style property: " + key + "=" + value;
+                        result.errorMessage = "Invalid layer style property: " + key;
                         return result;
                     }
-
-                    currentGlyphStyle = style;
+                    currentLayer.defaultStyle = style;
                     continue;
                 }
 
-                result.errorMessage = "Unsupported glyph property: " + key;
+                if (equalsIgnoreCase(key, "row"))
+                {
+                    if (currentLayer.width <= 0 || currentLayer.height <= 0)
+                    {
+                        result.errorMessage = "Layer dimensions are not initialized.";
+                        return result;
+                    }
+
+                    int nextRow = 0;
+                    while (nextRow < currentLayer.height)
+                    {
+                        bool rowOccupied = false;
+                        for (int x = 0; x < currentLayer.width; ++x)
+                        {
+                            const GlyphCell* cell = currentLayer.tryGetCell(x, nextRow);
+                            if (cell != nullptr && !cell->transparent)
+                            {
+                                rowOccupied = true;
+                                break;
+                            }
+                        }
+
+                        if (!rowOccupied)
+                        {
+                            break;
+                        }
+
+                        ++nextRow;
+                    }
+
+                    if (nextRow >= currentLayer.height)
+                    {
+                        result.errorMessage = "Too many row entries in layer '" + currentLayer.name + "'.";
+                        return result;
+                    }
+
+                    const std::u32string rowText = UnicodeConversion::utf8ToU32(value);
+
+                    if (static_cast<int>(rowText.size()) > currentLayer.width)
+                    {
+                        result.errorMessage = "Row is wider than glyph_width in layer '" + currentLayer.name + "'.";
+                        return result;
+                    }
+
+                    for (int x = 0; x < currentLayer.width; ++x)
+                    {
+                        GlyphCell cell;
+                        cell.glyph = U' ';
+                        cell.transparent = true;
+
+                        if (x < static_cast<int>(rowText.size()))
+                        {
+                            const char32_t cp = rowText[static_cast<std::size_t>(x)];
+                            if (cp != font.transparentMarker)
+                            {
+                                cell.transparent = false;
+                                cell.glyph = cp;
+                            }
+                        }
+
+                        currentLayer.cells[static_cast<std::size_t>(nextRow * currentLayer.width + x)] = cell;
+                    }
+
+                    continue;
+                }
+
+                result.errorMessage = "Unsupported layer property: " + key;
                 return result;
             }
-
-            if (iequals(key, "name"))
-            {
-                font.name = value;
-                continue;
-            }
-
-            if (iequals(key, "glyph_width"))
-            {
-                if (!parseInt(value, font.glyphWidth))
-                {
-                    result.errorMessage = "Invalid glyph_width value: " + value;
-                    return result;
-                }
-
-                if (font.glyphWidth < 0)
-                {
-                    result.errorMessage = "glyph_width must be >= 0.";
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (iequals(key, "glyph_height"))
-            {
-                if (!parseInt(value, font.glyphHeight))
-                {
-                    result.errorMessage = "Invalid glyph_height value: " + value;
-                    return result;
-                }
-
-                if (font.glyphHeight < 0)
-                {
-                    result.errorMessage = "glyph_height must be >= 0.";
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (iequals(key, "letter_spacing"))
-            {
-                if (!parseInt(value, font.spacing.letterSpacing))
-                {
-                    result.errorMessage = "Invalid letter_spacing value: " + value;
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (iequals(key, "word_spacing"))
-            {
-                if (!parseInt(value, font.spacing.wordSpacing))
-                {
-                    result.errorMessage = "Invalid word_spacing value: " + value;
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (iequals(key, "line_spacing"))
-            {
-                if (!parseInt(value, font.spacing.lineSpacing))
-                {
-                    result.errorMessage = "Invalid line_spacing value: " + value;
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (iequals(key, "fallback"))
-            {
-                if (!parseCodePointToken(value, font.fallbackCodePoint))
-                {
-                    result.errorMessage = "Invalid fallback code point: " + value;
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (iequals(key, "transparent"))
-            {
-                if (!parseCodePointToken(value, font.transparentMarker))
-                {
-                    result.errorMessage = "Invalid transparent marker: " + value;
-                    return result;
-                }
-
-                continue;
-            }
-
-            if (startsWith(key, "default_style."))
-            {
-                Style style = font.defaultStyle.value_or(Style{});
-                if (!applyStyleProperty(style, key.substr(14), value))
-                {
-                    result.errorMessage = "Invalid default_style property: " + key + "=" + value;
-                    return result;
-                }
-
-                font.defaultStyle = style;
-                continue;
-            }
-
-            addWarning(
-                result,
-                LoadWarningCode::MissingOptionalPropertyIgnored,
-                "Unknown top-level property ignored: " + key);
         }
 
-        if (!flushGlyph())
+        if (!finalizeGlyph())
         {
             return result;
         }
@@ -1035,11 +1443,13 @@ namespace PseudoFont
         {
             for (const auto& entry : font.glyphs)
             {
-                const GlyphPattern& glyph = entry.second;
+                const LayeredGlyph& glyph = entry.second;
                 if (glyph.width != font.glyphWidth || glyph.height != font.glyphHeight)
                 {
-                    result.errorMessage = "Pseudo font failed uniform glyph size validation.";
-                    return result;
+                    addWarning(
+                        result,
+                        LoadWarningCode::NonUniformGlyphSize,
+                        "Glyph size differs from declared font glyph size.");
                 }
             }
         }
@@ -1051,7 +1461,7 @@ namespace PseudoFont
 
     bool tryLoadFromFile(const std::string& filePath, FontDefinition& outFont)
     {
-        return tryLoadFromFile(filePath, outFont, {});
+        return tryLoadFromFile(filePath, outFont, LoadOptions{});
     }
 
     bool tryLoadFromFile(const std::string& filePath, FontDefinition& outFont, const LoadOptions& options)
@@ -1059,7 +1469,7 @@ namespace PseudoFont
         const LoadResult result = loadFromFile(filePath, options);
         if (!result.success)
         {
-            outFont = {};
+            outFont = FontDefinition{};
             return false;
         }
 
@@ -1067,9 +1477,7 @@ namespace PseudoFont
         return true;
     }
 
-    TextObject generateTextObject(
-        const FontDefinition& font,
-        std::string_view utf8Text)
+    TextObject generateTextObject(const FontDefinition& font, std::string_view utf8Text)
     {
         return generateTextObject(font, utf8Text, RenderOptions{});
     }
@@ -1079,30 +1487,107 @@ namespace PseudoFont
         std::string_view utf8Text,
         const RenderOptions& options)
     {
-        const std::u32string text = UnicodeConversion::utf8ToU32(utf8Text);
-
-        std::vector<std::u32string> lines;
-        std::u32string currentLine;
-
-        for (char32_t cp : text)
+        if (!font.isLoaded())
         {
-            if (cp == U'\r')
-            {
-                continue;
-            }
-
-            if (cp == U'\n')
-            {
-                lines.push_back(currentLine);
-                currentLine.clear();
-                continue;
-            }
-
-            currentLine.push_back(cp);
+            return TextObject{};
         }
 
-        lines.push_back(currentLine);
-        return buildTextObject(font, lines, std::nullopt, options);
+        const std::vector<std::u32string> lines = splitTextLinesUtf32(utf8Text);
+        const int outputWidth = computeOutputWidth(
+            font,
+            lines,
+            options.alignment,
+            options.targetWidth,
+            options.useFallbackGlyphForUnknownChars);
+        const int outputHeight = computeOutputHeight(font, lines.size());
+
+        if (outputWidth <= 0 || outputHeight <= 0)
+        {
+            return TextObject{};
+        }
+
+        TextObjectBuilder builder(outputWidth, outputHeight);
+
+        int yBase = 0;
+        for (const std::u32string& line : lines)
+        {
+            int xCursor = computeAlignedLineStartX(
+                font,
+                line,
+                outputWidth,
+                options.alignment,
+                options.useFallbackGlyphForUnknownChars);
+
+            bool first = true;
+            for (char32_t cp : line)
+            {
+                if (cp == U'\t')
+                {
+                    cp = U' ';
+                }
+
+                const LayeredGlyph* glyph = font.findGlyph(cp);
+                if (glyph == nullptr && options.useFallbackGlyphForUnknownChars)
+                {
+                    glyph = font.findFallbackGlyph();
+                }
+
+                if (glyph == nullptr)
+                {
+                    continue;
+                }
+
+                if (!first)
+                {
+                    xCursor += spacingForCodePoint(font, cp);
+                }
+
+                std::vector<const GlyphLayer*> layersToRender;
+                layersToRender.reserve(glyph->layers.size());
+
+                for (const GlyphLayer& layer : glyph->layers)
+                {
+                    if (includeLayer(layer, options))
+                    {
+                        layersToRender.push_back(&layer);
+                    }
+                }
+
+                std::stable_sort(
+                    layersToRender.begin(),
+                    layersToRender.end(),
+                    [](const GlyphLayer* a, const GlyphLayer* b)
+                    {
+                        return a->zIndex < b->zIndex;
+                    });
+
+                for (const GlyphLayer* layer : layersToRender)
+                {
+                    if (layer == nullptr)
+                    {
+                        continue;
+                    }
+
+                    stampGlyphLayerToBuilder(
+                        builder,
+                        font,
+                        *glyph,
+                        *layer,
+                        xCursor,
+                        yBase,
+                        options.styleMode,
+                        options.overrideStyle,
+                        options.transparentSpaces);
+                }
+
+                xCursor += glyph->width;
+                first = false;
+            }
+
+            yBase += font.glyphHeight + font.spacing.lineSpacing;
+        }
+
+        return builder.build();
     }
 
     TextObject generateTextObject(
@@ -1110,7 +1595,10 @@ namespace PseudoFont
         std::string_view utf8Text,
         const Style& overrideStyle)
     {
-        return generateTextObject(font, utf8Text, overrideStyle, RenderOptions{});
+        RenderOptions options;
+        options.overrideStyle = overrideStyle;
+        options.styleMode = StyleMode::ForceOverride;
+        return generateTextObject(font, utf8Text, options);
     }
 
     TextObject generateTextObject(
@@ -1119,29 +1607,154 @@ namespace PseudoFont
         const Style& overrideStyle,
         const RenderOptions& options)
     {
-        const std::u32string text = UnicodeConversion::utf8ToU32(utf8Text);
+        RenderOptions resolved = options;
+        resolved.overrideStyle = overrideStyle;
+        resolved.styleMode = StyleMode::ForceOverride;
+        return generateTextObject(font, utf8Text, resolved);
+    }
 
-        std::vector<std::u32string> lines;
-        std::u32string currentLine;
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text)
+    {
+        return generateLayeredTextObject(font, utf8Text, LayeredRenderOptions{});
+    }
 
-        for (char32_t cp : text)
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text,
+        const LayeredRenderOptions& options)
+    {
+        if (!font.isLoaded())
         {
-            if (cp == U'\r')
-            {
-                continue;
-            }
-
-            if (cp == U'\n')
-            {
-                lines.push_back(currentLine);
-                currentLine.clear();
-                continue;
-            }
-
-            currentLine.push_back(cp);
+            return Rendering::LayeredTextObject{};
         }
 
-        lines.push_back(currentLine);
-        return buildTextObject(font, lines, overrideStyle, options);
+        const std::vector<std::u32string> lines = splitTextLinesUtf32(utf8Text);
+        const int outputWidth = computeOutputWidth(
+            font,
+            lines,
+            options.alignment,
+            options.targetWidth,
+            options.useFallbackGlyphForUnknownChars);
+        const int outputHeight = computeOutputHeight(font, lines.size());
+
+        if (outputWidth <= 0 || outputHeight <= 0)
+        {
+            return Rendering::LayeredTextObject{};
+        }
+
+        Rendering::LayeredTextObject layered(outputWidth, outputHeight);
+
+        int yBase = 0;
+        for (const std::u32string& line : lines)
+        {
+            int xCursor = computeAlignedLineStartX(
+                font,
+                line,
+                outputWidth,
+                options.alignment,
+                options.useFallbackGlyphForUnknownChars);
+
+            bool first = true;
+            for (char32_t cp : line)
+            {
+                if (cp == U'\t')
+                {
+                    cp = U' ';
+                }
+
+                const LayeredGlyph* glyph = font.findGlyph(cp);
+                if (glyph == nullptr && options.useFallbackGlyphForUnknownChars)
+                {
+                    glyph = font.findFallbackGlyph();
+                }
+
+                if (glyph == nullptr)
+                {
+                    continue;
+                }
+
+                if (!first)
+                {
+                    xCursor += spacingForCodePoint(font, cp);
+                }
+
+                for (const GlyphLayer& glyphLayer : glyph->layers)
+                {
+                    ensureOutputLayer(layered, glyphLayer, options);
+
+                    Rendering::TextObjectLayer* outputLayer = layered.findLayer(glyphLayer.name);
+                    if (outputLayer == nullptr)
+                    {
+                        continue;
+                    }
+
+                    TextObjectBuilder builder(outputLayer->object.getWidth(), outputLayer->object.getHeight());
+
+                    for (int y = 0; y < outputLayer->object.getHeight(); ++y)
+                    {
+                        for (int x = 0; x < outputLayer->object.getWidth(); ++x)
+                        {
+                            const TextObjectCell* existing = outputLayer->object.tryGetCell(x, y);
+                            if (existing == nullptr)
+                            {
+                                continue;
+                            }
+
+                            if (existing->kind == CellKind::Empty)
+                            {
+                                continue;
+                            }
+
+                            builder.setCell(x, y, existing->glyph, existing->kind, existing->width, existing->style);
+                        }
+                    }
+
+                    stampGlyphLayerToOutputLayer(
+                        builder,
+                        font,
+                        *glyph,
+                        glyphLayer,
+                        xCursor,
+                        yBase,
+                        options.styleMode,
+                        options.overrideStyle,
+                        options.transparentSpaces);
+
+                    outputLayer->object = builder.build();
+                }
+
+                xCursor += glyph->width;
+                first = false;
+            }
+
+            yBase += font.glyphHeight + font.spacing.lineSpacing;
+        }
+
+        return layered;
+    }
+
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text,
+        const Style& overrideStyle)
+    {
+        LayeredRenderOptions options;
+        options.overrideStyle = overrideStyle;
+        options.styleMode = StyleMode::ForceOverride;
+        return generateLayeredTextObject(font, utf8Text, options);
+    }
+
+    Rendering::LayeredTextObject generateLayeredTextObject(
+        const FontDefinition& font,
+        std::string_view utf8Text,
+        const Style& overrideStyle,
+        const LayeredRenderOptions& options)
+    {
+        LayeredRenderOptions resolved = options;
+        resolved.overrideStyle = overrideStyle;
+        resolved.styleMode = StyleMode::ForceOverride;
+        return generateLayeredTextObject(font, utf8Text, resolved);
     }
 }
