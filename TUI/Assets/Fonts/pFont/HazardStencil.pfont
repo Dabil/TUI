@@ -1,0 +1,391 @@
+pfont1
+
+name=Hazard Stencil
+glyph_width=5
+glyph_height=5
+letter_spacing=1
+word_spacing=3
+line_spacing=1
+transparent=.
+fallback=?
+default_style.foreground=black
+default_style.background=bright_yellow
+default_style.bold=true
+
+[glyph A]
+row=.███.
+row=█...█
+row=█████
+row=█...█
+row=█...█
+[endglyph]
+
+[glyph B]
+row=████.
+row=█...█
+row=████.
+row=█...█
+row=████.
+[endglyph]
+
+[glyph C]
+row=.████
+row=█....
+row=█....
+row=█....
+row=.████
+[endglyph]
+
+[glyph D]
+row=████.
+row=█...█
+row=█...█
+row=█...█
+row=████.
+[endglyph]
+
+[glyph E]
+row=█████
+row=█....
+row=████.
+row=█....
+row=█████
+[endglyph]
+
+[glyph F]
+row=█████
+row=█....
+row=████.
+row=█....
+row=█....
+[endglyph]
+
+[glyph G]
+row=.████
+row=█....
+row=█.███
+row=█...█
+row=.████
+[endglyph]
+
+[glyph H]
+row=█...█
+row=█...█
+row=█████
+row=█...█
+row=█...█
+[endglyph]
+
+[glyph I]
+row=█████
+row=..█..
+row=..█..
+row=..█..
+row=█████
+[endglyph]
+
+[glyph J]
+row=..███
+row=...█.
+row=...█.
+row=█..█.
+row=.██..
+[endglyph]
+
+[glyph K]
+row=█...█
+row=█..█.
+row=███..
+row=█..█.
+row=█...█
+[endglyph]
+
+[glyph L]
+row=█....
+row=█....
+row=█....
+row=█....
+row=█████
+[endglyph]
+
+[glyph M]
+row=█...█
+row=██.██
+row=█.█.█
+row=█...█
+row=█...█
+[endglyph]
+
+[glyph N]
+row=█...█
+row=██..█
+row=█.█.█
+row=█..██
+row=█...█
+[endglyph]
+
+[glyph O]
+row=.███.
+row=█...█
+row=█...█
+row=█...█
+row=.███.
+[endglyph]
+
+[glyph P]
+row=████.
+row=█...█
+row=████.
+row=█....
+row=█....
+[endglyph]
+
+[glyph Q]
+row=.███.
+row=█...█
+row=█...█
+row=█..██
+row=.████
+[endglyph]
+
+[glyph R]
+row=████.
+row=█...█
+row=████.
+row=█..█.
+row=█...█
+[endglyph]
+
+[glyph S]
+row=.████
+row=█....
+row=.███.
+row=....█
+row=████.
+[endglyph]
+
+[glyph T]
+row=█████
+row=..█..
+row=..█..
+row=..█..
+row=..█..
+[endglyph]
+
+[glyph U]
+row=█...█
+row=█...█
+row=█...█
+row=█...█
+row=.███.
+[endglyph]
+
+[glyph V]
+row=█...█
+row=█...█
+row=█...█
+row=.█.█.
+row=..█..
+[endglyph]
+
+[glyph W]
+row=█...█
+row=█...█
+row=█.█.█
+row=██.██
+row=█...█
+[endglyph]
+
+[glyph X]
+style.foreground=bright_white
+style.background=red
+style.bold=true
+row=█...█
+row=.█.█.
+row=..█..
+row=.█.█.
+row=█...█
+[endglyph]
+
+[glyph Y]
+row=█...█
+row=.█.█.
+row=..█..
+row=..█..
+row=..█..
+[endglyph]
+
+[glyph Z]
+row=█████
+row=...█.
+row=..█..
+row=.█...
+row=█████
+[endglyph]
+
+[glyph 0]
+style.foreground=black
+style.background=bright_white
+row=.███.
+row=█..██
+row=█.█.█
+row=██..█
+row=.███.
+[endglyph]
+
+[glyph 1]
+style.foreground=black
+style.background=bright_white
+row=..█..
+row=.██..
+row=..█..
+row=..█..
+row=.███.
+[endglyph]
+
+[glyph 2]
+style.foreground=black
+style.background=bright_white
+row=.███.
+row=....█
+row=..██.
+row=.█...
+row=█████
+[endglyph]
+
+[glyph 3]
+style.foreground=black
+style.background=bright_white
+row=████.
+row=....█
+row=..██.
+row=....█
+row=████.
+[endglyph]
+
+[glyph 4]
+style.foreground=black
+style.background=bright_white
+row=█...█
+row=█...█
+row=█████
+row=....█
+row=....█
+[endglyph]
+
+[glyph 5]
+style.foreground=black
+style.background=bright_white
+row=█████
+row=█....
+row=████.
+row=....█
+row=████.
+[endglyph]
+
+[glyph 6]
+style.foreground=black
+style.background=bright_white
+row=.███.
+row=█....
+row=████.
+row=█...█
+row=.███.
+[endglyph]
+
+[glyph 7]
+style.foreground=black
+style.background=bright_white
+row=█████
+row=....█
+row=...█.
+row=..█..
+row=..█..
+[endglyph]
+
+[glyph 8]
+style.foreground=black
+style.background=bright_white
+row=.███.
+row=█...█
+row=.███.
+row=█...█
+row=.███.
+[endglyph]
+
+[glyph 9]
+style.foreground=black
+style.background=bright_white
+row=.███.
+row=█...█
+row=.████
+row=....█
+row=.███.
+[endglyph]
+
+[glyph space]
+row=.....
+row=.....
+row=.....
+row=.....
+row=.....
+[endglyph]
+
+[glyph ?]
+style.foreground=bright_white
+style.background=red
+style.bold=true
+row=████.
+row=...█.
+row=..█..
+row=.....
+row=..█..
+[endglyph]
+
+[glyph !]
+style.foreground=bright_white
+style.background=red
+style.bold=true
+row=..█..
+row=..█..
+row=..█..
+row=.....
+row=..█..
+[endglyph]
+
+[glyph .]
+row=.....
+row=.....
+row=.....
+row=.....
+row=..█..
+[endglyph]
+
+[glyph :]
+style.foreground=black
+style.background=bright_red
+style.bold=true
+row=.....
+row=..█..
+row=.....
+row=..█..
+row=.....
+[endglyph]
+
+[glyph -]
+style.foreground=black
+style.background=bright_black
+row=.....
+row=.....
+row=.███.
+row=.....
+row=.....
+[endglyph]
+
+[glyph /]
+row=....█
+row=...█.
+row=..█..
+row=.█...
+row=█....
+[endglyph]
