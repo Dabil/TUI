@@ -5,24 +5,12 @@
 
 #include "Assets/Models/AsciiBannerFont.h"
 #include "Rendering/Objects/AsciiBanner.h"
+#include "Rendering/Objects/LayeredTextObject.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"
 
 namespace BannerFactory
 {
-    struct LayeredBanner
-    {
-        TextObject layerOne;
-        TextObject layerTwo;
-        int layerOffsetX = 0;
-        int layerOffsetY = 0;
-
-        bool empty() const
-        {
-            return layerOne.getWidth() <= 0 || layerOne.getHeight() <= 0;
-        }
-    };
-
     // -------------------------------------------------------------------------
     // Render option presets
     // -------------------------------------------------------------------------
@@ -87,26 +75,26 @@ namespace BannerFactory
     // Generic layered helpers
     // -------------------------------------------------------------------------
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle);
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle,
         const AsciiBanner::RenderOptions& options);
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle);
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& layerOneStyle,
@@ -115,8 +103,6 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Shadow effects
-    // Flattened helpers return a single composited TextObject.
-    // Layered helpers preserve independent layers and carry shadow offsets.
     // -------------------------------------------------------------------------
 
     TextObject makeShadowBanner(
@@ -153,7 +139,7 @@ namespace BannerFactory
         int shadowOffsetX = 1,
         int shadowOffsetY = 1);
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& mainStyle,
@@ -161,7 +147,7 @@ namespace BannerFactory
         int shadowOffsetX = 1,
         int shadowOffsetY = 1);
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& mainStyle,
@@ -170,7 +156,7 @@ namespace BannerFactory
         int shadowOffsetX = 1,
         int shadowOffsetY = 1);
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& mainStyle,
@@ -178,7 +164,7 @@ namespace BannerFactory
         int shadowOffsetX = 1,
         int shadowOffsetY = 1);
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& mainStyle,
