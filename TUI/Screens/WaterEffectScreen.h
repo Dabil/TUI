@@ -4,9 +4,12 @@
 #include <vector>
 
 #include "Screens/Screen.h"
+#include "Rendering/Objects/pFontLoader.h"
+#include "Rendering/Objects/LayeredTextObject.h"
 #include "Rendering/Styles/Style.h"
 
 class Surface;
+class ScreenBuffer;
 
 class WaterEffectScreen : public Screen
 {
@@ -47,6 +50,13 @@ private:
 
     void renderWaveField(Surface& surface);
 
+    void ensureWaterTitleLoaded();
+    void rebuildWaterTitle();
+    void updateWaterTitleAnimation();
+    void setWaterTitleLayerVisibility(bool stage1Visible, bool stage2Visible, bool stage3Visible, bool finalVisible);
+    void hideWaterTitleLayers();
+    void drawWaterTitle(ScreenBuffer& buffer) const;
+
     int index(int x, int y) const;
 
     int computeAmplitudeAtCell(int x, int y) const;
@@ -71,4 +81,10 @@ private:
 
     std::vector<char32_t> m_textMask;
     std::vector<Droplet> m_droplets;
+
+    PseudoFont::FontDefinition m_waterTitleFont;
+    Rendering::LayeredTextObject m_waterTitleObject;
+    bool m_waterTitleLoadAttempted = false;
+    bool m_waterTitleLoaded = false;
+    std::string m_waterTitleLoadError;
 };

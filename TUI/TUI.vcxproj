@@ -171,6 +171,7 @@
     <ClInclude Include="Rendering\Objects\BannerFactory.h" />
     <ClInclude Include="Rendering\Objects\BinaryArtLoader.h" />
     <ClInclude Include="Rendering\Objects\Cp437Encoding.h" />
+    <ClInclude Include="Rendering\Objects\LayeredTextObject.h" />
     <ClInclude Include="Rendering\Objects\ObjectFactory.h" />
     <ClInclude Include="Rendering\Objects\pFontLoader.h">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>
@@ -275,6 +276,7 @@
     <ClCompile Include="Rendering\Objects\BannerFactory.cpp" />
     <ClCompile Include="Rendering\Objects\BinaryArtLoader.cpp" />
     <ClCompile Include="Rendering\Objects\Cp437Encoding.cpp" />
+    <ClCompile Include="Rendering\Objects\LayeredTextObject.cpp" />
     <ClCompile Include="Rendering\Objects\ObjectFactory.cpp" />
     <ClCompile Include="Rendering\Objects\pFontLoader.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">false</ExcludedFromBuild>

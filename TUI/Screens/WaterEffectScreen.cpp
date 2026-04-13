@@ -19,9 +19,18 @@ namespace
     constexpr int MaxVisualAmplitude = 64;
     constexpr float Pi = 3.1415926535f;
 
-    // Approximate "5-10 frames later" using a 60 FPS-style timing window.
     constexpr float SecondaryDropDelaySeconds = 45.0f / 60.0f;
     constexpr float SecondaryDropStrengthScale = 0.5f;
+
+    constexpr double WaterTitleAssembleDurationSeconds = 1.0;
+    constexpr double WaterTitleHoldDurationSeconds = 5.0;
+    constexpr double WaterTitleReverseDurationSeconds = 1.0;
+    constexpr double WaterTitleRepeatDelaySeconds = 10.0;
+    constexpr double WaterTitleCycleDurationSeconds =
+        WaterTitleAssembleDurationSeconds +
+        WaterTitleHoldDurationSeconds +
+        WaterTitleReverseDurationSeconds +
+        WaterTitleRepeatDelaySeconds;
 
     constexpr char32_t toUpperAscii(char32_t c)
     {
@@ -59,6 +68,9 @@ namespace
         const double t = static_cast<double>(std::rand()) / static_cast<double>(RAND_MAX);
         return minValue + ((maxValue - minValue) * t);
     }
+
+    const char* kWaterTitleFontPath = "Assets/Fonts/pFont/AssembleBox.pfont";
+    constexpr std::u32string_view kWaterTitleText = U"WATER";
 }
 
 namespace WaterColors
@@ -69,13 +81,13 @@ namespace WaterColors
         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 
     inline const Style TitleColorUnderlined =
-          style::Bold
+        style::Bold
         + style::Underline
         + style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 
     inline const Style BorderColor =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 
     inline const Style SprinkleColor =
@@ -92,6 +104,11 @@ namespace WaterColors
         style::SlowBlink
         + style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style WaterTitleLoadErrorColor =
+        style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightYellow))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
 }
 
 WaterEffectScreen::WaterEffectScreen()
@@ -109,11 +126,17 @@ void WaterEffectScreen::onEnter()
     m_rainMode = RainMode::Sprinkle;
     m_nextDropTime = randomRange(0.8, 2.0);
     m_nextRainModeChangeTime = randomRange(6.0, 12.0);
+
+    ensureWaterTitleLoaded();
+    rebuildWaterTitle();
+    updateWaterTitleAnimation();
 }
 
 void WaterEffectScreen::update(double deltaTime)
 {
     m_elapsedSeconds += deltaTime;
+
+    updateWaterTitleAnimation();
 
     if (m_waveWidth <= 2 || m_waveHeight <= 2)
     {
@@ -150,9 +173,11 @@ void WaterEffectScreen::draw(Surface& surface)
 
     ensureSimulationSize(m_waveWidth, m_waveHeight);
     renderWaveField(surface);
-    
+
+    drawWaterTitle(buffer);
+
     buffer.writeString(4, 0, "[                         ]", WaterColors::TitleColor);
-    buffer.writeString(5, 0, " Rain Drops Water Effect "  , WaterColors::TitleColorUnderlined);
+    buffer.writeString(5, 0, " Rain Drops Water Effect ", WaterColors::TitleColorUnderlined);
 
     int startModeXpos = 4;
 
@@ -361,6 +386,164 @@ void WaterEffectScreen::renderWaveField(Surface& surface)
     }
 }
 
+void WaterEffectScreen::ensureWaterTitleLoaded()
+{
+    if (m_waterTitleLoadAttempted)
+    {
+        return;
+    }
+
+    m_waterTitleLoadAttempted = true;
+    m_waterTitleLoaded = false;
+    m_waterTitleLoadError.clear();
+
+    const PseudoFont::LoadResult loadResult = PseudoFont::loadFromFile(kWaterTitleFontPath);
+    if (!loadResult.success)
+    {
+        m_waterTitleLoadError = loadResult.errorMessage;
+        return;
+    }
+
+    m_waterTitleFont = loadResult.font;
+    m_waterTitleLoaded = true;
+}
+
+void WaterEffectScreen::rebuildWaterTitle()
+{
+    if (!m_waterTitleLoaded)
+    {
+        m_waterTitleObject.clear();
+        return;
+    }
+
+    PseudoFont::LayeredRenderOptions options;
+    options.initialVisibilityMode =
+        PseudoFont::LayeredRenderOptions::InitialVisibilityMode::AllHidden;
+
+    m_waterTitleObject =
+        PseudoFont::generateLayeredTextObject(
+            m_waterTitleFont,
+            "WATER TUI",
+            options);
+
+    hideWaterTitleLayers();
+}
+
+void WaterEffectScreen::updateWaterTitleAnimation()
+{
+    if (!m_waterTitleLoaded || m_waterTitleObject.isEmpty())
+    {
+        return;
+    }
+
+    hideWaterTitleLayers();
+
+    const double cycleTime = std::fmod(m_elapsedSeconds, WaterTitleCycleDurationSeconds);
+
+    if (cycleTime < WaterTitleAssembleDurationSeconds)
+    {
+        const double stepDuration = WaterTitleAssembleDurationSeconds / 4.0;
+
+        if (cycleTime < stepDuration)
+        {
+            setWaterTitleLayerVisibility(true, false, false, false);
+        }
+        else if (cycleTime < (stepDuration * 2.0))
+        {
+            setWaterTitleLayerVisibility(false, true, false, false);
+        }
+        else if (cycleTime < (stepDuration * 3.0))
+        {
+            setWaterTitleLayerVisibility(false, false, true, false);
+        }
+        else
+        {
+            setWaterTitleLayerVisibility(false, false, false, true);
+        }
+
+        return;
+    }
+
+    if (cycleTime < (WaterTitleAssembleDurationSeconds + WaterTitleHoldDurationSeconds))
+    {
+        setWaterTitleLayerVisibility(false, false, false, true);
+        return;
+    }
+
+    if (cycleTime < (WaterTitleAssembleDurationSeconds + WaterTitleHoldDurationSeconds + WaterTitleReverseDurationSeconds))
+    {
+        const double reverseTime =
+            cycleTime - (WaterTitleAssembleDurationSeconds + WaterTitleHoldDurationSeconds);
+        const double stepDuration = WaterTitleReverseDurationSeconds / 4.0;
+
+        if (reverseTime < stepDuration)
+        {
+            setWaterTitleLayerVisibility(false, false, false, true);
+        }
+        else if (reverseTime < (stepDuration * 2.0))
+        {
+            setWaterTitleLayerVisibility(false, false, true, false);
+        }
+        else if (reverseTime < (stepDuration * 3.0))
+        {
+            setWaterTitleLayerVisibility(false, true, false, false);
+        }
+        else
+        {
+            setWaterTitleLayerVisibility(true, false, false, false);
+        }
+
+        return;
+    }
+
+    hideWaterTitleLayers();
+}
+
+void WaterEffectScreen::setWaterTitleLayerVisibility(
+    bool stage1Visible,
+    bool stage2Visible,
+    bool stage3Visible,
+    bool finalVisible)
+{
+    m_waterTitleObject.setLayerVisibility("stage_1", stage1Visible);
+    m_waterTitleObject.setLayerVisibility("stage_2", stage2Visible);
+    m_waterTitleObject.setLayerVisibility("stage_3", stage3Visible);
+    m_waterTitleObject.setLayerVisibility("final", finalVisible);
+}
+
+void WaterEffectScreen::hideWaterTitleLayers()
+{
+    setWaterTitleLayerVisibility(false, false, false, false);
+}
+
+void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer) const
+{
+    if (!m_waterTitleLoaded)
+    {
+        if (!m_waterTitleLoadError.empty())
+        {
+            const std::string errorText = "[Missing Assemble Box.pfont]";
+            const int x = std::max(1, (buffer.getWidth() - static_cast<int>(errorText.size())) / 2);
+            const int y = std::max(2, (buffer.getHeight() / 3) - 1);
+            buffer.writeString(x, y, errorText, WaterColors::WaterTitleLoadErrorColor);
+        }
+
+        return;
+    }
+
+    const TextObject waterTitle = m_waterTitleObject.flattenVisibleOnly();
+    if (waterTitle.isEmpty())
+    {
+        return;
+    }
+
+    const int x = std::max(0, (buffer.getWidth() - waterTitle.getWidth()) / 2);
+    const int y = std::max(2, (buffer.getHeight() / 3) - (waterTitle.getHeight() / 2));
+
+    waterTitle.draw(buffer, x, y);
+}
+
+
 int WaterEffectScreen::index(int x, int y) const
 {
     return (y * m_waveWidth) + x;
@@ -452,15 +635,15 @@ Style WaterEffectScreen::selectWaveStyle(int amplitude, char32_t sourceGlyph) co
     if (magnitude >= 24)
     {
         return style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
-             + style::Bg(Color::FromBasic(Color::Basic::Blue));
+            + style::Bg(Color::FromBasic(Color::Basic::Blue));
     }
 
     if (magnitude >= 10)
     {
         return style::Fg(Color::FromBasic(Color::Basic::Cyan))
-             + style::Bg(Color::FromBasic(Color::Basic::Blue));
+            + style::Bg(Color::FromBasic(Color::Basic::Blue));
     }
 
     return style::Fg(Color::FromBasic(Color::Basic::BrightBlue))
-         + style::Bg(Color::FromBasic(Color::Basic::Blue));
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
 }
