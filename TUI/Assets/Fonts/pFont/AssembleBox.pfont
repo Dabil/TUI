@@ -9,7 +9,7 @@ line_spacing=1
 fallback=?
 transparent=.
 default_style.bold=true
-default_style.foreground=red
+default_style.background=blue
 
 [glyph A]
 [layer stage_1]
@@ -220,8 +220,8 @@ z=1
 visible=false
 style.foreground=white
 row=┌───┐
-row=├──..
 row=│....
+row=├──..
 row=.....
 row=.....
 [endlayer]
@@ -232,9 +232,9 @@ visible=false
 style.foreground=bright_white
 style.bold=true
 row=┌───┐
-row=├──..
 row=│....
 row=├──..
+row=│....
 row=└....
 [endlayer]
 
@@ -243,9 +243,9 @@ z=10
 visible=true
 style.foreground=bright_white
 row=┌───┐
-row=├──..
 row=│....
 row=├──..
+row=│....
 row=└───┘
 [endlayer]
 
