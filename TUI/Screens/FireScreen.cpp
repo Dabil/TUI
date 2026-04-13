@@ -61,8 +61,8 @@ void FireScreen::onEnter()
         m_bannerStyle,
         m_bannerStyleShadow,
         options,
-        1,
-        1);
+        0,
+        -1);
 }
 
 void FireScreen::onExit()
