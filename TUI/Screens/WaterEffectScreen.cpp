@@ -70,7 +70,6 @@ namespace
     }
 
     const char* kWaterTitleFontPath = "Assets/Fonts/pFont/AssembleBox.pfont";
-    constexpr std::u32string_view kWaterTitleText = U"WATER";
 }
 
 namespace WaterColors
