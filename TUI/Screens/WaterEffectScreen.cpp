@@ -10,7 +10,7 @@
 #include "Rendering/Styles/BannerThemes.h"
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/Styles/StyleBuilder.h"
-#include "Rendering/Objects/ObjectFactory.h"
+#include "Rendering/Objects/TextObjectFactory.h"
 #include "Rendering/Objects/BannerFactory.h"
 
 namespace
