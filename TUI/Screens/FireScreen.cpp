@@ -45,7 +45,7 @@ void FireScreen::onEnter()
     m_nextFireBuffer.clear();
     m_tuiFireLogoObject.clear();
 
-    m_fontResult = m_assetLibrary.loadBannerFont(m_tuiFireLogoKey);
+    m_fontResult = m_assetLibrary.loadBannerFontAsset(m_tuiFireLogoKey);
 
     if (!m_fontResult.success || !m_fontResult.hasFont())
     {
