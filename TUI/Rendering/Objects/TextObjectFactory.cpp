@@ -1,8 +1,20 @@
-﻿#include "Rendering/Objects/ObjectFactory.h"
+﻿#include "Rendering/Objects/TextObjectFactory.h"
 
 #include <algorithm>
 #include <optional>
 #include <vector>
+
+/*
+When ObjectFactory method's should use TextObjectBuilder.h instead of TextObject.h
+
+A new or revised ObjectFactory method should use TextObjectBuilder when any of these are true:
+- it must place a wide glyph and also emit the required trailing cell correctly
+- it must intentionally write non-default CellKind or CellWidth
+- it must distinguish true empty cells from visible space glyph cells in a structural way
+- it must apply style at different cells within the same returned object
+- it must compose output procedurally at exact (x, y) positions rather than by assembling rows of text
+- it needs to overlay or merge multiple generated pieces into one object at cell precision
+*/
 
 namespace
 {
@@ -574,26 +586,6 @@ namespace ObjectFactory
     TextObject makeTextUtf8(std::string_view text, const Style& style)
     {
         return TextObject::fromUtf8(text, style);
-    }
-
-    TextObject makeFigletText(std::u32string_view text)
-    {
-        return makeText(text);
-    }
-
-    TextObject makeFigletText(std::u32string_view text, const Style& style)
-    {
-        return makeText(text, style);
-    }
-
-    TextObject makeFigletTextUtf8(std::string_view text)
-    {
-        return makeTextUtf8(text);
-    }
-
-    TextObject makeFigletTextUtf8(std::string_view text, const Style& style)
-    {
-        return makeTextUtf8(text, style);
     }
 
     TextObject makeFilledRect(int width, int height, char32_t fillGlyph)

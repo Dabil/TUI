@@ -52,12 +52,6 @@ namespace ObjectFactory
     TextObject makeTextUtf8(std::string_view text);
     TextObject makeTextUtf8(std::string_view text, const Style& style);
 
-    TextObject makeFigletText(std::u32string_view text);
-    TextObject makeFigletText(std::u32string_view text, const Style& style);
-
-    TextObject makeFigletTextUtf8(std::string_view text);
-    TextObject makeFigletTextUtf8(std::string_view text, const Style& style);
-
     TextObject makeFilledRect(int width, int height, char32_t fillGlyph = U' ');
     TextObject makeFilledRect(int width, int height, char32_t fillGlyph, const Style& style);
 
