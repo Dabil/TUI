@@ -153,7 +153,7 @@ namespace AssetPaths
 
         static const std::unordered_set<std::string> fontExtensions =
         {
-            "fon", "fnt"
+            "fon", "fnt", "pfont"
         };
 
         static const std::unordered_set<std::string> bannerExtensions =
