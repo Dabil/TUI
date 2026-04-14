@@ -270,4 +270,79 @@ namespace BannerFactory
         const AsciiBanner::RenderOptions& options,
         int shadowOffsetX = 1,
         int shadowOffsetY = 1);
+
+    // -------------------------------------------------------------------------
+    // Shadow effects
+    // pFont
+    // -------------------------------------------------------------------------
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& options,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& options,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& shadowOptions,
+        const PseudoFont::LayeredRenderOptions& mainOptions,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& shadowOptions,
+        const PseudoFont::LayeredRenderOptions& mainOptions,
+        int shadowOffsetX = 1,
+        int shadowOffsetY = 1);
 }
