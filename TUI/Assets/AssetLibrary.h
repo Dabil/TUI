@@ -2,7 +2,6 @@
 
 #include <cstddef>
 #include <memory>
-#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -14,6 +13,7 @@
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Objects/XpArtLoader.h"
 #include "Rendering/Objects/XpSequenceAccess.h"
+#include "Rendering/Objects/pFontLoader.h"
 #include "Utilities/AssetPaths.h"
 
 namespace Assets
@@ -28,7 +28,8 @@ namespace Assets
         BinaryArtLoader::LoadOptions binaryArtOptions;
         XpArtLoader::LoadOptions xpLoadOptions;
         XpSequenceAccess::SequenceLoadOptions xpSequenceOptions;
-        AsciiBannerFontLoader::LoadOptions bannerFontOptions;
+        AsciiBannerFontLoader::LoadOptions bannerFontLoadOptions;
+        PseudoFont::LoadOptions pFontLoadOptions;
     };
 
     struct LoadedTextAsset
@@ -56,8 +57,8 @@ namespace Assets
 
     struct LoadedBannerFontAsset
     {
-        std::shared_ptr<const AsciiBannerFont> font;
-        AssetPaths::AssetType assetType = AssetPaths::AssetType::BannerSource;
+        std::shared_ptr<AsciiBannerFont> font;
+        AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
         std::string requestedPath;
         std::string resolvedPath;
         std::string normalizedPath;
@@ -67,6 +68,29 @@ namespace Assets
     struct LoadBannerFontResult
     {
         LoadedBannerFontAsset asset;
+        bool success = false;
+        bool fromCache = false;
+        std::string errorMessage;
+
+        bool hasFont() const
+        {
+            return asset.font != nullptr;
+        }
+    };
+
+    struct LoadedPseudoFontAsset
+    {
+        std::shared_ptr<PseudoFont::FontDefinition> font;
+        AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+        std::string requestedPath;
+        std::string resolvedPath;
+        std::string normalizedPath;
+        std::string cacheKey;
+    };
+
+    struct LoadPseudoFontAssetResult
+    {
+        LoadedPseudoFontAsset asset;
         bool success = false;
         bool fromCache = false;
         std::string errorMessage;
@@ -96,19 +120,27 @@ namespace Assets
         LoadTextAssetResult loadTextAsset(const std::string& assetNameOrPath);
         LoadTextAssetResult reloadTextAsset(const std::string& assetNameOrPath);
 
-        LoadBannerFontResult loadBannerFont(const std::string& assetNameOrPath);
-        LoadBannerFontResult reloadBannerFont(const std::string& assetNameOrPath);
+        LoadBannerFontResult loadBannerFontAsset(const std::string& assetNameOrPath);
+        LoadBannerFontResult reloadBannerFontAsset(const std::string& assetNameOrPath);
+
+        LoadPseudoFontAssetResult loadPseudoFontAsset(const std::string& assetNameOrPath);
+        LoadPseudoFontAssetResult reloadPseudoFontAsset(const std::string& assetNameOrPath);
 
         const std::shared_ptr<TextObject>* findCachedTextAsset(const std::string& assetNameOrPath) const;
-        const std::shared_ptr<const AsciiBannerFont>* findCachedBannerFont(const std::string& assetNameOrPath) const;
+        const std::shared_ptr<AsciiBannerFont>* findCachedBannerFontAsset(
+            const std::string& assetNameOrPath) const;
+        const std::shared_ptr<PseudoFont::FontDefinition>* findCachedPseudoFontAsset(
+            const std::string& assetNameOrPath) const;
 
         bool evictCachedTextAsset(const std::string& assetNameOrPath);
-        bool evictCachedBannerFont(const std::string& assetNameOrPath);
+        bool evictCachedBannerFontAsset(const std::string& assetNameOrPath);
+        bool evictCachedPseudoFontAsset(const std::string& assetNameOrPath);
 
         void clear();
 
         std::size_t getCachedTextAssetCount() const;
-        std::size_t getCachedBannerFontCount() const;
+        std::size_t getCachedBannerFontAssetCount() const;
+        std::size_t getCachedPseudoFontAssetCount() const;
         std::size_t getAliasCount() const;
 
     private:
@@ -125,8 +157,19 @@ namespace Assets
 
         struct BannerFontCacheEntry
         {
-            std::shared_ptr<const AsciiBannerFont> font;
-            AssetPaths::AssetType assetType = AssetPaths::AssetType::BannerSource;
+            std::shared_ptr<AsciiBannerFont> font;
+            AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+            std::string requestedPath;
+            std::string resolvedPath;
+            std::string normalizedPath;
+            bool loadSucceeded = false;
+            std::string errorMessage;
+        };
+
+        struct PseudoFontCacheEntry
+        {
+            std::shared_ptr<PseudoFont::FontDefinition> font;
+            AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
             std::string requestedPath;
             std::string resolvedPath;
             std::string normalizedPath;
@@ -135,13 +178,20 @@ namespace Assets
         };
 
         LoadTextAssetResult loadTextAssetInternal(const std::string& assetNameOrPath, bool forceReload);
-        LoadBannerFontResult loadBannerFontInternal(const std::string& assetNameOrPath, bool forceReload);
+        LoadBannerFontResult loadBannerFontAssetInternal(const std::string& assetNameOrPath, bool forceReload);
+        LoadPseudoFontAssetResult loadPseudoFontAssetInternal(
+            const std::string& assetNameOrPath,
+            bool forceReload);
 
-        LoadTextAssetResult dispatchLoad(
+        LoadTextAssetResult dispatchTextLoad(
             const std::string& requestedPath,
             const AssetPaths::ResolutionResult& resolution);
 
-        LoadBannerFontResult dispatchLoadBannerFont(
+        LoadBannerFontResult dispatchBannerFontLoad(
+            const std::string& requestedPath,
+            const AssetPaths::ResolutionResult& resolution);
+
+        LoadPseudoFontAssetResult dispatchPseudoFontLoad(
             const std::string& requestedPath,
             const AssetPaths::ResolutionResult& resolution);
 
@@ -153,5 +203,6 @@ namespace Assets
         std::unordered_map<std::string, std::string> m_aliases;
         std::unordered_map<std::string, TextCacheEntry> m_textAssetCache;
         std::unordered_map<std::string, BannerFontCacheEntry> m_bannerFontCache;
+        std::unordered_map<std::string, PseudoFontCacheEntry> m_pseudoFontCache;
     };
 }
