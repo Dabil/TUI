@@ -1,5 +1,7 @@
 #include "Rendering/Objects/BannerFactory.h"
 
+#include <algorithm>
+
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 namespace BannerFactory
@@ -54,7 +56,7 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Preferred API: makeBanner(...)
-    // UTF-8 overloads
+    // AsciiBannerFont UTF-8 overloads
     // -------------------------------------------------------------------------
 
     TextObject makeBanner(
@@ -91,7 +93,7 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Preferred API: makeBanner(...)
-    // UTF-32 overloads
+    // AsciiBannerFont UTF-32 overloads
     // -------------------------------------------------------------------------
 
     TextObject makeBanner(
@@ -127,7 +129,82 @@ namespace BannerFactory
     }
 
     // -------------------------------------------------------------------------
-    // Generic layered helpers
+    // Preferred API: makeBanner(...)
+    // pFont UTF-8 overloads
+    // -------------------------------------------------------------------------
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text)
+    {
+        return PseudoFont::generateTextObject(font, text);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const PseudoFont::RenderOptions& options)
+    {
+        return PseudoFont::generateTextObject(font, text, options);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle)
+    {
+        return PseudoFont::generateTextObject(font, text, overrideStyle);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::RenderOptions& options)
+    {
+        return PseudoFont::generateTextObject(font, text, overrideStyle, options);
+    }
+
+    // -------------------------------------------------------------------------
+    // Preferred API: makeBanner(...)
+    // pFont UTF-32 overloads
+    // -------------------------------------------------------------------------
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text)
+    {
+        return makeBanner(font, toUtf8(text));
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const PseudoFont::RenderOptions& options)
+    {
+        return makeBanner(font, toUtf8(text), options);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle)
+    {
+        return makeBanner(font, toUtf8(text), overrideStyle);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::RenderOptions& options)
+    {
+        return makeBanner(font, toUtf8(text), overrideStyle, options);
+    }
+
+    // -------------------------------------------------------------------------
+    // Layered helpers
+    // AsciiBanner synthetic layered helpers
     // -------------------------------------------------------------------------
 
     Rendering::LayeredTextObject makeLayeredBannerObject(
@@ -201,7 +278,77 @@ namespace BannerFactory
     }
 
     // -------------------------------------------------------------------------
+    // Layered helpers
+    // pFont native layered helpers
+    // -------------------------------------------------------------------------
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text, options);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text, overrideStyle);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text, overrideStyle, options);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text));
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text), options);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text), overrideStyle);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text), overrideStyle, options);
+    }
+
+    // -------------------------------------------------------------------------
     // Shadow effects
+    // AsciiBanner only
     // -------------------------------------------------------------------------
 
     TextObject makeShadowBanner(
