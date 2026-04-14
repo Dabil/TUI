@@ -11,6 +11,7 @@
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Objects/ObjectFactory.h"
+#include "Rendering/Objects/BannerFactory.h"
 
 namespace
 {
@@ -68,8 +69,6 @@ namespace
         const double t = static_cast<double>(std::rand()) / static_cast<double>(RAND_MAX);
         return minValue + ((maxValue - minValue) * t);
     }
-
-    const char* kWaterTitleFontPath = "Assets/Fonts/pFont/AssembleBox.pfont";
 }
 
 namespace WaterColors
@@ -110,7 +109,8 @@ namespace WaterColors
         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 }
 
-WaterEffectScreen::WaterEffectScreen()
+WaterEffectScreen::WaterEffectScreen(Assets::AssetLibrary& assetLibrary)
+    : m_assetLibrary(assetLibrary)
 {
     m_modeColor[0] = WaterColors::SprinkleColor;
     m_modeColor[1] = WaterColors::LightRainColor;
@@ -129,6 +129,11 @@ void WaterEffectScreen::onEnter()
     ensureWaterTitleLoaded();
     rebuildWaterTitle();
     updateWaterTitleAnimation();
+}
+
+void WaterEffectScreen::onExit()
+{
+    m_waterTitleObject.clear();
 }
 
 void WaterEffectScreen::update(double deltaTime)
@@ -396,14 +401,18 @@ void WaterEffectScreen::ensureWaterTitleLoaded()
     m_waterTitleLoaded = false;
     m_waterTitleLoadError.clear();
 
-    const PseudoFont::LoadResult loadResult = PseudoFont::loadFromFile(kWaterTitleFontPath);
-    if (!loadResult.success)
+    const Assets::LoadPseudoFontAssetResult loadResult =
+        m_assetLibrary.loadPseudoFontAsset(m_tuiWaterLogoKey);
+
+    if (!loadResult.success || !loadResult.hasFont())
     {
-        m_waterTitleLoadError = loadResult.errorMessage;
+        m_waterTitleLoadError = loadResult.errorMessage.empty()
+            ? std::string("Failed to load water title pFont asset.")
+            : loadResult.errorMessage;
         return;
     }
 
-    m_waterTitleFont = loadResult.font;
+    m_waterTitleFont = *loadResult.asset.font;
     m_waterTitleLoaded = true;
 }
 

@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "Screens/Screen.h"
-#include "Rendering/Objects/pFontLoader.h"
+#include "Assets/AssetLibrary.h"
 #include "Rendering/Objects/LayeredTextObject.h"
 #include "Rendering/Styles/Style.h"
 
@@ -14,10 +14,11 @@ class ScreenBuffer;
 class WaterEffectScreen : public Screen
 {
 public:
-    WaterEffectScreen();
+    explicit WaterEffectScreen(Assets::AssetLibrary& assetLibrary);
     ~WaterEffectScreen() override = default;
 
     void onEnter() override;
+    void onExit() override;
     void update(double deltaTime) override;
     void draw(Surface& surface) override;
 
@@ -64,6 +65,9 @@ private:
     Style selectWaveStyle(int amplitude, char32_t sourceGlyph) const;
 
 private:
+    Assets::AssetLibrary& m_assetLibrary;
+    std::string m_tuiWaterLogoKey = "pseudo.assemblyFont";
+
     int m_waveLeft = 0;
     int m_waveTop = 0;
     int m_waveWidth = 0;
