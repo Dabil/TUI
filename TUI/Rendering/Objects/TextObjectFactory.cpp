@@ -1,4 +1,5 @@
 ﻿#include "Rendering/Objects/TextObjectFactory.h"
+#include "Rendering/Objects/TextObjectBuilder.h"
 
 #include <algorithm>
 #include <optional>
@@ -461,6 +462,174 @@ namespace
 
         return lines;
     }
+    int maxPatternWidth(const PatternTile& tile)
+    {
+        int width = 0;
+
+        for (const std::u32string& row : tile.rows)
+        {
+            width = std::max(width, static_cast<int>(row.size()));
+        }
+
+        return width;
+    }
+
+    PatternTile normalizePatternTile(const PatternTile& tile)
+    {
+        if (tile.rows.empty())
+        {
+            return {};
+        }
+
+        const int tileWidth = maxPatternWidth(tile);
+        if (tileWidth <= 0)
+        {
+            return {};
+        }
+
+        PatternTile normalized;
+        normalized.capMode = tile.capMode;
+        normalized.rows.reserve(tile.rows.size());
+
+        for (const std::u32string& row : tile.rows)
+        {
+            std::u32string padded = row;
+            if (static_cast<int>(padded.size()) < tileWidth)
+            {
+                padded.append(
+                    static_cast<std::size_t>(tileWidth - static_cast<int>(padded.size())),
+                    U' ');
+            }
+
+            normalized.rows.push_back(std::move(padded));
+        }
+
+        return normalized;
+    }
+
+    TextObject buildPatternFillObject(
+        int width,
+        int height,
+        const PatternTile& tile,
+        const std::optional<Style>& style)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return TextObject();
+        }
+
+        const PatternTile normalizedTile = normalizePatternTile(tile);
+        if (normalizedTile.rows.empty())
+        {
+            return TextObject();
+        }
+
+        const int tileHeight = static_cast<int>(normalizedTile.rows.size());
+        const int tileWidth = static_cast<int>(normalizedTile.rows.front().size());
+
+        if (tileHeight <= 0 || tileWidth <= 0)
+        {
+            return TextObject();
+        }
+
+        int repeatStart = 0;
+        int repeatEndExclusive = tileHeight;
+
+        switch (normalizedTile.capMode)
+        {
+        case PatternCapMode::None:
+            repeatStart = 0;
+            repeatEndExclusive = tileHeight;
+            break;
+
+        case PatternCapMode::Top:
+            repeatStart = 1;
+            repeatEndExclusive = tileHeight;
+            break;
+
+        case PatternCapMode::Bottom:
+            repeatStart = 0;
+            repeatEndExclusive = tileHeight - 1;
+            break;
+
+        case PatternCapMode::TopAndBottom:
+            repeatStart = 1;
+            repeatEndExclusive = tileHeight - 1;
+            break;
+        }
+
+        const bool hasTopCap =
+            normalizedTile.capMode == PatternCapMode::Top ||
+            normalizedTile.capMode == PatternCapMode::TopAndBottom;
+
+        const bool hasBottomCap =
+            normalizedTile.capMode == PatternCapMode::Bottom ||
+            normalizedTile.capMode == PatternCapMode::TopAndBottom;
+
+        const int repeatRowCount = std::max(0, repeatEndExclusive - repeatStart);
+
+        TextObjectBuilder builder(width, height);
+
+        auto writePatternRow = [&](int destY, const std::u32string& sourceRow)
+            {
+                for (int x = 0; x < width; ++x)
+                {
+                    const char32_t glyph = sourceRow[static_cast<std::size_t>(x % tileWidth)];
+
+                    if (style.has_value())
+                    {
+                        builder.setGlyph(x, destY, glyph, *style);
+                    }
+                    else
+                    {
+                        builder.setGlyph(x, destY, glyph);
+                    }
+                }
+            };
+
+        int y = 0;
+
+        if (hasTopCap&& y < height)
+        {
+            writePatternRow(y, normalizedTile.rows.front());
+            ++y;
+        }
+
+        const int lastRowY = height - 1;
+        const bool reserveBottomRow = hasBottomCap && height > 0;
+
+        const int repeatableEndY = reserveBottomRow ? lastRowY : height;
+
+        if (repeatRowCount > 0)
+        {
+            while (y < repeatableEndY)
+            {
+                const int repeatIndex = (y - (hasTopCap ? 1 : 0)) % repeatRowCount;
+                const int sourceIndex = repeatStart + repeatIndex;
+                writePatternRow(y, normalizedTile.rows[static_cast<std::size_t>(sourceIndex)]);
+                ++y;
+            }
+        }
+        else
+        {
+            // No repeat body exists. If needed, extend caps to fill the space.
+            while (y < repeatableEndY)
+            {
+                const std::u32string& fallbackRow =
+                    hasTopCap ? normalizedTile.rows.front() : normalizedTile.rows.back();
+
+                writePatternRow(y, fallbackRow);
+                ++y;
+            }
+        }
+
+        if (hasBottomCap && height > 0)
+        {
+            writePatternRow(lastRowY, normalizedTile.rows.back());
+        }
+
+        return builder.build();
+    }
 }
 
 namespace ObjectFactory
@@ -830,5 +999,183 @@ namespace ObjectFactory
                 fillGlyph,
                 glyphs),
             style);
+    }
+
+    TextObject makePatternFill(
+        int width,
+        int height,
+        const PatternTile& tile)
+    {
+        return buildPatternFillObject(width, height, tile, std::nullopt);
+    }
+
+    TextObject makePatternFill(
+        int width,
+        int height,
+        const PatternTile& tile,
+        const Style& style)
+    {
+        return buildPatternFillObject(width, height, tile, style);
+    }
+
+    /*
+        Things you need to know to properly create these text patterns
+
+        1) Backslashes need to be escaped to print properly
+        so if you want to print a backslash you have to "\\" escape it
+        this leads to a readability problem. And worse, since we aren't
+        printing through cout, the escaped backslash gets drawn as
+        \\ breaking the effect altogether.
+
+        2) You can use this pattern to avoid the escaped backslash:
+            R"( ... )"
+
+        like in UR"( / __ \ \__)"
+
+        3) You can also use a custom pattern such as:
+            UR"PATTERN( ... )PATTERN"
+    */
+
+    PatternTile brickPattern()
+    {
+        return PatternTile
+        {
+            {
+            U"_|___",
+            U"___|_"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile bubblesPattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"( / __ \ \__/)",
+            UR"(/ /  \ \____)",
+            UR"(\ \__/ / __ )",
+            UR"( \____/ /  \)"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile crossStitchPattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"(<>================================<>)",
+            UR"(||\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/||)",
+            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
+            UR"(||/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\||)",
+            UR"(||================================||)",
+            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
+            UR"(||================================||)",
+            UR"(||/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\||)",
+            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
+            UR"(||\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/||)",
+            UR"(<>================================<>)"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile crossedPattern()
+    {
+        return PatternTile
+        {
+            {
+            U"_|_     ",
+            U" |      ",
+            U"    _|_ ",
+            U"     |  "
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile embroideryPattern()
+    {
+        return PatternTile
+        {
+            {
+            U" /\\ ",
+            U" )( ",
+            U"(  )",
+            U" \\/"
+            },
+            PatternCapMode::TopAndBottom
+        };
+    }
+
+    PatternTile fencePattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"(   /  \ )",
+            UR"(__/    \)",
+            UR"(  \    /)",
+            UR"(   \__/ )"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile honeyCombPattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"(/      \____)",
+            UR"(\      /    )",
+            UR"( \____/     )",
+            UR"( /    \     )"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile houndsToothPattern()
+    {
+        return PatternTile
+        {
+            {
+            U"|__|   __",
+            U" __|__|  ",
+            U"|   __|__"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile ninjaPattern()
+    {
+        return PatternTile
+        {
+            {
+            U" |___  |",
+            U"    _|_|",
+            U"_  | |__",
+            U"_|_|    "
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile puzzlePattern()
+    {
+        return PatternTile
+        {
+            {
+            U" _|    ",
+            U"(_   _ ",
+            U" |__( )"
+            },
+            PatternCapMode::None
+        };
     }
 }

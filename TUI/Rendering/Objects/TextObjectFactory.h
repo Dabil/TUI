@@ -7,6 +7,20 @@
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"
 
+enum class PatternCapMode
+{
+    None,
+    Top,
+    Bottom,
+    TopAndBottom
+};
+
+struct PatternTile
+{
+    std::vector<std::u32string> rows;
+    PatternCapMode capMode = PatternCapMode::None;
+};
+
 namespace ObjectFactory
 {
     struct BorderGlyphs
@@ -167,4 +181,30 @@ namespace ObjectFactory
         char32_t fillGlyph,
         const Style& style,
         const LineGlyphs& glyphs = asciiLineGlyphs());
+
+
+    // Named repeating pattern presets.
+    PatternTile brickPattern();
+    PatternTile bubblesPattern();
+    PatternTile crossStitchPattern();
+    PatternTile crossedPattern();
+    PatternTile embroideryPattern();
+    PatternTile fencePattern();
+    PatternTile honeyCombPattern();
+    PatternTile houndsToothPattern();
+    PatternTile ninjaPattern();
+    PatternTile puzzlePattern();
+
+    // fill patterns
+
+    TextObject makePatternFill(
+        int width,
+        int height,
+        const PatternTile& tile);
+
+    TextObject makePatternFill(
+        int width,
+        int height,
+        const PatternTile& tile,
+        const Style& style);
 }
