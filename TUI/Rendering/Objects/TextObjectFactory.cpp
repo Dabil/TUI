@@ -1445,7 +1445,7 @@ namespace ObjectFactory
                 U"."
             },
             {
-                UR"(+\"\+.)"
+                UR"(+"+.)"
             },
             {}
         };
