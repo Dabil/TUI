@@ -28,6 +28,13 @@ struct HorizontalLinePattern
     std::vector<std::u32string> endRows;
 };
 
+struct VerticalLinePattern
+{
+    std::vector<std::u32string> topRows;
+    std::vector<std::u32string> repeatRows;
+    std::vector<std::u32string> bottomRows;
+};
+
 namespace ObjectFactory
 {
     struct BorderGlyphs
@@ -241,5 +248,26 @@ namespace ObjectFactory
     TextObject makeHorizontalPatternLine(
         int width,
         const HorizontalLinePattern& pattern,
+        const Style& style);
+
+    // Named vertical multi-glyph line presets.
+    VerticalLinePattern heartChainVerticalPattern();
+
+    // Creates a vertical line object using multi-glyph repeating row blocks.
+    // height is the final output height in rows.
+    // The pattern may contain:
+    // - topRows: written once at the top
+    // - repeatRows: repeated down the middle span
+    // - bottomRows: written once at the bottom
+    //
+    // For a simple repeating vertical pattern, leave topRows/bottomRows empty
+    // and provide only repeatRows.
+    TextObject makeVerticalPatternLine(
+        int height,
+        const VerticalLinePattern& pattern);
+
+    TextObject makeVerticalPatternLine(
+        int height,
+        const VerticalLinePattern& pattern,
         const Style& style);
 }

@@ -823,6 +823,162 @@ namespace
 
         return builder.build();
     }
+
+    struct NormalizedVerticalLinePattern
+    {
+        std::vector<std::u32string> topRows;
+        std::vector<std::u32string> repeatRows;
+        std::vector<std::u32string> bottomRows;
+
+        int width = 0;
+        int topHeight = 0;
+        int repeatHeight = 0;
+        int bottomHeight = 0;
+    };
+
+    std::vector<std::u32string> normalizeRowsToWidth(
+        const std::vector<std::u32string>& rows,
+        int targetWidth)
+    {
+        std::vector<std::u32string> normalized;
+        normalized.reserve(rows.size());
+
+        for (const std::u32string& row : rows)
+        {
+            std::u32string padded = row;
+            if (static_cast<int>(padded.size()) < targetWidth)
+            {
+                padded.append(
+                    static_cast<std::size_t>(targetWidth - static_cast<int>(padded.size())),
+                    U' ');
+            }
+
+            normalized.push_back(std::move(padded));
+        }
+
+        return normalized;
+    }
+
+    NormalizedVerticalLinePattern normalizeVerticalLinePattern(
+        const VerticalLinePattern& pattern)
+    {
+        NormalizedVerticalLinePattern normalized;
+
+        normalized.width = std::max({
+            maxRowWidth(pattern.topRows),
+            maxRowWidth(pattern.repeatRows),
+            maxRowWidth(pattern.bottomRows)
+            });
+
+        if (normalized.width <= 0)
+        {
+            return normalized;
+        }
+
+        normalized.topRows = normalizeRowsToWidth(pattern.topRows, normalized.width);
+        normalized.repeatRows = normalizeRowsToWidth(pattern.repeatRows, normalized.width);
+        normalized.bottomRows = normalizeRowsToWidth(pattern.bottomRows, normalized.width);
+
+        normalized.topHeight = static_cast<int>(normalized.topRows.size());
+        normalized.repeatHeight = static_cast<int>(normalized.repeatRows.size());
+        normalized.bottomHeight = static_cast<int>(normalized.bottomRows.size());
+
+        return normalized;
+    }
+
+    TextObject buildVerticalPatternLineObject(
+        int height,
+        const VerticalLinePattern& pattern,
+        const std::optional<Style>& style)
+    {
+        if (height <= 0)
+        {
+            return TextObject();
+        }
+
+        const NormalizedVerticalLinePattern normalized =
+            normalizeVerticalLinePattern(pattern);
+
+        if (normalized.width <= 0)
+        {
+            return TextObject();
+        }
+
+        if (normalized.topHeight <= 0 &&
+            normalized.repeatHeight <= 0 &&
+            normalized.bottomHeight <= 0)
+        {
+            return TextObject();
+        }
+
+        TextObjectBuilder builder(normalized.width, height);
+
+        auto writeRowsAtY = [&](int startY, const std::vector<std::u32string>& rows)
+            {
+                for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
+                {
+                    const int destY = startY + rowIndex;
+                    if (destY < 0 || destY >= height)
+                    {
+                        continue;
+                    }
+
+                    const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
+
+                    for (int x = 0; x < static_cast<int>(row.size()); ++x)
+                    {
+                        const char32_t glyph = row[static_cast<std::size_t>(x)];
+
+                        if (style.has_value())
+                        {
+                            builder.setGlyph(x, destY, glyph, *style);
+                        }
+                        else
+                        {
+                            builder.setGlyph(x, destY, glyph);
+                        }
+                    }
+                }
+            };
+
+        int y = 0;
+
+        // Write TOP once.
+        if (normalized.topHeight > 0)
+        {
+            writeRowsAtY(0, normalized.topRows);
+            y += normalized.topHeight;
+        }
+
+        // Reserve room for a full BOTTOM if it can fit.
+        int reservedBottomHeight = 0;
+        if (normalized.bottomHeight > 0 && y + normalized.bottomHeight <= height)
+        {
+            reservedBottomHeight = normalized.bottomHeight;
+        }
+
+        const int repeatLimit = height - reservedBottomHeight;
+
+        // Only place full repeat blocks before the reserved bottom area.
+        if (normalized.repeatHeight > 0)
+        {
+            while (y + normalized.repeatHeight <= repeatLimit)
+            {
+                writeRowsAtY(y, normalized.repeatRows);
+                y += normalized.repeatHeight;
+            }
+        }
+
+        // Write BOTTOM immediately after the last full repeat.
+        // If it does not fully fit, it is omitted rather than partially clipped.
+        if (normalized.bottomHeight > 0 &&
+            y + normalized.bottomHeight <= height)
+        {
+            writeRowsAtY(y, normalized.bottomRows);
+        }
+
+        return builder.build();
+    }
 }
 
 namespace ObjectFactory
@@ -1545,6 +1701,50 @@ namespace ObjectFactory
                 UR"(|       /)",
                 UR"( \     / )",
                 UR"(  `---'  )"            }
+        };
+    }
+
+    TextObject makeVerticalPatternLine(
+        int height,
+        const VerticalLinePattern& pattern)
+    {
+        return buildVerticalPatternLineObject(height, pattern, std::nullopt);
+    }
+
+    TextObject makeVerticalPatternLine(
+        int height,
+        const VerticalLinePattern& pattern,
+        const Style& style)
+    {
+        return buildVerticalPatternLineObject(height, pattern, style);
+    }
+
+    VerticalLinePattern heartChainVerticalPattern()
+    {
+        return VerticalLinePattern
+        {
+            {
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(    ( (    )PATTERN"
+            },
+            {
+                UR"PATTERN(    ) )    )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(   ( (     )PATTERN"
+            },
+            {
+                UR"PATTERN(    ) )    )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN"
+            }
         };
     }
 }
