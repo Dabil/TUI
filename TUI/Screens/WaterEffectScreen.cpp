@@ -7,11 +7,11 @@
 #include "Core/Rect.h"
 #include "Rendering/Surface.h"
 #include "Rendering/ScreenBuffer.h"
-#include "Rendering/Styles/BannerThemes.h"
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/Styles/StyleBuilder.h"
-#include "Rendering/Objects/TextObjectFactory.h"
+#include "Rendering/Styles/BannerThemes.h"
 #include "Rendering/Objects/BannerFactory.h"
+#include "Rendering/Objects/TextObjectFactory.h"
 
 namespace
 {
@@ -28,10 +28,10 @@ namespace
     constexpr double WaterTitleReverseDurationSeconds = 1.0;
     constexpr double WaterTitleRepeatDelaySeconds = 10.0;
     constexpr double WaterTitleCycleDurationSeconds =
-        WaterTitleAssembleDurationSeconds +
-        WaterTitleHoldDurationSeconds +
-        WaterTitleReverseDurationSeconds +
-        WaterTitleRepeatDelaySeconds;
+                     WaterTitleAssembleDurationSeconds +
+                     WaterTitleHoldDurationSeconds +
+                     WaterTitleReverseDurationSeconds +
+                     WaterTitleRepeatDelaySeconds;
 
     constexpr char32_t toUpperAscii(char32_t c)
     {
@@ -170,16 +170,6 @@ void WaterEffectScreen::draw(Surface& surface)
     outerFrame.draw(buffer, 0, 0, WaterColors::BorderColor);
     innerFrame.draw(buffer, 2, 1, WaterColors::BorderColor);
 
-    m_waveLeft = 3;
-    m_waveTop = 2;
-    m_waveWidth = std::max(0, screenWidth - 6);
-    m_waveHeight = std::max(0, screenHeight - 4);
-
-    ensureSimulationSize(m_waveWidth, m_waveHeight);
-    renderWaveField(surface);
-
-    drawWaterTitle(buffer);
-
     buffer.writeString(4, 0, "[                         ]", WaterColors::TitleColor);
     buffer.writeString(5, 0, " Rain Drops Water Effect ", WaterColors::TitleColorUnderlined);
 
@@ -207,6 +197,20 @@ void WaterEffectScreen::draw(Surface& surface)
     }
 
     buffer.writeChar(startModeXpos, screenHeight - 1, U']', WaterColors::TitleColor);
+
+    // TextObject fillPattern = ObjectFactory::makePatternFill(m_screenWidth, m_screenHeight, ObjectFactory::brickPattern(), WaterColors::BorderColor);
+    
+
+    m_waveLeft = 3;
+    m_waveTop = 2;
+    m_waveWidth = std::max(0, screenWidth - 6);
+    m_waveHeight = std::max(0, screenHeight - 4);
+
+    ensureSimulationSize(m_waveWidth, m_waveHeight);
+    renderWaveField(surface);
+
+    drawWaterTitle(buffer);
+    // fillPattern.draw(buffer, 0, 0);
 }
 
 void WaterEffectScreen::ensureSimulationSize(int width, int height)
