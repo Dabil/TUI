@@ -221,6 +221,9 @@ namespace ObjectFactory
     HorizontalLinePattern pennantLinePattern();
     HorizontalLinePattern sparkChainLinePattern();
     HorizontalLinePattern orbChainLinePattern();
+    HorizontalLinePattern rightAroundPattern();
+    HorizontalLinePattern dnaPattern();
+    HorizontalLinePattern scrollSemetricPattern();
 
     // Creates a horizontal line object using multi-glyph repeating rows.
     // width is the final output width in columns.

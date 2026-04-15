@@ -1472,4 +1472,79 @@ namespace ObjectFactory
             }
         };
     }
+
+    HorizontalLinePattern rightAroundPattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                UR"(  .--.    )",
+                UR"(:::::.\:::)",
+                UR"('      `--)"
+            },
+            {}
+        };
+    }
+
+    HorizontalLinePattern dnaPattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                UR"( ,-"-.   ,-"-.)",
+                UR"(X | | \ / | | )",
+                UR"( \| | |X| | |/)",
+                UR"(  `-!-' `-!-" )"
+            },
+            {
+                UR"( )",
+                UR"(X)",
+                UR"( )",
+                UR"( )"
+            }
+        };
+    }
+
+    HorizontalLinePattern scrollSemetricPattern()
+    {
+        return HorizontalLinePattern
+        {
+            {
+                UR"(  .------)",
+                UR"( /  .-.  )",
+                UR"(|  /   \ )",
+                UR"(| |\_.  |)",
+                UR"(|\|  | /|)",
+                UR"(| `---' |)",
+                UR"(|       |)",
+                UR"(|       |)",
+                UR"(\       |)",
+                UR"( \     / )",
+                UR"(  `---'  )"            },
+            {
+                U"-",
+                U" ",
+                U" ",
+                U" ",
+                U" ",
+                U" ",
+                U" ",
+                U"-"
+            },
+            {
+                UR"(------.  )",
+                UR"(  .-.  \ )",
+                UR"( /   \  |)",
+                UR"(|    /| |)",
+                UR"(|\  | |/|)",
+                UR"(| `---' |)",
+                UR"(|       |)",
+                UR"(|       |)",
+                UR"(|       /)",
+                UR"( \     / )",
+                UR"(  `---'  )"            }
+        };
+    }
 }
