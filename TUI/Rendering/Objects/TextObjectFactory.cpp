@@ -17,6 +17,11 @@ A new or revised ObjectFactory method should use TextObjectBuilder when any of t
 - it needs to overlay or merge multiple generated pieces into one object at cell precision
 */
 
+/*
+* Concrete Rule: preserve the integrity of the motif, even if that means leaving 
+* space or shortening the repeat
+*/
+
 namespace
 {
     std::u32string repeatGlyph(char32_t glyph, int count)
@@ -630,6 +635,194 @@ namespace
 
         return builder.build();
     }
+
+    int maxRowWidth(const std::vector<std::u32string>& rows)
+    {
+        int width = 0;
+
+        for (const std::u32string& row : rows)
+        {
+            width = std::max(width, static_cast<int>(row.size()));
+        }
+
+        return width;
+    }
+
+    std::vector<std::u32string> normalizeRows(
+        const std::vector<std::u32string>& rows,
+        int targetHeight)
+    {
+        std::vector<std::u32string> normalized;
+
+        if (targetHeight <= 0)
+        {
+            return normalized;
+        }
+
+        const int segmentWidth = maxRowWidth(rows);
+        normalized.reserve(static_cast<std::size_t>(targetHeight));
+
+        for (int y = 0; y < targetHeight; ++y)
+        {
+            std::u32string row;
+
+            if (y < static_cast<int>(rows.size()))
+            {
+                row = rows[static_cast<std::size_t>(y)];
+            }
+
+            if (static_cast<int>(row.size()) < segmentWidth)
+            {
+                row.append(
+                    static_cast<std::size_t>(segmentWidth - static_cast<int>(row.size())),
+                    U' ');
+            }
+
+            normalized.push_back(std::move(row));
+        }
+
+        return normalized;
+    }
+
+    struct NormalizedHorizontalLinePattern
+    {
+        std::vector<std::u32string> beginRows;
+        std::vector<std::u32string> repeatRows;
+        std::vector<std::u32string> endRows;
+
+        int height = 0;
+        int beginWidth = 0;
+        int repeatWidth = 0;
+        int endWidth = 0;
+    };
+
+    NormalizedHorizontalLinePattern normalizeHorizontalLinePattern(
+        const HorizontalLinePattern& pattern)
+    {
+        NormalizedHorizontalLinePattern normalized;
+
+        const int beginHeight = static_cast<int>(pattern.beginRows.size());
+        const int repeatHeight = static_cast<int>(pattern.repeatRows.size());
+        const int endHeight = static_cast<int>(pattern.endRows.size());
+
+        normalized.height = std::max({ beginHeight, repeatHeight, endHeight });
+        if (normalized.height <= 0)
+        {
+            return normalized;
+        }
+
+        normalized.beginRows = normalizeRows(pattern.beginRows, normalized.height);
+        normalized.repeatRows = normalizeRows(pattern.repeatRows, normalized.height);
+        normalized.endRows = normalizeRows(pattern.endRows, normalized.height);
+
+        normalized.beginWidth = maxRowWidth(normalized.beginRows);
+        normalized.repeatWidth = maxRowWidth(normalized.repeatRows);
+        normalized.endWidth = maxRowWidth(normalized.endRows);
+
+        return normalized;
+    }
+    /*
+     Horizontal pattern line behavior:
+    
+     - BEGIN is written once at the left.
+     - REPEAT tiles in full blocks only.
+     - END is written only if it fully fits.
+     - The repeat region may truncate to preserve a complete END.
+     - Partial END rendering is intentionally not supported.
+    */
+
+    TextObject buildHorizontalPatternLineObject(
+        int width,
+        const HorizontalLinePattern& pattern,
+        const std::optional<Style>& style)
+    {
+        if (width <= 0)
+        {
+            return TextObject();
+        }
+
+        const NormalizedHorizontalLinePattern normalized =
+            normalizeHorizontalLinePattern(pattern);
+
+        if (normalized.height <= 0)
+        {
+            return TextObject();
+        }
+
+        if (normalized.beginWidth <= 0 &&
+            normalized.repeatWidth <= 0 &&
+            normalized.endWidth <= 0)
+        {
+            return TextObject();
+        }
+
+        TextObjectBuilder builder(width, normalized.height);
+
+        auto writeRowsAtX = [&](int startX, const std::vector<std::u32string>& rows)
+            {
+                for (int y = 0; y < normalized.height; ++y)
+                {
+                    const std::u32string& row = rows[static_cast<std::size_t>(y)];
+
+                    for (int i = 0; i < static_cast<int>(row.size()); ++i)
+                    {
+                        const int destX = startX + i;
+                        if (destX < 0 || destX >= width)
+                        {
+                            continue;
+                        }
+
+                        const char32_t glyph = row[static_cast<std::size_t>(i)];
+
+                        if (style.has_value())
+                        {
+                            builder.setGlyph(destX, y, glyph, *style);
+                        }
+                        else
+                        {
+                            builder.setGlyph(destX, y, glyph);
+                        }
+                    }
+                }
+            };
+
+        int x = 0;
+
+        // Write begin once.
+        if (normalized.beginWidth > 0)
+        {
+            writeRowsAtX(0, normalized.beginRows);
+            x += normalized.beginWidth;
+        }
+
+        // Reserve room for a full end if it can fit.
+        int reservedEndWidth = 0;
+        if (normalized.endWidth > 0 && x + normalized.endWidth <= width)
+        {
+            reservedEndWidth = normalized.endWidth;
+        }
+
+        const int repeatLimit = width - reservedEndWidth;
+
+        // Only place full repeat blocks before the reserved end area.
+        if (normalized.repeatWidth > 0)
+        {
+            while (x + normalized.repeatWidth <= repeatLimit)
+            {
+                writeRowsAtX(x, normalized.repeatRows);
+                x += normalized.repeatWidth;
+            }
+        }
+
+        // Write end immediately after the last full repeat.
+        // If it extends past width, it clips on the right, preserving the leading characters.
+        if (normalized.endWidth > 0)
+        {
+            writeRowsAtX(x, normalized.endRows);
+        }
+
+        return builder.build();
+    }
 }
 
 namespace ObjectFactory
@@ -1111,6 +1304,29 @@ namespace ObjectFactory
         };
     }
 
+    PatternTile embroideryTile()
+    {
+        return PatternTile
+        {
+            {
+            U".----------------------------.",
+            U"|\\  /\\  /\\  /\\  /\\  /\\  /\\  /|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|/  \\/  \\/  \\/  \\/  \\/  \\/  \|",
+            U"'----------------------------'"
+            },
+            PatternCapMode::None
+        };
+    }
+
     PatternTile fencePattern()
     {
         return PatternTile
@@ -1176,6 +1392,84 @@ namespace ObjectFactory
             U" |__( )"
             },
             PatternCapMode::None
+        };
+    }
+
+    TextObject makeHorizontalPatternLine(
+        int width,
+        const HorizontalLinePattern& pattern)
+    {
+        return buildHorizontalPatternLineObject(width, pattern, std::nullopt);
+    }
+
+    TextObject makeHorizontalPatternLine(
+        int width,
+        const HorizontalLinePattern& pattern,
+        const Style& style)
+    {
+        return buildHorizontalPatternLineObject(width, pattern, style);
+    }
+
+    HorizontalLinePattern catFaceLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                U"=^..^=    "
+            },
+            {
+                U"=^..^="
+            }
+        };
+    }
+
+    HorizontalLinePattern pennantLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                U"     .-.",
+                U"`._.'   "
+            },
+            {}
+        };
+    }
+
+    HorizontalLinePattern sparkChainLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {
+                U"."
+            },
+            {
+                UR"(+\"\+.)"
+            },
+            {}
+        };
+    }
+
+    HorizontalLinePattern orbChainLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {
+                UR"( /)",
+                U"O ",
+                UR"( \)"
+            },
+            {
+                UR"(\ /)",
+                UR"( \ )",
+                UR"(/ \)"
+            },
+            {
+                UR"(\ )",
+                U" O",
+                UR"(/ )"
+            }
         };
     }
 }

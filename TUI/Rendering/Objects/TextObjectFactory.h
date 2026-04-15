@@ -21,6 +21,13 @@ struct PatternTile
     PatternCapMode capMode = PatternCapMode::None;
 };
 
+struct HorizontalLinePattern
+{
+    std::vector<std::u32string> beginRows;
+    std::vector<std::u32string> repeatRows;
+    std::vector<std::u32string> endRows;
+};
+
 namespace ObjectFactory
 {
     struct BorderGlyphs
@@ -189,6 +196,7 @@ namespace ObjectFactory
     PatternTile crossStitchPattern();
     PatternTile crossedPattern();
     PatternTile embroideryPattern();
+    PatternTile embroideryTile();
     PatternTile fencePattern();
     PatternTile honeyCombPattern();
     PatternTile houndsToothPattern();
@@ -206,5 +214,29 @@ namespace ObjectFactory
         int width,
         int height,
         const PatternTile& tile,
+        const Style& style);
+
+    // Named horizontal multi-glyph line presets.
+    HorizontalLinePattern catFaceLinePattern();
+    HorizontalLinePattern pennantLinePattern();
+    HorizontalLinePattern sparkChainLinePattern();
+    HorizontalLinePattern orbChainLinePattern();
+
+    // Creates a horizontal line object using multi-glyph repeating rows.
+    // width is the final output width in columns.
+    // The pattern may contain:
+    // - beginRows: written once at the left edge
+    // - repeatRows: repeated across the middle span
+    // - endRows: written once at the right edge
+    //
+    // For a simple repeating pattern, leave beginRows/endRows empty
+    // and provide only repeatRows.
+    TextObject makeHorizontalPatternLine(
+        int width,
+        const HorizontalLinePattern& pattern);
+
+    TextObject makeHorizontalPatternLine(
+        int width,
+        const HorizontalLinePattern& pattern,
         const Style& style);
 }
