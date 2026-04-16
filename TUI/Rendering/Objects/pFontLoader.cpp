@@ -688,7 +688,8 @@ namespace
         const int destY,
         const StyleMode styleMode,
         const std::optional<Style>& overrideStyle,
-        const bool transparentSpaces)
+        const bool transparentSpaces,
+        const bool applyLayerOffset)
     {
         for (int y = 0; y < layer.height; ++y)
         {
@@ -700,8 +701,8 @@ namespace
                     continue;
                 }
 
-                const int outX = destX + layer.offsetX + x;
-                const int outY = destY + layer.offsetY + y;
+                const int outX = destX + (applyLayerOffset ? layer.offsetX : 0) + x;
+                const int outY = destY + (applyLayerOffset ? layer.offsetY : 0) + y;
 
                 if (!builder.inBounds(outX, outY))
                 {
@@ -795,7 +796,8 @@ namespace
             glyphOriginY,
             styleMode,
             overrideStyle,
-            transparentSpaces);
+            transparentSpaces,
+            false);
     }
 }
 
@@ -1577,7 +1579,8 @@ namespace PseudoFont
                         yBase,
                         options.styleMode,
                         options.overrideStyle,
-                        options.transparentSpaces);
+                        options.transparentSpaces,
+                        true);
                 }
 
                 xCursor += glyph->width;

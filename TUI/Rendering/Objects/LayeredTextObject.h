@@ -10,6 +10,9 @@
 
 namespace Rendering
 {
+    // A single composition layer that places one TextObject into a larger layered asset.
+    // The TextObject remains layer-local content; placement is expressed only through
+    // offsetX/offsetY plus zIndex/visibility metadata.
     struct TextObjectLayer
     {
         std::string name;
@@ -25,6 +28,9 @@ namespace Rendering
         }
     };
 
+    // LayeredTextObject is a composition container around TextObject primitives.
+    // It exists for authored/multi-pass assets that need preserved layer identity until
+    // a later flatten/composition step. It is not a second kind of render surface.
     class LayeredTextObject
     {
     public:
@@ -48,6 +54,8 @@ namespace Rendering
         void setDimensions(int width, int height);
 
         std::size_t getLayerCount() const;
+        bool hasVisibleLayers() const;
+        bool hasVisibleNonEmptyLayers() const;
 
         const std::vector<TextObjectLayer>& getLayers() const;
         std::vector<TextObjectLayer>& getLayers();
@@ -70,6 +78,10 @@ namespace Rendering
         TextObject flatten(const FlattenOptions& options) const;
 
     private:
+        static std::vector<const TextObjectLayer*> collectFlattenLayers(
+            const std::vector<TextObjectLayer>& layers,
+            const FlattenOptions& options);
+
         static TextObject flattenInternal(
             const std::vector<TextObjectLayer>& layers,
             int width,
@@ -83,3 +95,4 @@ namespace Rendering
         std::vector<TextObjectLayer> m_layers;
     };
 }
+

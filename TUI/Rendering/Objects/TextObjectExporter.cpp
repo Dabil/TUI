@@ -26,6 +26,20 @@ namespace
         TextObjectExporter::SourcePosition source;
     };
 
+    struct LossyConversionExample
+    {
+        bool hasExample = false;
+        TextObjectExporter::SourcePosition source;
+        char32_t sourceCodePoint = U'\0';
+        char32_t replacementCodePoint = U'\0';
+    };
+
+    struct PlainTextScanInfo
+    {
+        std::vector<ExportCodePoint> codePoints;
+        bool discardedStyle = false;
+    };
+
     struct TerminalArtStyleInfo
     {
         Style emittedStyle;
@@ -224,17 +238,63 @@ namespace
         return Encoding::Utf8;
     }
 
+    void addDetailedWarning(
+        TextObjectExporter::SaveResult& result,
+        TextObjectExporter::SaveWarningCode code,
+        const std::string& message,
+        const TextObjectExporter::SourcePosition& position = {},
+        char32_t sourceCodePoint = U'\0',
+        char32_t replacementCodePoint = U'\0')
+    {
+        TextObjectExporter::SaveWarning warning;
+        warning.code = code;
+        warning.message = message;
+        warning.sourcePosition = position;
+        warning.sourceCodePoint = sourceCodePoint;
+        warning.replacementCodePoint = replacementCodePoint;
+        result.warnings.push_back(warning);
+    }
+
     void addWarning(
         TextObjectExporter::SaveResult& result,
         TextObjectExporter::SaveWarningCode code,
         const std::string& message)
     {
-        TextObjectExporter::SaveWarning warning;
-        warning.code = code;
-        warning.message = message;
-        result.warnings.push_back(warning);
+        addDetailedWarning(result, code, message);
     }
 
+    std::string toHexCodePoint(char32_t codePoint);
+
+    std::string buildLossyConversionWarningMessage(
+        std::size_t lossyCount,
+        const LossyConversionExample& example)
+    {
+        std::ostringstream warning;
+        warning << "Lossy conversion occurred for "
+            << lossyCount
+            << " code point(s).";
+
+        if (example.hasExample)
+        {
+            warning << " First example: "
+                << toHexCodePoint(example.sourceCodePoint)
+                << " -> "
+                << toHexCodePoint(example.replacementCodePoint);
+
+            if (example.source.isValid())
+            {
+                warning << " at ("
+                    << example.source.x
+                    << ", "
+                    << example.source.y
+                    << ")";
+            }
+
+            warning << ".";
+        }
+
+        return warning.str();
+    }
 
     bool warningImpliesTerminalArtFidelityLoss(TextObjectExporter::SaveWarningCode code)
     {
@@ -372,20 +432,20 @@ namespace
         return true;
     }
 
-    std::vector<ExportCodePoint> buildPlainTextExportCodePoints(
+    PlainTextScanInfo buildPlainTextExportCodePoints(
         const TextObject& object,
         const TextObjectExporter::SaveOptions& options)
     {
-        std::vector<ExportCodePoint> result;
+        PlainTextScanInfo scan;
 
         if (!object.isLoaded())
         {
-            return result;
+            return scan;
         }
 
         for (int row = 0; row < object.getHeight(); ++row)
         {
-            const std::size_t lineStart = result.size();
+            const std::size_t lineStart = scan.codePoints.size();
 
             for (int x = 0; x < object.getWidth(); ++x)
             {
@@ -397,6 +457,11 @@ namespace
                     continue;
                 }
 
+                if (cell.style.has_value() && !cell.style->isEmpty())
+                {
+                    scan.discardedStyle = true;
+                }
+
                 ExportCodePoint item;
                 item.source.x = x;
                 item.source.y = row;
@@ -404,14 +469,14 @@ namespace
                     ? U' '
                     : UnicodeConversion::sanitizeCodePoint(cell.glyph);
 
-                result.push_back(item);
+                scan.codePoints.push_back(item);
             }
 
             if (!options.preserveTrailingSpaces)
             {
-                while (result.size() > lineStart && result.back().value == U' ')
+                while (scan.codePoints.size() > lineStart && scan.codePoints.back().value == U' ')
                 {
-                    result.pop_back();
+                    scan.codePoints.pop_back();
                 }
             }
 
@@ -421,11 +486,11 @@ namespace
                 newline.value = U'\n';
                 newline.source.x = -1;
                 newline.source.y = row;
-                result.push_back(newline);
+                scan.codePoints.push_back(newline);
             }
         }
 
-        return result;
+        return scan;
     }
 
     bool tryEncodeCodePoints(
@@ -435,12 +500,14 @@ namespace
         std::string& outBytes,
         std::size_t& outLossyCount,
         char32_t& outFirstFailingCodePoint,
-        TextObjectExporter::SourcePosition& outFirstFailingPosition)
+        TextObjectExporter::SourcePosition& outFirstFailingPosition,
+        LossyConversionExample& outLossyExample)
     {
         outBytes.clear();
         outLossyCount = 0;
         outFirstFailingCodePoint = U'\0';
         outFirstFailingPosition = {};
+        outLossyExample = {};
 
         if (encoding == TextObjectExporter::Encoding::Utf8)
         {
@@ -509,6 +576,15 @@ namespace
             if (lossyForThisCodePoint)
             {
                 ++outLossyCount;
+
+                if (!outLossyExample.hasExample)
+                {
+                    outLossyExample.hasExample = true;
+                    outLossyExample.source = item.source;
+                    outLossyExample.sourceCodePoint = item.value;
+                    outLossyExample.replacementCodePoint =
+                        UnicodeConversion::sanitizeCodePoint(static_cast<unsigned char>(options.replacementChar));
+                }
             }
         }
 
@@ -603,10 +679,12 @@ namespace
         char32_t codePoint,
         const TextObjectExporter::SaveOptions& options,
         char& outByte,
-        bool& outLossy)
+        bool& outLossy,
+        char32_t& outReplacementCodePoint)
     {
         std::string encoded;
         outLossy = false;
+        outReplacementCodePoint = U'\0';
 
         if (!tryEncodeCp437(
             codePoint,
@@ -624,6 +702,11 @@ namespace
         }
 
         outByte = encoded[0];
+        if (outLossy)
+        {
+            outReplacementCodePoint =
+                UnicodeConversion::sanitizeCodePoint(static_cast<unsigned char>(options.replacementChar));
+        }
         return true;
     }
 
@@ -944,7 +1027,7 @@ namespace
             addWarning(
                 result,
                 SaveWarningCode::TerminalArtTrailingSpacesForced,
-                "BIN export always writes the full rectangular grid, so trailing spaces were preserved regardless of SaveOptions::preserveTrailingSpaces.");
+                "Terminal-art export writes the full rectangular grid, so trailing spaces were preserved regardless of SaveOptions::preserveTrailingSpaces.");
         }
     }
 
@@ -983,6 +1066,7 @@ namespace
         bool usedIceColors = false;
         bool hadLossyConversion = false;
         std::size_t lossyCount = 0;
+        LossyConversionExample lossyExample;
 
         for (int y = 0; y < object.getHeight(); ++y)
         {
@@ -1021,7 +1105,8 @@ namespace
 
                 char encodedGlyph = ' ';
                 bool lossyForGlyph = false;
-                if (!tryEncodeCp437Glyph(glyph, options, encodedGlyph, lossyForGlyph))
+                char32_t replacementCodePoint = U'\0';
+                if (!tryEncodeCp437Glyph(glyph, options, encodedGlyph, lossyForGlyph, replacementCodePoint))
                 {
                     result.hasEncodingFailure = true;
                     result.firstFailingCodePoint = glyph;
@@ -1037,6 +1122,14 @@ namespace
                 {
                     hadLossyConversion = true;
                     ++lossyCount;
+
+                    if (!lossyExample.hasExample)
+                    {
+                        lossyExample.hasExample = true;
+                        lossyExample.source = { x, y };
+                        lossyExample.sourceCodePoint = glyph;
+                        lossyExample.replacementCodePoint = replacementCodePoint;
+                    }
                 }
             }
 
@@ -1064,15 +1157,13 @@ namespace
 
         if (result.hadLossyConversion)
         {
-            std::ostringstream warning;
-            warning << "Lossy conversion occurred for "
-                << result.lossyCodePointCount
-                << " code point(s).";
-
-            addWarning(
+            addDetailedWarning(
                 result,
                 TextObjectExporter::SaveWarningCode::LossyConversionOccurred,
-                warning.str());
+                buildLossyConversionWarningMessage(result.lossyCodePointCount, lossyExample),
+                lossyExample.source,
+                lossyExample.sourceCodePoint,
+                lossyExample.replacementCodePoint);
         }
 
         appendTerminalArtWarnings(
@@ -1084,7 +1175,7 @@ namespace
             approximatedBold,
             usedIceColors,
             true,
-            false);
+            !options.preserveTrailingSpaces);
 
         if (shouldRecommendXpForResult(result))
         {
@@ -1119,6 +1210,7 @@ namespace
         bool usedIceColors = false;
         bool hadLossyConversion = false;
         std::size_t lossyCount = 0;
+        LossyConversionExample lossyExample;
 
         for (int y = 0; y < object.getHeight(); ++y)
         {
@@ -1150,7 +1242,8 @@ namespace
 
                 char encodedGlyph = ' ';
                 bool lossyForGlyph = false;
-                if (!tryEncodeCp437Glyph(glyph, options, encodedGlyph, lossyForGlyph))
+                char32_t replacementCodePoint = U'\0';
+                if (!tryEncodeCp437Glyph(glyph, options, encodedGlyph, lossyForGlyph, replacementCodePoint))
                 {
                     result.hasEncodingFailure = true;
                     result.firstFailingCodePoint = glyph;
@@ -1167,6 +1260,14 @@ namespace
                 {
                     hadLossyConversion = true;
                     ++lossyCount;
+
+                    if (!lossyExample.hasExample)
+                    {
+                        lossyExample.hasExample = true;
+                        lossyExample.source = { x, y };
+                        lossyExample.sourceCodePoint = glyph;
+                        lossyExample.replacementCodePoint = replacementCodePoint;
+                    }
                 }
             }
         }
@@ -1177,15 +1278,13 @@ namespace
 
         if (result.hadLossyConversion)
         {
-            std::ostringstream warning;
-            warning << "Lossy conversion occurred for "
-                << result.lossyCodePointCount
-                << " code point(s).";
-
-            addWarning(
+            addDetailedWarning(
                 result,
                 TextObjectExporter::SaveWarningCode::LossyConversionOccurred,
-                warning.str());
+                buildLossyConversionWarningMessage(result.lossyCodePointCount, lossyExample),
+                lossyExample.source,
+                lossyExample.sourceCodePoint,
+                lossyExample.replacementCodePoint);
         }
 
         appendTerminalArtWarnings(
@@ -1377,21 +1476,31 @@ namespace TextObjectExporter
             break;
         }
 
-        const std::vector<ExportCodePoint> codePoints = buildPlainTextExportCodePoints(object, options);
+        const PlainTextScanInfo plainTextScan = buildPlainTextExportCodePoints(object, options);
+
+        if (plainTextScan.discardedStyle)
+        {
+            addWarning(
+                result,
+                SaveWarningCode::PlainTextStyleDiscarded,
+                "Plain-text export preserves glyph layout only. Authored color and style metadata were discarded.");
+        }
 
         std::string encodedBytes;
         std::size_t lossyCount = 0;
         char32_t firstFailingCodePoint = U'\0';
         SourcePosition firstFailingPosition;
+        LossyConversionExample lossyExample;
 
         if (!tryEncodeCodePoints(
-            codePoints,
+            plainTextScan.codePoints,
             result.resolvedEncoding,
             options,
             encodedBytes,
             lossyCount,
             firstFailingCodePoint,
-            firstFailingPosition))
+            firstFailingPosition,
+            lossyExample))
         {
             result.hasEncodingFailure = true;
             result.firstFailingCodePoint = firstFailingCodePoint;
@@ -1406,15 +1515,13 @@ namespace TextObjectExporter
 
         if (result.hadLossyConversion)
         {
-            std::ostringstream warning;
-            warning << "Lossy conversion occurred for "
-                << result.lossyCodePointCount
-                << " code point(s).";
-
-            addWarning(
+            addDetailedWarning(
                 result,
                 SaveWarningCode::LossyConversionOccurred,
-                warning.str());
+                buildLossyConversionWarningMessage(result.lossyCodePointCount, lossyExample),
+                lossyExample.source,
+                lossyExample.sourceCodePoint,
+                lossyExample.replacementCodePoint);
         }
 
         result.bytes = applyLineEndings(encodedBytes, options.lineEnding);
@@ -1682,6 +1789,8 @@ namespace TextObjectExporter
             return "LossyConversionOccurred";
         case SaveWarningCode::Utf8BomIncluded:
             return "Utf8BomIncluded";
+        case SaveWarningCode::PlainTextStyleDiscarded:
+            return "PlainTextStyleDiscarded";
         case SaveWarningCode::TerminalArtColorApproximationOccurred:
             return "TerminalArtColorApproximationOccurred";
         case SaveWarningCode::TerminalArtThemeColorApproximationOccurred:

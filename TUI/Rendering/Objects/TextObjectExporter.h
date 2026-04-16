@@ -44,6 +44,7 @@ namespace TextObjectExporter
         NonCp437NfoEncodingOverride,
         LossyConversionOccurred,
         Utf8BomIncluded,
+        PlainTextStyleDiscarded,
 
         TerminalArtColorApproximationOccurred,
         TerminalArtThemeColorApproximationOccurred,
@@ -172,3 +173,4 @@ namespace TextObjectExporter
     const char* toString(LineEnding lineEnding);
     const char* toString(SaveWarningCode warningCode);
 }
+
