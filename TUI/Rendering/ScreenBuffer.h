@@ -29,6 +29,11 @@ public:
     const ScreenCell* tryGetRowData(int y) const;
     void expandSpanToGlyphBoundaries(int y, int& xStart, int& xEnd) const;
 
+    /*
+        Immediate mode drawing methods, use these when:
+        - Text that will frequently change
+    */
+
     void setCell(int x, int y, const ScreenCell& cell);
     void setCellStyle(int x, int y, const Style& style);
 

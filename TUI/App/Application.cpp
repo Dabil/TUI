@@ -225,7 +225,7 @@ void Application::switchToScreen(ScreenType screenType)
         break;
 
     case ScreenType::WaterEffect:
-        m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>());
+        m_screenManager->pushScreen(std::make_unique<WaterEffectScreen>(m_assetLibrary));
         break;
 
     case ScreenType::Donut3D:
@@ -285,4 +285,5 @@ void Application::configureAssetLibrary()
 {
     m_assetLibrary.setAssetsRoot("Assets");
     m_assetLibrary.registerAlias("banner.fireFontK", "Fonts/FIGlet/Fire Font-k.flf");
+    m_assetLibrary.registerAlias("pseudo.assemblyFont", "Fonts/pFont/AssembleBox.pfont");
 }

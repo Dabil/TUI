@@ -7,6 +7,48 @@
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"
 
+enum class PatternCapMode
+{
+    None,
+    Top,
+    Bottom,
+    TopAndBottom
+};
+
+struct PatternTile
+{
+    std::vector<std::u32string> rows;
+    PatternCapMode capMode = PatternCapMode::None;
+};
+
+struct HorizontalLinePattern
+{
+    std::vector<std::u32string> beginRows;
+    std::vector<std::u32string> repeatRows;
+    std::vector<std::u32string> endRows;
+};
+
+struct VerticalLinePattern
+{
+    std::vector<std::u32string> topRows;
+    std::vector<std::u32string> repeatRows;
+    std::vector<std::u32string> bottomRows;
+};
+
+struct FramePattern
+{
+    std::vector<std::u32string> topLeftRows;
+    std::vector<std::u32string> topRows;
+    std::vector<std::u32string> topRightRows;
+
+    std::vector<std::u32string> leftRows;
+    std::vector<std::u32string> rightRows;
+
+    std::vector<std::u32string> bottomLeftRows;
+    std::vector<std::u32string> bottomRows;
+    std::vector<std::u32string> bottomRightRows;
+};
+
 namespace ObjectFactory
 {
     struct BorderGlyphs
@@ -51,12 +93,6 @@ namespace ObjectFactory
 
     TextObject makeTextUtf8(std::string_view text);
     TextObject makeTextUtf8(std::string_view text, const Style& style);
-
-    TextObject makeFigletText(std::u32string_view text);
-    TextObject makeFigletText(std::u32string_view text, const Style& style);
-
-    TextObject makeFigletTextUtf8(std::string_view text);
-    TextObject makeFigletTextUtf8(std::string_view text, const Style& style);
 
     TextObject makeFilledRect(int width, int height, char32_t fillGlyph = U' ');
     TextObject makeFilledRect(int width, int height, char32_t fillGlyph, const Style& style);
@@ -173,4 +209,114 @@ namespace ObjectFactory
         char32_t fillGlyph,
         const Style& style,
         const LineGlyphs& glyphs = asciiLineGlyphs());
+
+
+    // Named repeating pattern presets.
+    PatternTile brickPattern();
+    PatternTile bubblesPattern();
+    PatternTile crossStitchPattern();
+    PatternTile crossedPattern();
+    PatternTile embroideryPattern();
+    PatternTile embroideryTile();
+    PatternTile fencePattern();
+    PatternTile honeyCombPattern();
+    PatternTile houndsToothPattern();
+    PatternTile ninjaPattern();
+    PatternTile puzzlePattern();
+
+    // fill patterns
+
+    TextObject makePatternFill(
+        int width,
+        int height,
+        const PatternTile& tile);
+
+    TextObject makePatternFill(
+        int width,
+        int height,
+        const PatternTile& tile,
+        const Style& style);
+
+    // Named horizontal multi-glyph line presets.
+    HorizontalLinePattern catFaceLinePattern();
+    HorizontalLinePattern pennantLinePattern();
+    HorizontalLinePattern sparkChainLinePattern();
+    HorizontalLinePattern orbChainLinePattern();
+    HorizontalLinePattern rightAroundPattern();
+    HorizontalLinePattern dnaPattern();
+    HorizontalLinePattern scrollSemetricPattern();
+
+    // Creates a horizontal line object using multi-glyph repeating rows.
+    // width is the final output width in columns.
+    // The pattern may contain:
+    // - beginRows: written once at the left edge
+    // - repeatRows: repeated across the middle span
+    // - endRows: written once at the right edge
+    //
+    // For a simple repeating pattern, leave beginRows/endRows empty
+    // and provide only repeatRows.
+    TextObject makeHorizontalPatternLine(
+        int width,
+        const HorizontalLinePattern& pattern);
+
+    TextObject makeHorizontalPatternLine(
+        int width,
+        const HorizontalLinePattern& pattern,
+        const Style& style);
+
+    // Named vertical multi-glyph line presets.
+    VerticalLinePattern heartChainVerticalPattern();
+
+    // Creates a vertical line object using multi-glyph repeating row blocks.
+    // height is the final output height in rows.
+    // The pattern may contain:
+    // - topRows: written once at the top
+    // - repeatRows: repeated down the middle span
+    // - bottomRows: written once at the bottom
+    //
+    // For a simple repeating vertical pattern, leave topRows/bottomRows empty
+    // and provide only repeatRows.
+    TextObject makeVerticalPatternLine(
+        int height,
+        const VerticalLinePattern& pattern);
+
+    TextObject makeVerticalPatternLine(
+        int height,
+        const VerticalLinePattern& pattern,
+        const Style& style);
+
+    // Named decorative frame presets.
+    FramePattern heartFramePattern();
+
+    // Creates a decorative multi-glyph frame.
+    // width and height are the final object dimensions in columns/rows.
+    // The corners are written once.
+    // The top/bottom rows repeat horizontally in full blocks only.
+    // The left/right rows repeat vertically in full blocks only.
+    // The interior remains empty (space-filled).
+    TextObject makePatternFrame(
+        int width,
+        int height,
+        const FramePattern& pattern);
+
+    TextObject makePatternFrame(
+        int width,
+        int height,
+        const FramePattern& pattern,
+        const Style& style);
+
+    // Creates a decorative multi-glyph frame with a repeating pattern fill
+// placed in the interior region.
+    TextObject makePatternFilledFrame(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern);
+
+    TextObject makePatternFilledFrame(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern,
+        const Style& style);
 }

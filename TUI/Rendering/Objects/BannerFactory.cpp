@@ -1,8 +1,9 @@
 #include "Rendering/Objects/BannerFactory.h"
 
 #include <algorithm>
+#include <string>
+#include <utility>
 
-#include "Rendering/Objects/TextObjectBuilder.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 namespace BannerFactory
@@ -14,103 +15,90 @@ namespace BannerFactory
             return UnicodeConversion::u32ToUtf8(text);
         }
 
-        void blitObject(
-            TextObjectBuilder& builder,
-            const TextObject& source,
-            const int offsetX,
-            const int offsetY)
+        int minLayerZIndex(const Rendering::LayeredTextObject& layered)
         {
-            for (int y = 0; y < source.getHeight(); ++y)
+            const std::vector<Rendering::TextObjectLayer>& layers = layered.getLayers();
+            if (layers.empty())
             {
-                for (int x = 0; x < source.getWidth(); ++x)
+                return 0;
+            }
+
+            int minValue = layers.front().zIndex;
+            for (const Rendering::TextObjectLayer& layer : layers)
+            {
+                minValue = std::min(minValue, layer.zIndex);
+            }
+
+            return minValue;
+        }
+
+        std::string makeUniqueLayerName(
+            const Rendering::LayeredTextObject& layered,
+            std::string_view baseName)
+        {
+            std::string candidate(baseName);
+            if (!layered.hasLayer(candidate))
+            {
+                return candidate;
+            }
+
+            int suffix = 1;
+            for (;;)
+            {
+                candidate = std::string(baseName) + "_" + std::to_string(suffix);
+                if (!layered.hasLayer(candidate))
                 {
-                    const TextObjectCell* cell = source.tryGetCell(x, y);
-                    if (cell == nullptr)
-                    {
-                        continue;
-                    }
-
-                    if (cell->kind == CellKind::Empty)
-                    {
-                        continue;
-                    }
-
-                    const int destX = offsetX + x;
-                    const int destY = offsetY + y;
-
-                    if (!builder.inBounds(destX, destY))
-                    {
-                        continue;
-                    }
-
-                    switch (cell->kind)
-                    {
-                    case CellKind::Glyph:
-                        if (cell->width == CellWidth::Two)
-                        {
-                            builder.setWideGlyph(destX, destY, cell->glyph, cell->style);
-                        }
-                        else
-                        {
-                            builder.setGlyph(destX, destY, cell->glyph, cell->style);
-                        }
-                        break;
-
-                    case CellKind::WideTrailing:
-                    case CellKind::CombiningContinuation:
-                        builder.setCell(destX, destY, cell->glyph, cell->kind, cell->width, cell->style);
-                        break;
-
-                    case CellKind::Empty:
-                    default:
-                        break;
-                    }
+                    return candidate;
                 }
+
+                ++suffix;
             }
         }
 
-        TextObject compositeTwo(
-            const TextObject& back,
-            const int backX,
-            const int backY,
-            const TextObject& front,
-            const int frontX,
-            const int frontY)
+        Rendering::LayeredTextObject makePFontShadowComposite(
+            const Rendering::LayeredTextObject& mainObject,
+            const TextObject& shadowObject,
+            const int shadowOffsetX,
+            const int shadowOffsetY)
         {
-            if (back.isEmpty() && front.isEmpty())
+            const int width =
+                std::max(
+                    mainObject.getWidth(),
+                    shadowObject.getWidth() + std::max(0, shadowOffsetX));
+
+            const int height =
+                std::max(
+                    mainObject.getHeight(),
+                    shadowObject.getHeight() + std::max(0, shadowOffsetY));
+
+            Rendering::LayeredTextObject layered(width, height);
+
+            Rendering::TextObjectLayer shadowLayer;
+            shadowLayer.name = makeUniqueLayerName(mainObject, "shadow");
+            shadowLayer.zIndex = minLayerZIndex(mainObject) - 1;
+            shadowLayer.visible = true;
+            shadowLayer.offsetX = shadowOffsetX;
+            shadowLayer.offsetY = shadowOffsetY;
+            shadowLayer.object = shadowObject;
+            layered.addLayer(std::move(shadowLayer));
+
+            for (const Rendering::TextObjectLayer& sourceLayer : mainObject.getLayers())
             {
-                return TextObject();
+                Rendering::TextObjectLayer copiedLayer = sourceLayer;
+
+                if (copiedLayer.name.empty())
+                {
+                    copiedLayer.name = makeUniqueLayerName(layered, "layer");
+                }
+                else if (layered.hasLayer(copiedLayer.name))
+                {
+                    copiedLayer.name = makeUniqueLayerName(layered, copiedLayer.name);
+                }
+
+                layered.addLayer(std::move(copiedLayer));
             }
 
-            const int backMinX = backX;
-            const int backMinY = backY;
-            const int backMaxX = backX + back.getWidth();
-            const int backMaxY = backY + back.getHeight();
-
-            const int frontMinX = frontX;
-            const int frontMinY = frontY;
-            const int frontMaxX = frontX + front.getWidth();
-            const int frontMaxY = frontY + front.getHeight();
-
-            const int minX = std::min(backMinX, frontMinX);
-            const int minY = std::min(backMinY, frontMinY);
-            const int maxX = std::max(backMaxX, frontMaxX);
-            const int maxY = std::max(backMaxY, frontMaxY);
-
-            const int width = std::max(0, maxX - minX);
-            const int height = std::max(0, maxY - minY);
-
-            if (width <= 0 || height <= 0)
-            {
-                return TextObject();
-            }
-
-            TextObjectBuilder builder(width, height);
-
-            blitObject(builder, back, backX - minX, backY - minY);
-            blitObject(builder, front, frontX - minX, frontY - minY);
-
-            return builder.build();
+            return layered;
         }
     }
 
@@ -156,7 +144,7 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Preferred API: makeBanner(...)
-    // UTF-8 overloads
+    // AsciiBannerFont UTF-8 overloads
     // -------------------------------------------------------------------------
 
     TextObject makeBanner(
@@ -193,7 +181,7 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Preferred API: makeBanner(...)
-    // UTF-32 overloads
+    // AsciiBannerFont UTF-32 overloads
     // -------------------------------------------------------------------------
 
     TextObject makeBanner(
@@ -229,54 +217,226 @@ namespace BannerFactory
     }
 
     // -------------------------------------------------------------------------
-    // Generic layered helpers
+    // Preferred API: makeBanner(...)
+    // pFont UTF-8 overloads
     // -------------------------------------------------------------------------
 
-    LayeredBanner makeLayeredBanner(
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text)
+    {
+        return PseudoFont::generateTextObject(font, text);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const PseudoFont::RenderOptions& options)
+    {
+        return PseudoFont::generateTextObject(font, text, options);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle)
+    {
+        return PseudoFont::generateTextObject(font, text, overrideStyle);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::RenderOptions& options)
+    {
+        return PseudoFont::generateTextObject(font, text, overrideStyle, options);
+    }
+
+    // -------------------------------------------------------------------------
+    // Preferred API: makeBanner(...)
+    // pFont UTF-32 overloads
+    // -------------------------------------------------------------------------
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text)
+    {
+        return makeBanner(font, toUtf8(text));
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const PseudoFont::RenderOptions& options)
+    {
+        return makeBanner(font, toUtf8(text), options);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle)
+    {
+        return makeBanner(font, toUtf8(text), overrideStyle);
+    }
+
+    TextObject makeBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::RenderOptions& options)
+    {
+        return makeBanner(font, toUtf8(text), overrideStyle, options);
+    }
+
+    // -------------------------------------------------------------------------
+    // Layered helpers
+    // AsciiBanner synthetic layered helpers
+    // -------------------------------------------------------------------------
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle)
     {
-        return makeLayeredBanner(font, text, layerOneStyle, layerTwoStyle, defaultOptions());
+        return makeLayeredBannerObject(
+            font,
+            text,
+            layerOneStyle,
+            layerTwoStyle,
+            defaultOptions());
     }
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle,
         const AsciiBanner::RenderOptions& options)
     {
-        LayeredBanner layered;
-        layered.layerOne = makeBanner(font, text, layerOneStyle, options);
-        layered.layerTwo = makeBanner(font, text, layerTwoStyle, options);
-        layered.layerOffsetX = 0;
-        layered.layerOffsetY = 0;
+        const TextObject first = makeBanner(font, text, layerOneStyle, options);
+        const TextObject second = makeBanner(font, text, layerTwoStyle, options);
+
+        const int width = std::max(first.getWidth(), second.getWidth());
+        const int height = std::max(first.getHeight(), second.getHeight());
+
+        Rendering::LayeredTextObject layered(width, height);
+
+        Rendering::TextObjectLayer layerOne;
+        layerOne.name = "layer_one";
+        layerOne.zIndex = 0;
+        layerOne.visible = true;
+        layerOne.object = first;
+        layered.addLayer(std::move(layerOne));
+
+        Rendering::TextObjectLayer layerTwo;
+        layerTwo.name = "layer_two";
+        layerTwo.zIndex = 1;
+        layerTwo.visible = true;
+        layerTwo.object = second;
+        layered.addLayer(std::move(layerTwo));
+
         return layered;
     }
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle)
     {
-        return makeLayeredBanner(font, text, layerOneStyle, layerTwoStyle, defaultOptions());
+        return makeLayeredBannerObject(
+            font,
+            text,
+            layerOneStyle,
+            layerTwoStyle,
+            defaultOptions());
     }
 
-    LayeredBanner makeLayeredBanner(
+    Rendering::LayeredTextObject makeLayeredBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& layerOneStyle,
         const Style& layerTwoStyle,
         const AsciiBanner::RenderOptions& options)
     {
-        return makeLayeredBanner(font, toUtf8(text), layerOneStyle, layerTwoStyle, options);
+        return makeLayeredBannerObject(font, toUtf8(text), layerOneStyle, layerTwoStyle, options);
+    }
+
+    // -------------------------------------------------------------------------
+    // Layered helpers
+    // pFont native layered helpers
+    // -------------------------------------------------------------------------
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text, options);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text, overrideStyle);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return PseudoFont::generateLayeredTextObject(font, text, overrideStyle, options);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text));
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text), options);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text), overrideStyle);
+    }
+
+    Rendering::LayeredTextObject makeLayeredBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& overrideStyle,
+        const PseudoFont::LayeredRenderOptions& options)
+    {
+        return makeLayeredBannerObject(font, toUtf8(text), overrideStyle, options);
     }
 
     // -------------------------------------------------------------------------
     // Shadow effects
+    // AsciiBanner only
     // -------------------------------------------------------------------------
 
     TextObject makeShadowBanner(
@@ -306,7 +466,7 @@ namespace BannerFactory
         int shadowOffsetX,
         int shadowOffsetY)
     {
-        const LayeredBanner layered = makeLayeredShadowBanner(
+        const Rendering::LayeredTextObject layered = makeLayeredShadowBannerObject(
             font,
             text,
             mainStyle,
@@ -315,13 +475,7 @@ namespace BannerFactory
             shadowOffsetX,
             shadowOffsetY);
 
-        return compositeTwo(
-            layered.layerTwo,
-            layered.layerOffsetX,
-            layered.layerOffsetY,
-            layered.layerOne,
-            0,
-            0);
+        return layered.flattenVisibleOnly();
     }
 
     TextObject makeShadowBanner(
@@ -361,7 +515,7 @@ namespace BannerFactory
             shadowOffsetY);
     }
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& mainStyle,
@@ -369,7 +523,7 @@ namespace BannerFactory
         int shadowOffsetX,
         int shadowOffsetY)
     {
-        return makeLayeredShadowBanner(
+        return makeLayeredShadowBannerObject(
             font,
             text,
             mainStyle,
@@ -379,7 +533,7 @@ namespace BannerFactory
             shadowOffsetY);
     }
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::string_view text,
         const Style& mainStyle,
@@ -388,15 +542,34 @@ namespace BannerFactory
         int shadowOffsetX,
         int shadowOffsetY)
     {
-        LayeredBanner layered;
-        layered.layerOne = makeBanner(font, text, mainStyle, options);
-        layered.layerTwo = makeBanner(font, text, shadowStyle, options);
-        layered.layerOffsetX = shadowOffsetX;
-        layered.layerOffsetY = shadowOffsetY;
+        const TextObject mainObject = makeBanner(font, text, mainStyle, options);
+        const TextObject shadowObject = makeBanner(font, text, shadowStyle, options);
+
+        const int width = std::max(mainObject.getWidth(), shadowObject.getWidth() + std::max(0, shadowOffsetX));
+        const int height = std::max(mainObject.getHeight(), shadowObject.getHeight() + std::max(0, shadowOffsetY));
+
+        Rendering::LayeredTextObject layered(width, height);
+
+        Rendering::TextObjectLayer shadowLayer;
+        shadowLayer.name = "shadow";
+        shadowLayer.zIndex = 0;
+        shadowLayer.visible = true;
+        shadowLayer.offsetX = shadowOffsetX;
+        shadowLayer.offsetY = shadowOffsetY;
+        shadowLayer.object = shadowObject;
+        layered.addLayer(std::move(shadowLayer));
+
+        Rendering::TextObjectLayer mainLayer;
+        mainLayer.name = "main";
+        mainLayer.zIndex = 1;
+        mainLayer.visible = true;
+        mainLayer.object = mainObject;
+        layered.addLayer(std::move(mainLayer));
+
         return layered;
     }
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& mainStyle,
@@ -404,7 +577,7 @@ namespace BannerFactory
         int shadowOffsetX,
         int shadowOffsetY)
     {
-        return makeLayeredShadowBanner(
+        return makeLayeredShadowBannerObject(
             font,
             text,
             mainStyle,
@@ -414,7 +587,7 @@ namespace BannerFactory
             shadowOffsetY);
     }
 
-    LayeredBanner makeLayeredShadowBanner(
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
         const AsciiBannerFont& font,
         std::u32string_view text,
         const Style& mainStyle,
@@ -423,12 +596,194 @@ namespace BannerFactory
         int shadowOffsetX,
         int shadowOffsetY)
     {
-        return makeLayeredShadowBanner(
+        return makeLayeredShadowBannerObject(
             font,
             toUtf8(text),
             mainStyle,
             shadowStyle,
             options,
+            shadowOffsetX,
+            shadowOffsetY);
+    }
+
+    // -------------------------------------------------------------------------
+    // Shadow effects
+    // pFont
+    // -------------------------------------------------------------------------
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        PseudoFont::RenderOptions shadowOptions;
+        PseudoFont::LayeredRenderOptions mainOptions;
+
+        const Rendering::LayeredTextObject layered = makeLayeredShadowBannerObject(
+            font,
+            text,
+            mainStyle,
+            shadowStyle,
+            shadowOptions,
+            mainOptions,
+            shadowOffsetX,
+            shadowOffsetY);
+
+        return layered.flattenVisibleOnly();
+    }
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& options,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        const TextObject mainObject = makeBanner(font, text, mainStyle, options);
+        const TextObject shadowObject = makeBanner(font, text, shadowStyle, options);
+
+        const int width = std::max(mainObject.getWidth(), shadowObject.getWidth() + std::max(0, shadowOffsetX));
+        const int height = std::max(mainObject.getHeight(), shadowObject.getHeight() + std::max(0, shadowOffsetY));
+
+        Rendering::LayeredTextObject layered(width, height);
+
+        Rendering::TextObjectLayer shadowLayer;
+        shadowLayer.name = "shadow";
+        shadowLayer.zIndex = 0;
+        shadowLayer.visible = true;
+        shadowLayer.offsetX = shadowOffsetX;
+        shadowLayer.offsetY = shadowOffsetY;
+        shadowLayer.object = shadowObject;
+        layered.addLayer(std::move(shadowLayer));
+
+        Rendering::TextObjectLayer mainLayer;
+        mainLayer.name = "main";
+        mainLayer.zIndex = 1;
+        mainLayer.visible = true;
+        mainLayer.object = mainObject;
+        layered.addLayer(std::move(mainLayer));
+
+        return layered.flattenVisibleOnly();
+    }
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        return makeShadowBanner(
+            font,
+            toUtf8(text),
+            mainStyle,
+            shadowStyle,
+            shadowOffsetX,
+            shadowOffsetY);
+    }
+
+    TextObject makeShadowBanner(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& options,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        return makeShadowBanner(
+            font,
+            toUtf8(text),
+            mainStyle,
+            shadowStyle,
+            options,
+            shadowOffsetX,
+            shadowOffsetY);
+    }
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        PseudoFont::RenderOptions shadowOptions;
+        PseudoFont::LayeredRenderOptions mainOptions;
+
+        return makeLayeredShadowBannerObject(
+            font,
+            text,
+            mainStyle,
+            shadowStyle,
+            shadowOptions,
+            mainOptions,
+            shadowOffsetX,
+            shadowOffsetY);
+    }
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& shadowOptions,
+        const PseudoFont::LayeredRenderOptions& mainOptions,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        const TextObject shadowObject = makeBanner(font, text, shadowStyle, shadowOptions);
+        const Rendering::LayeredTextObject mainObject =
+            makeLayeredBannerObject(font, text, mainStyle, mainOptions);
+
+        return makePFontShadowComposite(
+            mainObject,
+            shadowObject,
+            shadowOffsetX,
+            shadowOffsetY);
+    }
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        return makeLayeredShadowBannerObject(
+            font,
+            toUtf8(text),
+            mainStyle,
+            shadowStyle,
+            shadowOffsetX,
+            shadowOffsetY);
+    }
+
+    Rendering::LayeredTextObject makeLayeredShadowBannerObject(
+        const PseudoFont::FontDefinition& font,
+        std::u32string_view text,
+        const Style& mainStyle,
+        const Style& shadowStyle,
+        const PseudoFont::RenderOptions& shadowOptions,
+        const PseudoFont::LayeredRenderOptions& mainOptions,
+        int shadowOffsetX,
+        int shadowOffsetY)
+    {
+        return makeLayeredShadowBannerObject(
+            font,
+            toUtf8(text),
+            mainStyle,
+            shadowStyle,
+            shadowOptions,
+            mainOptions,
             shadowOffsetX,
             shadowOffsetY);
     }
