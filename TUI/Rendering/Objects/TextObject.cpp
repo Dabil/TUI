@@ -1,9 +1,9 @@
 #include "Rendering/Objects/TextObject.h"
 
-#include <fstream>
-#include <iterator>
 #include <stdexcept>
 
+#include "Rendering/Objects/PlainTextLoader.h"
+#include "Rendering/Objects/TextObjectBlitter.h"
 #include "Rendering/Objects/TextObjectExporter.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
@@ -24,31 +24,6 @@ namespace
         default:
             return 1;
         }
-    }
-
-    Style resolveDrawStyle(
-        const ScreenBuffer& target,
-        int x,
-        int y,
-        const TextObjectCell& sourceCell,
-        const std::optional<Style>& overrideStyle)
-    {
-        if (overrideStyle.has_value())
-        {
-            return *overrideStyle;
-        }
-
-        if (sourceCell.style.has_value())
-        {
-            return *sourceCell.style;
-        }
-
-        if (target.inBounds(x, y))
-        {
-            return target.getCell(x, y).style;
-        }
-
-        return Style{};
     }
 }
 
@@ -92,19 +67,13 @@ bool TextObject::loadUtf8File(const std::string& filePath)
 {
     clear();
 
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file)
+    const PlainTextLoader::LoadResult loadResult = PlainTextLoader::loadFromFile(filePath);
+    if (!loadResult.success || !loadResult.object.isLoaded())
     {
         return false;
     }
 
-    const std::string bytes{
-        std::istreambuf_iterator<char>(file),
-        std::istreambuf_iterator<char>()
-    };
-
-    *this = fromUtf8(std::string_view(bytes.data(), bytes.size()));
-    m_loaded = true;
+    *this = loadResult.object;
     return true;
 }
 
@@ -112,19 +81,13 @@ bool TextObject::loadUtf8File(const std::string& filePath, const Style& style)
 {
     clear();
 
-    std::ifstream file(filePath, std::ios::binary);
-    if (!file)
+    const PlainTextLoader::LoadResult loadResult = PlainTextLoader::loadFromFile(filePath, style);
+    if (!loadResult.success || !loadResult.object.isLoaded())
     {
         return false;
     }
 
-    const std::string bytes{
-        std::istreambuf_iterator<char>(file),
-        std::istreambuf_iterator<char>()
-    };
-
-    *this = fromUtf8(std::string_view(bytes.data(), bytes.size()), style);
-    m_loaded = true;
+    *this = loadResult.object;
     return true;
 }
 
@@ -224,44 +187,9 @@ void TextObject::draw(ScreenBuffer& target, int x, int y, const Style& overrideS
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const std::optional<Style>& overrideStyle) const
 {
-    if (!m_loaded || m_width <= 0 || m_height <= 0)
-    {
-        return;
-    }
-
-    for (int row = 0; row < m_height; ++row)
-    {
-        for (int col = 0; col < m_width; ++col)
-        {
-            const int targetX = x + col;
-            const int targetY = y + row;
-
-            if (!target.inBounds(targetX, targetY))
-            {
-                continue;
-            }
-
-            const TextObjectCell& sourceCell = m_cells[static_cast<std::size_t>(index(col, row))];
-
-            if (sourceCell.kind == CellKind::Empty)
-            {
-                continue;
-            }
-
-            if (sourceCell.kind == CellKind::WideTrailing)
-            {
-                continue;
-            }
-
-            if (sourceCell.kind == CellKind::CombiningContinuation)
-            {
-                continue;
-            }
-
-            const Style style = resolveDrawStyle(target, targetX, targetY, sourceCell, overrideStyle);
-            target.writeCodePoint(targetX, targetY, sourceCell.glyph, style);
-        }
-    }
+    TextObjectBlitter::BlitOptions options;
+    options.overrideStyle = overrideStyle;
+    TextObjectBlitter::blitToScreenBuffer(target, *this, x, y, options);
 }
 
 TextObject TextObject::buildFromLines(
