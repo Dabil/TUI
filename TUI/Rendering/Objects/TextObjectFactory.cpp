@@ -979,6 +979,584 @@ namespace
 
         return builder.build();
     }
+
+    struct NormalizedFramePattern
+    {
+        std::vector<std::u32string> topLeftRows;
+        std::vector<std::u32string> topRows;
+        std::vector<std::u32string> topRightRows;
+
+        std::vector<std::u32string> leftRows;
+        std::vector<std::u32string> rightRows;
+
+        std::vector<std::u32string> bottomLeftRows;
+        std::vector<std::u32string> bottomRows;
+        std::vector<std::u32string> bottomRightRows;
+
+        int topLeftWidth = 0;
+        int topWidth = 0;
+        int topRightWidth = 0;
+
+        int leftWidth = 0;
+        int rightWidth = 0;
+
+        int bottomLeftWidth = 0;
+        int bottomWidth = 0;
+        int bottomRightWidth = 0;
+
+        int topHeight = 0;
+        int middleHeight = 0;
+        int bottomHeight = 0;
+    };
+
+    std::vector<std::u32string> normalizeRowsToHeightAndWidth(
+        const std::vector<std::u32string>& rows,
+        int targetHeight,
+        int targetWidth)
+    {
+        std::vector<std::u32string> normalized;
+        normalized.reserve(static_cast<std::size_t>(targetHeight));
+
+        for (int y = 0; y < targetHeight; ++y)
+        {
+            std::u32string row;
+            if (y < static_cast<int>(rows.size()))
+            {
+                row = rows[static_cast<std::size_t>(y)];
+            }
+
+            if (static_cast<int>(row.size()) < targetWidth)
+            {
+                row.append(
+                    static_cast<std::size_t>(targetWidth - static_cast<int>(row.size())),
+                    U' ');
+            }
+
+            normalized.push_back(std::move(row));
+        }
+
+        return normalized;
+    }
+
+    NormalizedFramePattern normalizeFramePattern(const FramePattern& pattern)
+    {
+        NormalizedFramePattern normalized;
+
+        normalized.topLeftWidth = maxRowWidth(pattern.topLeftRows);
+        normalized.topWidth = maxRowWidth(pattern.topRows);
+        normalized.topRightWidth = maxRowWidth(pattern.topRightRows);
+
+        normalized.leftWidth = maxRowWidth(pattern.leftRows);
+        normalized.rightWidth = maxRowWidth(pattern.rightRows);
+
+        normalized.bottomLeftWidth = maxRowWidth(pattern.bottomLeftRows);
+        normalized.bottomWidth = maxRowWidth(pattern.bottomRows);
+        normalized.bottomRightWidth = maxRowWidth(pattern.bottomRightRows);
+
+        normalized.topHeight = std::max({
+            static_cast<int>(pattern.topLeftRows.size()),
+            static_cast<int>(pattern.topRows.size()),
+            static_cast<int>(pattern.topRightRows.size())
+            });
+
+        normalized.middleHeight = std::max(
+            static_cast<int>(pattern.leftRows.size()),
+            static_cast<int>(pattern.rightRows.size()));
+
+        normalized.bottomHeight = std::max({
+            static_cast<int>(pattern.bottomLeftRows.size()),
+            static_cast<int>(pattern.bottomRows.size()),
+            static_cast<int>(pattern.bottomRightRows.size())
+            });
+
+        normalized.topLeftRows =
+            normalizeRowsToHeightAndWidth(pattern.topLeftRows, normalized.topHeight, normalized.topLeftWidth);
+        normalized.topRows =
+            normalizeRowsToHeightAndWidth(pattern.topRows, normalized.topHeight, normalized.topWidth);
+        normalized.topRightRows =
+            normalizeRowsToHeightAndWidth(pattern.topRightRows, normalized.topHeight, normalized.topRightWidth);
+
+        normalized.leftRows =
+            normalizeRowsToWidth(pattern.leftRows, normalized.leftWidth);
+        normalized.rightRows =
+            normalizeRowsToWidth(pattern.rightRows, normalized.rightWidth);
+
+        normalized.bottomLeftRows =
+            normalizeRowsToHeightAndWidth(pattern.bottomLeftRows, normalized.bottomHeight, normalized.bottomLeftWidth);
+        normalized.bottomRows =
+            normalizeRowsToHeightAndWidth(pattern.bottomRows, normalized.bottomHeight, normalized.bottomWidth);
+        normalized.bottomRightRows =
+            normalizeRowsToHeightAndWidth(pattern.bottomRightRows, normalized.bottomHeight, normalized.bottomRightWidth);
+
+        return normalized;
+    }
+
+    TextObject buildPatternFrameObject(
+        int width,
+        int height,
+        const FramePattern& pattern,
+        const std::optional<Style>& style)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return TextObject();
+        }
+
+        const NormalizedFramePattern normalized = normalizeFramePattern(pattern);
+
+        TextObjectBuilder builder(width, height);
+
+        auto writeRowsAt = [&](int startX, int startY, const std::vector<std::u32string>& rows)
+            {
+                for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
+                {
+                    const int destY = startY + rowIndex;
+                    if (destY < 0 || destY >= height)
+                    {
+                        continue;
+                    }
+
+                    const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
+                    for (int x = 0; x < static_cast<int>(row.size()); ++x)
+                    {
+                        const int destX = startX + x;
+                        if (destX < 0 || destX >= width)
+                        {
+                            continue;
+                        }
+
+                        const char32_t glyph = row[static_cast<std::size_t>(x)];
+
+                        if (style.has_value())
+                        {
+                            builder.setGlyph(destX, destY, glyph, *style);
+                        }
+                        else
+                        {
+                            builder.setGlyph(destX, destY, glyph);
+                        }
+                    }
+                }
+            };
+
+        // Top corners
+        if (!normalized.topLeftRows.empty())
+        {
+            writeRowsAt(0, 0, normalized.topLeftRows);
+        }
+
+        if (!normalized.topRightRows.empty())
+        {
+            writeRowsAt(std::max(0, width - normalized.topRightWidth), 0, normalized.topRightRows);
+        }
+
+        // Bottom corners
+        if (!normalized.bottomLeftRows.empty())
+        {
+            writeRowsAt(0, std::max(0, height - normalized.bottomHeight), normalized.bottomLeftRows);
+        }
+
+        if (!normalized.bottomRightRows.empty())
+        {
+            writeRowsAt(
+                std::max(0, width - normalized.bottomRightWidth),
+                std::max(0, height - normalized.bottomHeight),
+                normalized.bottomRightRows);
+        }
+
+        // Top horizontal repeat
+        const int topRepeatStartX = normalized.topLeftWidth;
+        const int topRepeatEndX = std::max(topRepeatStartX, width - normalized.topRightWidth);
+        if (normalized.topWidth > 0 && normalized.topHeight > 0)
+        {
+            int x = topRepeatStartX;
+            while (x + normalized.topWidth <= topRepeatEndX)
+            {
+                writeRowsAt(x, 0, normalized.topRows);
+                x += normalized.topWidth;
+            }
+        }
+
+        // Bottom horizontal repeat
+        const int bottomRepeatStartX = normalized.bottomLeftWidth;
+        const int bottomRepeatEndX = std::max(bottomRepeatStartX, width - normalized.bottomRightWidth);
+        if (normalized.bottomWidth > 0 && normalized.bottomHeight > 0)
+        {
+            int x = bottomRepeatStartX;
+            while (x + normalized.bottomWidth <= bottomRepeatEndX)
+            {
+                writeRowsAt(x, std::max(0, height - normalized.bottomHeight), normalized.bottomRows);
+                x += normalized.bottomWidth;
+            }
+        }
+
+        // Left vertical repeat
+        const int middleStartY = normalized.topHeight;
+        const int middleEndY = std::max(middleStartY, height - normalized.bottomHeight);
+        if (normalized.leftWidth > 0 && normalized.middleHeight > 0)
+        {
+            int y = middleStartY;
+            while (y + normalized.middleHeight <= middleEndY)
+            {
+                writeRowsAt(0, y, normalized.leftRows);
+                y += normalized.middleHeight;
+            }
+        }
+
+        // Right vertical repeat
+        if (normalized.rightWidth > 0 && normalized.middleHeight > 0)
+        {
+            int y = middleStartY;
+            while (y + normalized.middleHeight <= middleEndY)
+            {
+                writeRowsAt(std::max(0, width - normalized.rightWidth), y, normalized.rightRows);
+                y += normalized.middleHeight;
+            }
+        }
+
+        return builder.build();
+    }
+
+    void writeRowsToBuilder(
+        TextObjectBuilder& builder,
+        int objectWidth,
+        int objectHeight,
+        int startX,
+        int startY,
+        const std::vector<std::u32string>& rows,
+        const std::optional<Style>& style)
+    {
+        for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
+        {
+            const int destY = startY + rowIndex;
+            if (destY < 0 || destY >= objectHeight)
+            {
+                continue;
+            }
+
+            const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
+
+            for (int x = 0; x < static_cast<int>(row.size()); ++x)
+            {
+                const int destX = startX + x;
+                if (destX < 0 || destX >= objectWidth)
+                {
+                    continue;
+                }
+
+                const char32_t glyph = row[static_cast<std::size_t>(x)];
+
+                if (style.has_value())
+                {
+                    builder.setGlyph(destX, destY, glyph, *style);
+                }
+                else
+                {
+                    builder.setGlyph(destX, destY, glyph);
+                }
+            }
+        }
+    }
+
+    void writePatternFillRegion(
+        TextObjectBuilder& builder,
+        int objectWidth,
+        int objectHeight,
+        int startX,
+        int startY,
+        int regionWidth,
+        int regionHeight,
+        const PatternTile& tile,
+        const std::optional<Style>& style)
+    {
+        if (regionWidth <= 0 || regionHeight <= 0)
+        {
+            return;
+        }
+
+        const PatternTile normalizedTile = normalizePatternTile(tile);
+        if (normalizedTile.rows.empty())
+        {
+            return;
+        }
+
+        const int tileHeight = static_cast<int>(normalizedTile.rows.size());
+        const int tileWidth = static_cast<int>(normalizedTile.rows.front().size());
+
+        if (tileHeight <= 0 || tileWidth <= 0)
+        {
+            return;
+        }
+
+        int repeatStart = 0;
+        int repeatEndExclusive = tileHeight;
+
+        switch (normalizedTile.capMode)
+        {
+        case PatternCapMode::None:
+            repeatStart = 0;
+            repeatEndExclusive = tileHeight;
+            break;
+
+        case PatternCapMode::Top:
+            repeatStart = 1;
+            repeatEndExclusive = tileHeight;
+            break;
+
+        case PatternCapMode::Bottom:
+            repeatStart = 0;
+            repeatEndExclusive = tileHeight - 1;
+            break;
+
+        case PatternCapMode::TopAndBottom:
+            repeatStart = 1;
+            repeatEndExclusive = tileHeight - 1;
+            break;
+        }
+
+        const bool hasTopCap =
+            normalizedTile.capMode == PatternCapMode::Top ||
+            normalizedTile.capMode == PatternCapMode::TopAndBottom;
+
+        const bool hasBottomCap =
+            normalizedTile.capMode == PatternCapMode::Bottom ||
+            normalizedTile.capMode == PatternCapMode::TopAndBottom;
+
+        const int repeatRowCount = std::max(0, repeatEndExclusive - repeatStart);
+
+        auto writePatternRow = [&](int destY, const std::u32string& sourceRow)
+            {
+                for (int x = 0; x < regionWidth; ++x)
+                {
+                    const int destX = startX + x;
+                    if (destX < 0 || destX >= objectWidth)
+                    {
+                        continue;
+                    }
+
+                    if (destY < 0 || destY >= objectHeight)
+                    {
+                        continue;
+                    }
+
+                    const char32_t glyph = sourceRow[static_cast<std::size_t>(x % tileWidth)];
+
+                    if (style.has_value())
+                    {
+                        builder.setGlyph(destX, destY, glyph, *style);
+                    }
+                    else
+                    {
+                        builder.setGlyph(destX, destY, glyph);
+                    }
+                }
+            };
+
+        int localY = 0;
+
+        if (hasTopCap&& localY < regionHeight)
+        {
+            writePatternRow(startY + localY, normalizedTile.rows.front());
+            ++localY;
+        }
+
+        const int lastLocalRow = regionHeight - 1;
+        const bool reserveBottomRow = hasBottomCap && regionHeight > 0;
+        const int repeatableEndY = reserveBottomRow ? lastLocalRow : regionHeight;
+
+        if (repeatRowCount > 0)
+        {
+            while (localY < repeatableEndY)
+            {
+                const int repeatIndex = (localY - (hasTopCap ? 1 : 0)) % repeatRowCount;
+                const int sourceIndex = repeatStart + repeatIndex;
+                writePatternRow(
+                    startY + localY,
+                    normalizedTile.rows[static_cast<std::size_t>(sourceIndex)]);
+                ++localY;
+            }
+        }
+        else
+        {
+            while (localY < repeatableEndY)
+            {
+                const std::u32string& fallbackRow =
+                    hasTopCap ? normalizedTile.rows.front() : normalizedTile.rows.back();
+
+                writePatternRow(startY + localY, fallbackRow);
+                ++localY;
+            }
+        }
+
+        if (hasBottomCap && regionHeight > 0)
+        {
+            writePatternRow(startY + lastLocalRow, normalizedTile.rows.back());
+        }
+    }
+
+    TextObject buildPatternFilledFrameObject(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern,
+        const std::optional<Style>& style)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return TextObject();
+        }
+
+        const NormalizedFramePattern normalized = normalizeFramePattern(framePattern);
+
+        TextObjectBuilder builder(width, height);
+
+        const int leftInset = std::max({
+            normalized.topLeftWidth,
+            normalized.leftWidth,
+            normalized.bottomLeftWidth
+            });
+
+        const int rightInset = std::max({
+            normalized.topRightWidth,
+            normalized.rightWidth,
+            normalized.bottomRightWidth
+            });
+
+        const int topInset = normalized.topHeight;
+        const int bottomInset = normalized.bottomHeight;
+
+        const int interiorWidth = std::max(0, width - leftInset - rightInset);
+        const int interiorHeight = std::max(0, height - topInset - bottomInset);
+
+        // Write interior fill first.
+        if (interiorWidth > 0 && interiorHeight > 0)
+        {
+            writePatternFillRegion(
+                builder,
+                width,
+                height,
+                leftInset,
+                topInset,
+                interiorWidth,
+                interiorHeight,
+                fillPattern,
+                style);
+        }
+
+        // Draw frame pieces over top of the fill.
+
+        // Top corners
+        if (!normalized.topLeftRows.empty())
+        {
+            writeRowsToBuilder(builder, width, height, 0, 0, normalized.topLeftRows, style);
+        }
+
+        if (!normalized.topRightRows.empty())
+        {
+            writeRowsToBuilder(
+                builder,
+                width,
+                height,
+                std::max(0, width - normalized.topRightWidth),
+                0,
+                normalized.topRightRows,
+                style);
+        }
+
+        // Bottom corners
+        if (!normalized.bottomLeftRows.empty())
+        {
+            writeRowsToBuilder(
+                builder,
+                width,
+                height,
+                0,
+                std::max(0, height - normalized.bottomHeight),
+                normalized.bottomLeftRows,
+                style);
+        }
+
+        if (!normalized.bottomRightRows.empty())
+        {
+            writeRowsToBuilder(
+                builder,
+                width,
+                height,
+                std::max(0, width - normalized.bottomRightWidth),
+                std::max(0, height - normalized.bottomHeight),
+                normalized.bottomRightRows,
+                style);
+        }
+
+        // Top horizontal repeat
+        const int topRepeatStartX = normalized.topLeftWidth;
+        const int topRepeatEndX = std::max(topRepeatStartX, width - normalized.topRightWidth);
+
+        if (normalized.topWidth > 0 && normalized.topHeight > 0)
+        {
+            int x = topRepeatStartX;
+            while (x + normalized.topWidth <= topRepeatEndX)
+            {
+                writeRowsToBuilder(builder, width, height, x, 0, normalized.topRows, style);
+                x += normalized.topWidth;
+            }
+        }
+
+        // Bottom horizontal repeat
+        const int bottomRepeatStartX = normalized.bottomLeftWidth;
+        const int bottomRepeatEndX = std::max(bottomRepeatStartX, width - normalized.bottomRightWidth);
+
+        if (normalized.bottomWidth > 0 && normalized.bottomHeight > 0)
+        {
+            int x = bottomRepeatStartX;
+            while (x + normalized.bottomWidth <= bottomRepeatEndX)
+            {
+                writeRowsToBuilder(
+                    builder,
+                    width,
+                    height,
+                    x,
+                    std::max(0, height - normalized.bottomHeight),
+                    normalized.bottomRows,
+                    style);
+                x += normalized.bottomWidth;
+            }
+        }
+
+        // Left vertical repeat
+        const int middleStartY = normalized.topHeight;
+        const int middleEndY = std::max(middleStartY, height - normalized.bottomHeight);
+
+        if (normalized.leftWidth > 0 && normalized.middleHeight > 0)
+        {
+            int y = middleStartY;
+            while (y + normalized.middleHeight <= middleEndY)
+            {
+                writeRowsToBuilder(builder, width, height, 0, y, normalized.leftRows, style);
+                y += normalized.middleHeight;
+            }
+        }
+
+        // Right vertical repeat
+        if (normalized.rightWidth > 0 && normalized.middleHeight > 0)
+        {
+            int y = middleStartY;
+            while (y + normalized.middleHeight <= middleEndY)
+            {
+                writeRowsToBuilder(
+                    builder,
+                    width,
+                    height,
+                    std::max(0, width - normalized.rightWidth),
+                    y,
+                    normalized.rightRows,
+                    style);
+                y += normalized.middleHeight;
+            }
+        }
+
+        return builder.build();
+    }
 }
 
 namespace ObjectFactory
@@ -1746,5 +2324,116 @@ namespace ObjectFactory
                 UR"PATTERN(   `._.'   )PATTERN"
             }
         };
+    }
+
+    TextObject makePatternFrame(
+        int width,
+        int height,
+        const FramePattern& pattern)
+    {
+        return buildPatternFrameObject(width, height, pattern, std::nullopt);
+    }
+
+    TextObject makePatternFrame(
+        int width,
+        int height,
+        const FramePattern& pattern,
+        const Style& style)
+    {
+        return buildPatternFrameObject(width, height, pattern, style);
+    }
+
+    // In order for the FramePatterns to be built correctly
+    // The corner pieces must be the same width as the column pieces
+    // and the same height as the row pieces
+
+    FramePattern heartFramePattern()
+    {
+        return FramePattern
+        {
+            {
+                UR"PATTERN(           )PATTERN",
+                UR"PATTERN(       _.-.)PATTERN",
+                UR"PATTERN(     .'_.-.)PATTERN",
+                UR"PATTERN(    ( (    )PATTERN"
+            },
+            {
+                UR"PATTERN(     .-"-,-"-.     )PATTERN",
+                UR"PATTERN(.-._(         ).-._)PATTERN",
+                UR"PATTERN(.-._.`.     .'_.-._)PATTERN",
+                UR"PATTERN(       `._.'       )PATTERN"
+            },
+            {
+                UR"PATTERN(           )PATTERN",
+                UR"PATTERN(.-..       )PATTERN",
+                UR"PATTERN(.-..`.     )PATTERN",
+                UR"PATTERN(    ) )    )PATTERN"
+            },
+
+            {
+                UR"PATTERN(     ) )   )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(    ( (    )PATTERN"
+            },
+            {
+                UR"PATTERN(   ( (     )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(    ) )    )PATTERN"
+            },
+
+            {
+                UR"PATTERN(    ) )    )PATTERN",
+                UR"PATTERN(   ( (_.-..)PATTERN",
+                UR"PATTERN(    `._.-..)PATTERN",
+                UR"PATTERN(           )PATTERN"
+            },
+            {
+                UR"PATTERN(     .-"-,-"-.     )PATTERN",
+                UR"PATTERN(.-._(         ).-._)PATTERN",
+                UR"PATTERN(.-._.`.     .'_.-._)PATTERN",
+                UR"PATTERN(       `._.'       )PATTERN"
+            },
+            {
+                UR"PATTERN(    ( (     )PATTERN",
+                UR"PATTERN(_.-._) )    )PATTERN",
+                UR"PATTERN(_.-._,'     )PATTERN",
+                UR"PATTERN(            )PATTERN"
+            }
+        };
+    }
+
+    TextObject makePatternFilledFrame(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern)
+    {
+        return buildPatternFilledFrameObject(
+            width,
+            height,
+            framePattern,
+            fillPattern,
+            std::nullopt);
+    }
+
+    TextObject makePatternFilledFrame(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern,
+        const Style& style)
+    {
+        return buildPatternFilledFrameObject(
+            width,
+            height,
+            framePattern,
+            fillPattern,
+            style);
     }
 }

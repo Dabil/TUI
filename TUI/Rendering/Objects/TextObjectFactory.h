@@ -35,6 +35,20 @@ struct VerticalLinePattern
     std::vector<std::u32string> bottomRows;
 };
 
+struct FramePattern
+{
+    std::vector<std::u32string> topLeftRows;
+    std::vector<std::u32string> topRows;
+    std::vector<std::u32string> topRightRows;
+
+    std::vector<std::u32string> leftRows;
+    std::vector<std::u32string> rightRows;
+
+    std::vector<std::u32string> bottomLeftRows;
+    std::vector<std::u32string> bottomRows;
+    std::vector<std::u32string> bottomRightRows;
+};
+
 namespace ObjectFactory
 {
     struct BorderGlyphs
@@ -269,5 +283,40 @@ namespace ObjectFactory
     TextObject makeVerticalPatternLine(
         int height,
         const VerticalLinePattern& pattern,
+        const Style& style);
+
+    // Named decorative frame presets.
+    FramePattern heartFramePattern();
+
+    // Creates a decorative multi-glyph frame.
+    // width and height are the final object dimensions in columns/rows.
+    // The corners are written once.
+    // The top/bottom rows repeat horizontally in full blocks only.
+    // The left/right rows repeat vertically in full blocks only.
+    // The interior remains empty (space-filled).
+    TextObject makePatternFrame(
+        int width,
+        int height,
+        const FramePattern& pattern);
+
+    TextObject makePatternFrame(
+        int width,
+        int height,
+        const FramePattern& pattern,
+        const Style& style);
+
+    // Creates a decorative multi-glyph frame with a repeating pattern fill
+// placed in the interior region.
+    TextObject makePatternFilledFrame(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern);
+
+    TextObject makePatternFilledFrame(
+        int width,
+        int height,
+        const FramePattern& framePattern,
+        const PatternTile& fillPattern,
         const Style& style);
 }
