@@ -3,69 +3,8 @@
 #include <algorithm>
 #include <utility>
 
+#include "Rendering/Objects/TextObjectBlitter.h"
 #include "Rendering/Objects/TextObjectBuilder.h"
-
-namespace
-{
-    void blitTextObject(
-        TextObjectBuilder& builder,
-        const TextObject& source,
-        const int offsetX,
-        const int offsetY,
-        const std::optional<Style>& overrideStyle)
-    {
-        for (int y = 0; y < source.getHeight(); ++y)
-        {
-            for (int x = 0; x < source.getWidth(); ++x)
-            {
-                const TextObjectCell* cell = source.tryGetCell(x, y);
-                if (cell == nullptr)
-                {
-                    continue;
-                }
-
-                if (cell->kind == CellKind::Empty)
-                {
-                    continue;
-                }
-
-                const int destX = offsetX + x;
-                const int destY = offsetY + y;
-
-                if (!builder.inBounds(destX, destY))
-                {
-                    continue;
-                }
-
-                const std::optional<Style> styleToApply =
-                    overrideStyle.has_value() ? overrideStyle : cell->style;
-
-                switch (cell->kind)
-                {
-                case CellKind::Glyph:
-                    if (cell->width == CellWidth::Two)
-                    {
-                        builder.setWideGlyph(destX, destY, cell->glyph, styleToApply);
-                    }
-                    else
-                    {
-                        builder.setGlyph(destX, destY, cell->glyph, styleToApply);
-                    }
-                    break;
-
-                case CellKind::WideTrailing:
-                case CellKind::CombiningContinuation:
-                    builder.setCell(destX, destY, cell->glyph, cell->kind, cell->width, styleToApply);
-                    break;
-
-                case CellKind::Empty:
-                default:
-                    break;
-                }
-            }
-        }
-    }
-}
 
 namespace Rendering
 {
@@ -288,12 +227,17 @@ namespace Rendering
                 continue;
             }
 
-            blitTextObject(
+            TextObjectBlitter::BlitOptions blitOptions;
+            blitOptions.overrideStyle = options.overrideStyle;
+            blitOptions.skipEmptyCells = true;
+            blitOptions.skipStructuralContinuationCells = false;
+
+            TextObjectBlitter::blitToBuilder(
                 builder,
                 layer->object,
                 layer->offsetX,
                 layer->offsetY,
-                options.overrideStyle);
+                blitOptions);
         }
 
         return builder.build();
