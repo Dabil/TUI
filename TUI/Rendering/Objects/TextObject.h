@@ -50,6 +50,10 @@ struct TextObjectCell
     }
 };
 
+// TextObject is the engine's single resolved cell surface.
+// It intentionally does NOT own named layers, z-order metadata, or composition policy.
+// Any reusable asset that has already been flattened into one placement-ready grid should
+// normalize to TextObject.
 class TextObject
 {
     friend class TextObjectBuilder;
@@ -119,3 +123,4 @@ private:
     bool m_hasAnyCellStyles = false;
     std::vector<TextObjectCell> m_cells;
 };
+

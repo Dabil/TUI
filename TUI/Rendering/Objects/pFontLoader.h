@@ -197,6 +197,9 @@ namespace PseudoFont
         const Style& overrideStyle,
         const RenderOptions& options);
 
+    // Returns a composition-aware layered asset that preserves named layers.
+    // Layer offsets remain as layer metadata and are not re-baked into the returned
+    // TextObject surfaces. Flatten later when a single placement-ready asset is needed.
     Rendering::LayeredTextObject generateLayeredTextObject(
         const FontDefinition& font,
         std::string_view utf8Text);

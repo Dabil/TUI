@@ -55,6 +55,28 @@ namespace Rendering
         return m_layers.size();
     }
 
+    bool LayeredTextObject::hasVisibleLayers() const
+    {
+        return std::any_of(
+            m_layers.begin(),
+            m_layers.end(),
+            [](const TextObjectLayer& layer)
+            {
+                return layer.visible;
+            });
+    }
+
+    bool LayeredTextObject::hasVisibleNonEmptyLayers() const
+    {
+        return std::any_of(
+            m_layers.begin(),
+            m_layers.end(),
+            [](const TextObjectLayer& layer)
+            {
+                return layer.visible && !layer.object.isEmpty();
+            });
+    }
+
     const std::vector<TextObjectLayer>& LayeredTextObject::getLayers() const
     {
         return m_layers;
@@ -181,17 +203,10 @@ namespace Rendering
         return flattenInternal(m_layers, m_width, m_height, options);
     }
 
-    TextObject LayeredTextObject::flattenInternal(
+    std::vector<const TextObjectLayer*> LayeredTextObject::collectFlattenLayers(
         const std::vector<TextObjectLayer>& layers,
-        const int width,
-        const int height,
         const FlattenOptions& options)
     {
-        if (width <= 0 || height <= 0)
-        {
-            return TextObject{};
-        }
-
         std::vector<const TextObjectLayer*> sortedLayers;
         sortedLayers.reserve(layers.size());
 
@@ -205,11 +220,6 @@ namespace Rendering
             sortedLayers.push_back(&layer);
         }
 
-        if (sortedLayers.empty())
-        {
-            return TextObjectBuilder(width, height).build();
-        }
-
         std::stable_sort(
             sortedLayers.begin(),
             sortedLayers.end(),
@@ -217,6 +227,28 @@ namespace Rendering
             {
                 return a->zIndex < b->zIndex;
             });
+
+        return sortedLayers;
+    }
+
+    TextObject LayeredTextObject::flattenInternal(
+        const std::vector<TextObjectLayer>& layers,
+        const int width,
+        const int height,
+        const FlattenOptions& options)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return TextObject{};
+        }
+
+        const std::vector<const TextObjectLayer*> sortedLayers =
+            collectFlattenLayers(layers, options);
+
+        if (sortedLayers.empty())
+        {
+            return TextObjectBuilder(width, height).build();
+        }
 
         TextObjectBuilder builder(width, height);
 
@@ -243,3 +275,4 @@ namespace Rendering
         return builder.build();
     }
 }
+

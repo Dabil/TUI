@@ -24,6 +24,8 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Preferred API: makeBanner(...)
+    // Returns a single placement-ready TextObject. Any layered source data is
+    // flattened before it leaves this API surface.
     // AsciiBannerFont UTF-8 overloads
     // -------------------------------------------------------------------------
 
@@ -124,6 +126,8 @@ namespace BannerFactory
 
     // -------------------------------------------------------------------------
     // Layered helpers
+    // Returns LayeredTextObject only when layer identity needs to survive for
+    // later composition/effects/animation control.
     // AsciiBanner synthetic layered helpers
     // -------------------------------------------------------------------------
 
