@@ -67,12 +67,6 @@ public:
     static TextObject fromU32(std::u32string_view text);
     static TextObject fromU32(std::u32string_view text, const Style& style);
 
-    static TextObject loadFromFile(const std::string& filePath);
-    static TextObject loadFromFile(const std::string& filePath, const Style& style);
-
-    bool loadUtf8File(const std::string& filePath);
-    bool loadUtf8File(const std::string& filePath, const Style& style);
-
     TextObjectExporter::SaveResult saveToFile(const std::string& filePath) const;
     TextObjectExporter::SaveResult saveToFile(
         const std::string& filePath,

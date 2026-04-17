@@ -49,48 +49,6 @@ TextObject TextObject::fromU32(std::u32string_view text, const Style& style)
     return buildFromLines(splitLines(text), std::optional<Style>(style));
 }
 
-TextObject TextObject::loadFromFile(const std::string& filePath)
-{
-    TextObject object;
-    object.loadUtf8File(filePath);
-    return object;
-}
-
-TextObject TextObject::loadFromFile(const std::string& filePath, const Style& style)
-{
-    TextObject object;
-    object.loadUtf8File(filePath, style);
-    return object;
-}
-
-bool TextObject::loadUtf8File(const std::string& filePath)
-{
-    clear();
-
-    const PlainTextLoader::LoadResult loadResult = PlainTextLoader::loadFromFile(filePath);
-    if (!loadResult.success || !loadResult.object.isLoaded())
-    {
-        return false;
-    }
-
-    *this = loadResult.object;
-    return true;
-}
-
-bool TextObject::loadUtf8File(const std::string& filePath, const Style& style)
-{
-    clear();
-
-    const PlainTextLoader::LoadResult loadResult = PlainTextLoader::loadFromFile(filePath, style);
-    if (!loadResult.success || !loadResult.object.isLoaded())
-    {
-        return false;
-    }
-
-    *this = loadResult.object;
-    return true;
-}
-
 TextObjectExporter::SaveResult TextObject::saveToFile(const std::string& filePath) const
 {
     return TextObjectExporter::saveToFile(*this, filePath);
