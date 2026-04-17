@@ -1899,6 +1899,24 @@ namespace
 
 namespace ObjectFactory
 {
+    /*
+        Things you need to know to properly create these text patterns
+
+        1) Backslashes need to be escaped to print properly
+        so if you want to print a backslash you have to "\\" escape it
+        this leads to a readability problem. And worse, since we aren't
+        printing through cout, the escaped backslash gets drawn as
+        \\ breaking the effect altogether.
+
+        2) You can use this pattern to avoid the escaped backslash:
+            R"( ... )"
+
+            like in UR"( / __ \ \__)"
+
+        3) You can also use a custom pattern such as:
+            UR"PATTERN( ... )PATTERN"
+*/
+
     BorderGlyphs asciiBorder()
     {
         return BorderGlyphs{};
@@ -2000,6 +2018,404 @@ namespace ObjectFactory
         glyphs.teeRight = U'┤';
         glyphs.cross = U'┼';
         return glyphs;
+    }
+
+    PatternTile brickPattern()
+    {
+        return PatternTile
+        {
+            {
+            U"_|___",
+            U"___|_"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile bubblesPattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"( / __ \ \__/)",
+            UR"(/ /  \ \____)",
+            UR"(\ \__/ / __ )",
+            UR"( \____/ /  \)"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile crossStitchPattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"(<>================================<>)",
+            UR"(||\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/||)",
+            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
+            UR"(||/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\||)",
+            UR"(||================================||)",
+            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
+            UR"(||================================||)",
+            UR"(||/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\||)",
+            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
+            UR"(||\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/||)",
+            UR"(<>================================<>)"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile crossedPattern()
+    {
+        return PatternTile
+        {
+            {
+            U"_|_     ",
+            U" |      ",
+            U"    _|_ ",
+            U"     |  "
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile embroideryPattern()
+    {
+        return PatternTile
+        {
+            {
+            U" /\\ ",
+            U" )( ",
+            U"(  )",
+            U" \\/"
+            },
+            PatternCapMode::TopAndBottom
+        };
+    }
+
+    PatternTile embroideryTile()
+    {
+        return PatternTile
+        {
+            {
+            U".----------------------------.",
+            U"|\\  /\\  /\\  /\\  /\\  /\\  /\\  /|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|(  )(  )(  )(  )(  )(  )(  )|",
+            U"| )(  )(  )(  )(  )(  )(  )( |",
+            U"|/  \\/  \\/  \\/  \\/  \\/  \\/  \|",
+            U"'----------------------------'"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile fencePattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"(   /  \ )",
+            UR"(__/    \)",
+            UR"(  \    /)",
+            UR"(   \__/ )"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile honeyCombPattern()
+    {
+        return PatternTile
+        {
+            {
+            UR"(/      \____)",
+            UR"(\      /    )",
+            UR"( \____/     )",
+            UR"( /    \     )"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile houndsToothPattern()
+    {
+        return PatternTile
+        {
+            {
+            U"|__|   __",
+            U" __|__|  ",
+            U"|   __|__"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile ninjaPattern()
+    {
+        return PatternTile
+        {
+            {
+            U" |___  |",
+            U"    _|_|",
+            U"_  | |__",
+            U"_|_|    "
+            },
+            PatternCapMode::None
+        };
+    }
+
+    PatternTile puzzlePattern()
+    {
+        return PatternTile
+        {
+            {
+            U" _|    ",
+            U"(_   _ ",
+            U" |__( )"
+            },
+            PatternCapMode::None
+        };
+    }
+
+    HorizontalLinePattern catFaceLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                U"=^..^=    "
+            },
+            {
+                U"=^..^="
+            }
+        };
+    }
+
+    HorizontalLinePattern pennantLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                U"     .-.",
+                U"`._.'   "
+            },
+            {}
+        };
+    }
+
+    HorizontalLinePattern sparkChainLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {
+                U"."
+            },
+            {
+                UR"(+"+.)"
+            },
+            {}
+        };
+    }
+
+    HorizontalLinePattern orbChainLinePattern()
+    {
+        return HorizontalLinePattern
+        {
+            {
+                UR"( /)",
+                U"O ",
+                UR"( \)"
+            },
+            {
+                UR"(\ /)",
+                UR"( \ )",
+                UR"(/ \)"
+            },
+            {
+                UR"(\ )",
+                U" O",
+                UR"(/ )"
+            }
+        };
+    }
+
+    HorizontalLinePattern rightAroundPattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                UR"(  .--.    )",
+                UR"(:::::.\:::)",
+                UR"('      `--)"
+            },
+            {}
+        };
+    }
+
+    HorizontalLinePattern dnaPattern()
+    {
+        return HorizontalLinePattern
+        {
+            {},
+            {
+                UR"( ,-"-.   ,-"-.)",
+                UR"(X | | \ / | | )",
+                UR"( \| | |X| | |/)",
+                UR"(  `-!-' `-!-" )"
+            },
+            {
+                UR"( )",
+                UR"(X)",
+                UR"( )",
+                UR"( )"
+            }
+        };
+    }
+
+    HorizontalLinePattern scrollSemetricPattern()
+    {
+        return HorizontalLinePattern
+        {
+            {
+                UR"(  .------)",
+                UR"( /  .-.  )",
+                UR"(|  /   \ )",
+                UR"(| |\_.  |)",
+                UR"(|\|  | /|)",
+                UR"(| `---' |)",
+                UR"(|       |)",
+                UR"(|       |)",
+                UR"(\       |)",
+                UR"( \     / )",
+                UR"(  `---'  )"            },
+            {
+                U"-",
+                U" ",
+                U" ",
+                U" ",
+                U" ",
+                U" ",
+                U" ",
+                U"-"
+            },
+            {
+                UR"(------.  )",
+                UR"(  .-.  \ )",
+                UR"( /   \  |)",
+                UR"(|    /| |)",
+                UR"(|\  | |/|)",
+                UR"(| `---' |)",
+                UR"(|       |)",
+                UR"(|       |)",
+                UR"(|       /)",
+                UR"( \     / )",
+                UR"(  `---'  )"            }
+        };
+    }
+
+    VerticalLinePattern heartChainVerticalPattern()
+    {
+        return VerticalLinePattern
+        {
+            {
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(    ( (    )PATTERN"
+            },
+            {
+                UR"PATTERN(    ) )    )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(   ( (     )PATTERN"
+            },
+            {
+                UR"PATTERN(    ) )    )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN"
+            }
+        };
+    }
+
+    // In order for the FramePatterns to be built correctly
+    // The corner pieces must be the same width as the column pieces
+    // and the same height as the row pieces
+
+    FramePattern heartFramePattern()
+    {
+        return FramePattern
+        {
+            {
+                UR"PATTERN(           )PATTERN",
+                UR"PATTERN(       _.-.)PATTERN",
+                UR"PATTERN(     .'_.-.)PATTERN",
+                UR"PATTERN(    ( (    )PATTERN"
+            },
+            {
+                UR"PATTERN(     .-"-,-"-.     )PATTERN",
+                UR"PATTERN(.-._(         ).-._)PATTERN",
+                UR"PATTERN(.-._.`.     .'_.-._)PATTERN",
+                UR"PATTERN(       `._.'       )PATTERN"
+            },
+            {
+                UR"PATTERN(           )PATTERN",
+                UR"PATTERN(.-..       )PATTERN",
+                UR"PATTERN(.-..`.     )PATTERN",
+                UR"PATTERN(    ) )    )PATTERN"
+            },
+
+            {
+                UR"PATTERN(     ) )   )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(    ( (    )PATTERN"
+            },
+            {
+                UR"PATTERN(   ( (     )PATTERN",
+                UR"PATTERN( .-"-,-"-. )PATTERN",
+                UR"PATTERN((         ))PATTERN",
+                UR"PATTERN( `.     .' )PATTERN",
+                UR"PATTERN(   `._.'   )PATTERN",
+                UR"PATTERN(    ) )    )PATTERN"
+            },
+
+            {
+                UR"PATTERN(    ) )    )PATTERN",
+                UR"PATTERN(   ( (_.-..)PATTERN",
+                UR"PATTERN(    `._.-..)PATTERN",
+                UR"PATTERN(           )PATTERN"
+            },
+            {
+                UR"PATTERN(     .-"-,-"-.     )PATTERN",
+                UR"PATTERN(.-._(         ).-._)PATTERN",
+                UR"PATTERN(.-._.`.     .'_.-._)PATTERN",
+                UR"PATTERN(       `._.'       )PATTERN"
+            },
+            {
+                UR"PATTERN(   ( (     )PATTERN",
+                UR"PATTERN(.-._) )    )PATTERN",
+                UR"PATTERN(.-._,'     )PATTERN",
+                UR"PATTERN(           )PATTERN"
+            }
+        };
     }
 
     TextObject makeText(std::u32string_view text)
@@ -2283,190 +2699,6 @@ namespace ObjectFactory
         return buildPatternFillObject(width, height, tile, style);
     }
 
-    /*
-        Things you need to know to properly create these text patterns
-
-        1) Backslashes need to be escaped to print properly
-        so if you want to print a backslash you have to "\\" escape it
-        this leads to a readability problem. And worse, since we aren't
-        printing through cout, the escaped backslash gets drawn as
-        \\ breaking the effect altogether.
-
-        2) You can use this pattern to avoid the escaped backslash:
-            R"( ... )"
-
-        like in UR"( / __ \ \__)"
-
-        3) You can also use a custom pattern such as:
-            UR"PATTERN( ... )PATTERN"
-    */
-
-    PatternTile brickPattern()
-    {
-        return PatternTile
-        {
-            {
-            U"_|___",
-            U"___|_"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile bubblesPattern()
-    {
-        return PatternTile
-        {
-            {
-            UR"( / __ \ \__/)",
-            UR"(/ /  \ \____)",
-            UR"(\ \__/ / __ )",
-            UR"( \____/ /  \)"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile crossStitchPattern()
-    {
-        return PatternTile
-        {
-            {
-            UR"(<>================================<>)",
-            UR"(||\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/||)",
-            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
-            UR"(||/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\||)",
-            UR"(||================================||)",
-            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
-            UR"(||================================||)",
-            UR"(||/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\||)",
-            UR"(||<> <> <> <> <> <> <> <> <> <> <>||)",
-            UR"(||\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/||)",
-            UR"(<>================================<>)"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile crossedPattern()
-    {
-        return PatternTile
-        {
-            {
-            U"_|_     ",
-            U" |      ",
-            U"    _|_ ",
-            U"     |  "
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile embroideryPattern()
-    {
-        return PatternTile
-        {
-            {
-            U" /\\ ",
-            U" )( ",
-            U"(  )",
-            U" \\/"
-            },
-            PatternCapMode::TopAndBottom
-        };
-    }
-
-    PatternTile embroideryTile()
-    {
-        return PatternTile
-        {
-            {
-            U".----------------------------.",
-            U"|\\  /\\  /\\  /\\  /\\  /\\  /\\  /|",
-            U"| )(  )(  )(  )(  )(  )(  )( |",
-            U"|(  )(  )(  )(  )(  )(  )(  )|",
-            U"| )(  )(  )(  )(  )(  )(  )( |",
-            U"|(  )(  )(  )(  )(  )(  )(  )|",
-            U"| )(  )(  )(  )(  )(  )(  )( |",
-            U"|(  )(  )(  )(  )(  )(  )(  )|",
-            U"| )(  )(  )(  )(  )(  )(  )( |",
-            U"|(  )(  )(  )(  )(  )(  )(  )|",
-            U"| )(  )(  )(  )(  )(  )(  )( |",
-            U"|/  \\/  \\/  \\/  \\/  \\/  \\/  \|",
-            U"'----------------------------'"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile fencePattern()
-    {
-        return PatternTile
-        {
-            {
-            UR"(   /  \ )",
-            UR"(__/    \)",
-            UR"(  \    /)",
-            UR"(   \__/ )"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile honeyCombPattern()
-    {
-        return PatternTile
-        {
-            {
-            UR"(/      \____)",
-            UR"(\      /    )",
-            UR"( \____/     )",
-            UR"( /    \     )"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile houndsToothPattern()
-    {
-        return PatternTile
-        {
-            {
-            U"|__|   __",
-            U" __|__|  ",
-            U"|   __|__"
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile ninjaPattern()
-    {
-        return PatternTile
-        {
-            {
-            U" |___  |",
-            U"    _|_|",
-            U"_  | |__",
-            U"_|_|    "
-            },
-            PatternCapMode::None
-        };
-    }
-
-    PatternTile puzzlePattern()
-    {
-        return PatternTile
-        {
-            {
-            U" _|    ",
-            U"(_   _ ",
-            U" |__( )"
-            },
-            PatternCapMode::None
-        };
-    }
-
     TextObject makeHorizontalPatternLine(
         int width,
         const HorizontalLinePattern& pattern)
@@ -2480,144 +2712,6 @@ namespace ObjectFactory
         const Style& style)
     {
         return buildHorizontalPatternLineObject(width, pattern, style);
-    }
-
-    HorizontalLinePattern catFaceLinePattern()
-    {
-        return HorizontalLinePattern
-        {
-            {},
-            {
-                U"=^..^=    "
-            },
-            {
-                U"=^..^="
-            }
-        };
-    }
-
-    HorizontalLinePattern pennantLinePattern()
-    {
-        return HorizontalLinePattern
-        {
-            {},
-            {
-                U"     .-.",
-                U"`._.'   "
-            },
-            {}
-        };
-    }
-
-    HorizontalLinePattern sparkChainLinePattern()
-    {
-        return HorizontalLinePattern
-        {
-            {
-                U"."
-            },
-            {
-                UR"(+"+.)"
-            },
-            {}
-        };
-    }
-
-    HorizontalLinePattern orbChainLinePattern()
-    {
-        return HorizontalLinePattern
-        {
-            {
-                UR"( /)",
-                U"O ",
-                UR"( \)"
-            },
-            {
-                UR"(\ /)",
-                UR"( \ )",
-                UR"(/ \)"
-            },
-            {
-                UR"(\ )",
-                U" O",
-                UR"(/ )"
-            }
-        };
-    }
-
-    HorizontalLinePattern rightAroundPattern()
-    {
-        return HorizontalLinePattern
-        {
-            {},
-            {
-                UR"(  .--.    )",
-                UR"(:::::.\:::)",
-                UR"('      `--)"
-            },
-            {}
-        };
-    }
-
-    HorizontalLinePattern dnaPattern()
-    {
-        return HorizontalLinePattern
-        {
-            {},
-            {
-                UR"( ,-"-.   ,-"-.)",
-                UR"(X | | \ / | | )",
-                UR"( \| | |X| | |/)",
-                UR"(  `-!-' `-!-" )"
-            },
-            {
-                UR"( )",
-                UR"(X)",
-                UR"( )",
-                UR"( )"
-            }
-        };
-    }
-
-    HorizontalLinePattern scrollSemetricPattern()
-    {
-        return HorizontalLinePattern
-        {
-            {
-                UR"(  .------)",
-                UR"( /  .-.  )",
-                UR"(|  /   \ )",
-                UR"(| |\_.  |)",
-                UR"(|\|  | /|)",
-                UR"(| `---' |)",
-                UR"(|       |)",
-                UR"(|       |)",
-                UR"(\       |)",
-                UR"( \     / )",
-                UR"(  `---'  )"            },
-            {
-                U"-",
-                U" ",
-                U" ",
-                U" ",
-                U" ",
-                U" ",
-                U" ",
-                U"-"
-            },
-            {
-                UR"(------.  )",
-                UR"(  .-.  \ )",
-                UR"( /   \  |)",
-                UR"(|    /| |)",
-                UR"(|\  | |/|)",
-                UR"(| `---' |)",
-                UR"(|       |)",
-                UR"(|       |)",
-                UR"(|       /)",
-                UR"( \     / )",
-                UR"(  `---'  )"            }
-        };
     }
 
     TextObject makeVerticalPatternLine(
@@ -2635,34 +2729,6 @@ namespace ObjectFactory
         return buildVerticalPatternLineObject(height, pattern, style);
     }
 
-    VerticalLinePattern heartChainVerticalPattern()
-    {
-        return VerticalLinePattern
-        {
-            {
-                UR"PATTERN( .-"-,-"-. )PATTERN",
-                UR"PATTERN((         ))PATTERN",
-                UR"PATTERN( `.     .' )PATTERN",
-                UR"PATTERN(   `._.'   )PATTERN",
-                UR"PATTERN(    ( (    )PATTERN"
-            },
-            {
-                UR"PATTERN(    ) )    )PATTERN",
-                UR"PATTERN( .-"-,-"-. )PATTERN",
-                UR"PATTERN((         ))PATTERN",
-                UR"PATTERN( `.     .' )PATTERN",
-                UR"PATTERN(   `._.'   )PATTERN",
-                UR"PATTERN(   ( (     )PATTERN"
-            },
-            {
-                UR"PATTERN(    ) )    )PATTERN",
-                UR"PATTERN( .-"-,-"-. )PATTERN",
-                UR"PATTERN((         ))PATTERN",
-                UR"PATTERN( `.     .' )PATTERN",
-                UR"PATTERN(   `._.'   )PATTERN"
-            }
-        };
-    }
 
     TextObject makePatternFrame(
         int width,
@@ -2681,70 +2747,6 @@ namespace ObjectFactory
         return buildPatternFrameObject(width, height, pattern, style);
     }
 
-    // In order for the FramePatterns to be built correctly
-    // The corner pieces must be the same width as the column pieces
-    // and the same height as the row pieces
-
-    FramePattern heartFramePattern()
-    {
-        return FramePattern
-        {
-            {
-                UR"PATTERN(           )PATTERN",
-                UR"PATTERN(       _.-.)PATTERN",
-                UR"PATTERN(     .'_.-.)PATTERN",
-                UR"PATTERN(    ( (    )PATTERN"
-            },
-            {
-                UR"PATTERN(     .-"-,-"-.     )PATTERN",
-                UR"PATTERN(.-._(         ).-._)PATTERN",
-                UR"PATTERN(.-._.`.     .'_.-._)PATTERN",
-                UR"PATTERN(       `._.'       )PATTERN"
-            },
-            {
-                UR"PATTERN(           )PATTERN",
-                UR"PATTERN(.-..       )PATTERN",
-                UR"PATTERN(.-..`.     )PATTERN",
-                UR"PATTERN(    ) )    )PATTERN"
-            },
-
-            {
-                UR"PATTERN(     ) )   )PATTERN",
-                UR"PATTERN( .-"-,-"-. )PATTERN",
-                UR"PATTERN((         ))PATTERN",
-                UR"PATTERN( `.     .' )PATTERN",
-                UR"PATTERN(   `._.'   )PATTERN",
-                UR"PATTERN(    ( (    )PATTERN"
-            },
-            {
-                UR"PATTERN(   ( (     )PATTERN",
-                UR"PATTERN( .-"-,-"-. )PATTERN",
-                UR"PATTERN((         ))PATTERN",
-                UR"PATTERN( `.     .' )PATTERN",
-                UR"PATTERN(   `._.'   )PATTERN",
-                UR"PATTERN(    ) )    )PATTERN"
-            },
-
-            {
-                UR"PATTERN(    ) )    )PATTERN",
-                UR"PATTERN(   ( (_.-..)PATTERN",
-                UR"PATTERN(    `._.-..)PATTERN",
-                UR"PATTERN(           )PATTERN"
-            },
-            {
-                UR"PATTERN(     .-"-,-"-.     )PATTERN",
-                UR"PATTERN(.-._(         ).-._)PATTERN",
-                UR"PATTERN(.-._.`.     .'_.-._)PATTERN",
-                UR"PATTERN(       `._.'       )PATTERN"
-            },
-            {
-                UR"PATTERN(   ( (     )PATTERN",
-                UR"PATTERN(.-._) )    )PATTERN",
-                UR"PATTERN(.-._,'     )PATTERN",
-                UR"PATTERN(           )PATTERN"
-            }
-        };
-    }
 
     TextObject makePatternFilledFrame(
         int width,

@@ -88,6 +88,33 @@ namespace ObjectFactory
     LineGlyphs doubleLineGlyphs();
     LineGlyphs roundedLineGlyphs();
 
+    // repeating pattern presets
+    PatternTile brickPattern();
+    PatternTile bubblesPattern();
+    PatternTile crossStitchPattern();
+    PatternTile crossedPattern();
+    PatternTile embroideryPattern();
+    PatternTile embroideryTile();
+    PatternTile fencePattern();
+    PatternTile honeyCombPattern();
+    PatternTile houndsToothPattern();
+    PatternTile ninjaPattern();
+    PatternTile puzzlePattern();
+
+    HorizontalLinePattern catFaceLinePattern();
+    HorizontalLinePattern pennantLinePattern();
+    HorizontalLinePattern sparkChainLinePattern();
+    HorizontalLinePattern orbChainLinePattern();
+    HorizontalLinePattern rightAroundPattern();
+    HorizontalLinePattern dnaPattern();
+    HorizontalLinePattern scrollSemetricPattern();
+
+    VerticalLinePattern heartChainVerticalPattern();
+
+    FramePattern heartFramePattern();
+
+    // beginning of methods
+
     TextObject makeText(std::u32string_view text);
     TextObject makeText(std::u32string_view text, const Style& style);
 
@@ -210,20 +237,6 @@ namespace ObjectFactory
         const Style& style,
         const LineGlyphs& glyphs = asciiLineGlyphs());
 
-
-    // Named repeating pattern presets.
-    PatternTile brickPattern();
-    PatternTile bubblesPattern();
-    PatternTile crossStitchPattern();
-    PatternTile crossedPattern();
-    PatternTile embroideryPattern();
-    PatternTile embroideryTile();
-    PatternTile fencePattern();
-    PatternTile honeyCombPattern();
-    PatternTile houndsToothPattern();
-    PatternTile ninjaPattern();
-    PatternTile puzzlePattern();
-
     // fill patterns
 
     TextObject makePatternFill(
@@ -236,15 +249,6 @@ namespace ObjectFactory
         int height,
         const PatternTile& tile,
         const Style& style);
-
-    // Named horizontal multi-glyph line presets.
-    HorizontalLinePattern catFaceLinePattern();
-    HorizontalLinePattern pennantLinePattern();
-    HorizontalLinePattern sparkChainLinePattern();
-    HorizontalLinePattern orbChainLinePattern();
-    HorizontalLinePattern rightAroundPattern();
-    HorizontalLinePattern dnaPattern();
-    HorizontalLinePattern scrollSemetricPattern();
 
     // Creates a horizontal line object using multi-glyph repeating rows.
     // width is the final output width in columns.
@@ -264,9 +268,6 @@ namespace ObjectFactory
         const HorizontalLinePattern& pattern,
         const Style& style);
 
-    // Named vertical multi-glyph line presets.
-    VerticalLinePattern heartChainVerticalPattern();
-
     // Creates a vertical line object using multi-glyph repeating row blocks.
     // height is the final output height in rows.
     // The pattern may contain:
@@ -284,9 +285,6 @@ namespace ObjectFactory
         int height,
         const VerticalLinePattern& pattern,
         const Style& style);
-
-    // Named decorative frame presets.
-    FramePattern heartFramePattern();
 
     // Creates a decorative multi-glyph frame.
     // width and height are the final object dimensions in columns/rows.
