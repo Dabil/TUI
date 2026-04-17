@@ -155,6 +155,12 @@
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ColorSupport.h" />
     <ClInclude Include="Rendering\Capabilities\RendererCapabilities.h" />
+    <ClInclude Include="Rendering\Composition\DepthPolicy.h" />
+    <ClInclude Include="Rendering\Composition\GlyphPolicy.h" />
+    <ClInclude Include="Rendering\Composition\OverwriteRule.h" />
+    <ClInclude Include="Rendering\Composition\SourceMask.h" />
+    <ClInclude Include="Rendering\Composition\StylePolicy.h" />
+    <ClInclude Include="Rendering\Composition\WritePolicy.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
@@ -266,6 +272,7 @@
     <ClCompile Include="Rendering\Backends\TerminalHostInfo.cpp" />
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\RendererCapabilities.cpp" />
+    <ClCompile Include="Rendering\Composition\WritePolicy.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
