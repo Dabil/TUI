@@ -34,6 +34,14 @@ namespace Assets
         PseudoFont::LoadOptions pFontLoadOptions;
     };
 
+    enum class AssetLoadKind
+    {
+        Unknown,
+        TextObject,
+        BannerFont,
+        PseudoFont
+    };
+
     struct LoadedTextAsset
     {
         std::shared_ptr<TextObject> object;
@@ -109,6 +117,79 @@ namespace Assets
         }
     };
 
+    struct LoadedAsset
+    {
+        AssetLoadKind kind = AssetLoadKind::Unknown;
+        AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+        std::string requestedReference;
+        std::string assetKey;
+        std::string requestedPath;
+        std::string resolvedPath;
+        std::string normalizedPath;
+        std::string cacheKey;
+
+        std::shared_ptr<TextObject> textObject;
+        std::shared_ptr<AsciiBannerFont> bannerFont;
+        std::shared_ptr<PseudoFont::FontDefinition> pseudoFont;
+
+        bool hasTextObject() const
+        {
+            return textObject != nullptr;
+        }
+
+        bool hasBannerFont() const
+        {
+            return bannerFont != nullptr;
+        }
+
+        bool hasPseudoFont() const
+        {
+            return pseudoFont != nullptr;
+        }
+    };
+
+    struct LoadAssetResult
+    {
+        LoadedAsset asset;
+        bool success = false;
+        bool fromCache = false;
+        std::string errorMessage;
+
+        bool hasAsset() const
+        {
+            switch (asset.kind)
+            {
+            case AssetLoadKind::TextObject:
+                return asset.hasTextObject();
+
+            case AssetLoadKind::BannerFont:
+                return asset.hasBannerFont();
+
+            case AssetLoadKind::PseudoFont:
+                return asset.hasPseudoFont();
+
+            case AssetLoadKind::Unknown:
+            default:
+                return false;
+            }
+        }
+
+        bool hasTextObject() const
+        {
+            return asset.hasTextObject();
+        }
+
+        bool hasBannerFont() const
+        {
+            return asset.hasBannerFont();
+        }
+
+        bool hasPseudoFont() const
+        {
+            return asset.hasPseudoFont();
+        }
+    };
+
     class AssetLibrary
     {
     public:
@@ -133,6 +214,9 @@ namespace Assets
         std::string getRegisteredAssetPath(const std::string& assetNameOrPath) const;
         std::string getPreferredAssetKeyForPath(const std::string& assetPath) const;
 
+        LoadAssetResult loadAsset(const std::string& assetNameOrPath);
+        LoadAssetResult reloadAsset(const std::string& assetNameOrPath);
+
         LoadTextAssetResult loadTextAsset(const std::string& assetNameOrPath);
         LoadTextAssetResult reloadTextAsset(const std::string& assetNameOrPath);
 
@@ -148,6 +232,7 @@ namespace Assets
         const std::shared_ptr<PseudoFont::FontDefinition>* findCachedPseudoFontAsset(
             const std::string& assetNameOrPath) const;
 
+        bool evictCachedAsset(const std::string& assetNameOrPath);
         bool evictCachedTextAsset(const std::string& assetNameOrPath);
         bool evictCachedBannerFontAsset(const std::string& assetNameOrPath);
         bool evictCachedPseudoFontAsset(const std::string& assetNameOrPath);
@@ -206,6 +291,7 @@ namespace Assets
             std::string assetKey;
         };
 
+        LoadAssetResult loadAssetInternal(const std::string& assetNameOrPath, bool forceReload);
         LoadTextAssetResult loadTextAssetInternal(const std::string& assetNameOrPath, bool forceReload);
         LoadBannerFontResult loadBannerFontAssetInternal(const std::string& assetNameOrPath, bool forceReload);
         LoadPseudoFontAssetResult loadPseudoFontAssetInternal(
@@ -224,6 +310,11 @@ namespace Assets
             const ResolvedAssetReference& reference,
             const AssetPaths::ResolutionResult& resolution);
 
+        LoadAssetResult makeUnifiedResult(const LoadTextAssetResult& result) const;
+        LoadAssetResult makeUnifiedResult(const LoadBannerFontResult& result) const;
+        LoadAssetResult makeUnifiedResult(const LoadPseudoFontAssetResult& result) const;
+
+        AssetPaths::ResolutionResult resolveAssetPath(const std::string& requestedPath) const;
         ResolvedAssetReference resolveAssetReference(const std::string& assetNameOrPath) const;
         std::string resolveAssetPathFromReference(const std::string& assetNameOrPath) const;
         std::string makeCacheKey(const std::string& assetNameOrPath) const;

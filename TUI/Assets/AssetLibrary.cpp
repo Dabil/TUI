@@ -263,6 +263,16 @@ namespace Assets
         return it->second;
     }
 
+    LoadAssetResult AssetLibrary::loadAsset(const std::string& assetNameOrPath)
+    {
+        return loadAssetInternal(assetNameOrPath, false);
+    }
+
+    LoadAssetResult AssetLibrary::reloadAsset(const std::string& assetNameOrPath)
+    {
+        return loadAssetInternal(assetNameOrPath, true);
+    }
+
     LoadTextAssetResult AssetLibrary::loadTextAsset(const std::string& assetNameOrPath)
     {
         return loadTextAssetInternal(assetNameOrPath, false);
@@ -347,6 +357,41 @@ namespace Assets
         return &it->second.font;
     }
 
+    bool AssetLibrary::evictCachedAsset(const std::string& assetNameOrPath)
+    {
+        const std::string requestedPath = resolveAssetPathFromReference(assetNameOrPath);
+        if (requestedPath.empty())
+        {
+            return false;
+        }
+
+        const AssetPaths::ResolutionResult resolution = resolveAssetPath(requestedPath);
+        if (!resolution.success)
+        {
+            return false;
+        }
+
+        switch (resolution.assetType)
+        {
+        case AssetPaths::AssetType::PlainText:
+        case AssetPaths::AssetType::AnsiArt:
+        case AssetPaths::AssetType::BinaryArt:
+        case AssetPaths::AssetType::XpDocument:
+        case AssetPaths::AssetType::XpSequence:
+            return evictCachedTextAsset(assetNameOrPath);
+
+        case AssetPaths::AssetType::BannerSource:
+            return evictCachedBannerFontAsset(assetNameOrPath);
+
+        case AssetPaths::AssetType::FontSource:
+            return evictCachedPseudoFontAsset(assetNameOrPath);
+
+        case AssetPaths::AssetType::Unknown:
+        default:
+            return false;
+        }
+    }
+
     bool AssetLibrary::evictCachedTextAsset(const std::string& assetNameOrPath)
     {
         const std::string cacheKey = makeCacheKey(assetNameOrPath);
@@ -407,6 +452,69 @@ namespace Assets
         return m_aliases.size();
     }
 
+    LoadAssetResult AssetLibrary::loadAssetInternal(
+        const std::string& assetNameOrPath,
+        const bool forceReload)
+    {
+        const ResolvedAssetReference reference = resolveAssetReference(assetNameOrPath);
+        if (reference.requestedPath.empty())
+        {
+            LoadAssetResult result;
+            result.success = false;
+            result.errorMessage = "Asset name/path is empty.";
+            result.asset.requestedReference = reference.requestedReference;
+            result.asset.assetKey = reference.assetKey;
+            result.asset.requestedPath = reference.requestedPath;
+            return result;
+        }
+
+        const AssetPaths::ResolutionResult resolution = resolveAssetPath(reference.requestedPath);
+        if (!resolution.success)
+        {
+            LoadAssetResult result;
+            result.success = false;
+            result.errorMessage = resolution.errorMessage;
+            result.asset.requestedReference = reference.requestedReference;
+            result.asset.assetKey = reference.assetKey;
+            result.asset.requestedPath = reference.requestedPath;
+            result.asset.assetType = resolution.assetType;
+            result.asset.resolvedPath = resolution.resolvedPath;
+            result.asset.normalizedPath = resolution.normalizedPath;
+            return result;
+        }
+
+        switch (resolution.assetType)
+        {
+        case AssetPaths::AssetType::PlainText:
+        case AssetPaths::AssetType::AnsiArt:
+        case AssetPaths::AssetType::BinaryArt:
+        case AssetPaths::AssetType::XpDocument:
+        case AssetPaths::AssetType::XpSequence:
+            return makeUnifiedResult(loadTextAssetInternal(assetNameOrPath, forceReload));
+
+        case AssetPaths::AssetType::BannerSource:
+            return makeUnifiedResult(loadBannerFontAssetInternal(assetNameOrPath, forceReload));
+
+        case AssetPaths::AssetType::FontSource:
+            return makeUnifiedResult(loadPseudoFontAssetInternal(assetNameOrPath, forceReload));
+
+        case AssetPaths::AssetType::Unknown:
+        default:
+        {
+            LoadAssetResult result;
+            result.success = false;
+            result.errorMessage = "Unsupported asset type.";
+            result.asset.requestedReference = reference.requestedReference;
+            result.asset.assetKey = reference.assetKey;
+            result.asset.requestedPath = reference.requestedPath;
+            result.asset.assetType = resolution.assetType;
+            result.asset.resolvedPath = resolution.resolvedPath;
+            result.asset.normalizedPath = resolution.normalizedPath;
+            return result;
+        }
+        }
+    }
+
     LoadTextAssetResult AssetLibrary::loadTextAssetInternal(
         const std::string& assetNameOrPath,
         const bool forceReload)
@@ -422,20 +530,15 @@ namespace Assets
                 "Asset name/path is empty.");
         }
 
-        AssetPaths::ResolutionOptions resolutionOptions;
-        resolutionOptions.assetsRoot = m_options.assetsRoot;
-        resolutionOptions.searchRoots.push_back(m_options.assetsRoot);
-
-        const AssetPaths::ResolutionResult resolution =
-            AssetPaths::resolveAssetPath(reference.requestedPath, resolutionOptions);
-
+        const AssetPaths::ResolutionResult resolution = resolveAssetPath(reference.requestedPath);
         if (!resolution.success)
         {
             return makeTextFailure(
                 reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
-                resolution, resolution.errorMessage);
+                resolution,
+                resolution.errorMessage);
         }
 
         const std::string cacheKey = resolution.normalizedPath;
@@ -491,16 +594,11 @@ namespace Assets
                 reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
-                {}, "Asset name/path is empty.");
+                {},
+                "Asset name/path is empty.");
         }
 
-        AssetPaths::ResolutionOptions resolutionOptions;
-        resolutionOptions.assetsRoot = m_options.assetsRoot;
-        resolutionOptions.searchRoots.push_back(m_options.assetsRoot);
-
-        const AssetPaths::ResolutionResult resolution =
-            AssetPaths::resolveAssetPath(reference.requestedPath, resolutionOptions);
-
+        const AssetPaths::ResolutionResult resolution = resolveAssetPath(reference.requestedPath);
         if (!resolution.success)
         {
             return makeBannerFontFailure(
@@ -568,13 +666,7 @@ namespace Assets
                 "Asset name/path is empty.");
         }
 
-        AssetPaths::ResolutionOptions resolutionOptions;
-        resolutionOptions.assetsRoot = m_options.assetsRoot;
-        resolutionOptions.searchRoots.push_back(m_options.assetsRoot);
-
-        const AssetPaths::ResolutionResult resolution =
-            AssetPaths::resolveAssetPath(reference.requestedPath, resolutionOptions);
-
+        const AssetPaths::ResolutionResult resolution = resolveAssetPath(reference.requestedPath);
         if (!resolution.success)
         {
             return makePseudoFontFailure(
@@ -645,7 +737,7 @@ namespace Assets
                     reference.assetKey,
                     reference.requestedPath,
                     resolution,
-                    "Plain text asset load failed.");
+                    "Plain text load failed.");
             }
 
             return makeTextSuccess(
@@ -663,14 +755,16 @@ namespace Assets
 
             if (!loadResult.success || !loadResult.object.isLoaded())
             {
-                return makeTextFailure(reference.requestedReference,
+                return makeTextFailure(
+                    reference.requestedReference,
                     reference.assetKey,
                     reference.requestedPath,
                     resolution,
                     AnsiLoader::formatLoadError(loadResult));
             }
 
-            return makeTextSuccess(reference.requestedReference,
+            return makeTextSuccess(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
@@ -684,14 +778,16 @@ namespace Assets
 
             if (!loadResult.success || !loadResult.object.isLoaded())
             {
-                return makeTextFailure(reference.requestedReference,
+                return makeTextFailure(
+                    reference.requestedReference,
                     reference.assetKey,
                     reference.requestedPath,
                     resolution,
                     BinaryArtLoader::formatLoadError(loadResult));
             }
 
-            return makeTextSuccess(reference.requestedReference,
+            return makeTextSuccess(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
@@ -705,14 +801,16 @@ namespace Assets
 
             if (!loadResult.success || !loadResult.object.isLoaded())
             {
-                return makeTextFailure(reference.requestedReference,
+                return makeTextFailure(
+                    reference.requestedReference,
                     reference.assetKey,
                     reference.requestedPath,
                     resolution,
                     XpArtLoader::formatLoadError(loadResult));
             }
 
-            return makeTextSuccess(reference.requestedReference,
+            return makeTextSuccess(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
@@ -730,7 +828,8 @@ namespace Assets
 
             if (!sequenceLoad.success || !sequenceLoad.hasSequence())
             {
-                return makeTextFailure(reference.requestedReference,
+                return makeTextFailure(
+                    reference.requestedReference,
                     reference.assetKey,
                     reference.requestedPath,
                     resolution,
@@ -754,7 +853,8 @@ namespace Assets
                     : buildResult.errorMessage);
             }
 
-            return makeTextSuccess(reference.requestedReference,
+            return makeTextSuccess(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
@@ -767,7 +867,7 @@ namespace Assets
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
-                "Requested asset is a banner font asset. Use loadBannerFontAsset(...).");
+                "Requested asset is a banner font asset. Use loadAsset(...) or loadBannerFontAsset(...).");
 
         case AssetPaths::AssetType::FontSource:
             return makeTextFailure(
@@ -775,11 +875,12 @@ namespace Assets
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
-                "Requested asset is a pFont asset. Use loadPseudoFontAsset(...).");
+                "Requested asset is a pFont asset. Use loadAsset(...) or loadPseudoFontAsset(...).");
 
         case AssetPaths::AssetType::Unknown:
         default:
-            return makeTextFailure(reference.requestedReference,
+            return makeTextFailure(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
@@ -830,7 +931,7 @@ namespace Assets
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
-                "Requested asset is not a banner font asset. Use loadTextAsset(...) for this asset type.");
+                "Requested asset is not a banner font asset. Use loadAsset(...) or loadTextAsset(...) for this asset type.");
 
         case AssetPaths::AssetType::FontSource:
             return makeBannerFontFailure(
@@ -838,11 +939,12 @@ namespace Assets
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
-                "Requested asset is a pFont asset. Use loadPseudoFontAsset(...).");
+                "Requested asset is a pFont asset. Use loadAsset(...) or loadPseudoFontAsset(...).");
 
         case AssetPaths::AssetType::Unknown:
         default:
-            return makeBannerFontFailure(reference.requestedReference,
+            return makeBannerFontFailure(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
@@ -891,7 +993,7 @@ namespace Assets
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
-                "Requested asset is not a pFont asset. Use loadTextAsset(...) for this asset type.");
+                "Requested asset is not a pFont asset. Use loadAsset(...) or loadTextAsset(...) for this asset type.");
 
         case AssetPaths::AssetType::BannerSource:
             return makePseudoFontFailure(
@@ -899,16 +1001,79 @@ namespace Assets
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
-                "Requested asset is a banner font asset. Use loadBannerFontAsset(...).");
+                "Requested asset is a banner font asset. Use loadAsset(...) or loadBannerFontAsset(...).");
 
         case AssetPaths::AssetType::Unknown:
         default:
-            return makePseudoFontFailure(reference.requestedReference,
+            return makePseudoFontFailure(
+                reference.requestedReference,
                 reference.assetKey,
                 reference.requestedPath,
                 resolution,
                 "Unsupported asset type.");
         }
+    }
+
+    LoadAssetResult AssetLibrary::makeUnifiedResult(const LoadTextAssetResult& result) const
+    {
+        LoadAssetResult unified;
+        unified.success = result.success;
+        unified.fromCache = result.fromCache;
+        unified.errorMessage = result.errorMessage;
+        unified.asset.kind = AssetLoadKind::TextObject;
+        unified.asset.assetType = result.asset.assetType;
+        unified.asset.requestedReference = result.asset.requestedReference;
+        unified.asset.assetKey = result.asset.assetKey;
+        unified.asset.requestedPath = result.asset.requestedPath;
+        unified.asset.resolvedPath = result.asset.resolvedPath;
+        unified.asset.normalizedPath = result.asset.normalizedPath;
+        unified.asset.cacheKey = result.asset.cacheKey;
+        unified.asset.textObject = result.asset.object;
+        return unified;
+    }
+
+    LoadAssetResult AssetLibrary::makeUnifiedResult(const LoadBannerFontResult& result) const
+    {
+        LoadAssetResult unified;
+        unified.success = result.success;
+        unified.fromCache = result.fromCache;
+        unified.errorMessage = result.errorMessage;
+        unified.asset.kind = AssetLoadKind::BannerFont;
+        unified.asset.assetType = result.asset.assetType;
+        unified.asset.requestedReference = result.asset.requestedReference;
+        unified.asset.assetKey = result.asset.assetKey;
+        unified.asset.requestedPath = result.asset.requestedPath;
+        unified.asset.resolvedPath = result.asset.resolvedPath;
+        unified.asset.normalizedPath = result.asset.normalizedPath;
+        unified.asset.cacheKey = result.asset.cacheKey;
+        unified.asset.bannerFont = result.asset.font;
+        return unified;
+    }
+
+    LoadAssetResult AssetLibrary::makeUnifiedResult(const LoadPseudoFontAssetResult& result) const
+    {
+        LoadAssetResult unified;
+        unified.success = result.success;
+        unified.fromCache = result.fromCache;
+        unified.errorMessage = result.errorMessage;
+        unified.asset.kind = AssetLoadKind::PseudoFont;
+        unified.asset.assetType = result.asset.assetType;
+        unified.asset.requestedReference = result.asset.requestedReference;
+        unified.asset.assetKey = result.asset.assetKey;
+        unified.asset.requestedPath = result.asset.requestedPath;
+        unified.asset.resolvedPath = result.asset.resolvedPath;
+        unified.asset.normalizedPath = result.asset.normalizedPath;
+        unified.asset.cacheKey = result.asset.cacheKey;
+        unified.asset.pseudoFont = result.asset.font;
+        return unified;
+    }
+
+    AssetPaths::ResolutionResult AssetLibrary::resolveAssetPath(const std::string& requestedPath) const
+    {
+        AssetPaths::ResolutionOptions resolutionOptions;
+        resolutionOptions.assetsRoot = m_options.assetsRoot;
+        resolutionOptions.searchRoots.push_back(m_options.assetsRoot);
+        return AssetPaths::resolveAssetPath(requestedPath, resolutionOptions);
     }
 
     AssetLibrary::ResolvedAssetReference AssetLibrary::resolveAssetReference(
@@ -970,13 +1135,7 @@ namespace Assets
             return std::string();
         }
 
-        AssetPaths::ResolutionOptions resolutionOptions;
-        resolutionOptions.assetsRoot = m_options.assetsRoot;
-        resolutionOptions.searchRoots.push_back(m_options.assetsRoot);
-
-        const AssetPaths::ResolutionResult resolution =
-            AssetPaths::resolveAssetPath(requestedPath, resolutionOptions);
-
+        const AssetPaths::ResolutionResult resolution = resolveAssetPath(requestedPath);
         if (!resolution.success)
         {
             return std::string();
@@ -992,7 +1151,10 @@ namespace Assets
             normalized.begin(),
             normalized.end(),
             normalized.begin(),
-            [](unsigned char ch) { return static_cast<char>(std::tolower(ch)); });
+            [](unsigned char ch)
+            {
+                return static_cast<char>(std::tolower(ch));
+            });
         return normalized;
     }
 
@@ -1013,4 +1175,3 @@ namespace Assets
         return value.substr(begin, end - begin);
     }
 }
-
