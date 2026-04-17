@@ -541,10 +541,46 @@ namespace PlainTextLoader
         return result.success;
     }
 
+    LoadResult loadFromBytesResult(std::string_view bytes, const LoadOptions& options)
+    {
+        LoadResult result;
+        result.detectedFileType =
+            options.fileType == FileType::Auto
+            ? FileType::Unknown
+            : options.fileType;
+
+        bool hadUtf8Bom = false;
+        result.resolvedEncoding =
+            resolveEncoding(bytes, result.detectedFileType, options.encoding, hadUtf8Bom);
+        result.hadUtf8Bom = hadUtf8Bom;
+
+        std::u32string text = decodeBytes(bytes, result.resolvedEncoding, result.hadUtf8Bom);
+
+        if (options.normalizeLineEndings)
+        {
+            bool normalized = false;
+            text = ::normalizeLineEndings(text, normalized);
+            result.normalizedLineEndings = normalized;
+        }
+
+        if (options.expandTabs)
+        {
+            text = ::expandTabs(text, options.tabWidth);
+        }
+
+        if (!options.preserveTrailingSpaces)
+        {
+            text = trimTrailingSpaces(text);
+        }
+
+        result.object = makeTextObject(text, options);
+        result.success = result.object.isLoaded();
+        return result;
+    }
+
     TextObject loadFromBytes(std::string_view bytes, const LoadOptions& options)
     {
-        std::u32string text = decodeToU32(bytes, options);
-        return makeTextObject(text, options);
+        return loadFromBytesResult(bytes, options).object;
     }
 
     std::u32string decodeToU32(std::string_view bytes, const LoadOptions& options)

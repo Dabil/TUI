@@ -65,6 +65,7 @@ namespace PlainTextLoader
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const LoadOptions& options);
     bool tryLoadFromFile(const std::string& filePath, TextObject& outObject, const Style& style);
 
+    LoadResult loadFromBytesResult(std::string_view bytes, const LoadOptions& options = {});
     TextObject loadFromBytes(std::string_view bytes, const LoadOptions& options = {});
     std::u32string decodeToU32(std::string_view bytes, const LoadOptions& options = {});
 
