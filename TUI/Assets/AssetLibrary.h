@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <vector>
 
 #include "Assets/Loaders/AsciiBannerFontLoader.h"
 #include "Assets/Models/AsciiBannerFont.h"
@@ -37,6 +38,8 @@ namespace Assets
     {
         std::shared_ptr<TextObject> object;
         AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+        std::string requestedReference;
+        std::string assetKey;
         std::string requestedPath;
         std::string resolvedPath;
         std::string normalizedPath;
@@ -60,6 +63,8 @@ namespace Assets
     {
         std::shared_ptr<AsciiBannerFont> font;
         AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+        std::string requestedReference;
+        std::string assetKey;
         std::string requestedPath;
         std::string resolvedPath;
         std::string normalizedPath;
@@ -83,6 +88,8 @@ namespace Assets
     {
         std::shared_ptr<PseudoFont::FontDefinition> font;
         AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+        std::string requestedReference;
+        std::string assetKey;
         std::string requestedPath;
         std::string resolvedPath;
         std::string normalizedPath;
@@ -113,10 +120,18 @@ namespace Assets
         void setAssetsRoot(const std::string& assetsRoot);
         const std::string& getAssetsRoot() const;
 
-        void registerAlias(const std::string& assetName, const std::string& assetPath);
+        void registerCanonicalAsset(const std::string& assetKey, const std::string& assetPath);
+        void registerAlias(const std::string& assetName, const std::string& assetPathOrAssetKey);
+        void registerAliases(
+            const std::string& canonicalAssetKey,
+            const std::vector<std::string>& aliases);
+
         bool hasAlias(const std::string& assetName) const;
         bool removeAlias(const std::string& assetName);
         void clearAliases();
+
+        std::string getRegisteredAssetPath(const std::string& assetNameOrPath) const;
+        std::string getPreferredAssetKeyForPath(const std::string& assetPath) const;
 
         LoadTextAssetResult loadTextAsset(const std::string& assetNameOrPath);
         LoadTextAssetResult reloadTextAsset(const std::string& assetNameOrPath);
@@ -149,6 +164,8 @@ namespace Assets
         {
             std::shared_ptr<TextObject> object;
             AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+            std::string requestedReference;
+            std::string assetKey;
             std::string requestedPath;
             std::string resolvedPath;
             std::string normalizedPath;
@@ -160,6 +177,8 @@ namespace Assets
         {
             std::shared_ptr<AsciiBannerFont> font;
             AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+            std::string requestedReference;
+            std::string assetKey;
             std::string requestedPath;
             std::string resolvedPath;
             std::string normalizedPath;
@@ -171,11 +190,20 @@ namespace Assets
         {
             std::shared_ptr<PseudoFont::FontDefinition> font;
             AssetPaths::AssetType assetType = AssetPaths::AssetType::Unknown;
+            std::string requestedReference;
+            std::string assetKey;
             std::string requestedPath;
             std::string resolvedPath;
             std::string normalizedPath;
             bool loadSucceeded = false;
             std::string errorMessage;
+        };
+
+        struct ResolvedAssetReference
+        {
+            std::string requestedReference;
+            std::string requestedPath;
+            std::string assetKey;
         };
 
         LoadTextAssetResult loadTextAssetInternal(const std::string& assetNameOrPath, bool forceReload);
@@ -185,23 +213,28 @@ namespace Assets
             bool forceReload);
 
         LoadTextAssetResult dispatchTextLoad(
-            const std::string& requestedPath,
+            const ResolvedAssetReference& reference,
             const AssetPaths::ResolutionResult& resolution);
 
         LoadBannerFontResult dispatchBannerFontLoad(
-            const std::string& requestedPath,
+            const ResolvedAssetReference& reference,
             const AssetPaths::ResolutionResult& resolution);
 
         LoadPseudoFontAssetResult dispatchPseudoFontLoad(
-            const std::string& requestedPath,
+            const ResolvedAssetReference& reference,
             const AssetPaths::ResolutionResult& resolution);
 
-        std::string resolveAssetReference(const std::string& assetNameOrPath) const;
+        ResolvedAssetReference resolveAssetReference(const std::string& assetNameOrPath) const;
+        std::string resolveAssetPathFromReference(const std::string& assetNameOrPath) const;
         std::string makeCacheKey(const std::string& assetNameOrPath) const;
+
+        static std::string normalizeAssetKey(const std::string& assetKey);
+        static std::string trimString(const std::string& value);
 
     private:
         AssetLibraryOptions m_options;
         std::unordered_map<std::string, std::string> m_aliases;
+        std::unordered_map<std::string, std::string> m_preferredAssetKeysByPath;
         std::unordered_map<std::string, TextCacheEntry> m_textAssetCache;
         std::unordered_map<std::string, BannerFontCacheEntry> m_bannerFontCache;
         std::unordered_map<std::string, PseudoFontCacheEntry> m_pseudoFontCache;

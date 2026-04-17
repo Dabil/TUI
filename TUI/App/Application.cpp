@@ -284,6 +284,25 @@ void Application::updateScreenCycle(double deltaTime)
 void Application::configureAssetLibrary()
 {
     m_assetLibrary.setAssetsRoot("Assets");
-    m_assetLibrary.registerAlias("banner.fireFontK", "Fonts/FIGlet/Fire Font-k.flf");
-    m_assetLibrary.registerAlias("pseudo.assemblyFont", "Fonts/pFont/AssembleBox.pfont");
+
+    // Preferred canonical keys
+    m_assetLibrary.registerCanonicalAsset(
+        "banner.fire_font_k",
+        "Fonts/FIGlet/Fire Font-k.flf");
+
+    m_assetLibrary.registerCanonicalAsset(
+        "pfont.assemble_box",
+        "Fonts/pFont/AssembleBox.pfont");
+
+    m_assetLibrary.registerAliases(
+        "banner.fire_font_k",
+        {
+            "banner.fireFontK"
+        });
+
+    m_assetLibrary.registerAliases(
+        "pfont.assemble_box",
+        {
+            "pseudo.assemblyFont"
+        });
 }

@@ -69,7 +69,7 @@ private:
     Assets::AssetLibrary& m_assetLibrary;
     PseudoFont::FontDefinition m_waterTitleFont;
     Rendering::LayeredTextObject m_waterTitleObject;
-    std::string m_tuiWaterLogoKey = "pseudo.assemblyFont";
+    std::string m_waterTitlePseudoFontKey = "pfont.assemble_box";
     std::string m_waterTitleLoadError;
     bool m_waterTitleLoadAttempted = false;
     bool m_waterTitleLoaded = false;

@@ -45,7 +45,7 @@ void FireScreen::onEnter()
     m_nextFireBuffer.clear();
     m_tuiFireLogoObject.clear();
 
-    m_fontResult = m_assetLibrary.loadBannerFontAsset(m_tuiFireLogoKey);
+    m_fontResult = m_assetLibrary.loadBannerFontAsset(m_fireBannerFontKey);
 
     if (!m_fontResult.success || !m_fontResult.hasFont())
     {
@@ -333,7 +333,8 @@ Style FireScreen::styleForIntensity(int intensity) const
 
     if (intensity <= 0)
     {
-        return style::Bg(black);
+        return style::Fg(Color::FromBasic(Color::Basic::Black))
+            + style::Bg(Color::FromBasic(Color::Basic::Black));
     }
 
     if (intensity <= 4)

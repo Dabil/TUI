@@ -406,7 +406,7 @@ void WaterEffectScreen::ensureWaterTitleLoaded()
     m_waterTitleLoadError.clear();
 
     const Assets::LoadPseudoFontAssetResult loadResult =
-        m_assetLibrary.loadPseudoFontAsset(m_tuiWaterLogoKey);
+        m_assetLibrary.loadPseudoFontAsset(m_waterTitlePseudoFontKey);
 
     if (!loadResult.success || !loadResult.hasFont())
     {
