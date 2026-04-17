@@ -293,16 +293,4 @@ void Application::configureAssetLibrary()
     m_assetLibrary.registerCanonicalAsset(
         "pfont.assemble_box",
         "Fonts/pFont/AssembleBox.pfont");
-
-    m_assetLibrary.registerAliases(
-        "banner.fire_font_k",
-        {
-            "banner.fireFontK"
-        });
-
-    m_assetLibrary.registerAliases(
-        "pfont.assemble_box",
-        {
-            "pseudo.assemblyFont"
-        });
 }
