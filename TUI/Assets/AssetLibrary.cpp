@@ -20,6 +20,14 @@ namespace
         return std::make_shared<PseudoFont::FontDefinition>(std::move(fontDefinition));
     }
 
+    XpArtLoader::XpFrameConversionOptions resolveXpFrameConversionOptions(
+        const Assets::AssetLibraryOptions& options)
+    {
+        XpArtLoader::XpFrameConversionOptions resolved = options.xpFrameConversionOptions;
+        resolved.loadOptions = options.xpLoadOptions;
+        return resolved;
+    }
+
     Assets::LoadTextAssetResult makeTextFailure(
         const std::string& requestedPath,
         const AssetPaths::ResolutionResult& resolution,
@@ -569,7 +577,7 @@ namespace Assets
             const XpArtLoader::LoadResult buildResult =
                 XpSequenceAccess::buildTextObjectFromDefaultFrame(
                     sequenceLoad.sequence,
-                    {});
+                    resolveXpFrameConversionOptions(m_options));
 
             if (!buildResult.success || !buildResult.object.isLoaded())
             {

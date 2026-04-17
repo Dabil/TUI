@@ -27,6 +27,7 @@ namespace Assets
         AnsiLoader::LoadOptions ansiOptions;
         BinaryArtLoader::LoadOptions binaryArtOptions;
         XpArtLoader::LoadOptions xpLoadOptions;
+        XpArtLoader::XpFrameConversionOptions xpFrameConversionOptions;
         XpSequenceAccess::SequenceLoadOptions xpSequenceOptions;
         AsciiBannerFontLoader::LoadOptions bannerFontLoadOptions;
         PseudoFont::LoadOptions pFontLoadOptions;
