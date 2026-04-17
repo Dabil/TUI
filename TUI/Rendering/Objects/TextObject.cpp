@@ -2,6 +2,7 @@
 
 #include <stdexcept>
 
+#include "Rendering/Composition/ObjectWriter.h"
 #include "Rendering/Objects/PlainTextLoader.h"
 #include "Rendering/Objects/TextObjectBlitter.h"
 #include "Rendering/Objects/TextObjectExporter.h"
@@ -145,9 +146,16 @@ void TextObject::draw(ScreenBuffer& target, int x, int y, const Style& overrideS
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const std::optional<Style>& overrideStyle) const
 {
-    TextObjectBlitter::BlitOptions options;
-    options.overrideStyle = overrideStyle;
-    TextObjectBlitter::blitToScreenBuffer(target, *this, x, y, options);
+    Composition::WritePolicy policy;
+    policy.glyphPolicy = Composition::GlyphPolicy::All;
+    policy.stylePolicy = Composition::StylePolicy::Apply;
+    policy.sourceMask = Composition::SourceMask::GlyphCellsOnly;
+    policy.glyphOverwriteRule = Composition::OverwriteRule::Always;
+    policy.styleOverwriteRule = Composition::OverwriteRule::Always;
+    policy.depthPolicy = Composition::DepthPolicy::Ignore;
+
+    Composition::ObjectWriter writer(target, x, y);
+    writer.writeObject(*this, policy, overrideStyle);
 }
 
 TextObject TextObject::buildFromLines(
