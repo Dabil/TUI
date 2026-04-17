@@ -28,10 +28,10 @@ namespace
     constexpr double WaterTitleReverseDurationSeconds = 1.0;
     constexpr double WaterTitleRepeatDelaySeconds = 10.0;
     constexpr double WaterTitleCycleDurationSeconds =
-                     WaterTitleAssembleDurationSeconds +
-                     WaterTitleHoldDurationSeconds +
-                     WaterTitleReverseDurationSeconds +
-                     WaterTitleRepeatDelaySeconds;
+        WaterTitleAssembleDurationSeconds +
+        WaterTitleHoldDurationSeconds +
+        WaterTitleReverseDurationSeconds +
+        WaterTitleRepeatDelaySeconds;
 
     constexpr char32_t toUpperAscii(char32_t c)
     {
@@ -199,7 +199,7 @@ void WaterEffectScreen::draw(Surface& surface)
     buffer.writeChar(startModeXpos, screenHeight - 1, U']', WaterColors::TitleColor);
 
     // TextObject fillPattern = ObjectFactory::makePatternFill(m_screenWidth, m_screenHeight, ObjectFactory::brickPattern(), WaterColors::BorderColor);
-    
+
 
     m_waveLeft = 3;
     m_waveTop = 2;
@@ -433,7 +433,7 @@ void WaterEffectScreen::rebuildWaterTitle()
         PseudoFont::LayeredRenderOptions::InitialVisibilityMode::AllHidden;
 
     m_waterTitleObject =
-        PseudoFont::generateLayeredTextObject(
+        BannerFactory::makeLayeredBannerObject(
             m_waterTitleFont,
             "WATER TUI",
             options);
