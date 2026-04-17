@@ -442,10 +442,10 @@ namespace Assets
         if (!forceReload)
         {
             const auto cacheIt = m_textAssetCache.find(cacheKey);
-            if (cacheIt != m_textAssetCache.end() && cacheIt->second.loadSucceeded)
+            if (cacheIt != m_textAssetCache.end())
             {
                 LoadTextAssetResult result;
-                result.success = true;
+                result.success = cacheIt->second.loadSucceeded;
                 result.fromCache = true;
                 result.asset.object = cacheIt->second.object;
                 result.asset.assetType = cacheIt->second.assetType;
@@ -455,6 +455,7 @@ namespace Assets
                 result.asset.resolvedPath = cacheIt->second.resolvedPath;
                 result.asset.normalizedPath = cacheIt->second.normalizedPath;
                 result.asset.cacheKey = cacheKey;
+                result.errorMessage = cacheIt->second.errorMessage;
                 return result;
             }
         }
@@ -514,10 +515,10 @@ namespace Assets
         if (!forceReload)
         {
             const auto cacheIt = m_bannerFontCache.find(cacheKey);
-            if (cacheIt != m_bannerFontCache.end() && cacheIt->second.loadSucceeded)
+            if (cacheIt != m_bannerFontCache.end())
             {
                 LoadBannerFontResult result;
-                result.success = true;
+                result.success = cacheIt->second.loadSucceeded;
                 result.fromCache = true;
                 result.asset.font = cacheIt->second.font;
                 result.asset.assetType = cacheIt->second.assetType;
@@ -527,6 +528,7 @@ namespace Assets
                 result.asset.resolvedPath = cacheIt->second.resolvedPath;
                 result.asset.normalizedPath = cacheIt->second.normalizedPath;
                 result.asset.cacheKey = cacheKey;
+                result.errorMessage = cacheIt->second.errorMessage;
                 return result;
             }
         }
@@ -587,10 +589,10 @@ namespace Assets
         if (!forceReload)
         {
             const auto cacheIt = m_pseudoFontCache.find(cacheKey);
-            if (cacheIt != m_pseudoFontCache.end() && cacheIt->second.loadSucceeded)
+            if (cacheIt != m_pseudoFontCache.end())
             {
                 LoadPseudoFontAssetResult result;
-                result.success = true;
+                result.success = cacheIt->second.loadSucceeded;
                 result.fromCache = true;
                 result.asset.font = cacheIt->second.font;
                 result.asset.assetType = cacheIt->second.assetType;
@@ -600,6 +602,7 @@ namespace Assets
                 result.asset.resolvedPath = cacheIt->second.resolvedPath;
                 result.asset.normalizedPath = cacheIt->second.normalizedPath;
                 result.asset.cacheKey = cacheKey;
+                result.errorMessage = cacheIt->second.errorMessage;
                 return result;
             }
         }
@@ -1010,3 +1013,4 @@ namespace Assets
         return value.substr(begin, end - begin);
     }
 }
+
