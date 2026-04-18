@@ -305,6 +305,7 @@ namespace ObjectFactory
 
     // Creates a decorative multi-glyph frame with a repeating pattern fill
     // placed in the interior region.
+    // remove these once TextObjectComposer is done
     TextObject makePatternFilledFrame(
         int width,
         int height,
