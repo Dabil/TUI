@@ -2,6 +2,7 @@
 
 #include <array>
 
+#include "Rendering/Composition/WritePolicyUtils.h"
 #include "Rendering/Composition/WritePresets.h"
 
 namespace
@@ -12,43 +13,6 @@ namespace
         int y = 0;
         const ScreenCell* cell = nullptr;
     };
-
-    bool isSourceLeadingCell(const TextObjectCell& cell)
-    {
-        return cell.kind == CellKind::Glyph || cell.kind == CellKind::Empty;
-    }
-
-    bool sourceMaskAllows(const TextObjectCell& cell, Composition::SourceMask mask)
-    {
-        switch (mask)
-        {
-        case Composition::SourceMask::GlyphCellsOnly:
-            return cell.kind == CellKind::Glyph;
-
-        case Composition::SourceMask::SpaceCellsOnly:
-            return cell.kind == CellKind::Empty;
-
-        case Composition::SourceMask::AllCells:
-        default:
-            return cell.kind == CellKind::Glyph || cell.kind == CellKind::Empty;
-        }
-    }
-
-    bool glyphPolicyAllows(const TextObjectCell& cell, Composition::GlyphPolicy policy)
-    {
-        switch (policy)
-        {
-        case Composition::GlyphPolicy::None:
-            return false;
-
-        case Composition::GlyphPolicy::NonSpaceOnly:
-            return cell.kind == CellKind::Glyph && cell.glyph != U' ';
-
-        case Composition::GlyphPolicy::All:
-        default:
-            return cell.kind == CellKind::Glyph || cell.kind == CellKind::Empty;
-        }
-    }
 
     const ScreenCell& resolveLogicalDestinationCell(const ScreenBuffer& target, int x, int y)
     {
@@ -281,12 +245,12 @@ namespace Composition
             for (int sourceX = 0; sourceX < source.getWidth(); ++sourceX)
             {
                 const TextObjectCell* sourceCell = source.tryGetCell(sourceX, sourceY);
-                if (sourceCell == nullptr || !isSourceLeadingCell(*sourceCell))
+                if (sourceCell == nullptr || !WritePolicyUtils::isSourceLeadingCell(*sourceCell))
                 {
                     continue;
                 }
 
-                if (!sourceMaskAllows(*sourceCell, policy.sourceMask))
+                if (!WritePolicyUtils::sourceMaskAllows(*sourceCell, policy.sourceMask))
                 {
                     continue;
                 }
@@ -313,7 +277,7 @@ namespace Composition
                 }
 
                 const bool canWriteGlyph =
-                    glyphPolicyAllows(*sourceCell, policy.glyphPolicy) &&
+                    WritePolicyUtils::glyphPolicyAllows(*sourceCell, policy.glyphPolicy) &&
                     overwriteRuleAllows(
                         m_target,
                         destinationX,

@@ -7,6 +7,7 @@ namespace Composition::WritePresets
 {
     WritePolicy solidObject(DepthPolicy depthPolicy = DepthPolicy::Ignore);
     WritePolicy visibleObject(DepthPolicy depthPolicy = DepthPolicy::Ignore);
+    WritePolicy transparentGlyphOverlay(DepthPolicy depthPolicy = DepthPolicy::Ignore);
     WritePolicy glyphsOnly(DepthPolicy depthPolicy = DepthPolicy::Ignore);
     WritePolicy styleMask(DepthPolicy depthPolicy = DepthPolicy::Ignore);
     WritePolicy styleBlock(DepthPolicy depthPolicy = DepthPolicy::Ignore);

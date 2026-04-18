@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Objects/TextObjectBuilder.h"
 #include "Rendering/ScreenBuffer.h"
@@ -12,7 +13,7 @@ namespace TextObjectBlitter
     struct BlitOptions
     {
         std::optional<Style> overrideStyle;
-        bool skipEmptyCells = true;
+        Composition::WritePolicy writePolicy = Composition::WritePresets::visibleObject();
         bool skipStructuralContinuationCells = true;
     };
 

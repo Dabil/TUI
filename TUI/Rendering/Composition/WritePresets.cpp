@@ -26,6 +26,18 @@ namespace Composition::WritePresets
         return policy;
     }
 
+    WritePolicy transparentGlyphOverlay(DepthPolicy depthPolicy)
+    {
+        WritePolicy policy;
+        policy.glyphPolicy = GlyphPolicy::NonSpaceOnly;
+        policy.stylePolicy = StylePolicy::Apply;
+        policy.sourceMask = SourceMask::GlyphCellsOnly;
+        policy.glyphOverwriteRule = OverwriteRule::Always;
+        policy.styleOverwriteRule = OverwriteRule::Always;
+        policy.depthPolicy = depthPolicy;
+        return policy;
+    }
+
     WritePolicy glyphsOnly(DepthPolicy depthPolicy)
     {
         WritePolicy policy;

@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Rendering/Composition/WritePolicy.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Text/TextTypes.h"
@@ -93,6 +94,19 @@ public:
     void draw(ScreenBuffer& target, int x, int y) const;
     void draw(ScreenBuffer& target, int x, int y, const Style& overrideStyle) const;
     void draw(ScreenBuffer& target, int x, int y, const std::optional<Style>& overrideStyle) const;
+    void draw(ScreenBuffer& target, int x, int y, const Composition::WritePolicy& writePolicy) const;
+    void draw(
+        ScreenBuffer& target,
+        int x,
+        int y,
+        const Composition::WritePolicy& writePolicy,
+        const Style& overrideStyle) const;
+    void draw(
+        ScreenBuffer& target,
+        int x,
+        int y,
+        const Composition::WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle) const;
 
 private:
     static TextObject buildFromLines(
@@ -117,4 +131,3 @@ private:
     bool m_hasAnyCellStyles = false;
     std::vector<TextObjectCell> m_cells;
 };
-
