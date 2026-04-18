@@ -1,41 +1,22 @@
 #include "Rendering/Composition/WritePolicy.h"
 
+#include "Rendering/Composition/WritePresets.h"
+
 namespace Composition
 {
     WritePolicy WritePolicy::ReplaceAll()
     {
-        WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::All;
-        policy.stylePolicy = StylePolicy::Apply;
-        policy.sourceMask = SourceMask::AllCells;
-        policy.glyphOverwriteRule = OverwriteRule::Always;
-        policy.styleOverwriteRule = OverwriteRule::Always;
-        policy.depthPolicy = DepthPolicy::Ignore;
-        return policy;
+        return WritePresets::solidObject();
     }
 
     WritePolicy WritePolicy::TransparentGlyphOverlay()
     {
-        WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::NonSpaceOnly;
-        policy.stylePolicy = StylePolicy::Apply;
-        policy.sourceMask = SourceMask::GlyphCellsOnly;
-        policy.glyphOverwriteRule = OverwriteRule::Always;
-        policy.styleOverwriteRule = OverwriteRule::Always;
-        policy.depthPolicy = DepthPolicy::Ignore;
-        return policy;
+        return WritePresets::transparentGlyphOverlay();
     }
 
     WritePolicy WritePolicy::StyleOnly()
     {
-        WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::None;
-        policy.stylePolicy = StylePolicy::Apply;
-        policy.sourceMask = SourceMask::AllCells;
-        policy.glyphOverwriteRule = OverwriteRule::Never;
-        policy.styleOverwriteRule = OverwriteRule::Always;
-        policy.depthPolicy = DepthPolicy::Ignore;
-        return policy;
+        return WritePresets::styleBlock();
     }
 
     WritePolicy WritePolicy::NoWrite()

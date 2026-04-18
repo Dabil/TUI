@@ -261,7 +261,7 @@ namespace Rendering
 
             TextObjectBlitter::BlitOptions blitOptions;
             blitOptions.overrideStyle = options.overrideStyle;
-            blitOptions.skipEmptyCells = true;
+            blitOptions.writePolicy = options.writePolicy;
             blitOptions.skipStructuralContinuationCells = false;
 
             TextObjectBlitter::blitToBuilder(
@@ -275,4 +275,3 @@ namespace Rendering
         return builder.build();
     }
 }
-

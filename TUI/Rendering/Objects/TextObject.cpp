@@ -3,6 +3,7 @@
 #include <stdexcept>
 
 #include "Rendering/Composition/ObjectWriter.h"
+#include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Objects/PlainTextLoader.h"
 #include "Rendering/Objects/TextObjectBlitter.h"
 #include "Rendering/Objects/TextObjectExporter.h"
@@ -136,18 +137,43 @@ const TextObjectCell* TextObject::tryGetCell(int x, int y) const
 
 void TextObject::draw(ScreenBuffer& target, int x, int y) const
 {
-    draw(target, x, y, std::nullopt);
+    draw(target, x, y, Composition::WritePresets::visibleObject(), std::nullopt);
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const Style& overrideStyle) const
 {
-    draw(target, x, y, std::optional<Style>(overrideStyle));
+    draw(target, x, y, Composition::WritePresets::visibleObject(), std::optional<Style>(overrideStyle));
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const std::optional<Style>& overrideStyle) const
 {
+    draw(target, x, y, Composition::WritePresets::visibleObject(), overrideStyle);
+}
+
+void TextObject::draw(ScreenBuffer& target, int x, int y, const Composition::WritePolicy& writePolicy) const
+{
+    draw(target, x, y, writePolicy, std::nullopt);
+}
+
+void TextObject::draw(
+    ScreenBuffer& target,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    const Style& overrideStyle) const
+{
+    draw(target, x, y, writePolicy, std::optional<Style>(overrideStyle));
+}
+
+void TextObject::draw(
+    ScreenBuffer& target,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    const std::optional<Style>& overrideStyle) const
+{
     Composition::ObjectWriter writer(target, x, y);
-    writer.writeVisibleObject(*this, overrideStyle);
+    writer.writeObject(*this, writePolicy, overrideStyle);
 }
 
 TextObject TextObject::buildFromLines(

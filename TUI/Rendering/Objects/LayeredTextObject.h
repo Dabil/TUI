@@ -5,6 +5,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"
 
@@ -38,6 +39,7 @@ namespace Rendering
         {
             bool visibleOnly = true;
             std::optional<Style> overrideStyle;
+            Composition::WritePolicy writePolicy = Composition::WritePresets::visibleObject();
         };
 
     public:
@@ -95,4 +97,3 @@ namespace Rendering
         std::vector<TextObjectLayer> m_layers;
     };
 }
-

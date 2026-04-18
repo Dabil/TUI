@@ -1,5 +1,9 @@
-#include "Rendering/Composition/ObjectWriter.h"
 #include "Rendering/Objects/TextObjectBlitter.h"
+
+#include <cassert>
+
+#include "Rendering/Composition/ObjectWriter.h"
+#include "Rendering/Composition/WritePolicyUtils.h"
 
 namespace
 {
@@ -7,11 +11,6 @@ namespace
         const TextObjectCell& cell,
         const TextObjectBlitter::BlitOptions& options)
     {
-        if (options.skipEmptyCells && cell.kind == CellKind::Empty)
-        {
-            return true;
-        }
-
         if (options.skipStructuralContinuationCells)
         {
             if (cell.kind == CellKind::WideTrailing)
@@ -55,12 +54,31 @@ namespace TextObjectBlitter
             return;
         }
 
+        assert(
+            Composition::WritePolicyUtils::isBuilderCompatible(options.writePolicy) &&
+            "TextObjectBlitter::blitToBuilder only supports glyph-writing overwrite policies.");
+
+        if (!Composition::WritePolicyUtils::isBuilderCompatible(options.writePolicy))
+        {
+            return;
+        }
+
         for (int y = 0; y < source.getHeight(); ++y)
         {
             for (int x = 0; x < source.getWidth(); ++x)
             {
                 const TextObjectCell* cell = source.tryGetCell(x, y);
                 if (cell == nullptr || shouldSkipCell(*cell, options))
+                {
+                    continue;
+                }
+
+                if (!Composition::WritePolicyUtils::sourceCellCanWriteGlyph(*cell, options.writePolicy))
+                {
+                    continue;
+                }
+
+                if (!Composition::WritePolicyUtils::sourceMaskAllows(*cell, options.writePolicy.sourceMask))
                 {
                     continue;
                 }
@@ -89,10 +107,16 @@ namespace TextObjectBlitter
 
                 case CellKind::WideTrailing:
                 case CellKind::CombiningContinuation:
-                    builder.setCell(destX, destY, cell->glyph, cell->kind, cell->width, styleToApply);
+                    if (!options.skipStructuralContinuationCells)
+                    {
+                        builder.setCell(destX, destY, cell->glyph, cell->kind, cell->width, styleToApply);
+                    }
                     break;
 
                 case CellKind::Empty:
+                    builder.setEmpty(destX, destY, styleToApply);
+                    break;
+
                 default:
                     break;
                 }
@@ -108,13 +132,6 @@ namespace TextObjectBlitter
         const BlitOptions& options)
     {
         Composition::ObjectWriter writer(target, offsetX, offsetY);
-
-        if (options.skipEmptyCells)
-        {
-            writer.writeVisibleObject(source, options.overrideStyle);
-            return;
-        }
-
-        writer.writeSolidObject(source, options.overrideStyle);
+        writer.writeObject(source, options.writePolicy, options.overrideStyle);
     }
 }
