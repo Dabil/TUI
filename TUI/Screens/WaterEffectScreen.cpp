@@ -5,13 +5,17 @@
 #include <cstdlib>
 
 #include "Core/Rect.h"
+#include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Surface.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/BannerThemes.h"
 #include "Rendering/Objects/BannerFactory.h"
+#include "Rendering/Objects/TextObjectComposer.h"
 #include "Rendering/Objects/TextObjectFactory.h"
+
+//TODO:: Seek and destroy unnecessary lambdas
 
 namespace
 {
@@ -73,6 +77,10 @@ namespace
 
 namespace WaterColors
 {
+    inline const Style BackGround =
+        style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+
     inline const Style TitleColor =
         style::Bold
         + style::Fg(Color::FromBasic(Color::Basic::White))
@@ -126,6 +134,11 @@ void WaterEffectScreen::onEnter()
     m_nextDropTime = randomRange(0.8, 2.0);
     m_nextRainModeChangeTime = randomRange(6.0, 12.0);
 
+    invalidateStaticUiCache();
+    invalidateModeBarCache();
+    invalidateMinimumScreenUiCache();
+    invalidateWaterTitleFallbackCache();
+
     ensureWaterTitleLoaded();
     rebuildWaterTitle();
     updateWaterTitleAnimation();
@@ -134,6 +147,7 @@ void WaterEffectScreen::onEnter()
 void WaterEffectScreen::onExit()
 {
     m_waterTitleObject.clear();
+    invalidateWaterTitleFallbackCache();
 }
 
 void WaterEffectScreen::update(double deltaTime)
@@ -160,57 +174,282 @@ void WaterEffectScreen::draw(Surface& surface)
 
     if (screenWidth < 30 || screenHeight < 12)
     {
-        buffer.writeString(1, 1, "WaterEffect needs a larger console window.", Themes::Warning);
+        ensureMinimumScreenUiCache();
+        m_minimumScreenUiObject.draw(buffer, 1, 1);
         return;
     }
 
-    TextObject outerFrame = ObjectFactory::makeFrame(screenWidth, screenHeight, ObjectFactory::roundedBorder());
-    TextObject innerFrame = ObjectFactory::makeFrame(screenWidth - 4, screenHeight - 2, ObjectFactory::roundedBorder());
+    ensureLayout(screenWidth, screenHeight);
+    ensureStaticUiCache();
+    ensureModeBarCache();
 
-    outerFrame.draw(buffer, 0, 0, WaterColors::BorderColor);
-    innerFrame.draw(buffer, 2, 1, WaterColors::BorderColor);
+    m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::solidObject());
+    m_modeBarObject.draw(buffer, 4, m_screenHeight - 1, Composition::WritePresets::solidObject());
 
-    buffer.writeString(4, 0, "[                         ]", WaterColors::TitleColor);
-    buffer.writeString(5, 0, " Rain Drops Water Effect ", WaterColors::TitleColorUnderlined);
+    renderWaveField(surface);
+    drawWaterTitle(buffer);
+}
 
-    int startModeXpos = 4;
+void WaterEffectScreen::ensureLayout(int screenWidth, int screenHeight)
+{
+    const int newWaveLeft = 3;
+    const int newWaveTop = 2;
+    const int newWaveWidth = std::max(0, screenWidth - 6);
+    const int newWaveHeight = std::max(0, screenHeight - 4);
 
-    buffer.writeString(startModeXpos, screenHeight - 1, "[ Mode:", WaterColors::TitleColor);
-    startModeXpos += 7;
+    const bool screenSizeChanged =
+        (screenWidth != m_screenWidth) ||
+        (screenHeight != m_screenHeight);
 
+    const bool simulationSizeChanged =
+        (newWaveWidth != m_waveWidth) ||
+        (newWaveHeight != m_waveHeight);
+
+    if (simulationSizeChanged)
+    {
+        ensureSimulationSize(newWaveWidth, newWaveHeight);
+    }
+
+    if (!screenSizeChanged &&
+        !simulationSizeChanged &&
+        newWaveLeft == m_waveLeft &&
+        newWaveTop == m_waveTop)
+    {
+        return;
+    }
+
+    m_screenWidth = screenWidth;
+    m_screenHeight = screenHeight;
+    m_waveLeft = newWaveLeft;
+    m_waveTop = newWaveTop;
+    m_waveWidth = newWaveWidth;
+    m_waveHeight = newWaveHeight;
+
+    invalidateStaticUiCache();
+    invalidateModeBarCache();
+}
+
+void WaterEffectScreen::invalidateStaticUiCache()
+{
+    m_staticUiDirty = true;
+}
+
+void WaterEffectScreen::invalidateModeBarCache()
+{
+    m_modeBarDirty = true;
+}
+
+void WaterEffectScreen::invalidateMinimumScreenUiCache()
+{
+    m_minimumScreenUiDirty = true;
+}
+
+void WaterEffectScreen::invalidateWaterTitleFallbackCache()
+{
+    m_waterTitleFallbackDirty = true;
+}
+
+void WaterEffectScreen::ensureStaticUiCache()
+{
+    if (!m_staticUiDirty)
+    {
+        return;
+    }
+
+    m_staticUiObject = buildStaticUiTextObject();
+    m_staticUiDirty = false;
+}
+
+void WaterEffectScreen::ensureModeBarCache()
+{
+    if (!m_modeBarDirty && m_cachedModeBarMode == m_rainMode)
+    {
+        return;
+    }
+
+    m_modeBarObject = buildModeBarTextObject();
+    m_cachedModeBarMode = m_rainMode;
+    m_modeBarDirty = false;
+}
+
+void WaterEffectScreen::ensureMinimumScreenUiCache()
+{
+    if (!m_minimumScreenUiDirty && !m_minimumScreenUiObject.isEmpty())
+    {
+        return;
+    }
+
+    m_minimumScreenUiObject = buildMinimumScreenTextObject();
+    m_minimumScreenUiDirty = false;
+}
+
+void WaterEffectScreen::ensureWaterTitleFallbackCache()
+{
+    const bool stateChanged =
+        (m_cachedWaterTitleLoaded != m_waterTitleLoaded) ||
+        (m_cachedWaterTitleLoadError != m_waterTitleLoadError);
+
+    if (!m_waterTitleFallbackDirty && !stateChanged)
+    {
+        return;
+    }
+
+    m_cachedWaterTitleLoaded = m_waterTitleLoaded;
+    m_cachedWaterTitleLoadError = m_waterTitleLoadError;
+    m_waterTitleFallbackObject = buildWaterTitleFallbackTextObject();
+    m_waterTitleFallbackDirty = false;
+}
+
+TextObject WaterEffectScreen::buildStaticUiTextObject() const
+{
+    if (m_screenWidth <= 0 || m_screenHeight <= 0)
+    {
+        return TextObject();
+    }
+
+    TextObjectComposer composer;
+
+    composer.addFilledRect(
+        0,
+        0,
+        m_screenWidth,
+        m_screenHeight,
+        U' ',
+        WaterColors::BackGround,
+        0,
+        "Background");
+    
+    composer.addFrame(
+        0,
+        0,
+        m_screenWidth,
+        m_screenHeight,
+        WaterColors::BorderColor,
+        ObjectFactory::roundedBorder(),
+        10,
+        "outerFrame");
+
+    composer.addFrame(
+        2,
+        1,
+        m_screenWidth - 4,
+        m_screenHeight - 2,
+        WaterColors::BorderColor,
+        ObjectFactory::roundedBorder(),
+        10,
+        "innerFrame");
+
+    composer.addTextUtf8(
+        "[                         ]",
+        4,
+        0,
+        WaterColors::TitleColor,
+        20,
+        "titleBarBack");
+
+    composer.addTextUtf8(
+        " Rain Drops Water Effect ",
+        5,
+        0,
+        WaterColors::TitleColorUnderlined,
+        21,
+        "titleBarText");
+       
+    TextObjectComposer::BuildTextObjectOptions options;
+    options.writePolicy = Composition::WritePresets::solidObject();
+    return composer.buildTextObject(options);
+}
+
+TextObject WaterEffectScreen::buildModeBarTextObject() const
+{
+    if (m_screenWidth <= 0 || m_screenHeight <= 0)
+    {
+        return TextObject();
+    }
+
+    const std::string modeText = currentModeTextUtf8();
+
+    TextObjectComposer composer;
+    composer.addTextUtf8(
+        "[ Mode:",
+        4,
+        0,
+        WaterColors::TitleColor,
+        10,
+        "modeBarPrefix");
+
+    composer.addTextUtf8(
+        modeText,
+        11,
+        0,
+        currentModeStyle(),
+        11,
+        "modeBarModeText");
+
+    composer.addGlyph(
+        U']',
+        11 + static_cast<int>(modeText.size()),
+        0,
+        WaterColors::TitleColor,
+        12,
+        "modeBarSuffix");
+
+    TextObjectComposer::BuildTextObjectOptions options;
+    options.writePolicy = Composition::WritePresets::solidObject();
+    return composer.buildTextObject(options);
+}
+
+TextObject WaterEffectScreen::buildMinimumScreenTextObject() const
+{
+    return TextObject::fromUtf8(
+        "WaterEffect needs a larger console window.",
+        Themes::Warning);
+}
+
+TextObject WaterEffectScreen::buildWaterTitleFallbackTextObject() const
+{
+    if (m_waterTitleLoaded || m_waterTitleLoadError.empty())
+    {
+        return TextObject();
+    }
+
+    return TextObject::fromUtf8(
+        "[Missing Assemble Box.pfont]",
+        WaterColors::WaterTitleLoadErrorColor);
+}
+
+std::string WaterEffectScreen::currentModeTextUtf8() const
+{
     switch (m_rainMode)
     {
     case RainMode::Sprinkle:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Sprinkle ", m_modeColor[int(RainMode::Sprinkle)]);
-        startModeXpos += 10;
-        break;
+        return " Sprinkle ";
 
     case RainMode::LightRain:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Light Rain ", m_modeColor[int(RainMode::LightRain)]);
-        startModeXpos += 12;
-        break;
+        return " Light Rain ";
 
     case RainMode::Pouring:
-        buffer.writeString(startModeXpos, screenHeight - 1, " Pouring ", m_modeColor[int(RainMode::Pouring)]);
-        startModeXpos += 9;
-        break;
+        return " Pouring ";
     }
 
-    buffer.writeChar(startModeXpos, screenHeight - 1, U']', WaterColors::TitleColor);
+    return " Sprinkle ";
+}
 
-    // TextObject fillPattern = ObjectFactory::makePatternFill(m_screenWidth, m_screenHeight, ObjectFactory::brickPattern(), WaterColors::BorderColor);
+Style WaterEffectScreen::currentModeStyle() const
+{
+    switch (m_rainMode)
+    {
+    case RainMode::Sprinkle:
+        return m_modeColor[static_cast<int>(RainMode::Sprinkle)];
 
+    case RainMode::LightRain:
+        return m_modeColor[static_cast<int>(RainMode::LightRain)];
 
-    m_waveLeft = 3;
-    m_waveTop = 2;
-    m_waveWidth = std::max(0, screenWidth - 6);
-    m_waveHeight = std::max(0, screenHeight - 4);
+    case RainMode::Pouring:
+        return m_modeColor[static_cast<int>(RainMode::Pouring)];
+    }
 
-    ensureSimulationSize(m_waveWidth, m_waveHeight);
-    renderWaveField(surface);
-
-    drawWaterTitle(buffer);
-    // fillPattern.draw(buffer, 0, 0);
+    return m_modeColor[static_cast<int>(RainMode::Sprinkle)];
 }
 
 void WaterEffectScreen::ensureSimulationSize(int width, int height)
@@ -235,6 +474,8 @@ void WaterEffectScreen::ensureSimulationSize(int width, int height)
     m_rainMode = RainMode::Sprinkle;
     m_nextDropTime = m_elapsedSeconds + randomRange(0.8, 2.0);
     m_nextRainModeChangeTime = m_elapsedSeconds + randomRange(6.0, 12.0);
+
+    invalidateModeBarCache();
 }
 
 void WaterEffectScreen::rebuildTextMask()
@@ -356,6 +597,7 @@ void WaterEffectScreen::updateRainTiming()
 
 void WaterEffectScreen::chooseNextRainMode()
 {
+    const RainMode previousMode = m_rainMode;
     const int roll = std::rand() % 100;
 
     if (roll < 50)
@@ -372,6 +614,11 @@ void WaterEffectScreen::chooseNextRainMode()
     {
         m_rainMode = RainMode::Pouring;
         m_nextRainModeChangeTime = m_elapsedSeconds + randomRange(4.0, 8.0);
+    }
+
+    if (m_rainMode != previousMode)
+    {
+        invalidateModeBarCache();
     }
 }
 
@@ -413,11 +660,13 @@ void WaterEffectScreen::ensureWaterTitleLoaded()
         m_waterTitleLoadError = loadResult.errorMessage.empty()
             ? std::string("Failed to load water title pFont asset.")
             : loadResult.errorMessage;
+        invalidateWaterTitleFallbackCache();
         return;
     }
 
     m_waterTitleFont = *loadResult.asset.font;
     m_waterTitleLoaded = true;
+    invalidateWaterTitleFallbackCache();
 }
 
 void WaterEffectScreen::rebuildWaterTitle()
@@ -532,12 +781,13 @@ void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer) const
 {
     if (!m_waterTitleLoaded)
     {
-        if (!m_waterTitleLoadError.empty())
+        const_cast<WaterEffectScreen*>(this)->ensureWaterTitleFallbackCache();
+
+        if (!m_waterTitleFallbackObject.isEmpty())
         {
-            const std::string errorText = "[Missing Assemble Box.pfont]";
-            const int x = std::max(1, (buffer.getWidth() - static_cast<int>(errorText.size())) / 2);
+            const int x = std::max(1, (buffer.getWidth() - m_waterTitleFallbackObject.getWidth()) / 2);
             const int y = std::max(2, (buffer.getHeight() / 3) - 1);
-            buffer.writeString(x, y, errorText, WaterColors::WaterTitleLoadErrorColor);
+            m_waterTitleFallbackObject.draw(buffer, x, y);
         }
 
         return;
@@ -554,7 +804,6 @@ void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer) const
 
     waterTitle.draw(buffer, x, y);
 }
-
 
 int WaterEffectScreen::index(int x, int y) const
 {

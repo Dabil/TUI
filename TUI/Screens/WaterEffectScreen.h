@@ -51,6 +51,27 @@ private:
     void hideWaterTitleLayers();
     void drawWaterTitle(ScreenBuffer& buffer) const;
 
+    // Static UI cache / layout related
+    void ensureLayout(int screenWidth, int screenHeight);
+
+    void invalidateStaticUiCache();
+    void invalidateModeBarCache();
+    void invalidateMinimumScreenUiCache();
+    void invalidateWaterTitleFallbackCache();
+
+    void ensureStaticUiCache();
+    void ensureModeBarCache();
+    void ensureMinimumScreenUiCache();
+    void ensureWaterTitleFallbackCache();
+
+    TextObject buildStaticUiTextObject() const;
+    TextObject buildModeBarTextObject() const;
+    TextObject buildMinimumScreenTextObject() const;
+    TextObject buildWaterTitleFallbackTextObject() const;
+
+    std::string currentModeTextUtf8() const;
+    Style currentModeStyle() const;
+
     // Simulation Related
     void ensureSimulationSize(int width, int height);
     void rebuildTextMask();
@@ -73,6 +94,24 @@ private:
     std::string m_waterTitleLoadError;
     bool m_waterTitleLoadAttempted = false;
     bool m_waterTitleLoaded = false;
+
+    // Retained static UI cache
+    int m_screenWidth = 0;
+    int m_screenHeight = 0;
+
+    bool m_staticUiDirty = true;
+    bool m_modeBarDirty = true;
+    bool m_minimumScreenUiDirty = true;
+    bool m_waterTitleFallbackDirty = true;
+
+    RainMode m_cachedModeBarMode = RainMode::Sprinkle;
+    bool m_cachedWaterTitleLoaded = false;
+    std::string m_cachedWaterTitleLoadError;
+
+    TextObject m_staticUiObject;
+    TextObject m_modeBarObject;
+    TextObject m_minimumScreenUiObject;
+    TextObject m_waterTitleFallbackObject;
 
     // Simulation related
     int m_waveLeft = 0;
