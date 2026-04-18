@@ -45,6 +45,26 @@ namespace
 
         return true;
     }
+
+    std::string makeLayerEntryBaseName(
+        std::string_view namePrefix,
+        const Rendering::TextObjectLayer& layer)
+    {
+        if (!namePrefix.empty())
+        {
+            std::string result(namePrefix);
+            result += "_";
+            result += layer.name.empty() ? "layer" : layer.name;
+            return result;
+        }
+
+        if (!layer.name.empty())
+        {
+            return layer.name;
+        }
+
+        return "layer";
+    }
 }
 
 void TextObjectComposer::clear()
@@ -75,7 +95,120 @@ TextObjectComposer& TextObjectComposer::addObject(
     std::string_view name,
     bool visible)
 {
-    return addResolvedEntry(EntryKind::Object, object, x, y, zIndex, name, visible);
+    return addResolvedEntry(
+        EntryKind::Object,
+        object,
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addObject(
+    const TextObject& object,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Object,
+        object,
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
+}
+
+TextObjectComposer& TextObjectComposer::addSolidObject(
+    const TextObject& object,
+    int x,
+    int y,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addObject(
+        object,
+        x,
+        y,
+        Composition::WritePresets::solidObject(),
+        zIndex,
+        name,
+        visible);
+}
+
+TextObjectComposer& TextObjectComposer::addVisibleObject(
+    const TextObject& object,
+    int x,
+    int y,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addObject(
+        object,
+        x,
+        y,
+        Composition::WritePresets::visibleObject(),
+        zIndex,
+        name,
+        visible);
+}
+
+TextObjectComposer& TextObjectComposer::addLayeredObject(
+    const Rendering::LayeredTextObject& object,
+    int x,
+    int y,
+    int zIndexBias,
+    std::string_view namePrefix,
+    bool visible)
+{
+    for (const Rendering::TextObjectLayer& layer : object.getLayers())
+    {
+        addResolvedEntry(
+            EntryKind::Object,
+            layer.object,
+            x + layer.offsetX,
+            y + layer.offsetY,
+            zIndexBias + layer.zIndex,
+            makeLayerEntryBaseName(namePrefix, layer),
+            visible && layer.visible,
+            std::nullopt);
+    }
+
+    return *this;
+}
+
+TextObjectComposer& TextObjectComposer::addLayeredObject(
+    const Rendering::LayeredTextObject& object,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    int zIndexBias,
+    std::string_view namePrefix,
+    bool visible)
+{
+    for (const Rendering::TextObjectLayer& layer : object.getLayers())
+    {
+        addResolvedEntry(
+            EntryKind::Object,
+            layer.object,
+            x + layer.offsetX,
+            y + layer.offsetY,
+            zIndexBias + layer.zIndex,
+            makeLayerEntryBaseName(namePrefix, layer),
+            visible && layer.visible,
+            writePolicy);
+    }
+
+    return *this;
 }
 
 TextObjectComposer& TextObjectComposer::addText(
@@ -86,7 +219,35 @@ TextObjectComposer& TextObjectComposer::addText(
     std::string_view name,
     bool visible)
 {
-    return addResolvedEntry(EntryKind::Text, TextObject::fromU32(text), x, y, zIndex, name, visible);
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromU32(text),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addText(
+    std::u32string_view text,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromU32(text),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addText(
@@ -98,7 +259,36 @@ TextObjectComposer& TextObjectComposer::addText(
     std::string_view name,
     bool visible)
 {
-    return addResolvedEntry(EntryKind::Text, TextObject::fromU32(text, style), x, y, zIndex, name, visible);
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromU32(text, style),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addText(
+    std::u32string_view text,
+    int x,
+    int y,
+    const Style& style,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromU32(text, style),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addTextUtf8(
@@ -109,7 +299,35 @@ TextObjectComposer& TextObjectComposer::addTextUtf8(
     std::string_view name,
     bool visible)
 {
-    return addResolvedEntry(EntryKind::Text, TextObject::fromUtf8(text), x, y, zIndex, name, visible);
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromUtf8(text),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addTextUtf8(
+    std::string_view text,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromUtf8(text),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addTextUtf8(
@@ -121,7 +339,36 @@ TextObjectComposer& TextObjectComposer::addTextUtf8(
     std::string_view name,
     bool visible)
 {
-    return addResolvedEntry(EntryKind::Text, TextObject::fromUtf8(text, style), x, y, zIndex, name, visible);
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromUtf8(text, style),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addTextUtf8(
+    std::string_view text,
+    int x,
+    int y,
+    const Style& style,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Text,
+        TextObject::fromUtf8(text, style),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addGlyph(
@@ -132,7 +379,35 @@ TextObjectComposer& TextObjectComposer::addGlyph(
     std::string_view name,
     bool visible)
 {
-    return addResolvedEntry(EntryKind::Glyph, makeGlyphObject(glyph, std::nullopt), x, y, zIndex, name, visible);
+    return addResolvedEntry(
+        EntryKind::Glyph,
+        makeGlyphObject(glyph, std::nullopt),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addGlyph(
+    char32_t glyph,
+    int x,
+    int y,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Glyph,
+        makeGlyphObject(glyph, std::nullopt),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addGlyph(
@@ -151,7 +426,29 @@ TextObjectComposer& TextObjectComposer::addGlyph(
         y,
         zIndex,
         name,
-        visible);
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addGlyph(
+    char32_t glyph,
+    int x,
+    int y,
+    const Style& style,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Glyph,
+        makeGlyphObject(glyph, std::optional<Style>(style)),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addFrame(
@@ -171,7 +468,30 @@ TextObjectComposer& TextObjectComposer::addFrame(
         y,
         zIndex,
         name,
-        visible);
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addFrame(
+    int x,
+    int y,
+    int width,
+    int height,
+    const ObjectFactory::BorderGlyphs& border,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Frame,
+        makeTransparentFrameObject(width, height, border, std::nullopt),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addFrame(
@@ -185,14 +505,81 @@ TextObjectComposer& TextObjectComposer::addFrame(
     std::string_view name,
     bool visible)
 {
-    // A styled retained frame is a fully-authored rectangular object.
-    // Using ObjectFactory::makeFrame(...) ensures interior authored spaces carry
-    // the style/background payload instead of collapsing back to a transparent border shell.
     return addResolvedEntry(
         EntryKind::Frame,
         ObjectFactory::makeFrame(width, height, style, border),
         x,
         y,
+        zIndex,
+        name,
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addFrame(
+    int x,
+    int y,
+    int width,
+    int height,
+    const Style& style,
+    const ObjectFactory::BorderGlyphs& border,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::Frame,
+        ObjectFactory::makeFrame(width, height, style, border),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
+}
+
+TextObjectComposer& TextObjectComposer::addSolidFrame(
+    int x,
+    int y,
+    int width,
+    int height,
+    const Style& style,
+    const ObjectFactory::BorderGlyphs& border,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addFrame(
+        x,
+        y,
+        width,
+        height,
+        style,
+        border,
+        Composition::WritePresets::solidObject(),
+        zIndex,
+        name,
+        visible);
+}
+
+TextObjectComposer& TextObjectComposer::addVisibleFrame(
+    int x,
+    int y,
+    int width,
+    int height,
+    const ObjectFactory::BorderGlyphs& border,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addFrame(
+        x,
+        y,
+        width,
+        height,
+        border,
+        Composition::WritePresets::visibleObject(),
         zIndex,
         name,
         visible);
@@ -215,7 +602,30 @@ TextObjectComposer& TextObjectComposer::addFilledRect(
         y,
         zIndex,
         name,
-        visible);
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addFilledRect(
+    int x,
+    int y,
+    int width,
+    int height,
+    char32_t fillGlyph,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::FilledRect,
+        ObjectFactory::makeFilledRect(width, height, fillGlyph),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObjectComposer& TextObjectComposer::addFilledRect(
@@ -236,7 +646,31 @@ TextObjectComposer& TextObjectComposer::addFilledRect(
         y,
         zIndex,
         name,
-        visible);
+        visible,
+        std::nullopt);
+}
+
+TextObjectComposer& TextObjectComposer::addFilledRect(
+    int x,
+    int y,
+    int width,
+    int height,
+    char32_t fillGlyph,
+    const Style& style,
+    const Composition::WritePolicy& writePolicy,
+    int zIndex,
+    std::string_view name,
+    bool visible)
+{
+    return addResolvedEntry(
+        EntryKind::FilledRect,
+        ObjectFactory::makeFilledRect(width, height, fillGlyph, style),
+        x,
+        y,
+        zIndex,
+        name,
+        visible,
+        writePolicy);
 }
 
 TextObject TextObjectComposer::buildTextObject() const
@@ -264,7 +698,9 @@ TextObject TextObjectComposer::buildTextObject(const BuildTextObjectOptions& opt
 
         TextObjectBlitter::BlitOptions blitOptions;
         blitOptions.overrideStyle = options.overrideStyle;
-        blitOptions.writePolicy = options.writePolicy;
+        blitOptions.writePolicy = entry->writePolicy.has_value()
+            ? *entry->writePolicy
+            : options.writePolicy;
         blitOptions.skipStructuralContinuationCells = false;
 
         TextObjectBlitter::blitToBuilder(
@@ -323,7 +759,8 @@ TextObjectComposer& TextObjectComposer::addResolvedEntry(
     int y,
     int zIndex,
     std::string_view name,
-    bool visible)
+    bool visible,
+    const std::optional<Composition::WritePolicy>& writePolicy)
 {
     Entry entry;
     entry.kind = kind;
@@ -332,6 +769,7 @@ TextObjectComposer& TextObjectComposer::addResolvedEntry(
     entry.offsetY = y;
     entry.zIndex = zIndex;
     entry.visible = visible;
+    entry.writePolicy = writePolicy;
     entry.object = object;
 
     m_entries.push_back(std::move(entry));

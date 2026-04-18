@@ -32,6 +32,7 @@ public:
         int offsetY = 0;
         int zIndex = 0;
         bool visible = true;
+        std::optional<Composition::WritePolicy> writePolicy;
         TextObject object;
     };
 
@@ -39,8 +40,7 @@ public:
     {
         bool visibleOnly = true;
         std::optional<Style> overrideStyle;
-        // Retained composition should preserve the full authored source surface by default.
-        // Callers that want transparent overlay behavior can still pass visibleObject().
+        // Legacy/default fallback used when an entry did not specify its own policy.
         Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
     };
 
@@ -67,6 +67,48 @@ public:
         std::string_view name = {},
         bool visible = true);
 
+    TextObjectComposer& addObject(
+        const TextObject& object,
+        int x,
+        int y,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addSolidObject(
+        const TextObject& object,
+        int x,
+        int y,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addVisibleObject(
+        const TextObject& object,
+        int x,
+        int y,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addLayeredObject(
+        const Rendering::LayeredTextObject& object,
+        int x,
+        int y,
+        int zIndexBias = 0,
+        std::string_view namePrefix = {},
+        bool visible = true);
+
+    TextObjectComposer& addLayeredObject(
+        const Rendering::LayeredTextObject& object,
+        int x,
+        int y,
+        const Composition::WritePolicy& writePolicy,
+        int zIndexBias = 0,
+        std::string_view namePrefix = {},
+        bool visible = true);
+
     TextObjectComposer& addText(
         std::u32string_view text,
         int x,
@@ -79,7 +121,26 @@ public:
         std::u32string_view text,
         int x,
         int y,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addText(
+        std::u32string_view text,
+        int x,
+        int y,
         const Style& style,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addText(
+        std::u32string_view text,
+        int x,
+        int y,
+        const Style& style,
+        const Composition::WritePolicy& writePolicy,
         int zIndex = 0,
         std::string_view name = {},
         bool visible = true);
@@ -96,7 +157,26 @@ public:
         std::string_view text,
         int x,
         int y,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addTextUtf8(
+        std::string_view text,
+        int x,
+        int y,
         const Style& style,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addTextUtf8(
+        std::string_view text,
+        int x,
+        int y,
+        const Style& style,
+        const Composition::WritePolicy& writePolicy,
         int zIndex = 0,
         std::string_view name = {},
         bool visible = true);
@@ -113,7 +193,26 @@ public:
         char32_t glyph,
         int x,
         int y,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addGlyph(
+        char32_t glyph,
+        int x,
+        int y,
         const Style& style,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addGlyph(
+        char32_t glyph,
+        int x,
+        int y,
+        const Style& style,
+        const Composition::WritePolicy& writePolicy,
         int zIndex = 0,
         std::string_view name = {},
         bool visible = true);
@@ -133,7 +232,51 @@ public:
         int y,
         int width,
         int height,
+        const ObjectFactory::BorderGlyphs& border,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addFrame(
+        int x,
+        int y,
+        int width,
+        int height,
         const Style& style,
+        const ObjectFactory::BorderGlyphs& border = ObjectFactory::asciiBorder(),
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addFrame(
+        int x,
+        int y,
+        int width,
+        int height,
+        const Style& style,
+        const ObjectFactory::BorderGlyphs& border,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addSolidFrame(
+        int x,
+        int y,
+        int width,
+        int height,
+        const Style& style,
+        const ObjectFactory::BorderGlyphs& border = ObjectFactory::asciiBorder(),
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addVisibleFrame(
+        int x,
+        int y,
+        int width,
+        int height,
         const ObjectFactory::BorderGlyphs& border = ObjectFactory::asciiBorder(),
         int zIndex = 0,
         std::string_view name = {},
@@ -155,7 +298,30 @@ public:
         int width,
         int height,
         char32_t fillGlyph,
+        const Composition::WritePolicy& writePolicy,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addFilledRect(
+        int x,
+        int y,
+        int width,
+        int height,
+        char32_t fillGlyph,
         const Style& style,
+        int zIndex = 0,
+        std::string_view name = {},
+        bool visible = true);
+
+    TextObjectComposer& addFilledRect(
+        int x,
+        int y,
+        int width,
+        int height,
+        char32_t fillGlyph,
+        const Style& style,
+        const Composition::WritePolicy& writePolicy,
         int zIndex = 0,
         std::string_view name = {},
         bool visible = true);
@@ -194,7 +360,8 @@ private:
         int y,
         int zIndex,
         std::string_view name,
-        bool visible);
+        bool visible,
+        const std::optional<Composition::WritePolicy>& writePolicy);
 
     std::string makeUniqueEntryName(std::string_view requestedName, EntryKind kind) const;
 
