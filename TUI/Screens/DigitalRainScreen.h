@@ -6,12 +6,12 @@
 #include <vector>
 
 #include "Screens/Screen.h"
-#include "Rendering/Styles/Style.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
+#include "Rendering/Objects/TextObject.h"
+#include "Rendering/Styles/Style.h"
 
 class Surface;
 class ScreenBuffer;
-
 
 class DigitalRainScreen : public Screen
 {
@@ -49,6 +49,11 @@ private:
     static std::u32string buildGlyphPoolForHost(TerminalHostKind hostKind);
 
     void ensureLayout(int screenWidth, int screenHeight);
+    void ensureStaticUiCache();
+    void ensureMinimumScreenUiCache(int screenWidth, int screenHeight);
+    void invalidateStaticUiCache();
+    void invalidateMinimumScreenUiCache();
+
     void rebuildStreams();
     void resetStream(Stream& stream, bool staggerStart);
     void configureActiveStream(Stream& stream);
@@ -57,8 +62,14 @@ private:
     void spawnDeadGlyphs(double deltaTime);
 
     void drawRain(ScreenBuffer& buffer) const;
-    void drawOverlay(ScreenBuffer& buffer) const;
     void drawPreviewLine(ScreenBuffer& buffer, int x, int y, int availableWidth, int startIndex) const;
+
+    TextObject buildStaticUiTextObject() const;
+    TextObject buildMinimumScreenTextObject(int screenWidth, int screenHeight) const;
+
+    std::u32string buildTitleText() const;
+    std::u32string buildFooterDescriptionText() const;
+    bool usesConsoleFooter() const;
 
     int countActiveStreams() const;
 
@@ -93,6 +104,16 @@ private:
     Style m_labelStyle;
     Style m_previewStyle;
     Style m_borderStyle;
+
+    bool m_staticUiDirty = true;
+    bool m_minimumScreenUiDirty = true;
+    int m_minimumScreenUiWidth = 0;
+    int m_minimumScreenUiHeight = 0;
+    bool m_cachedConsoleFooter = false;
+    std::u32string m_cachedTitleText;
+    std::u32string m_cachedFooterDescriptionText;
+    TextObject m_staticUiObject;
+    TextObject m_minimumScreenUiObject;
 
     std::mt19937 m_rng;
 };

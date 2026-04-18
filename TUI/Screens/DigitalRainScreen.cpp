@@ -6,6 +6,8 @@
 #include <utility>
 
 #include "Core/Rect.h"
+#include "Rendering/Composition/WritePresets.h"
+#include "Rendering/Objects/TextObjectComposer.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/StyleBuilder.h"
@@ -19,7 +21,7 @@
 //  add BrightBlack digital drops
 
 namespace
-{   
+{
     constexpr char32_t RabbitGlyph = U'\U0001F407';
 
     constexpr int MinimumScreenWidth = 48;
@@ -41,13 +43,6 @@ namespace
 
     std::vector<DeadGlyph> m_deadGlyphs;
     double m_deadGlyphSpawnAccumulator = 0.0;
-
-    enum class DropComposition
-    {
-        BrightWhiteWhite,   // 25%
-        WhiteOnly,          // 25%
-        GreenOnly           // 50%
-    };
 }
 
 std::u32string DigitalRainScreen::buildConsoleGlyphPool()
@@ -76,8 +71,7 @@ std::u32string DigitalRainScreen::buildTerminalGlyphPool()
         U"エェケセテネヘメレヱゲゼデベペ"
         U"オォコソトノホモヨョロヲゴゾドボポヴッン"
         U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
-        U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           //  greek alphabet 
-        // U"♔♕♖♗♘♙♚♛♜♝♞♟"                // chess pieces
+        U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           // greek alphabet
         U"♪♫⌘₿äü∄∃ƒ±£µℇ")
         + std::u32string(1, RabbitGlyph);
 }
@@ -157,6 +151,9 @@ void DigitalRainScreen::onEnter()
     m_previewAdvanceTimer = 0.0;
     m_previewOffset = 0;
     m_streams.clear();
+
+    invalidateStaticUiCache();
+    invalidateMinimumScreenUiCache();
 }
 
 void DigitalRainScreen::update(double deltaTime)
@@ -182,48 +179,26 @@ void DigitalRainScreen::draw(Surface& surface)
 
     if (screenWidth < MinimumScreenWidth || screenHeight < MinimumScreenHeight)
     {
-        buffer.fillRect(
-            Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-            U' ',
-            m_backgroundStyle);
-
-        buffer.drawFrame(
-            Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } }, 
-            m_borderStyle,
-            U'╔', U'╗', U'╚', U'╝', U'═', U'║');
-
-        buffer.writeString(2, 1, "Digital Rain needs a larger console window.", Themes::Warning);
-        buffer.writeString(2, 3, "Recommended: at least 48 x 14.", Themes::Subtitle);
+        ensureMinimumScreenUiCache(screenWidth, screenHeight);
+        m_minimumScreenUiObject.draw(buffer, 0, 0, Composition::WritePresets::solidObject());
         return;
     }
 
     ensureLayout(screenWidth, screenHeight);
+    ensureStaticUiCache();
 
-    buffer.fillRect(
-        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        U' ',
-        m_backgroundStyle);
-
+    m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::solidObject());
     drawRain(buffer);
 
-    buffer.drawFrame(
-        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        m_borderStyle,
-        U'╔', U'╗', U'╚', U'╝', U'═', U'║');
-
-    buffer.drawFrame(
-        Rect{ Point{ 2, 1 }, Size{ screenWidth - 4, screenHeight - 2 - FooterRows} },
-        m_tailStyle,
-        U'┌', U'┐', U'└', U'┘', U'─', U'│');
-
-    drawOverlay(buffer);
+    const int footerLabelY = m_screenHeight - 3;
+    drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
 }
 
 void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
 {
     const int newRainLeft = 3;
     const int newRainTop = 2;
-    const int newRainWidth = std::max(0, screenWidth - 6);
+    const int newRainWidth = std::max(0, screenWidth - 7);
     const int newRainHeight = std::max(0, screenHeight - 4 - FooterRows);
 
     if (screenWidth == m_screenWidth &&
@@ -241,7 +216,188 @@ void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
     m_rainWidth = newRainWidth;
     m_rainHeight = newRainHeight;
 
+    invalidateStaticUiCache();
     rebuildStreams();
+}
+
+void DigitalRainScreen::ensureStaticUiCache()
+{
+    const std::u32string titleText = buildTitleText();
+    const std::u32string footerDescriptionText = buildFooterDescriptionText();
+    const bool consoleFooter = usesConsoleFooter();
+
+    const bool contentChanged =
+        (m_cachedTitleText != titleText) ||
+        (m_cachedFooterDescriptionText != footerDescriptionText) ||
+        (m_cachedConsoleFooter != consoleFooter);
+
+    if (!m_staticUiDirty && !contentChanged)
+    {
+        return;
+    }
+
+    m_cachedTitleText = titleText;
+    m_cachedFooterDescriptionText = footerDescriptionText;
+    m_cachedConsoleFooter = consoleFooter;
+    m_staticUiObject = buildStaticUiTextObject();
+    m_staticUiDirty = false;
+}
+
+void DigitalRainScreen::ensureMinimumScreenUiCache(int screenWidth, int screenHeight)
+{
+    if (!m_minimumScreenUiDirty &&
+        screenWidth == m_minimumScreenUiWidth &&
+        screenHeight == m_minimumScreenUiHeight)
+    {
+        return;
+    }
+
+    m_minimumScreenUiWidth = screenWidth;
+    m_minimumScreenUiHeight = screenHeight;
+    m_minimumScreenUiObject = buildMinimumScreenTextObject(screenWidth, screenHeight);
+    m_minimumScreenUiDirty = false;
+}
+
+void DigitalRainScreen::invalidateStaticUiCache()
+{
+    m_staticUiDirty = true;
+}
+
+void DigitalRainScreen::invalidateMinimumScreenUiCache()
+{
+    m_minimumScreenUiDirty = true;
+}
+
+TextObject DigitalRainScreen::buildStaticUiTextObject() const
+{
+    if (m_screenWidth <= 0 || m_screenHeight <= 0)
+    {
+        return TextObject();
+    }
+
+    TextObjectComposer composer;
+    composer.addFilledRect(0, 0, m_screenWidth, m_screenHeight, U' ', m_backgroundStyle, 0, "background");
+    composer.addFrame(
+        0,
+        0,
+        m_screenWidth,
+        m_screenHeight,
+        m_borderStyle,
+        ObjectFactory::doubleLineBorder(),
+        10,
+        "outerFrame");
+    composer.addFrame(
+        2,
+        1,
+        m_screenWidth - 4,
+        m_screenHeight - 2 - FooterRows,
+        m_tailStyle,
+        ObjectFactory::singleLineBorder(),
+        10,
+        "innerFrame");
+    composer.addText(buildTitleText(), 4, 0, m_titleStyle, 20, "title");
+
+    const int footerLabelY = m_screenHeight - 3;
+    const int footerPreviewY = m_screenHeight - 2;
+
+    composer.addText(U"Pool", 2, footerLabelY, m_labelStyle, 20, "poolLabel");
+    composer.addGlyph(U':', 6, footerLabelY, m_headStyle, 20, "poolColon");
+
+    if (usesConsoleFooter())
+    {
+        composer.addText(U"Sample:", 2, footerPreviewY, m_labelStyle, 20, "sampleLabel");
+        composer.addGlyph(U'█', 10, footerPreviewY, m_previewStyle, 20, "sampleGlyph1");
+        composer.addGlyph(U'◆', 12, footerPreviewY, m_previewStyle, 20, "sampleGlyph2");
+        composer.addGlyph(U'╬', 14, footerPreviewY, m_previewStyle, 20, "sampleGlyph3");
+        composer.addGlyph(U'↑', 16, footerPreviewY, m_previewStyle, 20, "sampleGlyph4");
+        composer.addGlyph(U'△', 18, footerPreviewY, m_previewStyle, 20, "sampleGlyph5");
+        composer.addText(buildFooterDescriptionText(), 21, footerPreviewY, m_labelStyle, 20, "footerDescription");
+    }
+    else
+    {
+        composer.addGlyph(U'ア', 10, footerPreviewY, m_previewStyle, 20, "sampleGlyph1");
+        composer.addGlyph(U'♔', 12, footerPreviewY, m_previewStyle, 20, "sampleGlyph2");
+        composer.addGlyph(U'₿', 14, footerPreviewY, m_previewStyle, 20, "sampleGlyph3");
+        composer.addGlyph(U'♪', 16, footerPreviewY, m_previewStyle, 20, "sampleGlyph4");
+        composer.addGlyph(RabbitGlyph, 18, footerPreviewY, m_previewStyle, 20, "sampleGlyph5");
+        composer.addText(buildFooterDescriptionText(), 21, footerPreviewY, m_labelStyle, 20, "footerDescription");
+    }
+
+    TextObjectComposer::BuildTextObjectOptions options;
+    options.writePolicy = Composition::WritePresets::solidObject();
+    return composer.buildTextObject(options);
+}
+
+TextObject DigitalRainScreen::buildMinimumScreenTextObject(int screenWidth, int screenHeight) const
+{
+    if (screenWidth <= 0 || screenHeight <= 0)
+    {
+        return TextObject();
+    }
+
+    TextObjectComposer composer;
+    composer.addFilledRect(0, 0, screenWidth, screenHeight, U' ', m_backgroundStyle, 0, "background");
+    composer.addFrame(
+        0,
+        0,
+        screenWidth,
+        screenHeight,
+        m_borderStyle,
+        ObjectFactory::doubleLineBorder(),
+        10,
+        "outerFrame");
+    composer.addTextUtf8(
+        "Digital Rain needs a larger console window.",
+        2,
+        1,
+        Themes::Warning,
+        20,
+        "warningText");
+    composer.addTextUtf8(
+        "Recommended: at least 48 x 14.",
+        2,
+        3,
+        Themes::Subtitle,
+        20,
+        "recommendationText");
+
+    TextObjectComposer::BuildTextObjectOptions options;
+    options.writePolicy = Composition::WritePresets::solidObject();
+    return composer.buildTextObject(options);
+}
+
+std::u32string DigitalRainScreen::buildTitleText() const
+{
+    return U"[ Digital Rain Unicode Validation ]";
+}
+
+std::u32string DigitalRainScreen::buildFooterDescriptionText() const
+{
+    if (usesConsoleFooter())
+    {
+        return U"Console-safe fallback glyphs active";
+    }
+
+    return U"Katakana + chess + music + rabbit + math";
+}
+
+bool DigitalRainScreen::usesConsoleFooter() const
+{
+    switch (m_hostKind)
+    {
+    case TerminalHostKind::ClassicConsoleWindow:
+    case TerminalHostKind::RedirectedOrPipe:
+    case TerminalHostKind::Unknown:
+        return true;
+
+    case TerminalHostKind::WindowsTerminal:
+    case TerminalHostKind::VsCodeIntegratedTerminal:
+    case TerminalHostKind::ConEmu:
+    case TerminalHostKind::Mintty:
+    case TerminalHostKind::OtherTerminalHost:
+    default:
+        return false;
+    }
 }
 
 void DigitalRainScreen::rebuildStreams()
@@ -504,40 +660,6 @@ void DigitalRainScreen::drawRain(ScreenBuffer& buffer) const
             buffer.writeCodePoint(m_rainLeft + column, m_rainTop + y, glyph, style);
         }
     }
-}
-
-void DigitalRainScreen::drawOverlay(ScreenBuffer& buffer) const
-{
-    buffer.writeString(4, 0, "[ Digital Rain Unicode Validation ]", m_titleStyle);
-
-    const int footerLabelY = m_screenHeight - 3;
-    const int footerPreviewY = m_screenHeight - 2;
-    
-    buffer.writeString(2, footerLabelY, "Pool", m_labelStyle);
-    buffer.writeChar(6, footerLabelY, ':', m_headStyle);
-    drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
-    
-    // Use this footer for console
-    /*
-    buffer.writeString(2, footerPreviewY, "Sample:", m_labelStyle);
-
-    buffer.writeCodePoint(10, footerPreviewY, U'█', m_previewStyle);
-    buffer.writeCodePoint(12, footerPreviewY, U'◆', m_previewStyle);
-    buffer.writeCodePoint(14, footerPreviewY, U'╬', m_previewStyle);
-    buffer.writeCodePoint(16, footerPreviewY, U'↑', m_previewStyle);
-    buffer.writeCodePoint(18, footerPreviewY, U'△', m_previewStyle);
-
-    buffer.writeString(21, footerPreviewY, "Console-safe fallback glyphs active", m_labelStyle);
-    */
-    // Use this footer for Terminal
-    
-    buffer.writeCodePoint(10, footerPreviewY, U'ア', m_previewStyle);
-    buffer.writeCodePoint(12, footerPreviewY, U'♔', m_previewStyle);
-    buffer.writeCodePoint(14, footerPreviewY, U'₿', m_previewStyle);
-    buffer.writeCodePoint(16, footerPreviewY, U'♪', m_previewStyle);
-    buffer.writeCodePoint(18, footerPreviewY, RabbitGlyph, m_previewStyle);
-
-    buffer.writeString(21, footerPreviewY, "Katakana + chess + music + rabbit + math", m_labelStyle);
 }
 
 void DigitalRainScreen::drawPreviewLine(ScreenBuffer& buffer, int x, int y, int availableWidth, int startIndex) const
