@@ -304,7 +304,7 @@ namespace ObjectFactory
         const Style& style);
 
     // Creates a decorative multi-glyph frame with a repeating pattern fill
-// placed in the interior region.
+    // placed in the interior region.
     TextObject makePatternFilledFrame(
         int width,
         int height,
