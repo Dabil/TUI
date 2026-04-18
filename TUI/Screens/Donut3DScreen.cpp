@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Core/Rect.h"
+#include "Rendering/Objects/TextObjectFactory.h"
 #include "Rendering/Surface.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
@@ -26,6 +27,9 @@ namespace
     constexpr float RotationBSpeed = 0.45f;
 
     constexpr float SizeScale = 0.25f;
+
+    constexpr int MinimumScreenWidth = 30;
+    constexpr int MinimumScreenHeight = 12;
 
     constexpr char32_t LuminanceRamp[] = U".,-~:;=!*#$@";
     constexpr int LuminanceRampCount = static_cast<int>((sizeof(LuminanceRamp) / sizeof(LuminanceRamp[0])) - 1);
@@ -60,6 +64,8 @@ void Donut3DScreen::onEnter()
     m_elapsedSeconds = 0.0;
     m_rotationA = 0.0f;
     m_rotationB = 0.0f;
+
+    invalidateStaticUiCache();
 }
 
 void Donut3DScreen::update(double deltaTime)
@@ -87,11 +93,17 @@ void Donut3DScreen::draw(Surface& surface)
     const int screenWidth = buffer.getWidth();
     const int screenHeight = buffer.getHeight();
 
-    if (screenWidth < 30 || screenHeight < 12)
+    ensureStaticUiCache(screenWidth, screenHeight);
+
+    if (isBelowMinimumScreenSize(screenWidth, screenHeight))
     {
-        buffer.writeString(1, 1, "3D Donut needs a larger console window.", Themes::Warning);
+        m_minimumSizeWarningObject.draw(buffer, m_warningX, m_warningY);
         return;
     }
+
+    m_outerFrameObject.draw(buffer, 0, 0);
+    m_titleObject.draw(buffer, m_titleX, m_titleY);
+    m_footerObject.draw(buffer, m_footerX, m_footerY);
 
     const int viewportLeft = 1;
     const int viewportTop = 1;
@@ -99,13 +111,6 @@ void Donut3DScreen::draw(Surface& surface)
     const int viewportHeight = std::max(0, screenHeight - 2);
 
     renderDonut(surface, viewportLeft, viewportTop, viewportWidth, viewportHeight);
-
-    buffer.drawFrame(
-        Rect{ Point{ 0, 0 }, Size{ screenWidth, screenHeight } },
-        Themes::Background);
-
-    buffer.writeString(4, 0, "[ 3D ASCII Donut ]", Themes::Subtitle);
-    buffer.writeString(4, screenHeight - 1, "[ Hue Cycle + Depth Shading + Floor Shadow ]", Themes::Subtitle);
 }
 
 void Donut3DScreen::ensureBuffers(int width, int height)
@@ -129,6 +134,96 @@ void Donut3DScreen::ensureBuffers(int width, int height)
     {
         std::fill(m_glyphBuffer.begin(), m_glyphBuffer.end(), U' ');
     }
+}
+
+void Donut3DScreen::invalidateStaticUiCache()
+{
+    m_cachedScreenWidth = -1;
+    m_cachedScreenHeight = -1;
+
+    m_cachedTitleText.clear();
+    m_cachedFooterText.clear();
+    m_cachedMinimumSizeMessage.clear();
+
+    m_outerFrameObject.clear();
+    m_titleObject.clear();
+    m_footerObject.clear();
+    m_minimumSizeWarningObject.clear();
+
+    m_titleX = 4;
+    m_titleY = 0;
+    m_footerX = 4;
+    m_footerY = 0;
+    m_warningX = 1;
+    m_warningY = 1;
+}
+
+void Donut3DScreen::ensureStaticUiCache(int screenWidth, int screenHeight)
+{
+    const bool sizeChanged =
+        (screenWidth != m_cachedScreenWidth) ||
+        (screenHeight != m_cachedScreenHeight);
+
+    const bool contentChanged =
+        (m_titleText != m_cachedTitleText) ||
+        (m_footerText != m_cachedFooterText) ||
+        (m_minimumSizeMessage != m_cachedMinimumSizeMessage);
+
+    if (!sizeChanged && !contentChanged)
+    {
+        return;
+    }
+
+    rebuildStaticUiCache(screenWidth, screenHeight);
+}
+
+void Donut3DScreen::rebuildStaticUiCache(int screenWidth, int screenHeight)
+{
+    m_cachedScreenWidth = screenWidth;
+    m_cachedScreenHeight = screenHeight;
+
+    m_cachedTitleText = m_titleText;
+    m_cachedFooterText = m_footerText;
+    m_cachedMinimumSizeMessage = m_minimumSizeMessage;
+
+    m_outerFrameObject.clear();
+    m_titleObject.clear();
+    m_footerObject.clear();
+    m_minimumSizeWarningObject.clear();
+
+    if (screenWidth > 0 && screenHeight > 0)
+    {
+        m_outerFrameObject = ObjectFactory::makeFrame(
+            screenWidth,
+            screenHeight,
+            Themes::Background);
+    }
+
+    m_titleObject = ObjectFactory::makeTextUtf8(
+        m_titleText,
+        Themes::Subtitle);
+
+    m_footerObject = ObjectFactory::makeTextUtf8(
+        m_footerText,
+        Themes::Subtitle);
+
+    m_minimumSizeWarningObject = ObjectFactory::makeTextUtf8(
+        m_minimumSizeMessage,
+        Themes::Warning);
+
+    m_titleX = 4;
+    m_titleY = 0;
+
+    m_footerX = 4;
+    m_footerY = std::max(0, screenHeight - 1);
+
+    m_warningX = 1;
+    m_warningY = 1;
+}
+
+bool Donut3DScreen::isBelowMinimumScreenSize(int screenWidth, int screenHeight) const
+{
+    return screenWidth < MinimumScreenWidth || screenHeight < MinimumScreenHeight;
 }
 
 void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, int height)
