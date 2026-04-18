@@ -3,6 +3,7 @@
 #include <optional>
 
 #include "Rendering/Composition/WritePolicy.h"
+#include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
@@ -24,6 +25,66 @@ namespace Composition
             const TextObject& source,
             const WritePolicy& policy,
             const std::optional<Style>& sourceStyleOverride);
+
+        void writeSolidObject(
+            const TextObject& source,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeSolidObject(
+            const TextObject& source,
+            const Style& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeSolidObject(
+            const TextObject& source,
+            const std::optional<Style>& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+
+        void writeVisibleObject(
+            const TextObject& source,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeVisibleObject(
+            const TextObject& source,
+            const Style& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeVisibleObject(
+            const TextObject& source,
+            const std::optional<Style>& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+
+        void writeGlyphsOnly(
+            const TextObject& source,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeGlyphsOnly(
+            const TextObject& source,
+            const Style& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeGlyphsOnly(
+            const TextObject& source,
+            const std::optional<Style>& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+
+        void writeStyleMask(
+            const TextObject& source,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeStyleMask(
+            const TextObject& source,
+            const Style& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeStyleMask(
+            const TextObject& source,
+            const std::optional<Style>& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+
+        void writeStyleBlock(
+            const TextObject& source,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeStyleBlock(
+            const TextObject& source,
+            const Style& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeStyleBlock(
+            const TextObject& source,
+            const std::optional<Style>& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
 
     private:
         void writeObjectInternal(

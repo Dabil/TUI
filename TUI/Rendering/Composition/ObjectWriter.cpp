@@ -2,6 +2,8 @@
 
 #include <array>
 
+#include "Rendering/Composition/WritePresets.h"
+
 namespace
 {
     struct LogicalCellRef
@@ -210,6 +212,15 @@ namespace
 
         return sourceCell.style;
     }
+
+    void writeWithPreset(
+        Composition::ObjectWriter& writer,
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        const Composition::WritePolicy& policy)
+    {
+        writer.writeObject(source, policy, sourceStyleOverride);
+    }
 }
 
 namespace Composition
@@ -345,5 +356,120 @@ namespace Composition
                 m_target.setCellStyle(destinationX, destinationY, *resolvedSourceStyle);
             }
         }
+    }
+
+    void ObjectWriter::writeSolidObject(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeSolidObject(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeSolidObject(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeSolidObject(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeSolidObject(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::solidObject(depthPolicy));
+    }
+
+    void ObjectWriter::writeVisibleObject(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeVisibleObject(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeVisibleObject(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeVisibleObject(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeVisibleObject(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::visibleObject(depthPolicy));
+    }
+
+    void ObjectWriter::writeGlyphsOnly(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeGlyphsOnly(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeGlyphsOnly(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeGlyphsOnly(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeGlyphsOnly(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::glyphsOnly(depthPolicy));
+    }
+
+    void ObjectWriter::writeStyleMask(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeStyleMask(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeStyleMask(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeStyleMask(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeStyleMask(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::styleMask(depthPolicy));
+    }
+
+    void ObjectWriter::writeStyleBlock(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeStyleBlock(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeStyleBlock(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeStyleBlock(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeStyleBlock(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::styleBlock(depthPolicy));
     }
 }
