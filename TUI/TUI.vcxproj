@@ -162,6 +162,7 @@
     <ClInclude Include="Rendering\Composition\SourceMask.h" />
     <ClInclude Include="Rendering\Composition\StylePolicy.h" />
     <ClInclude Include="Rendering\Composition\WritePolicy.h" />
+    <ClInclude Include="Rendering\Composition\WritePolicyBuilder.h" />
     <ClInclude Include="Rendering\Composition\WritePolicyUtils.h" />
     <ClInclude Include="Rendering\Composition\WritePresets.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
@@ -277,6 +278,7 @@
     <ClCompile Include="Rendering\Capabilities\RendererCapabilities.cpp" />
     <ClCompile Include="Rendering\Composition\ObjectWriter.cpp" />
     <ClCompile Include="Rendering\Composition\WritePolicy.cpp" />
+    <ClCompile Include="Rendering\Composition\WritePolicyBuilder.cpp" />
     <ClCompile Include="Rendering\Composition\WritePolicyUtils.cpp" />
     <ClCompile Include="Rendering\Composition\WritePresets.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
