@@ -155,10 +155,14 @@
     <ClInclude Include="Rendering\Capabilities\CapabilityReport.h" />
     <ClInclude Include="Rendering\Capabilities\ColorSupport.h" />
     <ClInclude Include="Rendering\Capabilities\RendererCapabilities.h" />
+    <ClInclude Include="Rendering\Composition\Alignment.h" />
     <ClInclude Include="Rendering\Composition\DepthPolicy.h" />
     <ClInclude Include="Rendering\Composition\GlyphPolicy.h" />
     <ClInclude Include="Rendering\Composition\ObjectWriter.h" />
     <ClInclude Include="Rendering\Composition\OverwriteRule.h" />
+    <ClInclude Include="Rendering\Composition\PageComposer.h" />
+    <ClInclude Include="Rendering\Composition\Placement.h" />
+    <ClInclude Include="Rendering\Composition\RegionRegistry.h" />
     <ClInclude Include="Rendering\Composition\SourceMask.h" />
     <ClInclude Include="Rendering\Composition\StylePolicy.h" />
     <ClInclude Include="Rendering\Composition\WritePolicy.h" />
@@ -242,6 +246,7 @@
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
+    <ClInclude Include="Screens\PageBuffer.h" />
     <ClInclude Include="Screens\RendererDiagnosticsScreen.h" />
     <ClInclude Include="Screens\Screen.h" />
     <ClInclude Include="Screens\ShowcaseScreen.h" />
@@ -278,6 +283,9 @@
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\RendererCapabilities.cpp" />
     <ClCompile Include="Rendering\Composition\ObjectWriter.cpp" />
+    <ClCompile Include="Rendering\Composition\Placement.cpp" />
+    <ClCompile Include="Rendering\Composition\RegionRegistry.cpp" />
+    <ClCompile Include="Rendering\Composition\PageComposer.cpp" />
     <ClCompile Include="Rendering\Composition\WritePolicy.cpp" />
     <ClCompile Include="Rendering\Composition\WritePolicyBuilder.cpp" />
     <ClCompile Include="Rendering\Composition\WritePolicyUtils.cpp" />
@@ -349,6 +357,7 @@
     </ClCompile>
     <ClCompile Include="Screens\Donut3DScreen.cpp" />
     <ClCompile Include="Screens\FireScreen.cpp" />
+    <ClCompile Include="Screens\PageBuffer.cpp" />
     <ClCompile Include="Screens\RendererDiagnosticsScreen.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
     <ClCompile Include="Screens\TerminalCapabilitiesScreen.cpp" />
