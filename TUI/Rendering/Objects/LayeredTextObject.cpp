@@ -188,6 +188,7 @@ namespace Rendering
     {
         FlattenOptions options;
         options.visibleOnly = true;
+        options.writePolicy = Composition::WritePresets::solidObject();
         return flatten(options);
     }
 
@@ -195,6 +196,7 @@ namespace Rendering
     {
         FlattenOptions options;
         options.visibleOnly = false;
+        options.writePolicy = Composition::WritePresets::solidObject();
         return flatten(options);
     }
 

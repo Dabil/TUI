@@ -39,7 +39,9 @@ public:
     {
         bool visibleOnly = true;
         std::optional<Style> overrideStyle;
-        Composition::WritePolicy writePolicy = Composition::WritePresets::visibleObject();
+        // Retained composition should preserve the full authored source surface by default.
+        // Callers that want transparent overlay behavior can still pass visibleObject().
+        Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
     };
 
     struct BuildLayeredTextObjectOptions
@@ -212,4 +214,3 @@ private:
 private:
     std::vector<Entry> m_entries;
 };
-

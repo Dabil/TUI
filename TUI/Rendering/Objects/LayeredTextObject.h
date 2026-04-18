@@ -39,7 +39,9 @@ namespace Rendering
         {
             bool visibleOnly = true;
             std::optional<Style> overrideStyle;
-            Composition::WritePolicy writePolicy = Composition::WritePresets::visibleObject();
+            // Flattening a retained layered asset should preserve the full authored
+            // source surface unless the caller explicitly requests a different preset.
+            Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
         };
 
     public:

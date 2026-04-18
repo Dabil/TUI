@@ -33,7 +33,7 @@ namespace
 
     bool entryParticipatesInBuild(const TextObjectComposer::Entry& entry, bool visibleOnly)
     {
-        if (entry.object.isEmpty() || !entry.object.isLoaded())
+        if (entry.object.isEmpty())
         {
             return false;
         }
@@ -185,9 +185,12 @@ TextObjectComposer& TextObjectComposer::addFrame(
     std::string_view name,
     bool visible)
 {
+    // A styled retained frame is a fully-authored rectangular object.
+    // Using ObjectFactory::makeFrame(...) ensures interior authored spaces carry
+    // the style/background payload instead of collapsing back to a transparent border shell.
     return addResolvedEntry(
         EntryKind::Frame,
-        makeTransparentFrameObject(width, height, border, std::optional<Style>(style)),
+        ObjectFactory::makeFrame(width, height, style, border),
         x,
         y,
         zIndex,
@@ -515,4 +518,3 @@ std::vector<const TextObjectComposer::Entry*> TextObjectComposer::collectBuildEn
 
     return sortedEntries;
 }
-
