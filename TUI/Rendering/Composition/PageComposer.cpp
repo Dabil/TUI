@@ -190,7 +190,12 @@ namespace Composition
         m_regions.clearRegions();
     }
 
-    Point PageComposer::placeObject(
+    Rect PageComposer::getFullScreenRegion() const
+    {
+        return makeRect(0, 0, std::max(0, getWidth()), std::max(0, getHeight()));
+    }
+
+    Point PageComposer::writeObject(
         const TextObject& object,
         int x,
         int y,
@@ -200,7 +205,52 @@ namespace Composition
         return drawObjectAt(object, x, y, writePolicy, overrideStyle);
     }
 
-    PlacementResult PageComposer::placeObject(
+    Point PageComposer::writeSolidObject(
+        const TextObject& object,
+        int x,
+        int y,
+        const std::optional<Style>& overrideStyle)
+    {
+        return writeObject(object, x, y, WritePresets::solidObject(), overrideStyle);
+    }
+
+    Point PageComposer::writeVisibleObject(
+        const TextObject& object,
+        int x,
+        int y,
+        const std::optional<Style>& overrideStyle)
+    {
+        return writeObject(object, x, y, WritePresets::visibleObject(), overrideStyle);
+    }
+
+    Point PageComposer::writeGlyphsOnly(
+        const TextObject& object,
+        int x,
+        int y,
+        const std::optional<Style>& overrideStyle)
+    {
+        return writeObject(object, x, y, WritePresets::glyphsOnly(), overrideStyle);
+    }
+
+    Point PageComposer::writeStyleMask(
+        const TextObject& object,
+        int x,
+        int y,
+        const std::optional<Style>& overrideStyle)
+    {
+        return writeObject(object, x, y, WritePresets::styleMask(), overrideStyle);
+    }
+
+    Point PageComposer::writeStyleBlock(
+        const TextObject& object,
+        int x,
+        int y,
+        const std::optional<Style>& overrideStyle)
+    {
+        return writeObject(object, x, y, WritePresets::styleBlock(), overrideStyle);
+    }
+
+    PlacementResult PageComposer::writeObject(
         const TextObject& object,
         const Rect& region,
         const Alignment& alignment,
@@ -225,7 +275,87 @@ namespace Composition
         return result;
     }
 
-    PlacementResult PageComposer::placeObjectInRegion(
+    PlacementResult PageComposer::writeSolidObject(
+        const TextObject& object,
+        const Rect& region,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            region,
+            alignment,
+            WritePresets::solidObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeVisibleObject(
+        const TextObject& object,
+        const Rect& region,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            region,
+            alignment,
+            WritePresets::visibleObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeGlyphsOnly(
+        const TextObject& object,
+        const Rect& region,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            region,
+            alignment,
+            WritePresets::glyphsOnly(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleMask(
+        const TextObject& object,
+        const Rect& region,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            region,
+            alignment,
+            WritePresets::styleMask(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleBlock(
+        const TextObject& object,
+        const Rect& region,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            region,
+            alignment,
+            WritePresets::styleBlock(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeObjectInRegion(
         const TextObject& object,
         std::string_view regionName,
         const Alignment& alignment,
@@ -236,18 +366,222 @@ namespace Composition
         const NamedRegion* region = m_regions.getRegion(regionName);
         if (region == nullptr)
         {
-            PlacementResult result;
-            result.region = makeRect(0, 0, 0, 0);
-            result.contentSize = measureObject(object);
-            result.alignment = alignment;
-            result.origin = Point{};
-            result.clamped = false;
-            return result;
+            return makeUnresolvedPlacementResult(object, alignment);
         }
 
-        return placeObject(
+        return writeObject(
             object,
             region->bounds,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeSolidObjectInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
+            alignment,
+            WritePresets::solidObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeVisibleObjectInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
+            alignment,
+            WritePresets::visibleObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeGlyphsOnlyInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
+            alignment,
+            WritePresets::glyphsOnly(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleMaskInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
+            alignment,
+            WritePresets::styleMask(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleBlockInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
+            alignment,
+            WritePresets::styleBlock(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeObjectAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            getFullScreenRegion(),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeSolidObjectAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectAligned(
+            object,
+            alignment,
+            WritePresets::solidObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeVisibleObjectAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectAligned(
+            object,
+            alignment,
+            WritePresets::visibleObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeGlyphsOnlyAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectAligned(
+            object,
+            alignment,
+            WritePresets::glyphsOnly(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleMaskAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectAligned(
+            object,
+            alignment,
+            WritePresets::styleMask(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleBlockAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectAligned(
+            object,
+            alignment,
+            WritePresets::styleBlock(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    Point PageComposer::placeObject(
+        const TextObject& object,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        return writeObject(object, x, y, writePolicy, overrideStyle);
+    }
+
+    PlacementResult PageComposer::placeObject(
+        const TextObject& object,
+        const Rect& region,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            region,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::placeObjectInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
             alignment,
             writePolicy,
             overrideStyle,
@@ -370,6 +704,19 @@ namespace Composition
         object.draw(m_composedBuffer, x, y, writePolicy, overrideStyle);
         synchronizeTarget();
         return origin;
+    }
+
+    PlacementResult PageComposer::makeUnresolvedPlacementResult(
+        const TextObject& object,
+        const Alignment& alignment)
+    {
+        PlacementResult result;
+        result.origin = Point{};
+        result.region = makeRect(0, 0, 0, 0);
+        result.contentSize = measureObject(object);
+        result.alignment = alignment;
+        result.clamped = false;
+        return result;
     }
 
     void PageComposer::writeSegmentedLine(
