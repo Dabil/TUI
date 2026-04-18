@@ -107,17 +107,14 @@ namespace TextObjectBlitter
         int offsetY,
         const BlitOptions& options)
     {
-        Composition::WritePolicy policy;
-        policy.glyphPolicy = Composition::GlyphPolicy::All;
-        policy.stylePolicy = Composition::StylePolicy::Apply;
-        policy.sourceMask = options.skipEmptyCells
-            ? Composition::SourceMask::GlyphCellsOnly
-            : Composition::SourceMask::AllCells;
-        policy.glyphOverwriteRule = Composition::OverwriteRule::Always;
-        policy.styleOverwriteRule = Composition::OverwriteRule::Always;
-        policy.depthPolicy = Composition::DepthPolicy::Ignore;
-
         Composition::ObjectWriter writer(target, offsetX, offsetY);
-        writer.writeObject(source, policy, options.overrideStyle);
+
+        if (options.skipEmptyCells)
+        {
+            writer.writeVisibleObject(source, options.overrideStyle);
+            return;
+        }
+
+        writer.writeSolidObject(source, options.overrideStyle);
     }
 }
