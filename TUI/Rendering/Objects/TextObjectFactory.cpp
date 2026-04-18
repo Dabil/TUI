@@ -636,6 +636,16 @@ namespace
         return builder.build();
     }
 
+    TextObjectBuilder makeAuthoredRectBuilder(
+        int width,
+        int height,
+        const std::optional<Style>& style)
+    {
+        TextObjectBuilder builder(width, height);
+        builder.fill(U' ', CellKind::Glyph, CellWidth::One, style);
+        return builder;
+    }
+
     int maxRowWidth(const std::vector<std::u32string>& rows)
     {
         int width = 0;
@@ -1407,7 +1417,9 @@ namespace
 
         const NormalizedFramePattern normalized = normalizeFramePattern(pattern);
 
-        TextObjectBuilder builder(width, height);
+        // Frame-producing helpers must return fully-authored rectangular objects so
+        // retained composition can apply solid-object writes across the entire box.
+        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
 
         auto writeRowsAt = [&](int startX, int startY, const std::vector<std::u32string>& rows)
             {
@@ -1569,7 +1581,6 @@ namespace
 
         return builder.build();
     }
-
     TextObject buildPatternFilledFrameObject(
         int width,
         int height,
@@ -1584,7 +1595,9 @@ namespace
 
         const NormalizedFramePattern normalized = normalizeFramePattern(framePattern);
 
-        TextObjectBuilder builder(width, height);
+        // Pattern-backed frame helpers follow the same authored-rectangle rule as
+        // simple frames so uncovered cells still carry valid authored space content.
+        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
 
         // Compute polished frame extents first.
         const HorizontalAppendLayout topLayout = computeHorizontalAppendLayout(
