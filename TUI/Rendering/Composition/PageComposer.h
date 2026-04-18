@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "Rendering/Composition/Placement.h"
 #include "Rendering/Composition/RegionRegistry.h"
@@ -68,6 +69,169 @@ namespace Composition
         NamedRegion* getRegion(std::string_view name);
         void clearRegions();
 
+        Rect getFullScreenRegion() const;
+
+        Point writeObject(
+            const TextObject& object,
+            int x,
+            int y,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        Point writeSolidObject(
+            const TextObject& object,
+            int x,
+            int y,
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        Point writeVisibleObject(
+            const TextObject& object,
+            int x,
+            int y,
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        Point writeGlyphsOnly(
+            const TextObject& object,
+            int x,
+            int y,
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        Point writeStyleMask(
+            const TextObject& object,
+            int x,
+            int y,
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        Point writeStyleBlock(
+            const TextObject& object,
+            int x,
+            int y,
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        PlacementResult writeObject(
+            const TextObject& object,
+            const Rect& region,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeSolidObject(
+            const TextObject& object,
+            const Rect& region,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeVisibleObject(
+            const TextObject& object,
+            const Rect& region,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeGlyphsOnly(
+            const TextObject& object,
+            const Rect& region,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeStyleMask(
+            const TextObject& object,
+            const Rect& region,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeStyleBlock(
+            const TextObject& object,
+            const Rect& region,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeObjectInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeSolidObjectInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeVisibleObjectInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeGlyphsOnlyInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeStyleMaskInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeStyleBlockInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeObjectAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeSolidObjectAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeVisibleObjectAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeGlyphsOnlyAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeStyleMaskAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeStyleBlockAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        // Backward-compatible placement aliases
         Point placeObject(
             const TextObject& object,
             int x,
@@ -126,6 +290,10 @@ namespace Composition
             int y,
             const WritePolicy& writePolicy,
             const std::optional<Style>& overrideStyle);
+
+        static PlacementResult makeUnresolvedPlacementResult(
+            const TextObject& object,
+            const Alignment& alignment);
 
         void writeSegmentedLine(
             int x,
