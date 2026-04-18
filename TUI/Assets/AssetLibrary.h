@@ -214,17 +214,17 @@ namespace Assets
         std::string getRegisteredAssetPath(const std::string& assetNameOrPath) const;
         std::string getPreferredAssetKeyForPath(const std::string& assetPath) const;
 
-        LoadAssetResult loadAsset(const std::string& assetNameOrPath);
-        LoadAssetResult reloadAsset(const std::string& assetNameOrPath);
+        LoadAssetResult loadAsset(const std::string& assetNameOrPath) const;
+        LoadAssetResult reloadAsset(const std::string& assetNameOrPath) const;
 
-        LoadTextAssetResult loadTextAsset(const std::string& assetNameOrPath);
-        LoadTextAssetResult reloadTextAsset(const std::string& assetNameOrPath);
+        LoadTextAssetResult loadTextAsset(const std::string& assetNameOrPath) const;
+        LoadTextAssetResult reloadTextAsset(const std::string& assetNameOrPath) const;
 
-        LoadBannerFontResult loadBannerFontAsset(const std::string& assetNameOrPath);
-        LoadBannerFontResult reloadBannerFontAsset(const std::string& assetNameOrPath);
+        LoadBannerFontResult loadBannerFontAsset(const std::string& assetNameOrPath) const;
+        LoadBannerFontResult reloadBannerFontAsset(const std::string& assetNameOrPath) const;
 
-        LoadPseudoFontAssetResult loadPseudoFontAsset(const std::string& assetNameOrPath);
-        LoadPseudoFontAssetResult reloadPseudoFontAsset(const std::string& assetNameOrPath);
+        LoadPseudoFontAssetResult loadPseudoFontAsset(const std::string& assetNameOrPath) const;
+        LoadPseudoFontAssetResult reloadPseudoFontAsset(const std::string& assetNameOrPath) const;
 
         const std::shared_ptr<TextObject>* findCachedTextAsset(const std::string& assetNameOrPath) const;
         const std::shared_ptr<AsciiBannerFont>* findCachedBannerFontAsset(
@@ -291,24 +291,24 @@ namespace Assets
             std::string assetKey;
         };
 
-        LoadAssetResult loadAssetInternal(const std::string& assetNameOrPath, bool forceReload);
-        LoadTextAssetResult loadTextAssetInternal(const std::string& assetNameOrPath, bool forceReload);
-        LoadBannerFontResult loadBannerFontAssetInternal(const std::string& assetNameOrPath, bool forceReload);
+        LoadAssetResult loadAssetInternal(const std::string& assetNameOrPath, bool forceReload) const;
+        LoadTextAssetResult loadTextAssetInternal(const std::string& assetNameOrPath, bool forceReload) const;
+        LoadBannerFontResult loadBannerFontAssetInternal(const std::string& assetNameOrPath, bool forceReload) const;
         LoadPseudoFontAssetResult loadPseudoFontAssetInternal(
             const std::string& assetNameOrPath,
-            bool forceReload);
+            bool forceReload) const;
 
         LoadTextAssetResult dispatchTextLoad(
             const ResolvedAssetReference& reference,
-            const AssetPaths::ResolutionResult& resolution);
+            const AssetPaths::ResolutionResult& resolution) const;
 
         LoadBannerFontResult dispatchBannerFontLoad(
             const ResolvedAssetReference& reference,
-            const AssetPaths::ResolutionResult& resolution);
+            const AssetPaths::ResolutionResult& resolution) const;
 
         LoadPseudoFontAssetResult dispatchPseudoFontLoad(
             const ResolvedAssetReference& reference,
-            const AssetPaths::ResolutionResult& resolution);
+            const AssetPaths::ResolutionResult& resolution) const;
 
         LoadAssetResult makeUnifiedResult(const LoadTextAssetResult& result) const;
         LoadAssetResult makeUnifiedResult(const LoadBannerFontResult& result) const;
@@ -326,8 +326,7 @@ namespace Assets
         AssetLibraryOptions m_options;
         std::unordered_map<std::string, std::string> m_aliases;
         std::unordered_map<std::string, std::string> m_preferredAssetKeysByPath;
-        std::unordered_map<std::string, TextCacheEntry> m_textAssetCache;
-        std::unordered_map<std::string, BannerFontCacheEntry> m_bannerFontCache;
-        std::unordered_map<std::string, PseudoFontCacheEntry> m_pseudoFontCache;
-    };
+        mutable std::unordered_map<std::string, TextCacheEntry> m_textAssetCache;
+        mutable std::unordered_map<std::string, BannerFontCacheEntry> m_bannerFontCache;
+        mutable std::unordered_map<std::string, PseudoFontCacheEntry> m_pseudoFontCache;    };
 }
