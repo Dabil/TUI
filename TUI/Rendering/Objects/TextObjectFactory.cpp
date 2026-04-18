@@ -2746,34 +2746,4 @@ namespace ObjectFactory
     {
         return buildPatternFrameObject(width, height, pattern, style);
     }
-
-
-    TextObject makePatternFilledFrame(
-        int width,
-        int height,
-        const FramePattern& framePattern,
-        const PatternTile& fillPattern)
-    {
-        return buildPatternFilledFrameObject(
-            width,
-            height,
-            framePattern,
-            fillPattern,
-            std::nullopt);
-    }
-
-    TextObject makePatternFilledFrame(
-        int width,
-        int height,
-        const FramePattern& framePattern,
-        const PatternTile& fillPattern,
-        const Style& style)
-    {
-        return buildPatternFilledFrameObject(
-            width,
-            height,
-            framePattern,
-            fillPattern,
-            style);
-    }
 }
