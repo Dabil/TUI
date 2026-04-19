@@ -6,6 +6,7 @@
 #include <string_view>
 #include <vector>
 
+#include "Rendering/Composition/ObjectSource.h"
 #include "Rendering/Composition/Placement.h"
 #include "Rendering/Composition/RegionRegistry.h"
 #include "Rendering/Composition/WritePolicy.h"
@@ -14,8 +15,25 @@
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
 
+namespace Assets
+{
+    class AssetLibrary;
+}
+
 namespace Composition
 {
+    struct SourcePlacementResult
+    {
+        PlacementResult placement;
+        ResolvedObjectSource source;
+        bool success = false;
+
+        bool hasObject() const
+        {
+            return source.hasObject();
+        }
+    };
+
     class PageComposer
     {
     public:
@@ -70,6 +88,153 @@ namespace Composition
         void clearRegions();
 
         Rect getFullScreenRegion() const;
+
+        void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
+        void detachAssetLibrary();
+        bool hasAssetLibrary() const;
+
+        Assets::AssetLibrary* tryGetAssetLibrary();
+        const Assets::AssetLibrary* tryGetAssetLibrary() const;
+
+        void setFrames(std::vector<TextObject> frames);
+        void clearFrames();
+        std::size_t getFrameCount() const;
+        bool hasFrame(int frameIndex) const;
+        const TextObject* getFrame(int frameIndex) const;
+
+        SourcePlacementResult placeSource(
+            const ObjectSource& source,
+            int x,
+            int y,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeSource(
+            const ObjectSource& source,
+            const Rect& region,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeSourceInRegion(
+            const ObjectSource& source,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeSourceAligned(
+            const ObjectSource& source,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeAsset(
+            std::string_view assetName,
+            int x,
+            int y,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeAsset(
+            std::string_view assetName,
+            const Rect& region,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeAssetAligned(
+            std::string_view assetName,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeFrame(
+            int frameIndex,
+            int x,
+            int y,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeFrame(
+            int frameIndex,
+            const Rect& region,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeFrameAligned(
+            int frameIndex,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeSequenceFrame(
+            std::string_view assetName,
+            int frameIndex,
+            int x,
+            int y,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeSequenceFrame(
+            std::string_view assetName,
+            int frameIndex,
+            const Rect& region,
+            const Alignment& alignment,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeSequenceFrameAligned(
+            std::string_view assetName,
+            int frameIndex,
+            const Alignment& alignment,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeXpDocument(
+            const XpArtLoader::XpDocument& document,
+            int x,
+            int y,
+            const XpArtLoader::LoadOptions& loadOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeXpFrame(
+            const XpArtLoader::XpFrame& frame,
+            int x,
+            int y,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeXpDocumentAligned(
+            const XpArtLoader::XpDocument& document,
+            const Alignment& alignment,
+            const XpArtLoader::LoadOptions& loadOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeXpFrameAligned(
+            const XpArtLoader::XpFrame& frame,
+            const Alignment& alignment,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
 
         Point writeObject(
             const TextObject& object,
@@ -295,6 +460,25 @@ namespace Composition
             const TextObject& object,
             const Alignment& alignment);
 
+        SourcePlacementResult placeResolvedSource(
+            const ResolvedObjectSource& resolvedSource,
+            int x,
+            int y,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle);
+
+        SourcePlacementResult placeResolvedSource(
+            const ResolvedObjectSource& resolvedSource,
+            const Rect& region,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle,
+            bool clampToRegion);
+
+        static SourcePlacementResult makeFailedSourcePlacement(
+            const ResolvedObjectSource& resolvedSource,
+            const Alignment* alignment = nullptr);
+
         void writeSegmentedLine(
             int x,
             int y,
@@ -308,8 +492,10 @@ namespace Composition
 
     private:
         ScreenBuffer* m_target = nullptr;
+        Assets::AssetLibrary* m_assetLibrary = nullptr;
         ScreenBuffer m_composedBuffer;
         RegionRegistry m_regions;
+        std::vector<TextObject> m_frames;
         ScreenTemplateLoader m_screenTemplateLoader;
     };
 }

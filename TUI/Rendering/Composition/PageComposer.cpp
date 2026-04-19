@@ -1,5 +1,7 @@
 #include "Rendering/Composition/PageComposer.h"
 
+#include "Assets/AssetLibrary.h"
+
 #include <algorithm>
 #include <stdexcept>
 #include <utility>
@@ -193,6 +195,350 @@ namespace Composition
     Rect PageComposer::getFullScreenRegion() const
     {
         return makeRect(0, 0, std::max(0, getWidth()), std::max(0, getHeight()));
+    }
+
+
+    void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
+    {
+        m_assetLibrary = &assetLibrary;
+    }
+
+    void PageComposer::detachAssetLibrary()
+    {
+        m_assetLibrary = nullptr;
+    }
+
+    bool PageComposer::hasAssetLibrary() const
+    {
+        return m_assetLibrary != nullptr;
+    }
+
+    Assets::AssetLibrary* PageComposer::tryGetAssetLibrary()
+    {
+        return m_assetLibrary;
+    }
+
+    const Assets::AssetLibrary* PageComposer::tryGetAssetLibrary() const
+    {
+        return m_assetLibrary;
+    }
+
+    void PageComposer::setFrames(std::vector<TextObject> frames)
+    {
+        m_frames = std::move(frames);
+    }
+
+    void PageComposer::clearFrames()
+    {
+        m_frames.clear();
+    }
+
+    std::size_t PageComposer::getFrameCount() const
+    {
+        return m_frames.size();
+    }
+
+    bool PageComposer::hasFrame(int frameIndex) const
+    {
+        return getFrame(frameIndex) != nullptr;
+    }
+
+    const TextObject* PageComposer::getFrame(int frameIndex) const
+    {
+        if (frameIndex < 0 || static_cast<std::size_t>(frameIndex) >= m_frames.size())
+        {
+            return nullptr;
+        }
+
+        return &m_frames[static_cast<std::size_t>(frameIndex)];
+    }
+
+    SourcePlacementResult PageComposer::placeSource(
+        const ObjectSource& source,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        return placeResolvedSource(
+            resolveObjectSource(source, m_assetLibrary),
+            x,
+            y,
+            writePolicy,
+            overrideStyle);
+    }
+
+    SourcePlacementResult PageComposer::placeSource(
+        const ObjectSource& source,
+        const Rect& region,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeResolvedSource(
+            resolveObjectSource(source, m_assetLibrary),
+            region,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeSourceInRegion(
+        const ObjectSource& source,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        if (region == nullptr)
+        {
+            return makeFailedSourcePlacement(
+                resolveObjectSource(source, m_assetLibrary),
+                &alignment);
+        }
+
+        return placeSource(
+            source,
+            region->bounds,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeSourceAligned(
+        const ObjectSource& source,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeSource(
+            source,
+            getFullScreenRegion(),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeAsset(
+        std::string_view assetName,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        return placeSource(
+            ObjectSource::fromAsset(std::string(assetName)),
+            x,
+            y,
+            writePolicy,
+            overrideStyle);
+    }
+
+    SourcePlacementResult PageComposer::placeAsset(
+        std::string_view assetName,
+        const Rect& region,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeSource(
+            ObjectSource::fromAsset(std::string(assetName)),
+            region,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeAssetAligned(
+        std::string_view assetName,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeAsset(
+            assetName,
+            getFullScreenRegion(),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeFrame(
+        int frameIndex,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        return placeSource(
+            ObjectSource::fromRegisteredFrame(m_frames, frameIndex),
+            x,
+            y,
+            writePolicy,
+            overrideStyle);
+    }
+
+    SourcePlacementResult PageComposer::placeFrame(
+        int frameIndex,
+        const Rect& region,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeSource(
+            ObjectSource::fromRegisteredFrame(m_frames, frameIndex),
+            region,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeFrameAligned(
+        int frameIndex,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeFrame(
+            frameIndex,
+            getFullScreenRegion(),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeSequenceFrame(
+        std::string_view assetName,
+        int frameIndex,
+        int x,
+        int y,
+        const XpArtLoader::XpFrameConversionOptions& frameOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        ObjectSource source = ObjectSource::fromAssetFrame(std::string(assetName), frameIndex);
+        source.xpFrameOptions = frameOptions;
+        return placeSource(source, x, y, writePolicy, overrideStyle);
+    }
+
+    SourcePlacementResult PageComposer::placeSequenceFrame(
+        std::string_view assetName,
+        int frameIndex,
+        const Rect& region,
+        const Alignment& alignment,
+        const XpArtLoader::XpFrameConversionOptions& frameOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        ObjectSource source = ObjectSource::fromAssetFrame(std::string(assetName), frameIndex);
+        source.xpFrameOptions = frameOptions;
+        return placeSource(
+            source,
+            region,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeSequenceFrameAligned(
+        std::string_view assetName,
+        int frameIndex,
+        const Alignment& alignment,
+        const XpArtLoader::XpFrameConversionOptions& frameOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeSequenceFrame(
+            assetName,
+            frameIndex,
+            getFullScreenRegion(),
+            alignment,
+            frameOptions,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeXpDocument(
+        const XpArtLoader::XpDocument& document,
+        int x,
+        int y,
+        const XpArtLoader::LoadOptions& loadOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        return placeSource(
+            ObjectSource::fromXpDocument(document, loadOptions),
+            x,
+            y,
+            writePolicy,
+            overrideStyle);
+    }
+
+    SourcePlacementResult PageComposer::placeXpFrame(
+        const XpArtLoader::XpFrame& frame,
+        int x,
+        int y,
+        const XpArtLoader::XpFrameConversionOptions& frameOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        return placeSource(
+            ObjectSource::fromXpFrame(frame, frameOptions),
+            x,
+            y,
+            writePolicy,
+            overrideStyle);
+    }
+
+    SourcePlacementResult PageComposer::placeXpDocumentAligned(
+        const XpArtLoader::XpDocument& document,
+        const Alignment& alignment,
+        const XpArtLoader::LoadOptions& loadOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeSourceAligned(
+            ObjectSource::fromXpDocument(document, loadOptions),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    SourcePlacementResult PageComposer::placeXpFrameAligned(
+        const XpArtLoader::XpFrame& frame,
+        const Alignment& alignment,
+        const XpArtLoader::XpFrameConversionOptions& frameOptions,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return placeSourceAligned(
+            ObjectSource::fromXpFrame(frame, frameOptions),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
     }
 
     Point PageComposer::writeObject(
@@ -683,6 +1029,76 @@ namespace Composition
         const std::optional<Style>& styleOverride)
     {
         writeTextBlock(x, y, UnicodeConversion::utf8ToU32(utf8Block), styleOverride);
+    }
+
+
+    SourcePlacementResult PageComposer::placeResolvedSource(
+        const ResolvedObjectSource& resolvedSource,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle)
+    {
+        if (!resolvedSource.hasObject())
+        {
+            return makeFailedSourcePlacement(resolvedSource);
+        }
+
+        SourcePlacementResult result;
+        result.source = resolvedSource;
+        result.placement.origin = drawObjectAt(
+            resolvedSource.object,
+            x,
+            y,
+            writePolicy,
+            overrideStyle);
+        result.placement.region = makeRect(x, y, 0, 0);
+        result.placement.contentSize = measureObject(resolvedSource.object);
+        result.placement.alignment = Alignment{};
+        result.placement.clamped = false;
+        result.success = true;
+        return result;
+    }
+
+    SourcePlacementResult PageComposer::placeResolvedSource(
+        const ResolvedObjectSource& resolvedSource,
+        const Rect& region,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        if (!resolvedSource.hasObject())
+        {
+            return makeFailedSourcePlacement(resolvedSource, &alignment);
+        }
+
+        SourcePlacementResult result;
+        result.source = resolvedSource;
+        result.placement = writeObject(
+            resolvedSource.object,
+            region,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+        result.success = true;
+        return result;
+    }
+
+    SourcePlacementResult PageComposer::makeFailedSourcePlacement(
+        const ResolvedObjectSource& resolvedSource,
+        const Alignment* alignment)
+    {
+        SourcePlacementResult result;
+        result.source = resolvedSource;
+        result.success = false;
+        result.placement.origin = Point{};
+        result.placement.region = makeRect(0, 0, 0, 0);
+        result.placement.contentSize = measureObject(resolvedSource.object);
+        result.placement.alignment = alignment != nullptr ? *alignment : Alignment{};
+        result.placement.clamped = false;
+        return result;
     }
 
     Point PageComposer::drawObjectAt(
