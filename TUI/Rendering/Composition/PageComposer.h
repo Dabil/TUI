@@ -1,5 +1,7 @@
+// Rendering/Composition/PageComposer.h
 #pragma once
 
+#include <cstdint>
 #include <functional>
 #include <optional>
 #include <string>
@@ -11,6 +13,7 @@
 #include "Rendering/Composition/RegionRegistry.h"
 #include "Rendering/Composition/WritePolicy.h"
 #include "Rendering/Composition/WritePresets.h"
+#include "Rendering/Diagnostics/PageCompositionDiagnostics.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
@@ -46,6 +49,70 @@ namespace Composition
 
         using ScreenTemplateLoader =
             std::function<ScreenTemplateLoadResult(std::string_view filename)>;
+
+        struct PlacementSpec
+        {
+            enum class Mode
+            {
+                Point,
+                Region,
+                RegionName,
+                FullScreenAligned
+            };
+
+            Mode mode = Mode::Point;
+
+            Point point;
+            Rect region;
+            std::string regionName;
+            Alignment alignment = Align::topLeft();
+            bool clampToRegion = false;
+
+            static PlacementSpec at(int x, int y)
+            {
+                PlacementSpec spec;
+                spec.mode = Mode::Point;
+                spec.point = { x, y };
+                return spec;
+            }
+
+            static PlacementSpec inRegion(
+                const Rect& regionValue,
+                const Alignment& alignmentValue,
+                bool clamp = false)
+            {
+                PlacementSpec spec;
+                spec.mode = Mode::Region;
+                spec.region = regionValue;
+                spec.alignment = alignmentValue;
+                spec.clampToRegion = clamp;
+                return spec;
+            }
+
+            static PlacementSpec inNamedRegion(
+                std::string_view name,
+                const Alignment& alignmentValue,
+                bool clamp = false)
+            {
+                PlacementSpec spec;
+                spec.mode = Mode::RegionName;
+                spec.regionName = std::string(name);
+                spec.alignment = alignmentValue;
+                spec.clampToRegion = clamp;
+                return spec;
+            }
+
+            static PlacementSpec fullScreen(
+                const Alignment& alignmentValue,
+                bool clamp = false)
+            {
+                PlacementSpec spec;
+                spec.mode = Mode::FullScreenAligned;
+                spec.alignment = alignmentValue;
+                spec.clampToRegion = clamp;
+                return spec;
+            }
+        };
 
     public:
         PageComposer() = default;
@@ -102,6 +169,36 @@ namespace Composition
         bool hasFrame(int frameIndex) const;
         const TextObject* getFrame(int frameIndex) const;
 
+        void setDiagnostics(PageCompositionDiagnostics& diagnostics);
+        void detachDiagnostics();
+        bool hasDiagnostics() const;
+
+        PageCompositionDiagnostics* tryGetDiagnostics();
+        const PageCompositionDiagnostics* tryGetDiagnostics() const;
+
+        void beginFrame(
+            int frameIndex,
+            std::string_view channel = {},
+            std::string_view tag = {});
+        void endFrame();
+        void clearFrameContext();
+
+        const PageCompositionDiagnostics::FrameContext& frameContext() const;
+
+        std::uint64_t computeDeterministicSignature() const;
+        bool verifyDeterministicSignature(std::uint64_t expectedSignature) const;
+        std::uint64_t lastDeterministicSignature() const;
+
+        int centerX(int contentWidth) const;
+        int centerY(int contentHeight) const;
+        Point centerInFullScreen(const Size& contentSize) const;
+        Point anchorInFullScreen(AnchorPoint anchor) const;
+
+        int centerX(std::string_view regionName, int contentWidth) const;
+        int centerY(std::string_view regionName, int contentHeight) const;
+        Point centerInRegion(std::string_view regionName, const Size& contentSize) const;
+        Point anchorInRegion(std::string_view regionName, AnchorPoint anchor) const;
+
         SourcePlacementResult placeSource(
             const ObjectSource& source,
             int x,
@@ -116,6 +213,12 @@ namespace Composition
             const WritePolicy& writePolicy = WritePresets::visibleObject(),
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
+
+        SourcePlacementResult placeSource(
+            const ObjectSource& source,
+            const PlacementSpec& placement,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
 
         SourcePlacementResult placeSourceInRegion(
             const ObjectSource& source,
@@ -176,6 +279,25 @@ namespace Composition
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
+        SourcePlacementResult placeActiveFrame(
+            int x,
+            int y,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeActiveFrame(
+            const Rect& region,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeActiveFrameAligned(
+            const Alignment& alignment,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
         SourcePlacementResult placeSequenceFrame(
             std::string_view assetName,
             int frameIndex,
@@ -198,6 +320,31 @@ namespace Composition
         SourcePlacementResult placeSequenceFrameAligned(
             std::string_view assetName,
             int frameIndex,
+            const Alignment& alignment,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeActiveSequenceFrame(
+            std::string_view assetName,
+            int x,
+            int y,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
+
+        SourcePlacementResult placeActiveSequenceFrame(
+            std::string_view assetName,
+            const Rect& region,
+            const Alignment& alignment,
+            const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        SourcePlacementResult placeActiveSequenceFrameAligned(
+            std::string_view assetName,
             const Alignment& alignment,
             const XpArtLoader::XpFrameConversionOptions& frameOptions = {},
             const WritePolicy& writePolicy = WritePresets::visibleObject(),
@@ -280,6 +427,12 @@ namespace Composition
             const WritePolicy& writePolicy,
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
+
+        PlacementResult writeObject(
+            const TextObject& object,
+            const PlacementSpec& placement,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt);
 
         PlacementResult writeSolidObject(
             const TextObject& object,
@@ -396,7 +549,6 @@ namespace Composition
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
-        // Backward-compatible placement aliases
         Point placeObject(
             const TextObject& object,
             int x,
@@ -411,6 +563,12 @@ namespace Composition
             const WritePolicy& writePolicy = WritePresets::visibleObject(),
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
+
+        PlacementResult placeObject(
+            const TextObject& object,
+            const PlacementSpec& placement,
+            const WritePolicy& writePolicy = WritePresets::visibleObject(),
+            const std::optional<Style>& overrideStyle = std::nullopt);
 
         PlacementResult placeObjectInRegion(
             const TextObject& object,
@@ -488,14 +646,49 @@ namespace Composition
         static std::u32string extractFirstLine(std::u32string_view text);
         static std::vector<std::u32string> splitLines(std::u32string_view text);
 
+        int resolveActiveFrameIndex() const;
+
+        void recordOperation(
+            PageCompositionDiagnostics::OperationKind operation,
+            std::string_view operationName,
+            const Rect* requestedRegion = nullptr,
+            const Rect* resolvedRegion = nullptr,
+            const Point* origin = nullptr,
+            const Size* contentSize = nullptr,
+            const Alignment* alignment = nullptr,
+            const WritePolicy* writePolicy = nullptr,
+            bool usedAlignment = false,
+            bool usedOverrideStyle = false,
+            bool clampRequested = false,
+            bool clamped = false,
+            bool success = true,
+            std::string_view regionName = {},
+            std::string_view detail = {},
+            std::string_view errorMessage = {});
+
+        void recordSourcePlacement(
+            PageCompositionDiagnostics::OperationKind operation,
+            std::string_view operationName,
+            const ResolvedObjectSource& resolvedSource,
+            const Rect* requestedRegion,
+            const SourcePlacementResult& result,
+            const WritePolicy& writePolicy,
+            bool usedAlignment,
+            bool usedOverrideStyle,
+            bool clampRequested,
+            std::string_view regionName = {});
+
+        void refreshDeterministicSignature();
         void synchronizeTarget();
 
     private:
         ScreenBuffer* m_target = nullptr;
         Assets::AssetLibrary* m_assetLibrary = nullptr;
+        PageCompositionDiagnostics* m_diagnostics = nullptr;
         ScreenBuffer m_composedBuffer;
         RegionRegistry m_regions;
         std::vector<TextObject> m_frames;
         ScreenTemplateLoader m_screenTemplateLoader;
+        PageCompositionDiagnostics::FrameContext m_frameContext;
     };
 }

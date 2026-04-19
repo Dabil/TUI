@@ -1,3 +1,4 @@
+// Rendering/Composition/Placement.h
 #pragma once
 
 #include <string>
@@ -42,6 +43,19 @@ namespace Composition
         }
     };
 
+    enum class AnchorPoint
+    {
+        TopLeft,
+        TopCenter,
+        TopRight,
+        CenterLeft,
+        Center,
+        CenterRight,
+        BottomLeft,
+        BottomCenter,
+        BottomRight
+    };
+
     struct PlacementRequest
     {
         Rect region;
@@ -74,4 +88,16 @@ namespace Composition
 
     Rect makeRect(int x, int y, int width, int height);
     Size measureObject(const TextObject& object);
+
+    int centerX(const Rect& region, int contentWidth);
+    int centerY(const Rect& region, int contentHeight);
+    Point centerInRegion(const Rect& region, const Size& contentSize);
+
+    Point anchorPointInRegion(const Rect& region, AnchorPoint anchor);
+
+    PlacementRequest makePlacementRequest(
+        const Rect& region,
+        const Size& contentSize,
+        const Alignment& alignment,
+        bool clampToRegion = false);
 }

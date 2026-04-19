@@ -172,6 +172,7 @@
     <ClInclude Include="Rendering\Composition\WritePresets.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
+    <ClInclude Include="Rendering\Diagnostics\PageCompositionDiagnostics.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnostics.h" />
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnosticsWriter.h" />
     <ClInclude Include="Rendering\Diagnostics\RendererSelectionTrace.h" />
@@ -294,6 +295,7 @@
     <ClCompile Include="Rendering\Composition\WritePresets.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp" />
+    <ClCompile Include="Rendering\Diagnostics\PageCompositionDiagnostics.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnostics.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RendererSelectionTrace.cpp" />
