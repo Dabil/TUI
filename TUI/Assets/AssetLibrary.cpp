@@ -263,42 +263,42 @@ namespace Assets
         return it->second;
     }
 
-    LoadAssetResult AssetLibrary::loadAsset(const std::string& assetNameOrPath)
+    LoadAssetResult AssetLibrary::loadAsset(const std::string& assetNameOrPath) const
     {
         return loadAssetInternal(assetNameOrPath, false);
     }
 
-    LoadAssetResult AssetLibrary::reloadAsset(const std::string& assetNameOrPath)
+    LoadAssetResult AssetLibrary::reloadAsset(const std::string& assetNameOrPath) const
     {
         return loadAssetInternal(assetNameOrPath, true);
     }
 
-    LoadTextAssetResult AssetLibrary::loadTextAsset(const std::string& assetNameOrPath)
+    LoadTextAssetResult AssetLibrary::loadTextAsset(const std::string& assetNameOrPath) const
     {
         return loadTextAssetInternal(assetNameOrPath, false);
     }
 
-    LoadTextAssetResult AssetLibrary::reloadTextAsset(const std::string& assetNameOrPath)
+    LoadTextAssetResult AssetLibrary::reloadTextAsset(const std::string& assetNameOrPath) const
     {
         return loadTextAssetInternal(assetNameOrPath, true);
     }
 
-    LoadBannerFontResult AssetLibrary::loadBannerFontAsset(const std::string& assetNameOrPath)
+    LoadBannerFontResult AssetLibrary::loadBannerFontAsset(const std::string& assetNameOrPath) const
     {
         return loadBannerFontAssetInternal(assetNameOrPath, false);
     }
 
-    LoadBannerFontResult AssetLibrary::reloadBannerFontAsset(const std::string& assetNameOrPath)
+    LoadBannerFontResult AssetLibrary::reloadBannerFontAsset(const std::string& assetNameOrPath) const
     {
         return loadBannerFontAssetInternal(assetNameOrPath, true);
     }
 
-    LoadPseudoFontAssetResult AssetLibrary::loadPseudoFontAsset(const std::string& assetNameOrPath)
+    LoadPseudoFontAssetResult AssetLibrary::loadPseudoFontAsset(const std::string& assetNameOrPath) const
     {
         return loadPseudoFontAssetInternal(assetNameOrPath, false);
     }
 
-    LoadPseudoFontAssetResult AssetLibrary::reloadPseudoFontAsset(const std::string& assetNameOrPath)
+    LoadPseudoFontAssetResult AssetLibrary::reloadPseudoFontAsset(const std::string& assetNameOrPath) const
     {
         return loadPseudoFontAssetInternal(assetNameOrPath, true);
     }
@@ -454,7 +454,7 @@ namespace Assets
 
     LoadAssetResult AssetLibrary::loadAssetInternal(
         const std::string& assetNameOrPath,
-        const bool forceReload)
+        const bool forceReload) const
     {
         const ResolvedAssetReference reference = resolveAssetReference(assetNameOrPath);
         if (reference.requestedPath.empty())
@@ -517,7 +517,7 @@ namespace Assets
 
     LoadTextAssetResult AssetLibrary::loadTextAssetInternal(
         const std::string& assetNameOrPath,
-        const bool forceReload)
+        const bool forceReload) const
     {
         const ResolvedAssetReference reference = resolveAssetReference(assetNameOrPath);
         if (reference.requestedPath.empty())
@@ -585,7 +585,7 @@ namespace Assets
 
     LoadBannerFontResult AssetLibrary::loadBannerFontAssetInternal(
         const std::string& assetNameOrPath,
-        const bool forceReload)
+        const bool forceReload) const
     {
         const ResolvedAssetReference reference = resolveAssetReference(assetNameOrPath);
         if (reference.requestedPath.empty())
@@ -653,7 +653,7 @@ namespace Assets
 
     LoadPseudoFontAssetResult AssetLibrary::loadPseudoFontAssetInternal(
         const std::string& assetNameOrPath,
-        const bool forceReload)
+        const bool forceReload) const
     {
         const ResolvedAssetReference reference = resolveAssetReference(assetNameOrPath);
         if (reference.requestedPath.empty())
@@ -721,7 +721,7 @@ namespace Assets
 
     LoadTextAssetResult AssetLibrary::dispatchTextLoad(
         const ResolvedAssetReference& reference,
-        const AssetPaths::ResolutionResult& resolution)
+        const AssetPaths::ResolutionResult& resolution) const
     {
         switch (resolution.assetType)
         {
@@ -890,7 +890,7 @@ namespace Assets
 
     LoadBannerFontResult AssetLibrary::dispatchBannerFontLoad(
         const ResolvedAssetReference& reference,
-        const AssetPaths::ResolutionResult& resolution)
+        const AssetPaths::ResolutionResult& resolution) const
     {
         switch (resolution.assetType)
         {
@@ -954,7 +954,7 @@ namespace Assets
 
     LoadPseudoFontAssetResult AssetLibrary::dispatchPseudoFontLoad(
         const ResolvedAssetReference& reference,
-        const AssetPaths::ResolutionResult& resolution)
+        const AssetPaths::ResolutionResult& resolution) const
     {
         switch (resolution.assetType)
         {

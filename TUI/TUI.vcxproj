@@ -158,6 +158,7 @@
     <ClInclude Include="Rendering\Composition\Alignment.h" />
     <ClInclude Include="Rendering\Composition\DepthPolicy.h" />
     <ClInclude Include="Rendering\Composition\GlyphPolicy.h" />
+    <ClInclude Include="Rendering\Composition\ObjectSource.h" />
     <ClInclude Include="Rendering\Composition\ObjectWriter.h" />
     <ClInclude Include="Rendering\Composition\OverwriteRule.h" />
     <ClInclude Include="Rendering\Composition\PageComposer.h" />
@@ -282,6 +283,7 @@
     <ClCompile Include="Rendering\Backends\TerminalHostInfo.cpp" />
     <ClCompile Include="Rendering\Capabilities\CapabilityReport.cpp" />
     <ClCompile Include="Rendering\Capabilities\RendererCapabilities.cpp" />
+    <ClCompile Include="Rendering\Composition\ObjectSource.cpp" />
     <ClCompile Include="Rendering\Composition\ObjectWriter.cpp" />
     <ClCompile Include="Rendering\Composition\Placement.cpp" />
     <ClCompile Include="Rendering\Composition\RegionRegistry.cpp" />
