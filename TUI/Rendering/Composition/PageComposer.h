@@ -148,6 +148,22 @@ namespace Composition
             const std::optional<Style>& overrideStyle = std::nullopt);
 
         bool createRegion(int x, int y, int width, int height, std::string_view name);
+        bool createRegion(const Rect& rect, std::string_view name);
+
+        bool createFullScreenRegion(std::string_view name);
+
+        bool createCenteredRegion(int width, int height, std::string_view name);
+        bool createCenteredRegion(
+            const Rect& container,
+            int width,
+            int height,
+            std::string_view name);
+        bool createCenteredRegion(
+            std::string_view containerRegionName,
+            int width,
+            int height,
+            std::string_view name);
+
         bool hasRegion(std::string_view name) const;
         const NamedRegion* getRegion(std::string_view name) const;
         NamedRegion* getRegion(std::string_view name);

@@ -252,6 +252,74 @@ namespace Composition
         return success;
     }
 
+    bool PageComposer::createRegion(const Rect& rect, std::string_view name)
+    {
+        return createRegion(
+            rect.position.x,
+            rect.position.y,
+            rect.size.width,
+            rect.size.height,
+            name);
+    }
+
+    bool PageComposer::createFullScreenRegion(std::string_view name)
+    {
+        return createRegion(getFullScreenRegion(), name);
+    }
+
+    bool PageComposer::createCenteredRegion(
+        int width,
+        int height,
+        std::string_view name)
+    {
+        return createCenteredRegion(getFullScreenRegion(), width, height, name);
+    }
+
+    bool PageComposer::createCenteredRegion(
+        const Rect& container,
+        int width,
+        int height,
+        std::string_view name)
+    {
+        const int x = container.position.x + (container.size.width - width) / 2;
+        const int y = container.position.y + (container.size.height - height) / 2;
+
+        return createRegion(x, y, width, height, name);
+    }
+
+    bool PageComposer::createCenteredRegion(
+        std::string_view containerRegionName,
+        int width,
+        int height,
+        std::string_view name)
+    {
+        const NamedRegion* containerRegion = getRegion(containerRegionName);
+        if (containerRegion == nullptr)
+        {
+            const Rect requestedRegion = makeRect(0, 0, width, height);
+            recordOperation(
+                PageCompositionDiagnostics::OperationKind::CreateRegion,
+                "createCenteredRegion",
+                &requestedRegion,
+                nullptr,
+                nullptr,
+                &requestedRegion.size,
+                nullptr,
+                nullptr,
+                false,
+                false,
+                false,
+                false,
+                false,
+                name,
+                containerRegionName,
+                "Container region was not found.");
+            return false;
+        }
+
+        return createCenteredRegion(containerRegion->bounds, width, height, name);
+    }
+
     bool PageComposer::hasRegion(std::string_view name) const
     {
         return m_regions.hasRegion(name);
