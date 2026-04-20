@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <utility>
 #include <vector>
+#include <map>
 
 #include "Utilities/Unicode/GraphemeSegmentation.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
@@ -817,6 +818,150 @@ namespace Composition
         }
 
         return registerGrid(region->bounds, rows, cols, namePrefix);
+    }
+
+    bool PageComposer::registerGridArea(
+        const Rect& source,
+        int rows,
+        int cols,
+        const std::vector<std::string>& areaNames)
+    {
+        if (rows <= 0 || cols <= 0)
+        {
+            return false;
+        }
+
+        const std::size_t expectedCount = static_cast<std::size_t>(rows * cols);
+        if (areaNames.size() != expectedCount)
+        {
+            return false;
+        }
+
+        const std::vector<Rect> cells = splitGrid(source, rows, cols);
+        if (cells.size() != expectedCount)
+        {
+            return false;
+        }
+
+        struct AreaBounds
+        {
+            int minRow = 0;
+            int maxRow = 0;
+            int minCol = 0;
+            int maxCol = 0;
+            bool initialized = false;
+        };
+
+        std::map<std::string, AreaBounds> areas;
+
+        for (int row = 0; row < rows; ++row)
+        {
+            for (int col = 0; col < cols; ++col)
+            {
+                const std::size_t index = static_cast<std::size_t>(row * cols + col);
+                const std::string& name = areaNames[index];
+
+                if (name.empty())
+                {
+                    return false;
+                }
+
+                AreaBounds& bounds = areas[name];
+                if (!bounds.initialized)
+                {
+                    bounds.minRow = row;
+                    bounds.maxRow = row;
+                    bounds.minCol = col;
+                    bounds.maxCol = col;
+                    bounds.initialized = true;
+                }
+                else
+                {
+                    bounds.minRow = std::min(bounds.minRow, row);
+                    bounds.maxRow = std::max(bounds.maxRow, row);
+                    bounds.minCol = std::min(bounds.minCol, col);
+                    bounds.maxCol = std::max(bounds.maxCol, col);
+                }
+            }
+        }
+
+        for (const auto& entry : areas)
+        {
+            const std::string& name = entry.first;
+            const AreaBounds& bounds = entry.second;
+
+            for (int row = bounds.minRow; row <= bounds.maxRow; ++row)
+            {
+                for (int col = bounds.minCol; col <= bounds.maxCol; ++col)
+                {
+                    const std::size_t index = static_cast<std::size_t>(row * cols + col);
+                    if (areaNames[index] != name)
+                    {
+                        return false;
+                    }
+                }
+            }
+
+            const Rect& topLeft =
+                cells[static_cast<std::size_t>(bounds.minRow * cols + bounds.minCol)];
+            const Rect& bottomRight =
+                cells[static_cast<std::size_t>(bounds.maxRow * cols + bounds.maxCol)];
+
+            const int x = topLeft.position.x;
+            const int y = topLeft.position.y;
+            const int width =
+                (bottomRight.position.x + bottomRight.size.width) - topLeft.position.x;
+            const int height =
+                (bottomRight.position.y + bottomRight.size.height) - topLeft.position.y;
+
+            if (!createRegion(x, y, width, height, name))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool PageComposer::registerGridArea(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        const std::vector<std::string>& areaNames)
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return false;
+        }
+
+        return registerGridArea(region->bounds, rows, cols, areaNames);
+    }
+
+    bool PageComposer::registerGridArea(
+        const Rect& source,
+        int rows,
+        int cols,
+        std::initializer_list<std::string> areaNames)
+    {
+        return registerGridArea(
+            source,
+            rows,
+            cols,
+            std::vector<std::string>(areaNames));
+    }
+
+    bool PageComposer::registerGridArea(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        std::initializer_list<std::string> areaNames)
+    {
+        return registerGridArea(
+            sourceRegionName,
+            rows,
+            cols,
+            std::vector<std::string>(areaNames));
     }
 
     bool PageComposer::createInsetRegion(const Rect& source, int inset, std::string_view name)
