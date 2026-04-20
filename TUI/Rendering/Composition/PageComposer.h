@@ -6,6 +6,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <initializer_list>
 
 #include "Rendering/Composition/ObjectSource.h"
 #include "Rendering/Composition/Placement.h"
@@ -236,6 +237,30 @@ namespace Composition
             int rows,
             int cols,
             std::string_view namePrefix);
+
+        bool registerGridArea(
+            const Rect& source,
+            int rows,
+            int cols,
+            const std::vector<std::string>& areaNames);
+
+        bool registerGridArea(
+            std::string_view sourceRegionName,
+            int rows,
+            int cols,
+            const std::vector<std::string>& areaNames);
+
+        bool registerGridArea(
+            const Rect& source,
+            int rows,
+            int cols,
+            std::initializer_list<std::string> areaNames);
+
+        bool registerGridArea(
+            std::string_view sourceRegionName,
+            int rows,
+            int cols,
+            std::initializer_list<std::string> areaNames);
 
         bool createInsetRegion(const Rect& source, int inset, std::string_view name);
         bool createInsetRegion(std::string_view sourceRegionName, int inset, std::string_view name);
