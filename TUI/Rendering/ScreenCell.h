@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Text/TextTypes.h"
@@ -30,22 +31,22 @@ enum class ScreenCellFlags : std::uint32_t
 inline constexpr ScreenCellFlags operator|(ScreenCellFlags lhs, ScreenCellFlags rhs)
 {
     return static_cast<ScreenCellFlags>(
-        static_cast<std::uint32_t>(lhs) |
-        static_cast<std::uint32_t>(rhs));
+           static_cast<std::uint32_t>(lhs) |
+           static_cast<std::uint32_t>(rhs));
 }
 
 inline constexpr ScreenCellFlags operator&(ScreenCellFlags lhs, ScreenCellFlags rhs)
 {
     return static_cast<ScreenCellFlags>(
-        static_cast<std::uint32_t>(lhs) &
-        static_cast<std::uint32_t>(rhs));
+           static_cast<std::uint32_t>(lhs) &
+           static_cast<std::uint32_t>(rhs));
 }
 
 inline constexpr ScreenCellFlags operator^(ScreenCellFlags lhs, ScreenCellFlags rhs)
 {
     return static_cast<ScreenCellFlags>(
-        static_cast<std::uint32_t>(lhs) ^
-        static_cast<std::uint32_t>(rhs));
+           static_cast<std::uint32_t>(lhs) ^
+           static_cast<std::uint32_t>(rhs));
 }
 
 inline constexpr ScreenCellFlags operator~(ScreenCellFlags value)
@@ -122,6 +123,7 @@ struct ScreenCellMetadata
 struct ScreenCell
 {
     char32_t glyph = U' ';
+    std::u32string cluster{};
     Style style{};
     CellKind kind = CellKind::Empty;
     CellWidth width = CellWidth::One;
@@ -222,10 +224,11 @@ struct ScreenCell
     bool operator==(const ScreenCell& other) const
     {
         return glyph == other.glyph &&
-            style == other.style &&
-            kind == other.kind &&
-            width == other.width &&
-            metadata == other.metadata;
+               cluster == other.cluster &&
+               style == other.style &&
+               kind == other.kind &&
+               width == other.width &&
+               metadata == other.metadata;
     }
 
     bool operator!=(const ScreenCell& other) const
