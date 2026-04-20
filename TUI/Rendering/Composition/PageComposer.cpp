@@ -487,6 +487,82 @@ namespace Composition
         return region != nullptr ? remainderLeftOf(region->bounds, consumedWidth) : Rect{};
     }
 
+    std::pair<Rect, Rect> PageComposer::splitTop(const Rect& source, int height) const
+    {
+        return {
+            peekTop(source, height),
+            remainderBelow(source, height)
+        };
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitBottom(const Rect& source, int height) const
+    {
+        return {
+            peekBottom(source, height),
+            remainderAbove(source, height)
+        };
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitLeft(const Rect& source, int width) const
+    {
+        return {
+            peekLeft(source, width),
+            remainderRightOf(source, width)
+        };
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitRight(const Rect& source, int width) const
+    {
+        return {
+            peekRight(source, width),
+            remainderLeftOf(source, width)
+        };
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitTop(std::string_view sourceRegionName, int height) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return { Rect{}, Rect{} };
+        }
+
+        return splitTop(region->bounds, height);
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitBottom(std::string_view sourceRegionName, int height) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return { Rect{}, Rect{} };
+        }
+
+        return splitBottom(region->bounds, height);
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitLeft(std::string_view sourceRegionName, int width) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return { Rect{}, Rect{} };
+        }
+
+        return splitLeft(region->bounds, width);
+    }
+
+    std::pair<Rect, Rect> PageComposer::splitRight(std::string_view sourceRegionName, int width) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return { Rect{}, Rect{} };
+        }
+
+        return splitRight(region->bounds, width);
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
     {
         m_assetLibrary = &assetLibrary;

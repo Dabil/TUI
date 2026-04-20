@@ -191,6 +191,16 @@ namespace Composition
         Rect remainderRightOf(std::string_view sourceRegionName, int consumedWidth) const;
         Rect remainderLeftOf(std::string_view sourceRegionName, int consumedWidth) const;
 
+        std::pair<Rect, Rect> splitTop(const Rect& source, int height) const;
+        std::pair<Rect, Rect> splitBottom(const Rect& source, int height) const;
+        std::pair<Rect, Rect> splitLeft(const Rect& source, int width) const;
+        std::pair<Rect, Rect> splitRight(const Rect& source, int width) const;
+
+        std::pair<Rect, Rect> splitTop(std::string_view sourceRegionName, int height) const;
+        std::pair<Rect, Rect> splitBottom(std::string_view sourceRegionName, int height) const;
+        std::pair<Rect, Rect> splitLeft(std::string_view sourceRegionName, int width) const;
+        std::pair<Rect, Rect> splitRight(std::string_view sourceRegionName, int width) const;
+
         void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
         void detachAssetLibrary();
         bool hasAssetLibrary() const;
