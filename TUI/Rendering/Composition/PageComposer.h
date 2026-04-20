@@ -165,6 +165,19 @@ namespace Composition
             int height,
             std::string_view name);
 
+        void fillRegion(const Rect& target, char32_t glyph, const Style& style);
+        void fillRegion(std::string_view targetRegionName, char32_t glyph, const Style& style);
+
+        void styleRegion(const Rect& target, const Style& style);
+        void styleRegion(std::string_view targetRegionName, const Style& style);
+
+        void clearRegion(const Rect& target, const Style& style);
+        void clearRegion(std::string_view targetRegionName, const Style& style);
+
+        void drawFrame(const Rect& target, const Style& style);
+        void drawFrame(std::string_view targetRegionName, const Style& style);
+        void drawFrame(int x, int y, int width, int height, const Style& style);
+
         bool hasRegion(std::string_view name) const;
         const NamedRegion* getRegion(std::string_view name) const;
         NamedRegion* getRegion(std::string_view name);
