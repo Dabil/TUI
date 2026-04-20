@@ -423,6 +423,70 @@ namespace Composition
         return region != nullptr ? peekRight(region->bounds, width) : Rect{};
     }
 
+    Rect PageComposer::remainderBelow(const Rect& source, int consumedHeight) const
+    {
+        const int clampedHeight = std::max(0, std::min(consumedHeight, source.size.height));
+        return makeRect(
+            source.position.x,
+            source.position.y + clampedHeight,
+            source.size.width,
+            source.size.height - clampedHeight);
+    }
+
+    Rect PageComposer::remainderAbove(const Rect& source, int consumedHeight) const
+    {
+        const int clampedHeight = std::max(0, std::min(consumedHeight, source.size.height));
+        return makeRect(
+            source.position.x,
+            source.position.y,
+            source.size.width,
+            source.size.height - clampedHeight);
+    }
+
+    Rect PageComposer::remainderRightOf(const Rect& source, int consumedWidth) const
+    {
+        const int clampedWidth = std::max(0, std::min(consumedWidth, source.size.width));
+        return makeRect(
+            source.position.x + clampedWidth,
+            source.position.y,
+            source.size.width - clampedWidth,
+            source.size.height);
+    }
+
+    Rect PageComposer::remainderLeftOf(const Rect& source, int consumedWidth) const
+    {
+        const int clampedWidth = std::max(0, std::min(consumedWidth, source.size.width));
+        return makeRect(
+            source.position.x,
+            source.position.y,
+            source.size.width - clampedWidth,
+            source.size.height);
+    }
+
+    Rect PageComposer::remainderBelow(std::string_view sourceRegionName, int consumedHeight) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? remainderBelow(region->bounds, consumedHeight) : Rect{};
+    }
+
+    Rect PageComposer::remainderAbove(std::string_view sourceRegionName, int consumedHeight) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? remainderAbove(region->bounds, consumedHeight) : Rect{};
+    }
+
+    Rect PageComposer::remainderRightOf(std::string_view sourceRegionName, int consumedWidth) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? remainderRightOf(region->bounds, consumedWidth) : Rect{};
+    }
+
+    Rect PageComposer::remainderLeftOf(std::string_view sourceRegionName, int consumedWidth) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? remainderLeftOf(region->bounds, consumedWidth) : Rect{};
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
     {
         m_assetLibrary = &assetLibrary;
