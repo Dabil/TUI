@@ -281,6 +281,19 @@ namespace Composition
             int bottom,
             std::string_view name);
 
+        bool insetAll(
+            const std::vector<std::string>& sourceNames,
+            int inset,
+            const std::vector<std::string>& destNames);
+
+        bool insetAll(
+            const std::vector<std::string>& sourceNames,
+            int left,
+            int top,
+            int right,
+            int bottom,
+            const std::vector<std::string>& destNames);
+
         void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
         void detachAssetLibrary();
         bool hasAssetLibrary() const;
