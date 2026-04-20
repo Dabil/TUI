@@ -181,6 +181,16 @@ namespace Composition
         Rect peekLeft(std::string_view regionName, int width) const;
         Rect peekRight(std::string_view regionName, int width) const;
 
+        Rect remainderBelow(const Rect& source, int consumedHeight) const;
+        Rect remainderAbove(const Rect& source, int consumedHeight) const;
+        Rect remainderRightOf(const Rect& source, int consumedWidth) const;
+        Rect remainderLeftOf(const Rect& source, int consumedWidth) const;
+
+        Rect remainderBelow(std::string_view sourceRegionName, int consumedHeight) const;
+        Rect remainderAbove(std::string_view sourceRegionName, int consumedHeight) const;
+        Rect remainderRightOf(std::string_view sourceRegionName, int consumedWidth) const;
+        Rect remainderLeftOf(std::string_view sourceRegionName, int consumedWidth) const;
+
         void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
         void detachAssetLibrary();
         bool hasAssetLibrary() const;
