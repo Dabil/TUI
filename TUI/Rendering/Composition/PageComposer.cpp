@@ -1021,6 +1021,57 @@ namespace Composition
         return createInsetRegion(region->bounds, left, top, right, bottom, name);
     }
 
+    bool PageComposer::insetAll(
+        const std::vector<std::string>& sourceNames,
+        int inset,
+        const std::vector<std::string>& destNames)
+    {
+        if (sourceNames.size() != destNames.size())
+        {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < sourceNames.size(); ++i)
+        {
+            if (!createInsetRegion(sourceNames[i], inset, destNames[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool PageComposer::insetAll(
+        const std::vector<std::string>& sourceNames,
+        int left,
+        int top,
+        int right,
+        int bottom,
+        const std::vector<std::string>& destNames)
+    {
+        if (sourceNames.size() != destNames.size())
+        {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < sourceNames.size(); ++i)
+        {
+            if (!createInsetRegion(
+                sourceNames[i],
+                left,
+                top,
+                right,
+                bottom,
+                destNames[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
     {
         m_assetLibrary = &assetLibrary;
