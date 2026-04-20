@@ -29,6 +29,7 @@ public:
     const ScreenCell& getLogicalCell(int x, int y) const;
     char32_t getDisplayGlyph(int x, int y) const;
     Style getDisplayStyle(int x, int y) const;
+    std::u32string getDisplayCluster(int x, int y) const;
 
     const ScreenCell* tryGetRowData(int y) const;
     void expandSpanToGlyphBoundaries(int y, int& xStart, int& xEnd) const;

@@ -104,6 +104,7 @@ void ScreenBuffer::clear(const Style& style)
     for (auto& cell : m_cells)
     {
         cell.glyph = U' ';
+        cell.cluster.clear();
         cell.style = style;
         cell.kind = CellKind::Empty;
         cell.width = CellWidth::One;
@@ -175,6 +176,27 @@ Style ScreenBuffer::getDisplayStyle(int x, int y) const
     }
 
     return getLogicalCellInternal(x, y).style;
+}
+
+std::u32string ScreenBuffer::getDisplayCluster(int x, int y) const
+{
+    if (!inBounds(x, y))
+    {
+        return {};
+    }
+
+    const ScreenCell& cell = getLogicalCellInternal(x, y);
+    if (cell.kind != CellKind::Glyph)
+    {
+        return {};
+    }
+
+    if (!cell.cluster.empty())
+    {
+        return cell.cluster;
+    }
+
+    return std::u32string(1, cell.glyph);
 }
 
 const ScreenCell* ScreenBuffer::tryGetRowData(int y) const
@@ -268,6 +290,7 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
     {
         ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
         target.glyph = U' ';
+        target.cluster.clear();
         target.style = normalized.style;
         target.kind = CellKind::Empty;
         target.width = CellWidth::One;
@@ -284,6 +307,7 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
         {
             ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
             target.glyph = U' ';
+            target.cluster.clear();
             target.style = normalized.style;
             target.kind = CellKind::Empty;
             target.width = CellWidth::One;
@@ -302,11 +326,13 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 
             ScreenCell& leading = m_cells[static_cast<std::size_t>(index(x, y))];
             leading = normalized;
+            leading.cluster.clear();
             leading.kind = CellKind::Glyph;
             leading.width = CellWidth::Two;
 
             ScreenCell& trailing = m_cells[static_cast<std::size_t>(index(x + 1, y))];
             trailing.glyph = U' ';
+            trailing.cluster.clear();
             trailing.style = leading.style;
             trailing.kind = CellKind::WideTrailing;
             trailing.width = CellWidth::Zero;
@@ -316,6 +342,7 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 
         ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
         target = normalized;
+        target.cluster.clear();
         target.kind = CellKind::Glyph;
         target.width = CellWidth::One;
         return;
@@ -426,7 +453,7 @@ void ScreenBuffer::writeCodePoint(int x, int y, char32_t glyph, const std::optio
     {
         for (int previousX = x - 1; previousX >= 0; --previousX)
         {
-            const ScreenCell& previousCell =
+            ScreenCell& previousCell =
                 m_cells[static_cast<std::size_t>(index(previousX, y))];
 
             if (previousCell.kind == CellKind::WideTrailing ||
@@ -437,6 +464,12 @@ void ScreenBuffer::writeCodePoint(int x, int y, char32_t glyph, const std::optio
 
             if (isVisibleLeadingCell(previousCell))
             {
+                if (previousCell.cluster.empty())
+                {
+                    previousCell.cluster.push_back(previousCell.glyph);
+                }
+
+                previousCell.cluster.push_back(glyph);
                 return;
             }
 
@@ -676,6 +709,7 @@ void ScreenBuffer::clearCell(int x, int y)
 
     ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
     cell.glyph = U' ';
+    cell.cluster.clear();
     cell.style = Style{};
     cell.kind = CellKind::Empty;
     cell.width = CellWidth::One;
@@ -750,6 +784,7 @@ void ScreenBuffer::writeSingleWidthCodePoint(int x, int y, char32_t glyph, const
 
     ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
     cell.glyph = glyph;
+    cell.cluster.clear();
     cell.style = resolvedStyle;
     cell.kind = CellKind::Glyph;
     cell.width = CellWidth::One;
@@ -780,6 +815,7 @@ void ScreenBuffer::writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const
 
     ScreenCell& leading = m_cells[static_cast<std::size_t>(index(x, y))];
     leading.glyph = glyph;
+    leading.cluster.clear();
     leading.style = resolvedStyle;
     leading.kind = CellKind::Glyph;
     leading.width = CellWidth::Two;
@@ -787,6 +823,7 @@ void ScreenBuffer::writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const
 
     ScreenCell& trailing = m_cells[static_cast<std::size_t>(index(x + 1, y))];
     trailing.glyph = U' ';
+    trailing.cluster.clear();
     trailing.style = resolvedStyle;
     trailing.kind = CellKind::WideTrailing;
     trailing.width = CellWidth::Zero;
