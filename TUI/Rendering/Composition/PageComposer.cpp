@@ -359,6 +359,69 @@ namespace Composition
         return makeRect(0, 0, std::max(0, getWidth()), std::max(0, getHeight()));
     }
 
+    Rect PageComposer::peekTop(const Rect& rect, int height) const
+    {
+        const int clampedHeight = std::max(0, std::min(height, rect.size.height));
+        return makeRect(
+            rect.position.x,
+            rect.position.y,
+            rect.size.width,
+            clampedHeight);
+    }
+
+    Rect PageComposer::peekBottom(const Rect& rect, int height) const
+    {
+        const int clampedHeight = std::max(0, std::min(height, rect.size.height));
+        return makeRect(
+            rect.position.x,
+            rect.position.y + (rect.size.height - clampedHeight),
+            rect.size.width,
+            clampedHeight);
+    }
+
+    Rect PageComposer::peekLeft(const Rect& rect, int width) const
+    {
+        const int clampedWidth = std::max(0, std::min(width, rect.size.width));
+        return makeRect(
+            rect.position.x,
+            rect.position.y,
+            clampedWidth,
+            rect.size.height);
+    }
+
+    Rect PageComposer::peekRight(const Rect& rect, int width) const
+    {
+        const int clampedWidth = std::max(0, std::min(width, rect.size.width));
+        return makeRect(
+            rect.position.x + (rect.size.width - clampedWidth),
+            rect.position.y,
+            clampedWidth,
+            rect.size.height);
+    }
+
+    Rect PageComposer::peekTop(std::string_view regionName, int height) const
+    {
+        const NamedRegion* region = getRegion(regionName);
+        return region != nullptr ? peekTop(region->bounds, height) : Rect{};
+    }
+
+    Rect PageComposer::peekBottom(std::string_view regionName, int height) const
+    {
+        const NamedRegion* region = getRegion(regionName);
+        return region != nullptr ? peekBottom(region->bounds, height) : Rect{};
+    }
+
+    Rect PageComposer::peekLeft(std::string_view regionName, int width) const
+    {
+        const NamedRegion* region = getRegion(regionName);
+        return region != nullptr ? peekLeft(region->bounds, width) : Rect{};
+    }
+
+    Rect PageComposer::peekRight(std::string_view regionName, int width) const
+    {
+        const NamedRegion* region = getRegion(regionName);
+        return region != nullptr ? peekRight(region->bounds, width) : Rect{};
+    }
 
     void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
     {
