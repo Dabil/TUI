@@ -84,6 +84,10 @@ private:
         int xEnd,
         int& nextX);
 
+    std::u32string maskBlinkHiddenCellText(
+        const std::u32string& clusterText, 
+        CellWidth width) const;
+
     void resetStyle();
 
     bool queryVisibleConsoleSize(int& width, int& height) const;

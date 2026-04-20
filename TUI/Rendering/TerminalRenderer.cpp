@@ -83,21 +83,6 @@ namespace
         return UnicodeWidth::measureCodePointWidth(glyph);
     }
 
-    char32_t cellToPresentedGlyph(const ScreenCell& cell)
-    {
-        if (isContinuationCell(cell))
-        {
-            return U'\0';
-        }
-
-        if (cell.kind == CellKind::Glyph)
-        {
-            return cell.glyph;
-        }
-
-        return U' ';
-    }
-
     int glyphCellAdvance(const ScreenCell& cell)
     {
         if (cell.kind == CellKind::Glyph && cell.width == CellWidth::Two)
@@ -654,7 +639,7 @@ TextBackendCapabilities TerminalRenderer::textCapabilities() const
 {
     TextBackendCapabilities capabilities;
     capabilities.supportsUtf16Output = false;
-    capabilities.supportsCombiningMarks = false;
+    capabilities.supportsCombiningMarks = true;
     capabilities.supportsEastAsianWide = true;
     capabilities.supportsEmoji = false;
     capabilities.supportsFontFallback = false;
@@ -821,7 +806,6 @@ VtRun TerminalRenderer::buildRun(
     run.presentedStyle = resolved.presentedStyle;
 
     std::u32string runText;
-    std::vector<CellWidth> runGlyphWidths;
 
     int x = xStart;
     while (x <= xEnd)
@@ -839,11 +823,19 @@ VtRun TerminalRenderer::buildRun(
             break;
         }
 
-        const char32_t glyph = cellToPresentedGlyph(cell);
-        if (glyph != U'\0')
+        const std::u32string clusterText = frame.getDisplayCluster(x, y);
+
+        if (!clusterText.empty())
         {
-            runText.push_back(glyph);
-            runGlyphWidths.push_back(presentedGlyphWidth(glyph));
+            if (isBlinkVisibleForResolvedStyle(resolved))
+            {
+                runText += clusterText;
+            }
+            else
+            {
+                runText += maskBlinkHiddenCellText(clusterText, cell.width);
+            }
+
             run.cellWidth += glyphCellAdvance(cell);
         }
 
@@ -854,39 +846,27 @@ VtRun TerminalRenderer::buildRun(
         }
     }
 
-    if (!isBlinkVisibleForResolvedStyle(resolved))
-    {
-        std::u32string maskedText;
-        maskedText.reserve(runText.size() * 2);
-
-        for (std::size_t i = 0; i < runText.size(); ++i)
-        {
-            const char32_t glyph = runText[i];
-            const CellWidth width = runGlyphWidths[i];
-
-            if (glyph == U' ')
-            {
-                maskedText.push_back(U' ');
-                continue;
-            }
-
-            if (width == CellWidth::Two)
-            {
-                maskedText.push_back(U' ');
-                maskedText.push_back(U' ');
-                continue;
-            }
-
-            maskedText.push_back(U' ');
-        }
-
-        runText = std::move(maskedText);
-    }
-
     run.utf8Text = UnicodeConversion::u32ToUtf8(runText);
     nextX = x;
 
     return run;
+}
+
+std::u32string TerminalRenderer::maskBlinkHiddenCellText(
+    const std::u32string& clusterText,
+    CellWidth width) const
+{
+    if (clusterText.empty())
+    {
+        return {};
+    }
+
+    if (width == CellWidth::Two)
+    {
+        return std::u32string(2, U' ');
+    }
+
+    return std::u32string(1, U' ');
 }
 
 void TerminalRenderer::resetStyle()
