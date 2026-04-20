@@ -1,4 +1,3 @@
-// Rendering/Composition/Placement.h
 #pragma once
 
 #include <string>
