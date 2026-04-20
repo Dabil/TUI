@@ -171,6 +171,16 @@ namespace Composition
 
         Rect getFullScreenRegion() const;
 
+        Rect peekTop(const Rect& rect, int height) const;
+        Rect peekBottom(const Rect& rect, int height) const;
+        Rect peekLeft(const Rect& rect, int width) const;
+        Rect peekRight(const Rect& rect, int width) const;
+
+        Rect peekTop(std::string_view regionName, int height) const;
+        Rect peekBottom(std::string_view regionName, int height) const;
+        Rect peekLeft(std::string_view regionName, int width) const;
+        Rect peekRight(std::string_view regionName, int width) const;
+
         void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
         void detachAssetLibrary();
         bool hasAssetLibrary() const;
