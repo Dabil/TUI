@@ -1,4 +1,3 @@
-// Rendering/Composition/Placement.cpp
 #include "Rendering/Composition/Placement.h"
 
 #include <algorithm>

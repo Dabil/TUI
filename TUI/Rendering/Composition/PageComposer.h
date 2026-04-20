@@ -1,4 +1,3 @@
-// Rendering/Composition/PageComposer.h
 #pragma once
 
 #include <cstdint>
