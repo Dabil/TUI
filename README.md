@@ -116,7 +116,7 @@ The engine is evolving into a flexible **terminal UI framework** for building co
 
 # License
 
-	GPL 3.0
+	MIT
 	See: LICENSE
 
 # Author
