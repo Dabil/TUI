@@ -201,6 +201,18 @@ namespace Composition
         std::pair<Rect, Rect> splitLeft(std::string_view sourceRegionName, int width) const;
         std::pair<Rect, Rect> splitRight(std::string_view sourceRegionName, int width) const;
 
+        std::vector<Rect> splitGrid(const Rect& source, int rows, int cols) const;
+        std::vector<Rect> splitGrid(std::string_view sourceRegionName, int rows, int cols) const;
+
+        Rect gridCell(const Rect& source, int rows, int cols, int row, int col) const;
+        Rect gridCell(std::string_view sourceRegionName, int rows, int cols, int row, int col) const;
+
+        std::vector<Rect> gridRow(const Rect& source, int rows, int cols, int row) const;
+        std::vector<Rect> gridRow(std::string_view sourceRegionName, int rows, int cols, int row) const;
+
+        std::vector<Rect> gridColumn(const Rect& source, int rows, int cols, int col) const;
+        std::vector<Rect> gridColumn(std::string_view sourceRegionName, int rows, int cols, int col) const;
+
         void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
         void detachAssetLibrary();
         bool hasAssetLibrary() const;
