@@ -715,6 +715,167 @@ namespace Composition
         return region != nullptr ? gridColumn(region->bounds, rows, cols, col) : std::vector<Rect>{};
     }
 
+    bool PageComposer::registerGrid(
+        const Rect& source,
+        int rows,
+        int cols,
+        const std::vector<std::string>& names)
+    {
+        if (rows <= 0 || cols <= 0)
+        {
+            return false;
+        }
+
+        const std::size_t expectedCount = static_cast<std::size_t>(rows * cols);
+        if (names.size() != expectedCount)
+        {
+            return false;
+        }
+
+        const std::vector<Rect> cells = splitGrid(source, rows, cols);
+        if (cells.size() != expectedCount)
+        {
+            return false;
+        }
+
+        for (std::size_t i = 0; i < cells.size(); ++i)
+        {
+            if (!createRegion(cells[i], names[i]))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool PageComposer::registerGrid(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        const std::vector<std::string>& names)
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return false;
+        }
+
+        return registerGrid(region->bounds, rows, cols, names);
+    }
+
+    bool PageComposer::registerGrid(
+        const Rect& source,
+        int rows,
+        int cols,
+        std::string_view namePrefix)
+    {
+        if (rows <= 0 || cols <= 0)
+        {
+            return false;
+        }
+
+        const std::vector<Rect> cells = splitGrid(source, rows, cols);
+        const std::size_t expectedCount = static_cast<std::size_t>(rows * cols);
+        if (cells.size() != expectedCount)
+        {
+            return false;
+        }
+
+        std::size_t index = 0;
+        for (int row = 0; row < rows; ++row)
+        {
+            for (int col = 0; col < cols; ++col)
+            {
+                const std::string name =
+                    std::string(namePrefix) +
+                    "_r" + std::to_string(row) +
+                    "_c" + std::to_string(col);
+
+                if (!createRegion(cells[index], name))
+                {
+                    return false;
+                }
+
+                ++index;
+            }
+        }
+
+        return true;
+    }
+
+    bool PageComposer::registerGrid(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        std::string_view namePrefix)
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return false;
+        }
+
+        return registerGrid(region->bounds, rows, cols, namePrefix);
+    }
+
+    bool PageComposer::createInsetRegion(const Rect& source, int inset, std::string_view name)
+    {
+        return createInsetRegion(source, inset, inset, inset, inset, name);
+    }
+
+    bool PageComposer::createInsetRegion(
+        std::string_view sourceRegionName,
+        int inset,
+        std::string_view name)
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return false;
+        }
+
+        return createInsetRegion(region->bounds, inset, name);
+    }
+
+    bool PageComposer::createInsetRegion(
+        const Rect& source,
+        int left,
+        int top,
+        int right,
+        int bottom,
+        std::string_view name)
+    {
+        const int clampedLeft = std::max(0, left);
+        const int clampedTop = std::max(0, top);
+        const int clampedRight = std::max(0, right);
+        const int clampedBottom = std::max(0, bottom);
+
+        const int insetX = source.position.x + clampedLeft;
+        const int insetY = source.position.y + clampedTop;
+        const int insetWidth = std::max(0, source.size.width - clampedLeft - clampedRight);
+        const int insetHeight = std::max(0, source.size.height - clampedTop - clampedBottom);
+
+        return createRegion(insetX, insetY, insetWidth, insetHeight, name);
+    }
+
+    bool PageComposer::createInsetRegion(
+        std::string_view sourceRegionName,
+        int left,
+        int top,
+        int right,
+        int bottom,
+        std::string_view name)
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        if (region == nullptr)
+        {
+            return false;
+        }
+
+        return createInsetRegion(region->bounds, left, top, right, bottom, name);
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
     {
         m_assetLibrary = &assetLibrary;
