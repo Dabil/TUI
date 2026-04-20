@@ -213,6 +213,49 @@ namespace Composition
         std::vector<Rect> gridColumn(const Rect& source, int rows, int cols, int col) const;
         std::vector<Rect> gridColumn(std::string_view sourceRegionName, int rows, int cols, int col) const;
 
+        bool registerGrid(
+            const Rect& source,
+            int rows,
+            int cols,
+            const std::vector<std::string>& names);
+
+        bool registerGrid(
+            std::string_view sourceRegionName,
+            int rows,
+            int cols,
+            const std::vector<std::string>& names);
+
+        bool registerGrid(
+            const Rect& source,
+            int rows,
+            int cols,
+            std::string_view namePrefix);
+
+        bool registerGrid(
+            std::string_view sourceRegionName,
+            int rows,
+            int cols,
+            std::string_view namePrefix);
+
+        bool createInsetRegion(const Rect& source, int inset, std::string_view name);
+        bool createInsetRegion(std::string_view sourceRegionName, int inset, std::string_view name);
+
+        bool createInsetRegion(
+            const Rect& source,
+            int left,
+            int top,
+            int right,
+            int bottom,
+            std::string_view name);
+
+        bool createInsetRegion(
+            std::string_view sourceRegionName,
+            int left,
+            int top,
+            int right,
+            int bottom,
+            std::string_view name);
+
         void setAssetLibrary(Assets::AssetLibrary& assetLibrary);
         void detachAssetLibrary();
         bool hasAssetLibrary() const;
