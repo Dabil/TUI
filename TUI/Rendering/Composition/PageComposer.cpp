@@ -563,6 +563,158 @@ namespace Composition
         return splitRight(region->bounds, width);
     }
 
+    std::vector<Rect> PageComposer::splitGrid(const Rect& source, int rows, int cols) const
+    {
+        std::vector<Rect> cells;
+
+        if (rows <= 0 || cols <= 0 || source.size.width < 0 || source.size.height < 0)
+        {
+            return cells;
+        }
+
+        cells.reserve(static_cast<std::size_t>(rows * cols));
+
+        const int baseCellWidth = source.size.width / cols;
+        const int extraWidth = source.size.width % cols;
+
+        const int baseCellHeight = source.size.height / rows;
+        const int extraHeight = source.size.height % rows;
+
+        int y = source.position.y;
+        for (int row = 0; row < rows; ++row)
+        {
+            const int cellHeight = baseCellHeight + (row < extraHeight ? 1 : 0);
+
+            int x = source.position.x;
+            for (int col = 0; col < cols; ++col)
+            {
+                const int cellWidth = baseCellWidth + (col < extraWidth ? 1 : 0);
+
+                cells.push_back(makeRect(x, y, cellWidth, cellHeight));
+                x += cellWidth;
+            }
+
+            y += cellHeight;
+        }
+
+        return cells;
+    }
+
+    std::vector<Rect> PageComposer::splitGrid(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? splitGrid(region->bounds, rows, cols) : std::vector<Rect>{};
+    }
+
+    Rect PageComposer::gridCell(
+        const Rect& source,
+        int rows,
+        int cols,
+        int row,
+        int col) const
+    {
+        if (rows <= 0 || cols <= 0 || row < 0 || col < 0 || row >= rows || col >= cols)
+        {
+            return Rect{};
+        }
+
+        const std::vector<Rect> cells = splitGrid(source, rows, cols);
+        const std::size_t index = static_cast<std::size_t>(row * cols + col);
+
+        return index < cells.size() ? cells[index] : Rect{};
+    }
+
+    Rect PageComposer::gridCell(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        int row,
+        int col) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? gridCell(region->bounds, rows, cols, row, col) : Rect{};
+    }
+
+    std::vector<Rect> PageComposer::gridRow(
+        const Rect& source,
+        int rows,
+        int cols,
+        int row) const
+    {
+        std::vector<Rect> result;
+
+        if (rows <= 0 || cols <= 0 || row < 0 || row >= rows)
+        {
+            return result;
+        }
+
+        const std::vector<Rect> cells = splitGrid(source, rows, cols);
+        result.reserve(static_cast<std::size_t>(cols));
+
+        const std::size_t startIndex = static_cast<std::size_t>(row * cols);
+        for (int col = 0; col < cols; ++col)
+        {
+            const std::size_t index = startIndex + static_cast<std::size_t>(col);
+            if (index < cells.size())
+            {
+                result.push_back(cells[index]);
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<Rect> PageComposer::gridRow(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        int row) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? gridRow(region->bounds, rows, cols, row) : std::vector<Rect>{};
+    }
+
+    std::vector<Rect> PageComposer::gridColumn(
+        const Rect& source,
+        int rows,
+        int cols,
+        int col) const
+    {
+        std::vector<Rect> result;
+
+        if (rows <= 0 || cols <= 0 || col < 0 || col >= cols)
+        {
+            return result;
+        }
+
+        const std::vector<Rect> cells = splitGrid(source, rows, cols);
+        result.reserve(static_cast<std::size_t>(rows));
+
+        for (int row = 0; row < rows; ++row)
+        {
+            const std::size_t index = static_cast<std::size_t>(row * cols + col);
+            if (index < cells.size())
+            {
+                result.push_back(cells[index]);
+            }
+        }
+
+        return result;
+    }
+
+    std::vector<Rect> PageComposer::gridColumn(
+        std::string_view sourceRegionName,
+        int rows,
+        int cols,
+        int col) const
+    {
+        const NamedRegion* region = getRegion(sourceRegionName);
+        return region != nullptr ? gridColumn(region->bounds, rows, cols, col) : std::vector<Rect>{};
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
     {
         m_assetLibrary = &assetLibrary;
