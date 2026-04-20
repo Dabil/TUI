@@ -24,7 +24,11 @@ public:
     bool inBounds(int x, int y) const;
 
     const ScreenCell& getCell(int x, int y) const;
-    const ScreenCell& getCell(int x, int y);
+    const ScreenCell* tryGetCell(int x, int y) const;
+
+    const ScreenCell& getLogicalCell(int x, int y) const;
+    char32_t getDisplayGlyph(int x, int y) const;
+    Style getDisplayStyle(int x, int y) const;
 
     const ScreenCell* tryGetRowData(int y) const;
     void expandSpanToGlyphBoundaries(int y, int& xStart, int& xEnd) const;
@@ -96,7 +100,7 @@ private:
     void writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
 
     Style resolveWriteStyle(int x, int y, const std::optional<Style>& styleOverride) const;
-    const ScreenCell& getStyleSourceCell(int x, int y) const;
+    const ScreenCell& getLogicalCellInternal(int x, int y) const;
 
 private:
     int m_width = 0;

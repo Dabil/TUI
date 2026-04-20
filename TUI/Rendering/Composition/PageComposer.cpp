@@ -1,4 +1,4 @@
-#include "Rendering/Composition/PageComposer.h"
+﻿#include "Rendering/Composition/PageComposer.h"
 
 #include "Assets/AssetLibrary.h"
 
@@ -319,6 +319,272 @@ namespace Composition
         }
 
         return createCenteredRegion(containerRegion->bounds, width, height, name);
+    }
+
+    void PageComposer::fillRegion(const Rect& target, char32_t glyph, const Style& style)
+    {
+        if (target.size.width <= 0 || target.size.height <= 0)
+        {
+            return;
+        }
+
+        const std::optional<Style> styleOverride(style);
+
+        for (int row = 0; row < target.size.height; ++row)
+        {
+            const int y = target.position.y + row;
+            for (int col = 0; col < target.size.width; ++col)
+            {
+                const int x = target.position.x + col;
+                m_composedBuffer.writeCodePoint(x, y, glyph, styleOverride);
+            }
+        }
+
+        synchronizeTarget();
+
+        const Point origin{ target.position.x, target.position.y };
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+            "fillRegion",
+            &target,
+            &target,
+            &origin,
+            &target.size,
+            nullptr,
+            nullptr,
+            false,
+            true,
+            false,
+            false,
+            true);
+    }
+
+    void PageComposer::fillRegion(
+        std::string_view targetRegionName,
+        char32_t glyph,
+        const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        fillRegion(region->bounds, glyph, style);
+    }
+
+    void PageComposer::styleRegion(const Rect& target, const Style& style)
+    {
+        if (target.size.width <= 0 || target.size.height <= 0)
+        {
+            return;
+        }
+
+        const std::optional<Style> styleOverride(style);
+
+        for (int row = 0; row < target.size.height; ++row)
+        {
+            const int y = target.position.y + row;
+            for (int col = 0; col < target.size.width; ++col)
+            {
+                const int x = target.position.x + col;
+                const char32_t existingGlyph = m_composedBuffer.getDisplayGlyph(x, y);
+                m_composedBuffer.writeCodePoint(x, y, existingGlyph, styleOverride);
+            }
+        }
+
+        synchronizeTarget();
+
+        const Point origin{ target.position.x, target.position.y };
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+            "styleRegion",
+            &target,
+            &target,
+            &origin,
+            &target.size,
+            nullptr,
+            nullptr,
+            false,
+            true,
+            false,
+            false,
+            true);
+    }
+
+    void PageComposer::styleRegion(std::string_view targetRegionName, const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        styleRegion(region->bounds, style);
+    }
+
+    void PageComposer::clearRegion(const Rect& target, const Style& style)
+    {
+        fillRegion(target, U' ', style);
+    }
+
+    void PageComposer::clearRegion(std::string_view targetRegionName, const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        clearRegion(region->bounds, style);
+    }
+
+    void PageComposer::drawFrame(const Rect& target, const Style& style)
+    {
+        drawFrame(
+            target.position.x,
+            target.position.y,
+            target.size.width,
+            target.size.height,
+            style);
+    }
+
+    void PageComposer::drawFrame(std::string_view targetRegionName, const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        drawFrame(region->bounds, style);
+    }
+
+    void PageComposer::drawFrame(int x, int y, int width, int height, const Style& style)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return;
+        }
+
+        const std::optional<Style> styleOverride(style);
+        const Rect target = makeRect(x, y, width, height);
+
+        if (width == 1 && height == 1)
+        {
+            m_composedBuffer.writeCodePoint(x, y, U'•', styleOverride);
+            synchronizeTarget();
+
+            const Point origin{ x, y };
+            const Size contentSize{ width, height };
+            recordOperation(
+                PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+                "drawFrame",
+                &target,
+                &target,
+                &origin,
+                &contentSize,
+                nullptr,
+                nullptr,
+                false,
+                true,
+                false,
+                false,
+                true);
+            return;
+        }
+
+        if (height == 1)
+        {
+            for (int col = 0; col < width; ++col)
+            {
+                m_composedBuffer.writeCodePoint(x + col, y, U'─', styleOverride);
+            }
+
+            synchronizeTarget();
+
+            const Point origin{ x, y };
+            const Size contentSize{ width, height };
+            recordOperation(
+                PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+                "drawFrame",
+                &target,
+                &target,
+                &origin,
+                &contentSize,
+                nullptr,
+                nullptr,
+                false,
+                true,
+                false,
+                false,
+                true);
+            return;
+        }
+
+        if (width == 1)
+        {
+            for (int row = 0; row < height; ++row)
+            {
+                m_composedBuffer.writeCodePoint(x, y + row, U'│', styleOverride);
+            }
+
+            synchronizeTarget();
+
+            const Point origin{ x, y };
+            const Size contentSize{ width, height };
+            recordOperation(
+                PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+                "drawFrame",
+                &target,
+                &target,
+                &origin,
+                &contentSize,
+                nullptr,
+                nullptr,
+                false,
+                true,
+                false,
+                false,
+                true);
+            return;
+        }
+
+        m_composedBuffer.writeCodePoint(x, y, U'┌', styleOverride);
+        m_composedBuffer.writeCodePoint(x + width - 1, y, U'┐', styleOverride);
+        m_composedBuffer.writeCodePoint(x, y + height - 1, U'└', styleOverride);
+        m_composedBuffer.writeCodePoint(x + width - 1, y + height - 1, U'┘', styleOverride);
+
+        for (int col = 1; col < width - 1; ++col)
+        {
+            m_composedBuffer.writeCodePoint(x + col, y, U'─', styleOverride);
+            m_composedBuffer.writeCodePoint(x + col, y + height - 1, U'─', styleOverride);
+        }
+
+        for (int row = 1; row < height - 1; ++row)
+        {
+            m_composedBuffer.writeCodePoint(x, y + row, U'│', styleOverride);
+            m_composedBuffer.writeCodePoint(x + width - 1, y + row, U'│', styleOverride);
+        }
+
+        synchronizeTarget();
+
+        const Point origin{ x, y };
+        const Size contentSize{ width, height };
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+            "drawFrame",
+            &target,
+            &target,
+            &origin,
+            &contentSize,
+            nullptr,
+            nullptr,
+            false,
+            true,
+            false,
+            false,
+            true);
     }
 
     bool PageComposer::hasRegion(std::string_view name) const

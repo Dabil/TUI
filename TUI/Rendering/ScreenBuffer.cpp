@@ -136,14 +136,45 @@ const ScreenCell& ScreenBuffer::getCell(int x, int y) const
     return m_cells[static_cast<std::size_t>(index(x, y))];
 }
 
-const ScreenCell& ScreenBuffer::getCell(int x, int y)
+const ScreenCell* ScreenBuffer::tryGetCell(int x, int y) const
 {
     if (!inBounds(x, y))
     {
-        throw std::out_of_range("ScreenBuffer::getCell out of bounds.");
+        return nullptr;
     }
 
-    return m_cells[static_cast<std::size_t>(index(x, y))];
+    return &m_cells[static_cast<std::size_t>(index(x, y))];
+}
+
+const ScreenCell& ScreenBuffer::getLogicalCell(int x, int y) const
+{
+    if (!inBounds(x, y))
+    {
+        throw std::out_of_range("ScreenBuffer::getLogicalCell out of bounds.");
+    }
+
+    return getLogicalCellInternal(x, y);
+}
+
+char32_t ScreenBuffer::getDisplayGlyph(int x, int y) const
+{
+    if (!inBounds(x, y))
+    {
+        return U' ';
+    }
+
+    const ScreenCell& cell = getLogicalCellInternal(x, y);
+    return cell.kind == CellKind::Glyph ? cell.glyph : U' ';
+}
+
+Style ScreenBuffer::getDisplayStyle(int x, int y) const
+{
+    if (!inBounds(x, y))
+    {
+        return Style{};
+    }
+
+    return getLogicalCellInternal(x, y).style;
 }
 
 const ScreenCell* ScreenBuffer::tryGetRowData(int y) const
@@ -774,10 +805,10 @@ Style ScreenBuffer::resolveWriteStyle(int x, int y, const std::optional<Style>& 
         return Style{};
     }
 
-    return getStyleSourceCell(x, y).style;
+    return getLogicalCellInternal(x, y).style;
 }
 
-const ScreenCell& ScreenBuffer::getStyleSourceCell(int x, int y) const
+const ScreenCell& ScreenBuffer::getLogicalCellInternal(int x, int y) const
 {
     const ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
 
