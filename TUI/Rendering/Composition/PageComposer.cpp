@@ -17,6 +17,177 @@ namespace
     {
         return ch == U'\n' || ch == U'\r';
     }
+
+    bool isWrapWhitespace(char32_t ch)
+    {
+        return ch == U' ' ||
+            ch == U'\t' ||
+            ch == U'\v' ||
+            ch == U'\f';
+    }
+
+    bool isWhitespaceCluster(const TextCluster& cluster)
+    {
+        if (cluster.codePoints.empty())
+        {
+            return false;
+        }
+
+        for (char32_t codePoint : cluster.codePoints)
+        {
+            if (!isWrapWhitespace(codePoint))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    int measureClusterDisplayWidth(const std::vector<TextCluster>& clusters)
+    {
+        int width = 0;
+
+        for (const TextCluster& cluster : clusters)
+        {
+            width += std::max(0, cluster.displayWidth);
+        }
+
+        return width;
+    }
+
+    std::u32string joinClusterRange(
+        const std::vector<TextCluster>& clusters,
+        std::size_t startIndex,
+        std::size_t endIndexExclusive,
+        bool trimTrailingWhitespace)
+    {
+        std::size_t effectiveEnd = endIndexExclusive;
+
+        if (trimTrailingWhitespace)
+        {
+            while (effectiveEnd > startIndex &&
+                isWhitespaceCluster(clusters[effectiveEnd - 1]))
+            {
+                --effectiveEnd;
+            }
+        }
+
+        std::u32string result;
+        for (std::size_t i = startIndex; i < effectiveEnd; ++i)
+        {
+            result += clusters[i].codePoints;
+        }
+
+        return result;
+    }
+
+    std::vector<std::u32string> wrapSingleSegmentedLine(
+        const std::vector<TextCluster>& clusters,
+        int maxWidth)
+    {
+        std::vector<std::u32string> lines;
+
+        if (maxWidth <= 0)
+        {
+            return lines;
+        }
+
+        if (clusters.empty())
+        {
+            lines.push_back(U"");
+            return lines;
+        }
+
+        std::size_t lineStart = 0;
+
+        while (lineStart < clusters.size())
+        {
+            while (lineStart < clusters.size() &&
+                isWhitespaceCluster(clusters[lineStart]))
+            {
+                ++lineStart;
+            }
+
+            if (lineStart >= clusters.size())
+            {
+                lines.push_back(U"");
+                break;
+            }
+
+            std::size_t index = lineStart;
+            std::size_t lastBreak = static_cast<std::size_t>(-1);
+            int currentWidth = 0;
+
+            while (index < clusters.size())
+            {
+                const int clusterWidth = std::max(0, clusters[index].displayWidth);
+                const bool breakableWhitespace = isWhitespaceCluster(clusters[index]);
+
+                if (currentWidth > 0 &&
+                    (currentWidth + clusterWidth) > maxWidth)
+                {
+                    break;
+                }
+
+                currentWidth += clusterWidth;
+
+                if (breakableWhitespace)
+                {
+                    lastBreak = index;
+                }
+
+                ++index;
+            }
+
+            if (index >= clusters.size())
+            {
+                lines.push_back(joinClusterRange(
+                    clusters,
+                    lineStart,
+                    clusters.size(),
+                    true));
+                break;
+            }
+
+            if (currentWidth == 0)
+            {
+                lines.push_back(joinClusterRange(
+                    clusters,
+                    lineStart,
+                    lineStart + 1,
+                    false));
+                lineStart = lineStart + 1;
+                continue;
+            }
+
+            if (lastBreak != static_cast<std::size_t>(-1) &&
+                lastBreak >= lineStart)
+            {
+                lines.push_back(joinClusterRange(
+                    clusters,
+                    lineStart,
+                    lastBreak,
+                    true));
+                lineStart = lastBreak + 1;
+                continue;
+            }
+
+            lines.push_back(joinClusterRange(
+                clusters,
+                lineStart,
+                index,
+                true));
+            lineStart = index;
+        }
+
+        if (lines.empty())
+        {
+            lines.push_back(U"");
+        }
+
+        return lines;
+    }
 }
 
 namespace Composition
@@ -2491,7 +2662,7 @@ namespace Composition
         synchronizeTarget();
 
         const Point origin{ x, y };
-        const Size contentSize{ static_cast<int>(line.size()), 1 };
+        const Size contentSize{ measureDisplayWidth(line), 1 };
         recordOperation(
             PageCompositionDiagnostics::OperationKind::WriteTextLine,
             "writeText",
@@ -2548,12 +2719,9 @@ namespace Composition
 
         const std::vector<std::u32string> lines = splitLines(block);
         int currentY = y;
-        int maxWidth = 0;
 
         for (const std::u32string& line : lines)
         {
-            maxWidth = std::max(maxWidth, static_cast<int>(line.size()));
-
             if (currentY >= m_composedBuffer.getHeight())
             {
                 break;
@@ -2570,7 +2738,7 @@ namespace Composition
         synchronizeTarget();
 
         const Point origin{ x, y };
-        const Size contentSize{ maxWidth, static_cast<int>(lines.size()) };
+        const Size contentSize = measureTextBlockDisplay(lines);
         recordOperation(
             PageCompositionDiagnostics::OperationKind::WriteTextBlock,
             "writeTextBlock",
@@ -2850,6 +3018,338 @@ namespace Composition
         lines.push_back(current);
         return lines;
     }
+    void PageComposer::writeAlignedText(
+        const Rect& target,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style)
+    {
+        writeAlignedTextUtf32(
+            target,
+            alignment,
+            UnicodeConversion::utf8ToU32(text),
+            std::optional<Style>(style));
+    }
+
+    void PageComposer::writeAlignedText(
+        std::string_view targetRegionName,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        writeAlignedText(region->bounds, alignment, text, style);
+    }
+
+    void PageComposer::writeAlignedTextInFullScreen(
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style)
+    {
+        writeAlignedText(getFullScreenRegion(), alignment, text, style);
+    }
+
+    void PageComposer::writeAlignedTextBlock(
+        const Rect& target,
+        const Alignment& alignment,
+        std::string_view textBlock,
+        const Style& style)
+    {
+        writeAlignedTextBlockUtf32(
+            target,
+            alignment,
+            UnicodeConversion::utf8ToU32(textBlock),
+            std::optional<Style>(style),
+            "writeAlignedTextBlock");
+    }
+
+    void PageComposer::writeAlignedTextBlock(
+        std::string_view targetRegionName,
+        const Alignment& alignment,
+        std::string_view textBlock,
+        const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        writeAlignedTextBlock(region->bounds, alignment, textBlock, style);
+    }
+
+    void PageComposer::writeAlignedTextBlockInFullScreen(
+        const Alignment& alignment,
+        std::string_view textBlock,
+        const Style& style)
+    {
+        writeAlignedTextBlock(getFullScreenRegion(), alignment, textBlock, style);
+    }
+
+    void PageComposer::writeWrappedText(
+        const Rect& target,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style)
+    {
+        writeWrappedTextUtf32(
+            target,
+            alignment,
+            UnicodeConversion::utf8ToU32(text),
+            std::optional<Style>(style));
+    }
+
+    void PageComposer::writeWrappedText(
+        std::string_view targetRegionName,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style)
+    {
+        const NamedRegion* region = getRegion(targetRegionName);
+        if (region == nullptr)
+        {
+            return;
+        }
+
+        writeWrappedText(region->bounds, alignment, text, style);
+    }
+
+    void PageComposer::writeWrappedTextInFullScreen(
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style)
+    {
+        writeWrappedText(getFullScreenRegion(), alignment, text, style);
+    }
+
+    void PageComposer::writeAlignedTextUtf32(
+        const Rect& target,
+        const Alignment& alignment,
+        std::u32string_view text,
+        const std::optional<Style>& styleOverride)
+    {
+        if (target.size.width <= 0 || target.size.height <= 0)
+        {
+            return;
+        }
+
+        const std::u32string line = extractFirstLine(text);
+        const Size contentSize{ measureDisplayWidth(line), 1 };
+
+        const PlacementResult placement = resolvePlacement(
+            makePlacementRequest(target, contentSize, alignment, false));
+
+        writeSegmentedLine(
+            placement.origin.x,
+            placement.origin.y,
+            line,
+            styleOverride);
+
+        synchronizeTarget();
+
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::WriteTextLine,
+            "writeAlignedText",
+            &target,
+            &placement.region,
+            &placement.origin,
+            &placement.contentSize,
+            &alignment,
+            nullptr,
+            true,
+            styleOverride.has_value(),
+            false,
+            placement.clamped,
+            true);
+    }
+
+    void PageComposer::writeAlignedTextBlockUtf32(
+        const Rect& target,
+        const Alignment& alignment,
+        std::u32string_view textBlock,
+        const std::optional<Style>& styleOverride,
+        std::string_view operationName)
+    {
+        if (target.size.width <= 0 || target.size.height <= 0)
+        {
+            return;
+        }
+
+        const std::vector<std::u32string> lines = splitLines(textBlock);
+        const Size contentSize = measureTextBlockDisplay(lines);
+
+        const PlacementResult placement = resolvePlacement(
+            makePlacementRequest(target, contentSize, alignment, false));
+
+        for (std::size_t i = 0; i < lines.size(); ++i)
+        {
+            const int y = placement.origin.y + static_cast<int>(i);
+            if (y < 0 || y >= m_composedBuffer.getHeight())
+            {
+                continue;
+            }
+
+            const int lineWidth = measureDisplayWidth(lines[i]);
+            const Rect lineRegion = makeRect(
+                placement.region.position.x,
+                y,
+                placement.region.size.width,
+                1);
+
+            const Point lineOrigin = resolveAlignedOrigin(
+                lineRegion,
+                Size{ lineWidth, 1 },
+                alignment.horizontal,
+                VerticalAlign::Top);
+
+            writeSegmentedLine(
+                lineOrigin.x,
+                y,
+                lines[i],
+                styleOverride);
+        }
+
+        synchronizeTarget();
+
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+            operationName,
+            &target,
+            &placement.region,
+            &placement.origin,
+            &placement.contentSize,
+            &alignment,
+            nullptr,
+            true,
+            styleOverride.has_value(),
+            false,
+            placement.clamped,
+            true);
+    }
+
+    void PageComposer::writeWrappedTextUtf32(
+        const Rect& target,
+        const Alignment& alignment,
+        std::u32string_view text,
+        const std::optional<Style>& styleOverride)
+    {
+        if (target.size.width <= 0 || target.size.height <= 0)
+        {
+            return;
+        }
+
+        const std::vector<std::u32string> wrappedLines =
+            wrapTextToLines(text, target.size.width);
+
+        const Size contentSize = measureTextBlockDisplay(wrappedLines);
+        const PlacementResult placement = resolvePlacement(
+            makePlacementRequest(target, contentSize, alignment, false));
+
+        for (std::size_t i = 0; i < wrappedLines.size(); ++i)
+        {
+            const int y = placement.origin.y + static_cast<int>(i);
+            if (y < 0 || y >= m_composedBuffer.getHeight())
+            {
+                continue;
+            }
+
+            const int lineWidth = measureDisplayWidth(wrappedLines[i]);
+            const Rect lineRegion = makeRect(
+                placement.region.position.x,
+                y,
+                placement.region.size.width,
+                1);
+
+            const Point lineOrigin = resolveAlignedOrigin(
+                lineRegion,
+                Size{ lineWidth, 1 },
+                alignment.horizontal,
+                VerticalAlign::Top);
+
+            writeSegmentedLine(
+                lineOrigin.x,
+                y,
+                wrappedLines[i],
+                styleOverride);
+        }
+
+        synchronizeTarget();
+
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
+            "writeWrappedText",
+            &target,
+            &placement.region,
+            &placement.origin,
+            &placement.contentSize,
+            &alignment,
+            nullptr,
+            true,
+            styleOverride.has_value(),
+            false,
+            placement.clamped,
+            true);
+    }
+
+    int PageComposer::measureDisplayWidth(std::u32string_view text)
+    {
+        return measureClusterDisplayWidth(GraphemeSegmentation::segment(text));
+    }
+
+    Size PageComposer::measureTextBlockDisplay(const std::vector<std::u32string>& lines)
+    {
+        Size size;
+        size.width = 0;
+        size.height = static_cast<int>(lines.size());
+
+        for (const std::u32string& line : lines)
+        {
+            size.width = std::max(size.width, measureDisplayWidth(line));
+        }
+
+        return size;
+    }
+
+    std::vector<std::u32string> PageComposer::wrapTextToLines(
+        std::u32string_view text,
+        int maxWidth)
+    {
+        std::vector<std::u32string> wrappedLines;
+
+        if (maxWidth <= 0)
+        {
+            return wrappedLines;
+        }
+
+        const std::vector<std::u32string> sourceLines = splitLines(text);
+
+        for (const std::u32string& sourceLine : sourceLines)
+        {
+            const std::vector<TextCluster> clusters =
+                GraphemeSegmentation::segment(sourceLine);
+
+            std::vector<std::u32string> paragraphLines =
+                wrapSingleSegmentedLine(clusters, maxWidth);
+
+            if (paragraphLines.empty())
+            {
+                wrappedLines.push_back(U"");
+                continue;
+            }
+
+            wrappedLines.insert(
+                wrappedLines.end(),
+                paragraphLines.begin(),
+                paragraphLines.end());
+        }
+
+        return wrappedLines;
+    }
 
     int PageComposer::resolveActiveFrameIndex() const
     {
@@ -2995,4 +3495,3 @@ namespace Composition
         refreshDeterministicSignature();
     }
 }
-

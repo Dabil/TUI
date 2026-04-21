@@ -797,6 +797,83 @@ namespace Composition
         static std::u32string extractFirstLine(std::u32string_view text);
         static std::vector<std::u32string> splitLines(std::u32string_view text);
 
+        void writeAlignedText(
+            const Rect& target,
+            const Alignment& alignment,
+            std::string_view text,
+            const Style& style);
+
+        void writeAlignedText(
+            std::string_view targetRegionName,
+            const Alignment& alignment,
+            std::string_view text,
+            const Style& style);
+
+        void writeAlignedTextInFullScreen(
+            const Alignment& alignment,
+            std::string_view text,
+            const Style& style);
+
+        void writeAlignedTextBlock(
+            const Rect& target,
+            const Alignment& alignment,
+            std::string_view textBlock,
+            const Style& style);
+
+        void writeAlignedTextBlock(
+            std::string_view targetRegionName,
+            const Alignment& alignment,
+            std::string_view textBlock,
+            const Style& style);
+
+        void writeAlignedTextBlockInFullScreen(
+            const Alignment& alignment,
+            std::string_view textBlock,
+            const Style& style);
+
+        void writeWrappedText(
+            const Rect& target,
+            const Alignment& alignment,
+            std::string_view text,
+            const Style& style);
+
+        void writeWrappedText(
+            std::string_view targetRegionName,
+            const Alignment& alignment,
+            std::string_view text,
+            const Style& style);
+
+        void writeWrappedTextInFullScreen(
+            const Alignment& alignment,
+            std::string_view text,
+            const Style& style);
+
+        void writeAlignedTextUtf32(
+            const Rect& target,
+            const Alignment& alignment,
+            std::u32string_view text,
+            const std::optional<Style>& styleOverride);
+
+        void writeAlignedTextBlockUtf32(
+            const Rect& target,
+            const Alignment& alignment,
+            std::u32string_view textBlock,
+            const std::optional<Style>& styleOverride,
+            std::string_view operationName);
+
+        void writeWrappedTextUtf32(
+            const Rect& target,
+            const Alignment& alignment,
+            std::u32string_view text,
+            const std::optional<Style>& styleOverride);
+
+        static int measureDisplayWidth(std::u32string_view text);
+        static Size measureTextBlockDisplay(const std::vector<std::u32string>& lines);
+       
+        static std::vector<std::u32string> wrapTextToLines(
+            std::u32string_view text,
+            int maxWidth);
+
         int resolveActiveFrameIndex() const;
 
         void recordOperation(
