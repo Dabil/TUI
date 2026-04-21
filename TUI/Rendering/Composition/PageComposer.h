@@ -154,16 +154,38 @@ namespace Composition
         bool createFullScreenRegion(std::string_view name);
 
         bool createCenteredRegion(int width, int height, std::string_view name);
+
         bool createCenteredRegion(
             const Rect& container,
             int width,
             int height,
             std::string_view name);
+
         bool createCenteredRegion(
             std::string_view containerRegionName,
             int width,
             int height,
             std::string_view name);
+
+        bool createDesignScreen(
+            int width,
+            int height,
+            std::string_view outerRegionName,
+            std::string_view innerRegionName = {});
+
+        bool createDesignScreen(
+            const Rect& container,
+            int width,
+            int height,
+            std::string_view outerRegionName,
+            std::string_view innerRegionName = {});
+
+        bool createDesignScreen(
+            std::string_view containerRegionName,
+            int width,
+            int height,
+            std::string_view outerRegionName,
+            std::string_view innerRegionName = {});
 
         void fillRegion(const Rect& target, char32_t glyph, const Style& style);
         void fillRegion(std::string_view targetRegionName, char32_t glyph, const Style& style);

@@ -492,6 +492,60 @@ namespace Composition
         return createCenteredRegion(containerRegion->bounds, width, height, name);
     }
 
+    bool PageComposer::createDesignScreen(
+        int width,
+        int height,
+        std::string_view outerRegionName,
+        std::string_view innerRegionName)
+    {
+        return createDesignScreen(
+            getFullScreenRegion(),
+            width,
+            height,
+            outerRegionName,
+            innerRegionName);
+    }
+
+    bool PageComposer::createDesignScreen(
+        const Rect& container,
+        int width,
+        int height,
+        std::string_view outerRegionName,
+        std::string_view innerRegionName)
+    {
+        if (!createCenteredRegion(container, width, height, outerRegionName))
+        {
+            return false;
+        }
+
+        if (innerRegionName.empty())
+        {
+            return true;
+        }
+
+        return createInsetRegion(outerRegionName, 1, innerRegionName);
+    }
+
+    bool PageComposer::createDesignScreen(
+        std::string_view containerRegionName,
+        int width,
+        int height,
+        std::string_view outerRegionName,
+        std::string_view innerRegionName)
+    {
+        if (!createCenteredRegion(containerRegionName, width, height, outerRegionName))
+        {
+            return false;
+        }
+
+        if (innerRegionName.empty())
+        {
+            return true;
+        }
+
+        return createInsetRegion(outerRegionName, 1, innerRegionName);
+    }
+
     void PageComposer::fillRegion(const Rect& target, char32_t glyph, const Style& style)
     {
         if (target.size.width <= 0 || target.size.height <= 0)
