@@ -68,21 +68,6 @@ namespace
             cell.kind == CellKind::CombiningContinuation;
     }
 
-    CellWidth presentedGlyphWidth(char32_t glyph)
-    {
-        if (glyph == U'\0')
-        {
-            return CellWidth::Zero;
-        }
-
-        if (glyph == U' ')
-        {
-            return CellWidth::One;
-        }
-
-        return UnicodeWidth::measureCodePointWidth(glyph);
-    }
-
     int glyphCellAdvance(const ScreenCell& cell)
     {
         if (cell.kind == CellKind::Glyph && cell.width == CellWidth::Two)
@@ -637,11 +622,13 @@ int TerminalRenderer::getConsoleHeight() const
 
 TextBackendCapabilities TerminalRenderer::textCapabilities() const
 {
+    const bool supportsClusterText = supportsUnicodeClusterEmission();
+
     TextBackendCapabilities capabilities;
     capabilities.supportsUtf16Output = false;
-    capabilities.supportsCombiningMarks = true;
+    capabilities.supportsCombiningMarks = supportsClusterText;
     capabilities.supportsEastAsianWide = true;
-    capabilities.supportsEmoji = false;
+    capabilities.supportsEmoji = supportsClusterText;
     capabilities.supportsFontFallback = false;
     return capabilities;
 }
@@ -850,6 +837,11 @@ VtRun TerminalRenderer::buildRun(
     nextX = x;
 
     return run;
+}
+
+bool TerminalRenderer::supportsUnicodeClusterEmission() const
+{
+    return m_virtualTerminalEnableSucceeded;
 }
 
 std::u32string TerminalRenderer::maskBlinkHiddenCellText(

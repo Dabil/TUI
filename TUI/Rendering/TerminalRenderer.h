@@ -84,9 +84,7 @@ private:
         int xEnd,
         int& nextX);
 
-    std::u32string maskBlinkHiddenCellText(
-        const std::u32string& clusterText, 
-        CellWidth width) const;
+    bool supportsUnicodeClusterEmission() const;
 
     void resetStyle();
 
@@ -104,32 +102,42 @@ private:
     void clearScreen();
 
     void recordStyleUsage(const Style& authoredStyle, const ResolvedStyle& resolvedStyle);
+ 
     void recordColorFeature(
         StyleFeature feature,
         const std::optional<ColorResolutionDiagnostics>& diagnostics);
+
     void recordTextFeature(
         StyleFeature feature,
         const Style::AttributeState& authoredState,
         bool presentedEnabled,
         bool physicallyRendered,
         TextAttributeRenderMode renderMode);
+
     void recordBlinkFeature(
         StyleFeature feature,
         const Style::AttributeState& authoredState,
         bool presentedEnabled,
         bool emulated,
         bool physicallyRendered);
+
     void recordPresentPerformance(
         const TerminalPresentDecision& decision,
         const TerminalPresentMetrics& metrics,
         const VtFrameEmitterStats& emitterStats,
         bool skippedPresent);
 
+    std::u32string maskBlinkHiddenCellText(
+        const std::u32string& clusterText,
+        CellWidth width) const;
+
     bool shouldForceFullPresentForBlink(const ScreenBuffer& frame);
+   
     void collectBlinkEmulationUsage(
         const ScreenBuffer& frame,
         bool& usesSlowBlinkEmulation,
         bool& usesFastBlinkEmulation) const;
+  
     bool isBlinkVisibleForResolvedStyle(const ResolvedStyle& resolvedStyle) const;
     bool isBlinkCurrentlyVisible(bool fastBlink) const;
 
