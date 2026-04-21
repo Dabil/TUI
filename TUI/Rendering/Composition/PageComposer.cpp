@@ -648,21 +648,6 @@ namespace Composition
         styleRegion(region->bounds, style);
     }
 
-    bool PageComposer::hasRegion(std::string_view name) const
-    {
-        return m_regions.hasRegion(name);
-    }
-
-    const NamedRegion* PageComposer::getRegion(std::string_view name) const
-    {
-        return m_regions.getRegion(name);
-    }
-
-    NamedRegion* PageComposer::getRegion(std::string_view name)
-    {
-        return m_regions.getRegion(name);
-    }
-
     void PageComposer::removeRegion(std::string_view regionName)
     {
         m_regions.removeRegion(regionName);
@@ -920,28 +905,33 @@ namespace Composition
         return m_regions.getRegion(name);
     }
 
-    void PageComposer::clearRegions()
-    {
-        m_regions.clearRegions();
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::ClearRegions,
-            "clearRegions",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
-    }
-
     Rect PageComposer::getFullScreenRegion() const
     {
         return makeRect(0, 0, std::max(0, getWidth()), std::max(0, getHeight()));
+    }
+
+    int PageComposer::regionWidth(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.size.width : 0;
+    }
+
+    int PageComposer::regionHeight(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.size.height : 0;
+    }
+
+    Point PageComposer::regionPosition(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.position : Point{};
+    }
+
+    Size PageComposer::regionSize(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.size : Size{};
     }
 
     Rect PageComposer::peekTop(const Rect& rect, int height) const

@@ -193,10 +193,6 @@ namespace Composition
         void styleRegion(const Rect& target, const Style& style);
         void styleRegion(std::string_view targetRegionName, const Style& style);
 
-        bool hasRegion(std::string_view name) const;
-        const NamedRegion* getRegion(std::string_view name) const;
-        NamedRegion* getRegion(std::string_view name);
-
         void removeRegion(std::string_view regionName);
         void renameRegion(std::string_view oldName, std::string_view newName);
 
@@ -215,9 +211,14 @@ namespace Composition
         bool hasRegion(std::string_view name) const;
         const NamedRegion* getRegion(std::string_view name) const;
         NamedRegion* getRegion(std::string_view name);
-        void clearRegions();
 
         Rect getFullScreenRegion() const;
+
+        int regionWidth(std::string_view regionName) const;
+        int regionHeight(std::string_view regionName) const;
+
+        Point regionPosition(std::string_view regionName) const;
+        Size regionSize(std::string_view regionName) const;
 
         Rect peekTop(const Rect& rect, int height) const;
         Rect peekBottom(const Rect& rect, int height) const;
