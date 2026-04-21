@@ -648,6 +648,99 @@ namespace Composition
         styleRegion(region->bounds, style);
     }
 
+    bool PageComposer::hasRegion(std::string_view name) const
+    {
+        return m_regions.hasRegion(name);
+    }
+
+    const NamedRegion* PageComposer::getRegion(std::string_view name) const
+    {
+        return m_regions.getRegion(name);
+    }
+
+    NamedRegion* PageComposer::getRegion(std::string_view name)
+    {
+        return m_regions.getRegion(name);
+    }
+
+    void PageComposer::removeRegion(std::string_view regionName)
+    {
+        m_regions.removeRegion(regionName);
+    }
+
+    void PageComposer::renameRegion(std::string_view oldName, std::string_view newName)
+    {
+        if (oldName.empty() || newName.empty())
+        {
+            return;
+        }
+
+        if (oldName == newName)
+        {
+            return;
+        }
+
+        const NamedRegion* existing = m_regions.getRegion(oldName);
+        if (existing == nullptr)
+        {
+            return;
+        }
+
+        if (m_regions.hasRegion(newName))
+        {
+            return;
+        }
+
+        NamedRegion renamed = *existing;
+        renamed.name = std::string(newName);
+
+        m_regions.removeRegion(oldName);
+        m_regions.createRegion(renamed);
+    }
+
+    void PageComposer::replaceRegion(std::string_view regionName, const Rect& rect)
+    {
+        if (regionName.empty())
+        {
+            return;
+        }
+
+        NamedRegion region;
+        region.name = std::string(regionName);
+        region.bounds = rect;
+
+        m_regions.createRegion(region);
+    }
+
+    void PageComposer::replaceRegion(
+        std::string_view regionName,
+        int x,
+        int y,
+        int width,
+        int height)
+    {
+        replaceRegion(regionName, makeRect(x, y, width, height));
+    }
+
+    void PageComposer::clearRegions()
+    {
+        m_regions.clearRegions();
+        recordOperation(
+            PageCompositionDiagnostics::OperationKind::ClearRegions,
+            "clearRegions",
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            nullptr,
+            false,
+            false,
+            false,
+            false,
+            true);
+    }
+
     void PageComposer::clearRegion(const Rect& target, const Style& style)
     {
         fillRegion(target, U' ', style);

@@ -193,6 +193,18 @@ namespace Composition
         void styleRegion(const Rect& target, const Style& style);
         void styleRegion(std::string_view targetRegionName, const Style& style);
 
+        bool hasRegion(std::string_view name) const;
+        const NamedRegion* getRegion(std::string_view name) const;
+        NamedRegion* getRegion(std::string_view name);
+
+        void removeRegion(std::string_view regionName);
+        void renameRegion(std::string_view oldName, std::string_view newName);
+
+        void replaceRegion(std::string_view regionName, const Rect& rect);
+        void replaceRegion(std::string_view regionName, int x, int y, int width, int height);
+
+        void clearRegions();
+
         void clearRegion(const Rect& target, const Style& style);
         void clearRegion(std::string_view targetRegionName, const Style& style);
 
