@@ -44,6 +44,18 @@ namespace
         return true;
     }
 
+    int measureClusterDisplayWidth(const std::vector<TextCluster>& clusters)
+    {
+        int width = 0;
+
+        for (const TextCluster& cluster : clusters)
+        {
+            width += std::max(0, cluster.displayWidth);
+        }
+
+        return width;
+    }
+
     std::u32string joinClusterRange(
         const std::vector<TextCluster>& clusters,
         std::size_t startIndex,
@@ -70,8 +82,8 @@ namespace
         return result;
     }
 
-    std::vector<std::u32string> wrapSingleLineClusters(
-        std::u32string_view text,
+    std::vector<std::u32string> wrapSingleSegmentedLine(
+        const std::vector<TextCluster>& clusters,
         int maxWidth)
     {
         std::vector<std::u32string> lines;
@@ -81,7 +93,6 @@ namespace
             return lines;
         }
 
-        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
         if (clusters.empty())
         {
             lines.push_back(U"");
@@ -111,7 +122,7 @@ namespace
             while (index < clusters.size())
             {
                 const int clusterWidth = std::max(0, clusters[index].displayWidth);
-                const bool isBreakableWhitespace = isWhitespaceCluster(clusters[index]);
+                const bool breakableWhitespace = isWhitespaceCluster(clusters[index]);
 
                 if (currentWidth > 0 &&
                     (currentWidth + clusterWidth) > maxWidth)
@@ -121,7 +132,7 @@ namespace
 
                 currentWidth += clusterWidth;
 
-                if (isBreakableWhitespace)
+                if (breakableWhitespace)
                 {
                     lastBreak = index;
                 }
@@ -2651,7 +2662,7 @@ namespace Composition
         synchronizeTarget();
 
         const Point origin{ x, y };
-        const Size contentSize{ static_cast<int>(line.size()), 1 };
+        const Size contentSize{ measureDisplayWidth(line), 1 };
         recordOperation(
             PageCompositionDiagnostics::OperationKind::WriteTextLine,
             "writeText",
@@ -2708,12 +2719,9 @@ namespace Composition
 
         const std::vector<std::u32string> lines = splitLines(block);
         int currentY = y;
-        int maxWidth = 0;
 
         for (const std::u32string& line : lines)
         {
-            maxWidth = std::max(maxWidth, static_cast<int>(line.size()));
-
             if (currentY >= m_composedBuffer.getHeight())
             {
                 break;
@@ -2730,7 +2738,7 @@ namespace Composition
         synchronizeTarget();
 
         const Point origin{ x, y };
-        const Size contentSize{ maxWidth, static_cast<int>(lines.size()) };
+        const Size contentSize = measureTextBlockDisplay(lines);
         recordOperation(
             PageCompositionDiagnostics::OperationKind::WriteTextBlock,
             "writeTextBlock",
@@ -3188,9 +3196,9 @@ namespace Composition
 
             const int lineWidth = measureDisplayWidth(lines[i]);
             const Rect lineRegion = makeRect(
-                target.position.x,
+                placement.region.position.x,
                 y,
-                target.size.width,
+                placement.region.size.width,
                 1);
 
             const Point lineOrigin = resolveAlignedOrigin(
@@ -3252,9 +3260,9 @@ namespace Composition
 
             const int lineWidth = measureDisplayWidth(wrappedLines[i]);
             const Rect lineRegion = makeRect(
-                target.position.x,
+                placement.region.position.x,
                 y,
-                target.size.width,
+                placement.region.size.width,
                 1);
 
             const Point lineOrigin = resolveAlignedOrigin(
@@ -3290,15 +3298,7 @@ namespace Composition
 
     int PageComposer::measureDisplayWidth(std::u32string_view text)
     {
-        int width = 0;
-        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
-
-        for (const TextCluster& cluster : clusters)
-        {
-            width += std::max(0, cluster.displayWidth);
-        }
-
-        return width;
+        return measureClusterDisplayWidth(GraphemeSegmentation::segment(text));
     }
 
     Size PageComposer::measureTextBlockDisplay(const std::vector<std::u32string>& lines)
@@ -3330,14 +3330,11 @@ namespace Composition
 
         for (const std::u32string& sourceLine : sourceLines)
         {
-            if (sourceLine.empty())
-            {
-                wrappedLines.push_back(U"");
-                continue;
-            }
+            const std::vector<TextCluster> clusters =
+                GraphemeSegmentation::segment(sourceLine);
 
             std::vector<std::u32string> paragraphLines =
-                wrapSingleLineClusters(sourceLine, maxWidth);
+                wrapSingleSegmentedLine(clusters, maxWidth);
 
             if (paragraphLines.empty())
             {
@@ -3353,7 +3350,6 @@ namespace Composition
 
         return wrappedLines;
     }
-
 
     int PageComposer::resolveActiveFrameIndex() const
     {
