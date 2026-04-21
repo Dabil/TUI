@@ -62,6 +62,7 @@ std::u32string DigitalRainScreen::buildConsoleGlyphPool()
         U"←↑→↓");
 }
 
+//        U"♜♞♝♛♚♝♞♜♖♘♗♕♔♗♘♖"
 std::u32string DigitalRainScreen::buildTerminalGlyphPool()
 {
     return std::u32string(
