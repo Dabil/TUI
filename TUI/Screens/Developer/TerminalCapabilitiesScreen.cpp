@@ -1,4 +1,4 @@
-﻿#include "Screens/TerminalCapabilitiesScreen.h"
+﻿#include "Screens/Developer/TerminalCapabilitiesScreen.h"
 
 #include <algorithm>
 #include <array>
@@ -29,6 +29,20 @@ namespace
     std::string featureSupportSummary(RendererFeatureSupport support)
     {
         return CapabilityReport::toString(support);
+    }
+
+    std::string unicodeOutputSummary(bool supported)
+    {
+        return CapabilityReport::toString(
+            supported
+            ? RendererFeatureSupport::Supported
+            : RendererFeatureSupport::Unsupported);
+    }
+
+    bool shouldShowCapabilitySample(RendererFeatureSupport support)
+    {
+        return support == RendererFeatureSupport::Supported
+            || support == RendererFeatureSupport::Emulated;
     }
 
     std::string clipText(const std::string& text, int width)
@@ -191,7 +205,7 @@ void TerminalCapabilitiesScreen::draw(Surface& surface)
     drawSummaryPanel(buffer, report, 1, 2, screenWidth - 2);
     drawFeatureMatrix(buffer, report, 1, 8, leftWidth, screenHeight - 9);
     drawColorTierPanel(buffer, report, rightX, 8, rightWidth, (screenHeight - 9) / 2 + 2);
-    drawTextCapabilityPanel(buffer, rightX, 8 + ((screenHeight - 9) / 2 + 2), rightWidth, screenHeight - (8 + ((screenHeight - 9) / 2 + 2)) - 1);
+    drawTextCapabilityPanel(buffer, report, rightX, 8 + ((screenHeight - 9) / 2 + 2), rightWidth, screenHeight - (8 + ((screenHeight - 9) / 2 + 2)) - 1);
 }
 
 void TerminalCapabilitiesScreen::drawSummaryPanel(
@@ -448,6 +462,7 @@ void TerminalCapabilitiesScreen::drawColorTierPanel(
 
 void TerminalCapabilitiesScreen::drawTextCapabilityPanel(
     ScreenBuffer& buffer,
+    const CapabilityReport& report,
     int x,
     int y,
     int width,
@@ -455,49 +470,63 @@ void TerminalCapabilitiesScreen::drawTextCapabilityPanel(
 {
     drawPanel(buffer, x, y, width, height, "Text Backend Checks");
 
-    if (m_renderer == nullptr)
+    const RendererCapabilities& capabilities = report.capabilities();
+
+    int row = y + 1;
+    const int contentWidth = width - 4;
+    const int bottom = y + height - 1;
+
+    auto writeRow = [&](const std::string& text, const Style& style)
+        {
+            if (row >= bottom)
+            {
+                return;
+            }
+
+            writeClippedLine(buffer, x + 2, row, contentWidth, text, style);
+            ++row;
+        };
+
+    writeRow("Unicode output:     " + unicodeOutputSummary(capabilities.unicodeOutput), Themes::Text);
+    writeRow("Grapheme clusters:  " + featureSupportSummary(capabilities.graphemeClusters), Themes::Text);
+    writeRow("Combining marks:    " + featureSupportSummary(capabilities.combiningMarks), Themes::Text);
+    writeRow("East Asian wide:    " + featureSupportSummary(capabilities.eastAsianWide), Themes::Text);
+    writeRow("Emoji output:       " + featureSupportSummary(capabilities.emoji), Themes::Text);
+    writeRow("Font fallback:      " + featureSupportSummary(capabilities.fontFallback), Themes::Text);
+
+    if (row < bottom)
     {
-        writeClippedLine(buffer, x + 2, y + 1, width - 4, "No renderer available.", Themes::Warning);
-        return;
+        ++row;
     }
 
-    const TextBackendCapabilities textCaps = m_renderer->textCapabilities();
+    writeRow("Sample glyph checks", Themes::SectionHeader);
+    writeRow("ASCII      : ABC xyz 123 +-*/", Themes::Text);
+    writeRow("Box drawing: ╔═╦═╗  ╚═╩═╝", Themes::Text);
 
-    writeClippedLine(buffer, x + 2, y + 1, width - 4, "UTF-16 output:      " + boolText(textCaps.supportsUtf16Output), Themes::Text);
-    writeClippedLine(buffer, x + 2, y + 2, width - 4, "Combining marks:    " + boolText(textCaps.supportsCombiningMarks), Themes::Text);
-    writeClippedLine(buffer, x + 2, y + 3, width - 4, "East Asian wide:    " + boolText(textCaps.supportsEastAsianWide), Themes::Text);
-    writeClippedLine(buffer, x + 2, y + 4, width - 4, "Emoji:              " + boolText(textCaps.supportsEmoji), Themes::Text);
-    writeClippedLine(buffer, x + 2, y + 5, width - 4, "Font fallback:      " + boolText(textCaps.supportsFontFallback), Themes::Text);
-
-    writeClippedLine(buffer, x + 2, y + 7, width - 4, "Sample glyph checks", Themes::SectionHeader);
-
-    buffer.writeString(x + 2, y + 8, "ASCII      : ABC xyz 123 +-*/", Themes::Text);
-    buffer.writeString(x + 2, y + 9, "Box drawing: ╔═╦═╗  ╚═╩═╝", Themes::Text);
-
-    if (textCaps.supportsEastAsianWide)
+    if (shouldShowCapabilitySample(capabilities.eastAsianWide))
     {
-        buffer.writeString(x + 2, y + 10, "Wide chars : 你好 世界", Themes::Text);
-    }
-    else
-    {
-        buffer.writeString(x + 2, y + 10, "Wide chars : unsupported / unverified", Themes::MutedText);
-    }
-
-    if (textCaps.supportsCombiningMarks)
-    {
-        buffer.writeString(x + 2, y + 11, "Combining  : e\xCC\x81  a\xCC\x82  o\xCC\x88", Themes::Text);
-    }
-    else
-    {
-        buffer.writeString(x + 2, y + 11, "Combining  : unsupported / unverified", Themes::MutedText);
-    }
-
-    if (textCaps.supportsEmoji)
-    {
-        buffer.writeString(x + 2, y + 12, "Emoji      : 🙂 🚀 ⚙️", Themes::Text);
+        writeRow("Wide chars : 你好 世界", Themes::Text);
     }
     else
     {
-        buffer.writeString(x + 2, y + 12, "Emoji      : unsupported / unverified", Themes::MutedText);
+        writeRow("Wide chars : unsupported / unverified", Themes::MutedText);
+    }
+
+    if (shouldShowCapabilitySample(capabilities.combiningMarks))
+    {
+        writeRow("Combining  : e\xCC\x81  a\xCC\x82  o\xCC\x88", Themes::Text);
+    }
+    else
+    {
+        writeRow("Combining  : unsupported / unverified", Themes::MutedText);
+    }
+
+    if (shouldShowCapabilitySample(capabilities.emoji))
+    {
+        writeRow("Emoji      : 🙂 🚀 ⚙️", Themes::Text);
+    }
+    else
+    {
+        writeRow("Emoji      : unsupported / unverified", Themes::MutedText);
     }
 }

@@ -21,7 +21,7 @@ private:
     void drawSummaryPanel(ScreenBuffer& buffer, const CapabilityReport& report, int x, int y, int width) const;
     void drawFeatureMatrix(ScreenBuffer& buffer, const CapabilityReport& report, int x, int y, int width, int height) const;
     void drawColorTierPanel(ScreenBuffer& buffer, const CapabilityReport& report, int x, int y, int width, int height) const;
-    void drawTextCapabilityPanel(ScreenBuffer& buffer, int x, int y, int width, int height) const;
+    void drawTextCapabilityPanel(ScreenBuffer& buffer, const CapabilityReport& report, int x, int y, int width, int height) const;
 
 private:
     const IRenderer* m_renderer = nullptr;

@@ -1,4 +1,4 @@
-﻿#include "Screens/RendererDiagnosticsScreen.h"
+﻿#include "Screens/Developer/RendererDiagnosticsScreen.h"
 
 #include <algorithm>
 #include <array>

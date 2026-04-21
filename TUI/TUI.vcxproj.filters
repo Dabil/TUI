@@ -186,10 +186,10 @@
     <ClInclude Include="Rendering\TerminalSessionOptions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\RendererDiagnosticsScreen.h">
+    <ClInclude Include="Screens\Developer\RendererDiagnosticsScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\TerminalCapabilitiesScreen.h">
+    <ClInclude Include="Screens\Developer\TerminalCapabilitiesScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Styles\StylePolicyFactory.h">
@@ -345,6 +345,12 @@
     <ClInclude Include="Screens\PageBuffer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rendering\Composition\ObjectSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\Diagnostics\PageCompositionDiagnostics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -473,10 +479,10 @@
     <ClCompile Include="Rendering\TerminalSessionOptions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\RendererDiagnosticsScreen.cpp">
+    <ClCompile Include="Screens\Developer\RendererDiagnosticsScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\TerminalCapabilitiesScreen.cpp">
+    <ClCompile Include="Screens\Developer\TerminalCapabilitiesScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Styles\StylePolicyFactory.cpp">
@@ -645,6 +651,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\PageBuffer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\Composition\ObjectSource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\Diagnostics\PageCompositionDiagnostics.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

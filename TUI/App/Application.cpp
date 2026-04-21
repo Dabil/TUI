@@ -13,8 +13,8 @@
 #include "Screens/DigitalRainScreen.h"
 #include "Screens/Donut3DScreen.h"
 #include "Screens/FireScreen.h"
-#include "Screens/RendererDiagnosticsScreen.h"
-#include "Screens/TerminalCapabilitiesScreen.h"
+#include "Screens/Developer/RendererDiagnosticsScreen.h"
+#include "Screens/Developer/TerminalCapabilitiesScreen.h"
 #include "Screens/WaterEffectScreen.h"
 
 static Application* g_appInstance = nullptr;
