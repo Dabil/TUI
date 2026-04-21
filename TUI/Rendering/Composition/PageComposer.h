@@ -616,9 +616,24 @@ namespace Composition
 
         PlacementResult writeObject(
             const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
+
+        PlacementResult writeObject(
+            const TextObject& object,
             const PlacementSpec& placement,
             const WritePolicy& writePolicy,
             const std::optional<Style>& overrideStyle = std::nullopt);
+
+        PlacementResult writeObjectInFullScreen(
+            const TextObject& object,
+            const Alignment& alignment,
+            const WritePolicy& writePolicy,
+            const std::optional<Style>& overrideStyle = std::nullopt,
+            bool clampToRegion = false);
 
         PlacementResult writeSolidObject(
             const TextObject& object,
@@ -698,69 +713,33 @@ namespace Composition
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
-        PlacementResult writeObjectAligned(
-            const TextObject& object,
-            const Alignment& alignment,
-            const WritePolicy& writePolicy,
-            const std::optional<Style>& overrideStyle = std::nullopt,
-            bool clampToRegion = false);
-
-        PlacementResult writeSolidObjectAligned(
+        PlacementResult writeSolidObjectInFullScreen(
             const TextObject& object,
             const Alignment& alignment,
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
-        PlacementResult writeVisibleObjectAligned(
+        PlacementResult writeVisibleObjectInFullScreen(
             const TextObject& object,
             const Alignment& alignment,
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
-        PlacementResult writeGlyphsOnlyAligned(
+        PlacementResult writeGlyphsOnlyInFullScreen(
             const TextObject& object,
             const Alignment& alignment,
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
-        PlacementResult writeStyleMaskAligned(
+        PlacementResult writeStyleMaskInFullScreen(
             const TextObject& object,
             const Alignment& alignment,
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
-        PlacementResult writeStyleBlockAligned(
+        PlacementResult writeStyleBlockInFullScreen(
             const TextObject& object,
             const Alignment& alignment,
-            const std::optional<Style>& overrideStyle = std::nullopt,
-            bool clampToRegion = false);
-
-        Point placeObject(
-            const TextObject& object,
-            int x,
-            int y,
-            const WritePolicy& writePolicy = WritePresets::visibleObject(),
-            const std::optional<Style>& overrideStyle = std::nullopt);
-
-        PlacementResult placeObject(
-            const TextObject& object,
-            const Rect& region,
-            const Alignment& alignment,
-            const WritePolicy& writePolicy = WritePresets::visibleObject(),
-            const std::optional<Style>& overrideStyle = std::nullopt,
-            bool clampToRegion = false);
-
-        PlacementResult placeObject(
-            const TextObject& object,
-            const PlacementSpec& placement,
-            const WritePolicy& writePolicy = WritePresets::visibleObject(),
-            const std::optional<Style>& overrideStyle = std::nullopt);
-
-        PlacementResult placeObjectInRegion(
-            const TextObject& object,
-            std::string_view regionName,
-            const Alignment& alignment,
-            const WritePolicy& writePolicy = WritePresets::visibleObject(),
             const std::optional<Style>& overrideStyle = std::nullopt,
             bool clampToRegion = false);
 
@@ -792,166 +771,174 @@ namespace Composition
             std::string_view utf8Block,
             const std::optional<Style>& styleOverride = std::nullopt);
 
-    private:
-        Point drawObjectAt(
-            const TextObject& object,
-            int x,
-            int y,
-            const WritePolicy& writePolicy,
-            const std::optional<Style>& overrideStyle);
+private:
+    Point drawObjectAt(
+        const TextObject& object,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle);
 
-        static PlacementResult makeUnresolvedPlacementResult(
-            const TextObject& object,
-            const Alignment& alignment);
+    static PlacementResult makeUnresolvedPlacementResult(
+        const TextObject& object,
+        const Alignment& alignment);
 
-        SourcePlacementResult placeResolvedSource(
-            const ResolvedObjectSource& resolvedSource,
-            int x,
-            int y,
-            const WritePolicy& writePolicy,
-            const std::optional<Style>& overrideStyle);
+    SourcePlacementResult placeResolvedSource(
+        const ResolvedObjectSource& resolvedSource,
+        int x,
+        int y,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle);
 
-        SourcePlacementResult placeResolvedSource(
-            const ResolvedObjectSource& resolvedSource,
-            const Rect& region,
-            const Alignment& alignment,
-            const WritePolicy& writePolicy,
-            const std::optional<Style>& overrideStyle,
-            bool clampToRegion);
+    SourcePlacementResult placeResolvedSource(
+        const ResolvedObjectSource& resolvedSource,
+        const Rect& region,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion);
 
-        static SourcePlacementResult makeFailedSourcePlacement(
-            const ResolvedObjectSource& resolvedSource,
-            const Alignment* alignment = nullptr);
+    static SourcePlacementResult makeFailedSourcePlacement(
+        const ResolvedObjectSource& resolvedSource,
+        const Alignment* alignment = nullptr);
 
-        void writeSegmentedLine(
-            int x,
-            int y,
-            std::u32string_view line,
-            const std::optional<Style>& styleOverride);
+    void writeSegmentedLine(
+        int x,
+        int y,
+        std::u32string_view line,
+        const std::optional<Style>& styleOverride);
 
-        static std::u32string extractFirstLine(std::u32string_view text);
-        static std::vector<std::u32string> splitLines(std::u32string_view text);
+    static std::u32string extractFirstLine(std::u32string_view text);
+    static std::vector<std::u32string> splitLines(std::u32string_view text);
 
-        void writeAlignedText(
-            const Rect& target,
-            const Alignment& alignment,
-            std::string_view text,
-            const Style& style);
+    void writeAlignedText(
+        const Rect& target,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style);
 
-        void writeAlignedText(
-            std::string_view targetRegionName,
-            const Alignment& alignment,
-            std::string_view text,
-            const Style& style);
+    void writeAlignedText(
+        std::string_view targetRegionName,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style);
 
-        void writeAlignedTextInFullScreen(
-            const Alignment& alignment,
-            std::string_view text,
-            const Style& style);
+    void writeAlignedTextInFullScreen(
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style);
 
-        void writeAlignedTextBlock(
-            const Rect& target,
-            const Alignment& alignment,
-            std::string_view textBlock,
-            const Style& style);
+    void writeAlignedTextBlock(
+        const Rect& target,
+        const Alignment& alignment,
+        std::string_view textBlock,
+        const Style& style);
 
-        void writeAlignedTextBlock(
-            std::string_view targetRegionName,
-            const Alignment& alignment,
-            std::string_view textBlock,
-            const Style& style);
+    void writeAlignedTextBlock(
+        std::string_view targetRegionName,
+        const Alignment& alignment,
+        std::string_view textBlock,
+        const Style& style);
 
-        void writeAlignedTextBlockInFullScreen(
-            const Alignment& alignment,
-            std::string_view textBlock,
-            const Style& style);
+    void writeAlignedTextBlockInFullScreen(
+        const Alignment& alignment,
+        std::string_view textBlock,
+        const Style& style);
 
-        void writeWrappedText(
-            const Rect& target,
-            const Alignment& alignment,
-            std::string_view text,
-            const Style& style);
+    void writeWrappedText(
+        const Rect& target,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style);
 
-        void writeWrappedText(
-            std::string_view targetRegionName,
-            const Alignment& alignment,
-            std::string_view text,
-            const Style& style);
+    void writeWrappedText(
+        std::string_view targetRegionName,
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style);
 
-        void writeWrappedTextInFullScreen(
-            const Alignment& alignment,
-            std::string_view text,
-            const Style& style);
+    void writeWrappedTextInFullScreen(
+        const Alignment& alignment,
+        std::string_view text,
+        const Style& style);
 
-        void writeAlignedTextUtf32(
-            const Rect& target,
-            const Alignment& alignment,
-            std::u32string_view text,
-            const std::optional<Style>& styleOverride);
+    void writeAlignedTextUtf32(
+        const Rect& target,
+        const Alignment& alignment,
+        std::u32string_view text,
+        const std::optional<Style>& styleOverride);
 
-        void writeAlignedTextBlockUtf32(
-            const Rect& target,
-            const Alignment& alignment,
-            std::u32string_view textBlock,
-            const std::optional<Style>& styleOverride,
-            std::string_view operationName);
+    void writeAlignedTextBlockUtf32(
+        const Rect& target,
+        const Alignment& alignment,
+        std::u32string_view textBlock,
+        const std::optional<Style>& styleOverride,
+        std::string_view operationName);
 
-        void writeWrappedTextUtf32(
-            const Rect& target,
-            const Alignment& alignment,
-            std::u32string_view text,
-            const std::optional<Style>& styleOverride);
+    void writeWrappedTextUtf32(
+        const Rect& target,
+        const Alignment& alignment,
+        std::u32string_view text,
+        const std::optional<Style>& styleOverride);
 
-        static int measureDisplayWidth(std::u32string_view text);
-        static Size measureTextBlockDisplay(const std::vector<std::u32string>& lines);
-       
-        static std::vector<std::u32string> wrapTextToLines(
-            std::u32string_view text,
-            int maxWidth);
+    static bool isWrapWhitespaceText(std::u32string_view text);
 
-        int resolveActiveFrameIndex() const;
+    static std::u32string trimTrailingWrapWhitespace(std::u32string_view text);
 
-        void recordOperation(
-            PageCompositionDiagnostics::OperationKind operation,
-            std::string_view operationName,
-            const Rect* requestedRegion = nullptr,
-            const Rect* resolvedRegion = nullptr,
-            const Point* origin = nullptr,
-            const Size* contentSize = nullptr,
-            const Alignment* alignment = nullptr,
-            const WritePolicy* writePolicy = nullptr,
-            bool usedAlignment = false,
-            bool usedOverrideStyle = false,
-            bool clampRequested = false,
-            bool clamped = false,
-            bool success = true,
-            std::string_view regionName = {},
-            std::string_view detail = {},
-            std::string_view errorMessage = {});
+    static std::vector<std::u32string> wrapSingleLineToLines(
+        std::u32string_view text,
+        int maxWidth);
 
-        void recordSourcePlacement(
-            PageCompositionDiagnostics::OperationKind operation,
-            std::string_view operationName,
-            const ResolvedObjectSource& resolvedSource,
-            const Rect* requestedRegion,
-            const SourcePlacementResult& result,
-            const WritePolicy& writePolicy,
-            bool usedAlignment,
-            bool usedOverrideStyle,
-            bool clampRequested,
-            std::string_view regionName = {});
+    static int measureDisplayWidth(std::u32string_view text);
+    static Size measureTextBlockDisplay(const std::vector<std::u32string>& lines);
 
-        void refreshDeterministicSignature();
-        void synchronizeTarget();
+    static std::vector<std::u32string> wrapTextToLines(
+        std::u32string_view text,
+        int maxWidth);
 
-    private:
-        ScreenBuffer* m_target = nullptr;
-        Assets::AssetLibrary* m_assetLibrary = nullptr;
-        PageCompositionDiagnostics* m_diagnostics = nullptr;
-        ScreenBuffer m_composedBuffer;
-        RegionRegistry m_regions;
-        std::vector<TextObject> m_frames;
-        ScreenTemplateLoader m_screenTemplateLoader;
-        PageCompositionDiagnostics::FrameContext m_frameContext;
+    int resolveActiveFrameIndex() const;
+
+    void recordOperation(
+        PageCompositionDiagnostics::OperationKind operation,
+        std::string_view operationName,
+        const Rect* requestedRegion = nullptr,
+        const Rect* resolvedRegion = nullptr,
+        const Point* origin = nullptr,
+        const Size* contentSize = nullptr,
+        const Alignment* alignment = nullptr,
+        const WritePolicy* writePolicy = nullptr,
+        bool usedAlignment = false,
+        bool usedOverrideStyle = false,
+        bool clampRequested = false,
+        bool clamped = false,
+        bool success = true,
+        std::string_view regionName = {},
+        std::string_view detail = {},
+        std::string_view errorMessage = {});
+
+    void recordSourcePlacement(
+        PageCompositionDiagnostics::OperationKind operation,
+        std::string_view operationName,
+        const ResolvedObjectSource& resolvedSource,
+        const Rect* requestedRegion,
+        const SourcePlacementResult& result,
+        const WritePolicy& writePolicy,
+        bool usedAlignment,
+        bool usedOverrideStyle,
+        bool clampRequested,
+        std::string_view regionName = {});
+
+    void refreshDeterministicSignature();
+    void synchronizeTarget();
+
+private:
+    ScreenBuffer* m_target = nullptr;
+    Assets::AssetLibrary* m_assetLibrary = nullptr;
+    PageCompositionDiagnostics* m_diagnostics = nullptr;
+    ScreenBuffer m_composedBuffer;
+    RegionRegistry m_regions;
+    std::vector<TextObject> m_frames;
+    ScreenTemplateLoader m_screenTemplateLoader;
+    PageCompositionDiagnostics::FrameContext m_frameContext;
     };
 }
