@@ -648,21 +648,6 @@ namespace Composition
         styleRegion(region->bounds, style);
     }
 
-    bool PageComposer::hasRegion(std::string_view name) const
-    {
-        return m_regions.hasRegion(name);
-    }
-
-    const NamedRegion* PageComposer::getRegion(std::string_view name) const
-    {
-        return m_regions.getRegion(name);
-    }
-
-    NamedRegion* PageComposer::getRegion(std::string_view name)
-    {
-        return m_regions.getRegion(name);
-    }
-
     void PageComposer::removeRegion(std::string_view regionName)
     {
         m_regions.removeRegion(regionName);
@@ -918,25 +903,6 @@ namespace Composition
     NamedRegion* PageComposer::getRegion(std::string_view name)
     {
         return m_regions.getRegion(name);
-    }
-
-    void PageComposer::clearRegions()
-    {
-        m_regions.clearRegions();
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::ClearRegions,
-            "clearRegions",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
     }
 
     Rect PageComposer::getFullScreenRegion() const
