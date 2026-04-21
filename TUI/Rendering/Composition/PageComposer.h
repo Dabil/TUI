@@ -214,6 +214,12 @@ namespace Composition
 
         Rect getFullScreenRegion() const;
 
+        int regionWidth(std::string_view regionName) const;
+        int regionHeight(std::string_view regionName) const;
+
+        Point regionPosition(std::string_view regionName) const;
+        Size regionSize(std::string_view regionName) const;
+
         Rect peekTop(const Rect& rect, int height) const;
         Rect peekBottom(const Rect& rect, int height) const;
         Rect peekLeft(const Rect& rect, int width) const;

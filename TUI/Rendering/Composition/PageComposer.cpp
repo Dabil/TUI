@@ -910,6 +910,30 @@ namespace Composition
         return makeRect(0, 0, std::max(0, getWidth()), std::max(0, getHeight()));
     }
 
+    int PageComposer::regionWidth(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.size.width : 0;
+    }
+
+    int PageComposer::regionHeight(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.size.height : 0;
+    }
+
+    Point PageComposer::regionPosition(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.position : Point{};
+    }
+
+    Size PageComposer::regionSize(std::string_view regionName) const
+    {
+        const NamedRegion* region = m_regions.getRegion(regionName);
+        return region != nullptr ? region->bounds.size : Size{};
+    }
+
     Rect PageComposer::peekTop(const Rect& rect, int height) const
     {
         const int clampedHeight = std::max(0, std::min(height, rect.size.height));
