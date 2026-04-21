@@ -3,6 +3,7 @@
 #include <cstdint>
 
 #include "Rendering/Capabilities/ColorSupport.h"
+#include "Rendering/Text/TextTypes.h"
 
 /*
     Purpose:
@@ -46,6 +47,21 @@
     rather than leaving that distinction only implied by Basic16 handling or
     by Color::Basic enum values.
 
+    Unicode/text capability interpretation:
+
+    - unicodeOutput means the backend path can emit Unicode text at all.
+    - graphemeClusters means the renderer/backend path can preserve authored
+      cluster text as cluster text on output.
+    - combiningMarks means the backend path can pass through combining-mark
+      sequences as presented text.
+    - eastAsianWide means the backend path is designed to support wide-cell
+      text presentation.
+    - emoji means the backend path can emit emoji-bearing grapheme clusters.
+      This is about renderer/backend text emission, not a guarantee that the
+      host terminal font will have matching glyph coverage.
+    - fontFallback remains explicitly separate because host/font fallback
+      behavior is environment-dependent and should stay conservative.
+
     For the current Win32 attribute renderer, Unknown should be preferred over
     Supported whenever the visible result depends on host quirks or only loosely
     resembles the authored semantic intent.
@@ -78,6 +94,12 @@ struct RendererCapabilities
     bool virtualTerminalProcessing = false;
     bool unicodeOutput = true;
     bool preserveStyleSafeFallback = true;
+
+    RendererFeatureSupport graphemeClusters = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport combiningMarks = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport eastAsianWide = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport emoji = RendererFeatureSupport::Unknown;
+    RendererFeatureSupport fontFallback = RendererFeatureSupport::Unknown;
 
     std::uint32_t optionalBackendFlags = 0;
 
@@ -128,10 +150,27 @@ struct RendererCapabilities
     bool supportsSlowBlinkDirect() const;
     bool supportsFastBlinkDirect() const;
 
+    bool supportsUnicodeOutputDirect() const;
+    bool supportsGraphemeClustersDirect() const;
+    bool supportsCombiningMarksDirect() const;
+    bool supportsEastAsianWideDirect() const;
+    bool supportsEmojiDirect() const;
+    bool supportsFontFallbackDirect() const;
+
     bool mayEmulateSlowBlink() const;
     bool mayEmulateFastBlink() const;
 
     bool usesPreserveStyleSafeFallback() const;
     bool hasOptionalBackendFlags() const;
     bool hasOptionalBackendFlag(RendererBackendExtensionFlag flag) const;
+
+    /*
+        Temporary compatibility projection for older renderer/screen code that
+        still consumes the narrower TextBackendCapabilities shape.
+
+        Architectural intent:
+        - RendererCapabilities remains the authoritative source.
+        - TextBackendCapabilities becomes a compatibility view derived from it.
+    */
+    TextBackendCapabilities toTextBackendCapabilities() const;
 };

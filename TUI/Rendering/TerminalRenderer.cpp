@@ -622,15 +622,7 @@ int TerminalRenderer::getConsoleHeight() const
 
 TextBackendCapabilities TerminalRenderer::textCapabilities() const
 {
-    const bool supportsClusterText = supportsUnicodeClusterEmission();
-
-    TextBackendCapabilities capabilities;
-    capabilities.supportsUtf16Output = false;
-    capabilities.supportsCombiningMarks = supportsClusterText;
-    capabilities.supportsEastAsianWide = true;
-    capabilities.supportsEmoji = supportsClusterText;
-    capabilities.supportsFontFallback = false;
-    return capabilities;
+    return m_capabilities.toTextBackendCapabilities();
 }
 
 void TerminalRenderer::setDiagnosticsEnabled(bool enabled)

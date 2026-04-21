@@ -32,6 +32,10 @@ supportsBrightBasicColorsDirect()
 supportsUnderlineDirect()
 usesPreserveStyleSafeFallback()
 mayEmulateSlowBlink()
+supportsGraphemeClustersDirect()
+supportsCombiningMarksDirect()
+supportsEastAsianWideDirect()
+supportsEmojiDirect()
 
 optionalBackendFlags is intentionally a simple reserved extension point.
 The current code should not invent behavior from unknown flag bits.
@@ -57,8 +61,11 @@ For the current backend, BasicWin32 must stay conservative:
   invisible are not safe to promise as direct support across hosts
 - blink is not directly provided by the Win32 attribute path, but the current
   renderer may intentionally emulate it
-- if the renderer later chooses to approximate a visual effect, that should
-  be reflected in runtime adaptation data rather than overstated here
+- grapheme-cluster output is not something this path should promise
+- combining-mark presentation is not something this path should promise
+- East Asian wide-cell handling is still a reasonable backend claim
+- emoji glyph presentation should not be promised on the Win32 attribute path
+- font fallback certainty remains host-dependent and therefore Unknown
 
 Only use VirtualTerminal() once you truly add a VT output path rather than
 merely enabling the mode flag.
@@ -93,6 +100,12 @@ RendererCapabilities RendererCapabilities::Conservative()
     capabilities.slowBlink = RendererFeatureSupport::Emulated;
     capabilities.fastBlink = RendererFeatureSupport::Emulated;
 
+    capabilities.graphemeClusters = RendererFeatureSupport::Unknown;
+    capabilities.combiningMarks = RendererFeatureSupport::Unknown;
+    capabilities.eastAsianWide = RendererFeatureSupport::Unknown;
+    capabilities.emoji = RendererFeatureSupport::Unknown;
+    capabilities.fontFallback = RendererFeatureSupport::Unknown;
+
     return capabilities;
 }
 
@@ -122,6 +135,11 @@ RendererCapabilities RendererCapabilities::BasicWin32()
         Blink is modeled as Emulated rather than Unsupported because the active
         renderer/backend path can intentionally simulate blink timing without
         mutating authored logical style data.
+
+        Modern Unicode presentation semantics also stay conservative here:
+        the Win32 attribute path is Unicode-capable in a broad sense, but it
+        should not promise grapheme-cluster, combining-mark, or emoji-cluster
+        presentation as a direct backend capability.
     */
 
     capabilities.brightBasicColors = RendererFeatureSupport::Supported;
@@ -133,6 +151,12 @@ RendererCapabilities RendererCapabilities::BasicWin32()
     capabilities.strike = RendererFeatureSupport::Unsupported;
     capabilities.slowBlink = RendererFeatureSupport::Emulated;
     capabilities.fastBlink = RendererFeatureSupport::Emulated;
+
+    capabilities.graphemeClusters = RendererFeatureSupport::Unsupported;
+    capabilities.combiningMarks = RendererFeatureSupport::Unsupported;
+    capabilities.eastAsianWide = RendererFeatureSupport::Supported;
+    capabilities.emoji = RendererFeatureSupport::Unsupported;
+    capabilities.fontFallback = RendererFeatureSupport::Unknown;
 
     return capabilities;
 }
@@ -148,11 +172,18 @@ RendererCapabilities RendererCapabilities::VirtualTerminal()
 
     /*
         Even when VT processing is enabled, exact behavior can still vary by
-        host and font environment. These defaults describe intended capability,
-        not a guarantee that every terminal host behaves identically.
+        host and font environment. These defaults describe intended backend
+        capability, not a guarantee that every terminal host behaves identically.
 
-        This profile is meant for a future true VT presentation path, not the
-        current Win32-attribute renderer.
+        In particular:
+        - graphemeClusters / combiningMarks / eastAsianWide / emoji describe
+          what the VT renderer/backend path can intentionally emit and support
+          as text presentation behavior
+        - fontFallback remains Unknown because glyph coverage and fallback stay
+          host/font/display dependent even when cluster emission is correct
+
+        This profile is meant for a true VT presentation path, not the Win32
+        attribute renderer.
     */
 
     capabilities.brightBasicColors = RendererFeatureSupport::Supported;
@@ -164,6 +195,12 @@ RendererCapabilities RendererCapabilities::VirtualTerminal()
     capabilities.strike = RendererFeatureSupport::Supported;
     capabilities.slowBlink = RendererFeatureSupport::Emulated;
     capabilities.fastBlink = RendererFeatureSupport::Emulated;
+
+    capabilities.graphemeClusters = RendererFeatureSupport::Supported;
+    capabilities.combiningMarks = RendererFeatureSupport::Supported;
+    capabilities.eastAsianWide = RendererFeatureSupport::Supported;
+    capabilities.emoji = RendererFeatureSupport::Supported;
+    capabilities.fontFallback = RendererFeatureSupport::Unknown;
 
     return capabilities;
 }
@@ -238,6 +275,36 @@ bool RendererCapabilities::supportsFastBlinkDirect() const
     return fastBlink == RendererFeatureSupport::Supported;
 }
 
+bool RendererCapabilities::supportsUnicodeOutputDirect() const
+{
+    return unicodeOutput;
+}
+
+bool RendererCapabilities::supportsGraphemeClustersDirect() const
+{
+    return graphemeClusters == RendererFeatureSupport::Supported;
+}
+
+bool RendererCapabilities::supportsCombiningMarksDirect() const
+{
+    return combiningMarks == RendererFeatureSupport::Supported;
+}
+
+bool RendererCapabilities::supportsEastAsianWideDirect() const
+{
+    return eastAsianWide == RendererFeatureSupport::Supported;
+}
+
+bool RendererCapabilities::supportsEmojiDirect() const
+{
+    return emoji == RendererFeatureSupport::Supported;
+}
+
+bool RendererCapabilities::supportsFontFallbackDirect() const
+{
+    return fontFallback == RendererFeatureSupport::Supported;
+}
+
 bool RendererCapabilities::mayEmulateSlowBlink() const
 {
     return slowBlink == RendererFeatureSupport::Emulated;
@@ -262,4 +329,33 @@ bool RendererCapabilities::hasOptionalBackendFlag(RendererBackendExtensionFlag f
 {
     const std::uint32_t mask = static_cast<std::uint32_t>(flag);
     return (optionalBackendFlags & mask) != 0;
+}
+
+TextBackendCapabilities RendererCapabilities::toTextBackendCapabilities() const
+{
+    TextBackendCapabilities capabilities;
+
+    /*
+        This is a compatibility projection only.
+
+        The authoritative data remains RendererCapabilities.
+        This narrower bool model is retained so existing renderer/screen code
+        can transition incrementally without a broad interface rewrite.
+
+        supportsUtf16Output is interpreted conservatively:
+        - true for the non-VT console path
+        - false for the VT byte-stream path
+
+        The other fields only report true when direct support is strong enough
+        to advertise as Supported. Unknown stays false so this adapter does not
+        overstate host-dependent behavior.
+    */
+
+    capabilities.supportsUtf16Output = unicodeOutput && !virtualTerminalProcessing;
+    capabilities.supportsCombiningMarks = supportsCombiningMarksDirect();
+    capabilities.supportsEastAsianWide = supportsEastAsianWideDirect();
+    capabilities.supportsEmoji = supportsEmojiDirect();
+    capabilities.supportsFontFallback = supportsFontFallbackDirect();
+
+    return capabilities;
 }

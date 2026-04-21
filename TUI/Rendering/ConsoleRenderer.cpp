@@ -664,13 +664,7 @@ int ConsoleRenderer::getConsoleHeight() const
 
 TextBackendCapabilities ConsoleRenderer::textCapabilities() const
 {
-    TextBackendCapabilities capabilities;
-    capabilities.supportsUtf16Output = true;
-    capabilities.supportsCombiningMarks = false;
-    capabilities.supportsEastAsianWide = true;
-    capabilities.supportsEmoji = false;
-    capabilities.supportsFontFallback = false;
-    return capabilities;
+    return m_capabilities.toTextBackendCapabilities();
 }
 
 void ConsoleRenderer::setDiagnosticsEnabled(bool enabled)
