@@ -17,25 +17,23 @@ namespace
     {
         return ch == U'\n' || ch == U'\r';
     }
+}
 
-    bool isWrapWhitespace(char32_t ch)
+namespace Composition
+{
+    bool PageComposer::isWrapWhitespaceText(std::u32string_view text)
     {
-        return ch == U' ' ||
-            ch == U'\t' ||
-            ch == U'\v' ||
-            ch == U'\f';
-    }
-
-    bool isWhitespaceCluster(const TextCluster& cluster)
-    {
-        if (cluster.codePoints.empty())
+        if (text.empty())
         {
             return false;
         }
 
-        for (char32_t codePoint : cluster.codePoints)
+        for (char32_t ch : text)
         {
-            if (!isWrapWhitespace(codePoint))
+            if (ch != U' ' &&
+                ch != U'\t' &&
+                ch != U'\v' &&
+                ch != U'\f')
             {
                 return false;
             }
@@ -44,46 +42,25 @@ namespace
         return true;
     }
 
-    int measureClusterDisplayWidth(const std::vector<TextCluster>& clusters)
+    std::u32string PageComposer::trimTrailingWrapWhitespace(std::u32string_view text)
     {
-        int width = 0;
+        std::size_t end = text.size();
 
-        for (const TextCluster& cluster : clusters)
+        while (end > 0)
         {
-            width += std::max(0, cluster.displayWidth);
-        }
-
-        return width;
-    }
-
-    std::u32string joinClusterRange(
-        const std::vector<TextCluster>& clusters,
-        std::size_t startIndex,
-        std::size_t endIndexExclusive,
-        bool trimTrailingWhitespace)
-    {
-        std::size_t effectiveEnd = endIndexExclusive;
-
-        if (trimTrailingWhitespace)
-        {
-            while (effectiveEnd > startIndex &&
-                isWhitespaceCluster(clusters[effectiveEnd - 1]))
+            if (!isWrapWhitespaceText(std::u32string_view(text.data() + end - 1, 1)))
             {
-                --effectiveEnd;
+                break;
             }
+
+            --end;
         }
 
-        std::u32string result;
-        for (std::size_t i = startIndex; i < effectiveEnd; ++i)
-        {
-            result += clusters[i].codePoints;
-        }
-
-        return result;
+        return std::u32string(text.substr(0, end));
     }
 
-    std::vector<std::u32string> wrapSingleSegmentedLine(
-        const std::vector<TextCluster>& clusters,
+    std::vector<std::u32string> PageComposer::wrapSingleLineToLines(
+        std::u32string_view text,
         int maxWidth)
     {
         std::vector<std::u32string> lines;
@@ -93,18 +70,40 @@ namespace
             return lines;
         }
 
+        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
+
         if (clusters.empty())
         {
             lines.push_back(U"");
             return lines;
         }
 
+        auto buildClusterRange =
+            [&](std::size_t startIndex,
+                std::size_t endIndexExclusive,
+                bool trimTrailingWhitespace) -> std::u32string
+            {
+                std::u32string result;
+
+                for (std::size_t i = startIndex; i < endIndexExclusive; ++i)
+                {
+                    result += clusters[i].codePoints;
+                }
+
+                if (trimTrailingWhitespace)
+                {
+                    result = trimTrailingWrapWhitespace(result);
+                }
+
+                return result;
+            };
+
         std::size_t lineStart = 0;
 
         while (lineStart < clusters.size())
         {
             while (lineStart < clusters.size() &&
-                isWhitespaceCluster(clusters[lineStart]))
+                isWrapWhitespaceText(clusters[lineStart].codePoints))
             {
                 ++lineStart;
             }
@@ -121,8 +120,9 @@ namespace
 
             while (index < clusters.size())
             {
-                const int clusterWidth = std::max(0, clusters[index].displayWidth);
-                const bool breakableWhitespace = isWhitespaceCluster(clusters[index]);
+                const int clusterWidth = std::max(0, static_cast<int>(clusters[index].displayWidth));
+                const bool breakableWhitespace =
+                    isWrapWhitespaceText(clusters[index].codePoints);
 
                 if (currentWidth > 0 &&
                     (currentWidth + clusterWidth) > maxWidth)
@@ -142,8 +142,7 @@ namespace
 
             if (index >= clusters.size())
             {
-                lines.push_back(joinClusterRange(
-                    clusters,
+                lines.push_back(buildClusterRange(
                     lineStart,
                     clusters.size(),
                     true));
@@ -152,8 +151,7 @@ namespace
 
             if (currentWidth == 0)
             {
-                lines.push_back(joinClusterRange(
-                    clusters,
+                lines.push_back(buildClusterRange(
                     lineStart,
                     lineStart + 1,
                     false));
@@ -164,8 +162,7 @@ namespace
             if (lastBreak != static_cast<std::size_t>(-1) &&
                 lastBreak >= lineStart)
             {
-                lines.push_back(joinClusterRange(
-                    clusters,
+                lines.push_back(buildClusterRange(
                     lineStart,
                     lastBreak,
                     true));
@@ -173,8 +170,7 @@ namespace
                 continue;
             }
 
-            lines.push_back(joinClusterRange(
-                clusters,
+            lines.push_back(buildClusterRange(
                 lineStart,
                 index,
                 true));
@@ -188,10 +184,7 @@ namespace
 
         return lines;
     }
-}
 
-namespace Composition
-{
     PageComposer::PageComposer(ScreenBuffer& target)
         : m_target(&target)
         , m_composedBuffer(target)
@@ -2329,6 +2322,109 @@ namespace Composition
         return drawObjectAt(object, x, y, writePolicy, overrideStyle);
     }
 
+    PlacementResult PageComposer::writeObject(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInRegion(
+            object,
+            regionName,
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeObjectInFullScreen(
+        const TextObject& object,
+        const Alignment& alignment,
+        const WritePolicy& writePolicy,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObject(
+            object,
+            getFullScreenRegion(),
+            alignment,
+            writePolicy,
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeSolidObjectInFullScreen(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInFullScreen(
+            object,
+            alignment,
+            WritePresets::solidObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeVisibleObjectInFullScreen(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInFullScreen(
+            object,
+            alignment,
+            WritePresets::visibleObject(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeGlyphsOnlyInFullScreen(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInFullScreen(
+            object,
+            alignment,
+            WritePresets::glyphsOnly(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleMaskInFullScreen(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInFullScreen(
+            object,
+            alignment,
+            WritePresets::styleMask(),
+            overrideStyle,
+            clampToRegion);
+    }
+
+    PlacementResult PageComposer::writeStyleBlockInFullScreen(
+        const TextObject& object,
+        const Alignment& alignment,
+        const std::optional<Style>& overrideStyle,
+        bool clampToRegion)
+    {
+        return writeObjectInFullScreen(
+            object,
+            alignment,
+            WritePresets::styleBlock(),
+            overrideStyle,
+            clampToRegion);
+    }
+
     Point PageComposer::writeSolidObject(
         const TextObject& object,
         int x,
@@ -2443,7 +2539,7 @@ namespace Composition
                 placement.clampToRegion);
 
         case PlacementSpec::Mode::FullScreenAligned:
-            return writeObjectAligned(
+            return writeObjectInFullScreen(
                 object,
                 placement.alignment,
                 writePolicy,
@@ -2634,146 +2730,6 @@ namespace Composition
             regionName,
             alignment,
             WritePresets::styleBlock(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeObjectAligned(
-        const TextObject& object,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
-            getFullScreenRegion(),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeSolidObjectAligned(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectAligned(
-            object,
-            alignment,
-            WritePresets::solidObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeVisibleObjectAligned(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectAligned(
-            object,
-            alignment,
-            WritePresets::visibleObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeGlyphsOnlyAligned(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectAligned(
-            object,
-            alignment,
-            WritePresets::glyphsOnly(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleMaskAligned(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectAligned(
-            object,
-            alignment,
-            WritePresets::styleMask(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleBlockAligned(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectAligned(
-            object,
-            alignment,
-            WritePresets::styleBlock(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    Point PageComposer::placeObject(
-        const TextObject& object,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, x, y, writePolicy, overrideStyle);
-    }
-
-    PlacementResult PageComposer::placeObject(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-
-    PlacementResult PageComposer::placeObject(
-        const TextObject& object,
-        const PlacementSpec& placement,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, placement, writePolicy, overrideStyle);
-    }
-
-    PlacementResult PageComposer::placeObjectInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            writePolicy,
             overrideStyle,
             clampToRegion);
     }
@@ -3435,7 +3391,15 @@ namespace Composition
 
     int PageComposer::measureDisplayWidth(std::u32string_view text)
     {
-        return measureClusterDisplayWidth(GraphemeSegmentation::segment(text));
+        int width = 0;
+        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
+
+        for (const TextCluster& cluster : clusters)
+        {
+            width += std::max(0, static_cast<int>(cluster.displayWidth));
+        }
+
+        return width;
     }
 
     Size PageComposer::measureTextBlockDisplay(const std::vector<std::u32string>& lines)
@@ -3467,11 +3431,8 @@ namespace Composition
 
         for (const std::u32string& sourceLine : sourceLines)
         {
-            const std::vector<TextCluster> clusters =
-                GraphemeSegmentation::segment(sourceLine);
-
             std::vector<std::u32string> paragraphLines =
-                wrapSingleSegmentedLine(clusters, maxWidth);
+                wrapSingleLineToLines(sourceLine, maxWidth);
 
             if (paragraphLines.empty())
             {
