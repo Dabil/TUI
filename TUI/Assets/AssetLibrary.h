@@ -201,10 +201,10 @@ namespace Assets
         void setAssetsRoot(const std::string& assetsRoot);
         const std::string& getAssetsRoot() const;
 
-        void registerCanonicalAsset(const std::string& assetKey, const std::string& assetPath);
+        void registerAsset(const std::string& assetKey, const std::string& assetPath);
         void registerAlias(const std::string& assetName, const std::string& assetPathOrAssetKey);
         void registerAliases(
-            const std::string& canonicalAssetKey,
+            const std::string& AssetKey,
             const std::vector<std::string>& aliases);
 
         bool hasAlias(const std::string& assetName) const;

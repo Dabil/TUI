@@ -28,6 +28,10 @@ private:
     {
         TerminalCapabilities,
         RendererDiagnostics,
+        ControlDeck,
+        RetroTerminal,
+        NeonDialog,
+        OpsWall,
         DigitalRain,
         WaterEffect,
         Donut3D,
@@ -61,7 +65,8 @@ private:
     int m_width = 0;
     int m_height = 0;
 
-    ScreenType m_currentScreenType = ScreenType::DigitalRain;
+//    ScreenType m_currentScreenType = ScreenType::DigitalRain;
+    ScreenType m_currentScreenType = ScreenType::ControlDeck;
     double m_screenCycleElapsedSeconds = 0.0;
-    double m_screenCycleIntervalSeconds = 60.0;
+    double m_screenCycleIntervalSeconds = 20.0;
 };

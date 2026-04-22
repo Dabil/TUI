@@ -10,12 +10,13 @@
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/TerminalRenderer.h"
 
+#include "Screens/ShowcaseScreen.h"
 #include "Screens/DigitalRainScreen.h"
+#include "Screens/WaterEffectScreen.h"
 #include "Screens/Donut3DScreen.h"
 #include "Screens/FireScreen.h"
 #include "Screens/Developer/RendererDiagnosticsScreen.h"
 #include "Screens/Developer/TerminalCapabilitiesScreen.h"
-#include "Screens/WaterEffectScreen.h"
 
 static Application* g_appInstance = nullptr;
 
@@ -131,7 +132,8 @@ bool Application::initialize()
     }
     else
     {
-        m_currentScreenType = ScreenType::DigitalRain;
+//        m_currentScreenType = ScreenType::DigitalRain;
+        m_currentScreenType = ScreenType::ControlDeck;
     }
     m_screenCycleElapsedSeconds = 0.0;
 
@@ -219,9 +221,23 @@ void Application::switchToScreen(ScreenType screenType)
         m_screenManager->pushScreen(std::make_unique<RendererDiagnosticsScreen>(m_renderer.get()));
         break;
 
+    case ScreenType::ControlDeck:
+        m_screenManager->pushScreen(std::make_unique<ControlDeckScreen>());
+        break;
+
+    case ScreenType::RetroTerminal:
+        m_screenManager->pushScreen(std::make_unique<RetroTerminalScreen>(m_assetLibrary));        break;
+
+    case ScreenType::NeonDialog:
+        m_screenManager->pushScreen(std::make_unique<NeonDialogScreen>());
+        break;
+
+    case ScreenType::OpsWall:
+        m_screenManager->pushScreen(std::make_unique<OpsWallScreen>());
+        break;
+
     case ScreenType::DigitalRain:
-        m_screenManager->pushScreen(
-            std::make_unique<DigitalRainScreen>(m_startupDiagnostics.actualHost));
+        m_screenManager->pushScreen(std::make_unique<DigitalRainScreen>(m_startupDiagnostics.actualHost));
         break;
 
     case ScreenType::WaterEffect:
@@ -244,6 +260,22 @@ void Application::advanceScreen()
 {
     switch (m_currentScreenType)
     {
+    case ScreenType::ControlDeck:
+        switchToScreen(ScreenType::RetroTerminal);
+        break;
+
+    case ScreenType::RetroTerminal:
+        switchToScreen(ScreenType::NeonDialog);
+        break;
+
+    case ScreenType::NeonDialog:
+        switchToScreen(ScreenType::OpsWall);
+        break;
+
+    case ScreenType::OpsWall:
+        switchToScreen(ScreenType::DigitalRain);
+        break;
+
     case ScreenType::DigitalRain:
         switchToScreen(ScreenType::WaterEffect);
         break;
@@ -257,7 +289,7 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::Fire:
-        switchToScreen(ScreenType::DigitalRain);
+        switchToScreen(ScreenType::ControlDeck);
         break;
 
     case ScreenType::TerminalCapabilities:
@@ -285,12 +317,23 @@ void Application::configureAssetLibrary()
 {
     m_assetLibrary.setAssetsRoot("Assets");
 
-    // Preferred canonical keys
-    m_assetLibrary.registerCanonicalAsset(
+    m_assetLibrary.registerAsset(
         "banner.fire_font_k",
         "Fonts/FIGlet/Fire Font-k.flf");
 
-    m_assetLibrary.registerCanonicalAsset(
+    m_assetLibrary.registerAsset(
+        "banner.ansi_shadow",
+        "Fonts/FIGlet/ANSI Shadow.flf");
+
+    m_assetLibrary.registerAsset(
+        "banner.computer",
+        "Fonts/Figlet/Computer.flf");
+
+    m_assetLibrary.registerAsset(
         "pfont.assemble_box",
         "Fonts/pFont/AssembleBox.pfont");
+
+    m_assetLibrary.registerAsset(
+        "xp.retro_terminal_1",
+        "xp/retroTerm1.xp");
 }

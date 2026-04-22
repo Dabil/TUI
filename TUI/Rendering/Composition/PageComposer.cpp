@@ -1,13 +1,10 @@
 ﻿#include "Rendering/Composition/PageComposer.h"
 
-#include "Assets/AssetLibrary.h"
-
 #include <algorithm>
 #include <stdexcept>
-#include <utility>
-#include <vector>
-#include <map>
 
+#include "Assets/AssetLibrary.h"
+#include "Rendering/Objects/TextObjectBuilder.h"
 #include "Utilities/Unicode/GraphemeSegmentation.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
@@ -17,227 +14,130 @@ namespace
     {
         return ch == U'\n' || ch == U'\r';
     }
+
+    Rect makeRectValue(int x, int y, int width, int height)
+    {
+        return Composition::makeRect(x, y, std::max(0, width), std::max(0, height));
+    }
+
+    std::string makeGridCellName(std::string_view baseName, int row, int col)
+    {
+        return std::string(baseName) + ".r" + std::to_string(row) + ".c" + std::to_string(col);
+    }
+
+    Composition::PageComposer::PlacementSpec makeTopLeftPlacement(
+        const Composition::PageComposer::PlacementSpec& placement)
+    {
+        Composition::PageComposer::PlacementSpec normalized = placement;
+        normalized.alignment = Composition::Align::topLeft();
+        return normalized;
+    }
+
+    TextObject captureBufferAsTextObject(const ScreenBuffer& buffer)
+    {
+        TextObjectBuilder builder(buffer.getWidth(), buffer.getHeight());
+
+        for (int y = 0; y < buffer.getHeight(); ++y)
+        {
+            for (int x = 0; x < buffer.getWidth(); ++x)
+            {
+                const ScreenCell& cell = buffer.getCell(x, y);
+                const std::optional<Style> style =
+                    cell.hasStyle() ? std::optional<Style>(cell.style) : std::nullopt;
+
+                builder.setCell(x, y, cell.glyph, cell.kind, cell.width, style);
+            }
+        }
+
+        return builder.build();
+    }
 }
 
 namespace Composition
 {
-    bool PageComposer::isWrapWhitespaceText(std::u32string_view text)
+    PageComposer::PlacementSpec PageComposer::PlacementSpec::at(int x, int y)
     {
-        if (text.empty())
-        {
-            return false;
-        }
-
-        for (char32_t ch : text)
-        {
-            if (ch != U' ' &&
-                ch != U'\t' &&
-                ch != U'\v' &&
-                ch != U'\f')
-            {
-                return false;
-            }
-        }
-
-        return true;
+        PlacementSpec spec;
+        spec.mode = Mode::Point;
+        spec.point = { x, y };
+        return spec;
     }
 
-    std::u32string PageComposer::trimTrailingWrapWhitespace(std::u32string_view text)
+    PageComposer::PlacementSpec PageComposer::PlacementSpec::inRegion(
+        const Rect& regionValue,
+        const Alignment& alignmentValue,
+        bool clamp)
     {
-        std::size_t end = text.size();
-
-        while (end > 0)
-        {
-            if (!isWrapWhitespaceText(std::u32string_view(text.data() + end - 1, 1)))
-            {
-                break;
-            }
-
-            --end;
-        }
-
-        return std::u32string(text.substr(0, end));
+        PlacementSpec spec;
+        spec.mode = Mode::Region;
+        spec.region = regionValue;
+        spec.alignment = alignmentValue;
+        spec.clampToRegion = clamp;
+        return spec;
     }
 
-    std::vector<std::u32string> PageComposer::wrapSingleLineToLines(
-        std::u32string_view text,
-        int maxWidth)
+    PageComposer::PlacementSpec PageComposer::PlacementSpec::inNamedRegion(
+        std::string_view name,
+        const Alignment& alignmentValue,
+        bool clamp)
     {
-        std::vector<std::u32string> lines;
+        PlacementSpec spec;
+        spec.mode = Mode::NamedRegion;
+        spec.regionName = std::string(name);
+        spec.alignment = alignmentValue;
+        spec.clampToRegion = clamp;
+        return spec;
+    }
 
-        if (maxWidth <= 0)
-        {
-            return lines;
-        }
+    PageComposer::PlacementSpec PageComposer::PlacementSpec::inFullScreen(
+        const Alignment& alignmentValue,
+        bool clamp)
+    {
+        PlacementSpec spec;
+        spec.mode = Mode::FullScreen;
+        spec.alignment = alignmentValue;
+        spec.clampToRegion = clamp;
+        return spec;
+    }
 
-        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
-
-        if (clusters.empty())
-        {
-            lines.push_back(U"");
-            return lines;
-        }
-
-        auto buildClusterRange =
-            [&](std::size_t startIndex,
-                std::size_t endIndexExclusive,
-                bool trimTrailingWhitespace) -> std::u32string
-            {
-                std::u32string result;
-
-                for (std::size_t i = startIndex; i < endIndexExclusive; ++i)
-                {
-                    result += clusters[i].codePoints;
-                }
-
-                if (trimTrailingWhitespace)
-                {
-                    result = trimTrailingWrapWhitespace(result);
-                }
-
-                return result;
-            };
-
-        std::size_t lineStart = 0;
-
-        while (lineStart < clusters.size())
-        {
-            while (lineStart < clusters.size() &&
-                isWrapWhitespaceText(clusters[lineStart].codePoints))
-            {
-                ++lineStart;
-            }
-
-            if (lineStart >= clusters.size())
-            {
-                lines.push_back(U"");
-                break;
-            }
-
-            std::size_t index = lineStart;
-            std::size_t lastBreak = static_cast<std::size_t>(-1);
-            int currentWidth = 0;
-
-            while (index < clusters.size())
-            {
-                const int clusterWidth = std::max(0, static_cast<int>(clusters[index].displayWidth));
-                const bool breakableWhitespace =
-                    isWrapWhitespaceText(clusters[index].codePoints);
-
-                if (currentWidth > 0 &&
-                    (currentWidth + clusterWidth) > maxWidth)
-                {
-                    break;
-                }
-
-                currentWidth += clusterWidth;
-
-                if (breakableWhitespace)
-                {
-                    lastBreak = index;
-                }
-
-                ++index;
-            }
-
-            if (index >= clusters.size())
-            {
-                lines.push_back(buildClusterRange(
-                    lineStart,
-                    clusters.size(),
-                    true));
-                break;
-            }
-
-            if (currentWidth == 0)
-            {
-                lines.push_back(buildClusterRange(
-                    lineStart,
-                    lineStart + 1,
-                    false));
-                lineStart = lineStart + 1;
-                continue;
-            }
-
-            if (lastBreak != static_cast<std::size_t>(-1) &&
-                lastBreak >= lineStart)
-            {
-                lines.push_back(buildClusterRange(
-                    lineStart,
-                    lastBreak,
-                    true));
-                lineStart = lastBreak + 1;
-                continue;
-            }
-
-            lines.push_back(buildClusterRange(
-                lineStart,
-                index,
-                true));
-            lineStart = index;
-        }
-
-        if (lines.empty())
-        {
-            lines.push_back(U"");
-        }
-
-        return lines;
+    PageComposer::PageComposer()
+    {
+        m_frameContext.bounds = Rect{};
     }
 
     PageComposer::PageComposer(ScreenBuffer& target)
         : m_target(&target)
-        , m_composedBuffer(target)
+        , m_buffer(target)
     {
-    }
-
-    void PageComposer::resize(int width, int height)
-    {
-        m_composedBuffer.resize(width, height);
-        synchronizeTarget();
-
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::Resize,
-            "resize",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
-    }
-
-    int PageComposer::getWidth() const
-    {
-        return m_composedBuffer.getWidth();
-    }
-
-    int PageComposer::getHeight() const
-    {
-        return m_composedBuffer.getHeight();
+        m_frameContext.bounds = getFullScreenRegion();
     }
 
     void PageComposer::setTarget(ScreenBuffer& target)
     {
         m_target = &target;
 
-        if (m_composedBuffer.getWidth() <= 0 || m_composedBuffer.getHeight() <= 0)
+        if (m_buffer.getWidth() <= 0 || m_buffer.getHeight() <= 0)
         {
-            m_composedBuffer = target;
+            m_buffer = target;
+            m_lastSignature = 0;
             return;
         }
 
         synchronizeTarget();
+        m_lastSignature = 0;
     }
 
     void PageComposer::detachTarget()
     {
         m_target = nullptr;
+    }
+
+    void PageComposer::refreshFromTarget()
+    {
+        if (m_target != nullptr)
+        {
+            m_buffer = *m_target;
+        }
     }
 
     bool PageComposer::hasTarget() const
@@ -259,7 +159,7 @@ namespace Composition
     {
         if (m_target == nullptr)
         {
-            throw std::runtime_error("PageComposer has no target ScreenBuffer.");
+            throw std::runtime_error("PageComposer target is not attached.");
         }
 
         return *m_target;
@@ -269,618 +169,117 @@ namespace Composition
     {
         if (m_target == nullptr)
         {
-            throw std::runtime_error("PageComposer has no target ScreenBuffer.");
+            throw std::runtime_error("PageComposer target is not attached.");
         }
 
         return *m_target;
     }
 
-    ScreenBuffer PageComposer::captureBuffer() const
+    void PageComposer::resize(int width, int height)
     {
-        return m_composedBuffer;
-    }
+        m_buffer.resize(std::max(0, width), std::max(0, height));
 
-    std::u32string PageComposer::renderToU32String() const
-    {
-        return m_composedBuffer.renderToU32String();
-    }
+        if (!m_frameContext.activeFrameName.has_value())
+        {
+            m_frameContext.bounds = getFullScreenRegion();
+        }
 
-    std::string PageComposer::renderToUtf8String() const
-    {
-        return m_composedBuffer.renderToUtf8String();
+        synchronizeTarget();
+        m_lastSignature = 0;
     }
 
     void PageComposer::clear(const Style& style)
     {
-        m_composedBuffer.clear(style);
+        m_buffer.clear(style);
         synchronizeTarget();
-
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::Clear,
-            "clear",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
+        m_lastSignature = 0;
     }
 
-    void PageComposer::setScreenTemplateLoader(ScreenTemplateLoader loader)
+    int PageComposer::getWidth() const
     {
-        m_screenTemplateLoader = std::move(loader);
+        return m_buffer.getWidth();
     }
 
-    bool PageComposer::hasScreenTemplateLoader() const
+    int PageComposer::getHeight() const
     {
-        return static_cast<bool>(m_screenTemplateLoader);
+        return m_buffer.getHeight();
     }
 
-    bool PageComposer::createScreen(std::string_view filename)
+    TextObject PageComposer::captureBuffer() const
     {
-        if (!m_screenTemplateLoader)
+        return captureBufferAsTextObject(m_buffer);
+    }
+
+    std::u32string PageComposer::renderToU32String() const
+    {
+        return m_buffer.renderToU32String();
+    }
+
+    std::string PageComposer::renderToUtf8String() const
+    {
+        return m_buffer.renderToUtf8String();
+    }
+
+    void PageComposer::createRegion(std::string_view name, const Rect& rect)
+    {
+        if (name.empty())
         {
-            return false;
+            throw std::invalid_argument("PageComposer::createRegion requires a non-empty name.");
         }
 
-        const ScreenTemplateLoadResult loadResult = m_screenTemplateLoader(filename);
-        if (!loadResult.success)
+        if (!m_regions.createRegion(NamedRegion{ std::string(name), rect }))
         {
-            return false;
+            throw std::runtime_error("PageComposer::createRegion cannot create a duplicate region: " + std::string(name));
+        }
+    }
+
+    void PageComposer::replaceRegion(std::string_view name, const Rect& rect)
+    {
+        if (name.empty())
+        {
+            throw std::invalid_argument("PageComposer::replaceRegion requires a non-empty name.");
         }
 
-        return loadScreen(loadResult.object);
+        m_regions.removeRegion(name);
+        m_regions.createRegion(NamedRegion{ std::string(name), rect });
     }
 
-    bool PageComposer::loadScreen(const TextObject& object)
+    void PageComposer::removeRegion(std::string_view name)
     {
-        return loadScreen(object, WritePresets::solidObject(), std::nullopt);
+        m_regions.removeRegion(name);
     }
 
-    bool PageComposer::loadScreen(
-        const TextObject& object,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
+    void PageComposer::renameRegion(std::string_view from, std::string_view to)
     {
-        if (!object.isLoaded())
+        if (from.empty() || to.empty())
         {
-            recordOperation(
-                PageCompositionDiagnostics::OperationKind::LoadScreen,
-                "loadScreen",
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr,
-                nullptr,
-                &writePolicy,
-                false,
-                overrideStyle.has_value(),
-                false,
-                false,
-                false,
-                {},
-                {},
-                "Screen object is not loaded.");
-            return false;
+            throw std::invalid_argument("PageComposer::renameRegion requires non-empty names.");
         }
 
-        object.draw(m_composedBuffer, 0, 0, writePolicy, overrideStyle);
-        synchronizeTarget();
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::LoadScreen,
-            "loadScreen",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            &writePolicy,
-            false,
-            overrideStyle.has_value(),
-            false,
-            false,
-            true);
-        return true;
-    }
-
-    bool PageComposer::createRegion(
-        int x,
-        int y,
-        int width,
-        int height,
-        std::string_view name)
-    {
-        const Rect region = makeRect(x, y, width, height);
-        const bool success = m_regions.createRegion(x, y, width, height, name);
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::CreateRegion,
-            "createRegion",
-            &region,
-            &region,
-            nullptr,
-            &region.size,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            success,
-            name,
-            {},
-            success ? std::string_view{} : std::string_view{ "Unable to create region." });
-        return success;
-    }
-
-    bool PageComposer::createRegion(const Rect& rect, std::string_view name)
-    {
-        return createRegion(
-            rect.position.x,
-            rect.position.y,
-            rect.size.width,
-            rect.size.height,
-            name);
-    }
-
-    bool PageComposer::createFullScreenRegion(std::string_view name)
-    {
-        return createRegion(getFullScreenRegion(), name);
-    }
-
-    bool PageComposer::createCenteredRegion(
-        int width,
-        int height,
-        std::string_view name)
-    {
-        return createCenteredRegion(getFullScreenRegion(), width, height, name);
-    }
-
-    bool PageComposer::createCenteredRegion(
-        const Rect& container,
-        int width,
-        int height,
-        std::string_view name)
-    {
-        const int x = container.position.x + (container.size.width - width) / 2;
-        const int y = container.position.y + (container.size.height - height) / 2;
-
-        return createRegion(x, y, width, height, name);
-    }
-
-    bool PageComposer::createCenteredRegion(
-        std::string_view containerRegionName,
-        int width,
-        int height,
-        std::string_view name)
-    {
-        const NamedRegion* containerRegion = getRegion(containerRegionName);
-        if (containerRegion == nullptr)
-        {
-            const Rect requestedRegion = makeRect(0, 0, width, height);
-            recordOperation(
-                PageCompositionDiagnostics::OperationKind::CreateRegion,
-                "createCenteredRegion",
-                &requestedRegion,
-                nullptr,
-                nullptr,
-                &requestedRegion.size,
-                nullptr,
-                nullptr,
-                false,
-                false,
-                false,
-                false,
-                false,
-                name,
-                containerRegionName,
-                "Container region was not found.");
-            return false;
-        }
-
-        return createCenteredRegion(containerRegion->bounds, width, height, name);
-    }
-
-    bool PageComposer::createDesignScreen(
-        int width,
-        int height,
-        std::string_view outerRegionName,
-        std::string_view innerRegionName)
-    {
-        return createDesignScreen(
-            getFullScreenRegion(),
-            width,
-            height,
-            outerRegionName,
-            innerRegionName);
-    }
-
-    bool PageComposer::createDesignScreen(
-        const Rect& container,
-        int width,
-        int height,
-        std::string_view outerRegionName,
-        std::string_view innerRegionName)
-    {
-        if (!createCenteredRegion(container, width, height, outerRegionName))
-        {
-            return false;
-        }
-
-        if (innerRegionName.empty())
-        {
-            return true;
-        }
-
-        return createInsetRegion(outerRegionName, 1, innerRegionName);
-    }
-
-    bool PageComposer::createDesignScreen(
-        std::string_view containerRegionName,
-        int width,
-        int height,
-        std::string_view outerRegionName,
-        std::string_view innerRegionName)
-    {
-        if (!createCenteredRegion(containerRegionName, width, height, outerRegionName))
-        {
-            return false;
-        }
-
-        if (innerRegionName.empty())
-        {
-            return true;
-        }
-
-        return createInsetRegion(outerRegionName, 1, innerRegionName);
-    }
-
-    void PageComposer::fillRegion(const Rect& target, char32_t glyph, const Style& style)
-    {
-        if (target.size.width <= 0 || target.size.height <= 0)
+        if (from == to)
         {
             return;
         }
 
-        const std::optional<Style> styleOverride(style);
-
-        for (int row = 0; row < target.size.height; ++row)
-        {
-            const int y = target.position.y + row;
-            for (int col = 0; col < target.size.width; ++col)
-            {
-                const int x = target.position.x + col;
-                m_composedBuffer.writeCodePoint(x, y, glyph, styleOverride);
-            }
-        }
-
-        synchronizeTarget();
-
-        const Point origin{ target.position.x, target.position.y };
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-            "fillRegion",
-            &target,
-            &target,
-            &origin,
-            &target.size,
-            nullptr,
-            nullptr,
-            false,
-            true,
-            false,
-            false,
-            true);
-    }
-
-    void PageComposer::fillRegion(
-        std::string_view targetRegionName,
-        char32_t glyph,
-        const Style& style)
-    {
-        const NamedRegion* region = getRegion(targetRegionName);
+        const NamedRegion* region = m_regions.getRegion(from);
         if (region == nullptr)
         {
-            return;
+            throw std::runtime_error("PageComposer::renameRegion could not find source region: " + std::string(from));
         }
 
-        fillRegion(region->bounds, glyph, style);
-    }
-
-    void PageComposer::styleRegion(const Rect& target, const Style& style)
-    {
-        if (target.size.width <= 0 || target.size.height <= 0)
+        if (m_regions.hasRegion(to))
         {
-            return;
+            throw std::runtime_error("PageComposer::renameRegion target already exists: " + std::string(to));
         }
 
-        const std::optional<Style> styleOverride(style);
-
-        for (int row = 0; row < target.size.height; ++row)
-        {
-            const int y = target.position.y + row;
-            for (int col = 0; col < target.size.width; ++col)
-            {
-                const int x = target.position.x + col;
-                const char32_t existingGlyph = m_composedBuffer.getDisplayGlyph(x, y);
-                m_composedBuffer.writeCodePoint(x, y, existingGlyph, styleOverride);
-            }
-        }
-
-        synchronizeTarget();
-
-        const Point origin{ target.position.x, target.position.y };
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-            "styleRegion",
-            &target,
-            &target,
-            &origin,
-            &target.size,
-            nullptr,
-            nullptr,
-            false,
-            true,
-            false,
-            false,
-            true);
-    }
-
-    void PageComposer::styleRegion(std::string_view targetRegionName, const Style& style)
-    {
-        const NamedRegion* region = getRegion(targetRegionName);
-        if (region == nullptr)
-        {
-            return;
-        }
-
-        styleRegion(region->bounds, style);
-    }
-
-    void PageComposer::removeRegion(std::string_view regionName)
-    {
-        m_regions.removeRegion(regionName);
-    }
-
-    void PageComposer::renameRegion(std::string_view oldName, std::string_view newName)
-    {
-        if (oldName.empty() || newName.empty())
-        {
-            return;
-        }
-
-        if (oldName == newName)
-        {
-            return;
-        }
-
-        const NamedRegion* existing = m_regions.getRegion(oldName);
-        if (existing == nullptr)
-        {
-            return;
-        }
-
-        if (m_regions.hasRegion(newName))
-        {
-            return;
-        }
-
-        NamedRegion renamed = *existing;
-        renamed.name = std::string(newName);
-
-        m_regions.removeRegion(oldName);
-        m_regions.createRegion(renamed);
-    }
-
-    void PageComposer::replaceRegion(std::string_view regionName, const Rect& rect)
-    {
-        if (regionName.empty())
-        {
-            return;
-        }
-
-        NamedRegion region;
-        region.name = std::string(regionName);
-        region.bounds = rect;
-
-        m_regions.createRegion(region);
-    }
-
-    void PageComposer::replaceRegion(
-        std::string_view regionName,
-        int x,
-        int y,
-        int width,
-        int height)
-    {
-        replaceRegion(regionName, makeRect(x, y, width, height));
+        const Rect bounds = region->bounds;
+        m_regions.removeRegion(from);
+        m_regions.createRegion(NamedRegion{ std::string(to), bounds });
     }
 
     void PageComposer::clearRegions()
     {
         m_regions.clearRegions();
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::ClearRegions,
-            "clearRegions",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
-    }
-
-    void PageComposer::clearRegion(const Rect& target, const Style& style)
-    {
-        fillRegion(target, U' ', style);
-    }
-
-    void PageComposer::clearRegion(std::string_view targetRegionName, const Style& style)
-    {
-        const NamedRegion* region = getRegion(targetRegionName);
-        if (region == nullptr)
-        {
-            return;
-        }
-
-        clearRegion(region->bounds, style);
-    }
-
-    void PageComposer::drawFrame(const Rect& target, const Style& style)
-    {
-        drawFrame(
-            target.position.x,
-            target.position.y,
-            target.size.width,
-            target.size.height,
-            style);
-    }
-
-    void PageComposer::drawFrame(std::string_view targetRegionName, const Style& style)
-    {
-        const NamedRegion* region = getRegion(targetRegionName);
-        if (region == nullptr)
-        {
-            return;
-        }
-
-        drawFrame(region->bounds, style);
-    }
-
-    void PageComposer::drawFrame(int x, int y, int width, int height, const Style& style)
-    {
-        if (width <= 0 || height <= 0)
-        {
-            return;
-        }
-
-        const std::optional<Style> styleOverride(style);
-        const Rect target = makeRect(x, y, width, height);
-
-        if (width == 1 && height == 1)
-        {
-            m_composedBuffer.writeCodePoint(x, y, U'•', styleOverride);
-            synchronizeTarget();
-
-            const Point origin{ x, y };
-            const Size contentSize{ width, height };
-            recordOperation(
-                PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-                "drawFrame",
-                &target,
-                &target,
-                &origin,
-                &contentSize,
-                nullptr,
-                nullptr,
-                false,
-                true,
-                false,
-                false,
-                true);
-            return;
-        }
-
-        if (height == 1)
-        {
-            for (int col = 0; col < width; ++col)
-            {
-                m_composedBuffer.writeCodePoint(x + col, y, U'─', styleOverride);
-            }
-
-            synchronizeTarget();
-
-            const Point origin{ x, y };
-            const Size contentSize{ width, height };
-            recordOperation(
-                PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-                "drawFrame",
-                &target,
-                &target,
-                &origin,
-                &contentSize,
-                nullptr,
-                nullptr,
-                false,
-                true,
-                false,
-                false,
-                true);
-            return;
-        }
-
-        if (width == 1)
-        {
-            for (int row = 0; row < height; ++row)
-            {
-                m_composedBuffer.writeCodePoint(x, y + row, U'│', styleOverride);
-            }
-
-            synchronizeTarget();
-
-            const Point origin{ x, y };
-            const Size contentSize{ width, height };
-            recordOperation(
-                PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-                "drawFrame",
-                &target,
-                &target,
-                &origin,
-                &contentSize,
-                nullptr,
-                nullptr,
-                false,
-                true,
-                false,
-                false,
-                true);
-            return;
-        }
-
-        m_composedBuffer.writeCodePoint(x, y, U'┌', styleOverride);
-        m_composedBuffer.writeCodePoint(x + width - 1, y, U'┐', styleOverride);
-        m_composedBuffer.writeCodePoint(x, y + height - 1, U'└', styleOverride);
-        m_composedBuffer.writeCodePoint(x + width - 1, y + height - 1, U'┘', styleOverride);
-
-        for (int col = 1; col < width - 1; ++col)
-        {
-            m_composedBuffer.writeCodePoint(x + col, y, U'─', styleOverride);
-            m_composedBuffer.writeCodePoint(x + col, y + height - 1, U'─', styleOverride);
-        }
-
-        for (int row = 1; row < height - 1; ++row)
-        {
-            m_composedBuffer.writeCodePoint(x, y + row, U'│', styleOverride);
-            m_composedBuffer.writeCodePoint(x + width - 1, y + row, U'│', styleOverride);
-        }
-
-        synchronizeTarget();
-
-        const Point origin{ x, y };
-        const Size contentSize{ width, height };
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-            "drawFrame",
-            &target,
-            &target,
-            &origin,
-            &contentSize,
-            nullptr,
-            nullptr,
-            false,
-            true,
-            false,
-            false,
-            true);
     }
 
     bool PageComposer::hasRegion(std::string_view name) const
@@ -888,760 +287,488 @@ namespace Composition
         return m_regions.hasRegion(name);
     }
 
-    const NamedRegion* PageComposer::getRegion(std::string_view name) const
+    std::optional<Rect> PageComposer::tryGetRegion(std::string_view name) const
     {
-        return m_regions.getRegion(name);
+        const NamedRegion* region = m_regions.getRegion(name);
+        if (region == nullptr)
+        {
+            return std::nullopt;
+        }
+
+        return region->bounds;
     }
 
-    NamedRegion* PageComposer::getRegion(std::string_view name)
+    Rect PageComposer::resolveRegion(std::string_view name) const
     {
-        return m_regions.getRegion(name);
+        const std::optional<Rect> region = tryGetRegion(name);
+        if (!region.has_value())
+        {
+            throw std::runtime_error("PageComposer::resolveRegion could not find region: " + std::string(name));
+        }
+
+        return *region;
     }
 
     Rect PageComposer::getFullScreenRegion() const
     {
-        return makeRect(0, 0, std::max(0, getWidth()), std::max(0, getHeight()));
+        return makeRectValue(0, 0, m_buffer.getWidth(), m_buffer.getHeight());
     }
 
-    int PageComposer::regionWidth(std::string_view regionName) const
+    void PageComposer::createFullScreenRegion(std::string_view name)
     {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? region->bounds.size.width : 0;
+        createRegion(name, getFullScreenRegion());
     }
 
-    int PageComposer::regionHeight(std::string_view regionName) const
+    void PageComposer::createCenteredRegion(std::string_view name, int width, int height)
     {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? region->bounds.size.height : 0;
+        createCenteredRegion(name, Size{ width, height });
     }
 
-    Point PageComposer::regionPosition(std::string_view regionName) const
+    void PageComposer::createCenteredRegion(std::string_view name, const Size& size)
     {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? region->bounds.position : Point{};
+        const Rect full = getFullScreenRegion();
+        createRegion(
+            name,
+            makeRectValue(
+                full.position.x + (full.size.width - size.width) / 2,
+                full.position.y + (full.size.height - size.height) / 2,
+                size.width,
+                size.height));
     }
 
-    Size PageComposer::regionSize(std::string_view regionName) const
+    void PageComposer::createInsetRegion(
+        std::string_view name,
+        std::string_view parent,
+        int inset)
     {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? region->bounds.size : Size{};
+        const Rect base = resolveRegion(parent);
+        createRegion(
+            name,
+            makeRectValue(
+                base.position.x + inset,
+                base.position.y + inset,
+                base.size.width - (inset * 2),
+                base.size.height - (inset * 2)));
     }
 
-    Rect PageComposer::peekTop(const Rect& rect, int height) const
+    void PageComposer::createFramedScreenRegions(
+        std::string_view outerName,
+        std::string_view innerName,
+        int thickness)
     {
-        const int clampedHeight = std::max(0, std::min(height, rect.size.height));
-        return makeRect(
-            rect.position.x,
-            rect.position.y,
-            rect.size.width,
+        createFramedScreenRegions(outerName, innerName, thickness, thickness);
+    }
+
+    void PageComposer::createFramedScreenRegions(
+        std::string_view outerName,
+        std::string_view innerName,
+        int horizontalThickness,
+        int verticalThickness)
+    {
+        const Rect full = getFullScreenRegion();
+
+        createRegion(outerName, full);
+        createRegion(
+            innerName,
+            makeRectValue(
+                full.position.x + horizontalThickness,
+                full.position.y + verticalThickness,
+                full.size.width - (horizontalThickness * 2),
+                full.size.height - (verticalThickness * 2)));
+    }
+
+    void PageComposer::registerGrid(
+        std::string_view baseName,
+        const Rect& bounds,
+        int rows,
+        int cols)
+    {
+        if (baseName.empty())
+        {
+            throw std::invalid_argument("PageComposer::registerGrid requires a non-empty base name.");
+        }
+
+        if (rows <= 0 || cols <= 0)
+        {
+            throw std::invalid_argument("PageComposer::registerGrid requires positive rows and cols.");
+        }
+
+        for (int row = 0; row < rows; ++row)
+        {
+            for (int col = 0; col < cols; ++col)
+            {
+                createRegion(
+                    makeGridCellName(baseName, row, col),
+                    gridCell(bounds, rows, cols, row, col));
+            }
+        }
+    }
+
+    void PageComposer::registerGridArea(
+        std::string_view name,
+        std::string_view baseName,
+        int row,
+        int col)
+    {
+        createRegion(name, resolveRegion(makeGridCellName(baseName, row, col)));
+    }
+
+    Rect PageComposer::peekTop(const Rect& base, int height) const
+    {
+        return makeRectValue(
+            base.position.x,
+            base.position.y,
+            base.size.width,
+            std::min(std::max(0, height), base.size.height));
+    }
+
+    Rect PageComposer::peekBottom(const Rect& base, int height) const
+    {
+        const int clampedHeight = std::min(std::max(0, height), base.size.height);
+        return makeRectValue(
+            base.position.x,
+            base.position.y + base.size.height - clampedHeight,
+            base.size.width,
             clampedHeight);
     }
 
-    Rect PageComposer::peekBottom(const Rect& rect, int height) const
+    Rect PageComposer::peekLeft(const Rect& base, int width) const
     {
-        const int clampedHeight = std::max(0, std::min(height, rect.size.height));
-        return makeRect(
-            rect.position.x,
-            rect.position.y + (rect.size.height - clampedHeight),
-            rect.size.width,
-            clampedHeight);
+        return makeRectValue(
+            base.position.x,
+            base.position.y,
+            std::min(std::max(0, width), base.size.width),
+            base.size.height);
     }
 
-    Rect PageComposer::peekLeft(const Rect& rect, int width) const
+    Rect PageComposer::peekRight(const Rect& base, int width) const
     {
-        const int clampedWidth = std::max(0, std::min(width, rect.size.width));
-        return makeRect(
-            rect.position.x,
-            rect.position.y,
+        const int clampedWidth = std::min(std::max(0, width), base.size.width);
+        return makeRectValue(
+            base.position.x + base.size.width - clampedWidth,
+            base.position.y,
             clampedWidth,
-            rect.size.height);
+            base.size.height);
     }
 
-    Rect PageComposer::peekRight(const Rect& rect, int width) const
+    Rect PageComposer::remainderBelow(const Rect& base, int height) const
     {
-        const int clampedWidth = std::max(0, std::min(width, rect.size.width));
-        return makeRect(
-            rect.position.x + (rect.size.width - clampedWidth),
-            rect.position.y,
-            clampedWidth,
-            rect.size.height);
+        const int consumed = std::min(std::max(0, height), base.size.height);
+        return makeRectValue(
+            base.position.x,
+            base.position.y + consumed,
+            base.size.width,
+            base.size.height - consumed);
     }
 
-    Rect PageComposer::peekTop(std::string_view regionName, int height) const
+    Rect PageComposer::remainderAbove(const Rect& base, int height) const
     {
-        const NamedRegion* region = getRegion(regionName);
-        return region != nullptr ? peekTop(region->bounds, height) : Rect{};
+        const int consumed = std::min(std::max(0, height), base.size.height);
+        return makeRectValue(
+            base.position.x,
+            base.position.y,
+            base.size.width,
+            base.size.height - consumed);
     }
 
-    Rect PageComposer::peekBottom(std::string_view regionName, int height) const
+    Rect PageComposer::remainderRightOf(const Rect& base, int width) const
     {
-        const NamedRegion* region = getRegion(regionName);
-        return region != nullptr ? peekBottom(region->bounds, height) : Rect{};
+        const int consumed = std::min(std::max(0, width), base.size.width);
+        return makeRectValue(
+            base.position.x + consumed,
+            base.position.y,
+            base.size.width - consumed,
+            base.size.height);
     }
 
-    Rect PageComposer::peekLeft(std::string_view regionName, int width) const
+    Rect PageComposer::remainderLeftOf(const Rect& base, int width) const
     {
-        const NamedRegion* region = getRegion(regionName);
-        return region != nullptr ? peekLeft(region->bounds, width) : Rect{};
+        const int consumed = std::min(std::max(0, width), base.size.width);
+        return makeRectValue(
+            base.position.x,
+            base.position.y,
+            base.size.width - consumed,
+            base.size.height);
     }
 
-    Rect PageComposer::peekRight(std::string_view regionName, int width) const
+    std::pair<Rect, Rect> PageComposer::splitTop(const Rect& base, int height) const
     {
-        const NamedRegion* region = getRegion(regionName);
-        return region != nullptr ? peekRight(region->bounds, width) : Rect{};
+        return { peekTop(base, height), remainderBelow(base, height) };
     }
 
-    Rect PageComposer::remainderBelow(const Rect& source, int consumedHeight) const
+    std::pair<Rect, Rect> PageComposer::splitBottom(const Rect& base, int height) const
     {
-        const int clampedHeight = std::max(0, std::min(consumedHeight, source.size.height));
-        return makeRect(
-            source.position.x,
-            source.position.y + clampedHeight,
-            source.size.width,
-            source.size.height - clampedHeight);
+        return { peekBottom(base, height), remainderAbove(base, height) };
     }
 
-    Rect PageComposer::remainderAbove(const Rect& source, int consumedHeight) const
+    std::pair<Rect, Rect> PageComposer::splitLeft(const Rect& base, int width) const
     {
-        const int clampedHeight = std::max(0, std::min(consumedHeight, source.size.height));
-        return makeRect(
-            source.position.x,
-            source.position.y,
-            source.size.width,
-            source.size.height - clampedHeight);
+        return { peekLeft(base, width), remainderRightOf(base, width) };
     }
 
-    Rect PageComposer::remainderRightOf(const Rect& source, int consumedWidth) const
+    std::pair<Rect, Rect> PageComposer::splitRight(const Rect& base, int width) const
     {
-        const int clampedWidth = std::max(0, std::min(consumedWidth, source.size.width));
-        return makeRect(
-            source.position.x + clampedWidth,
-            source.position.y,
-            source.size.width - clampedWidth,
-            source.size.height);
+        return { peekRight(base, width), remainderLeftOf(base, width) };
     }
 
-    Rect PageComposer::remainderLeftOf(const Rect& source, int consumedWidth) const
-    {
-        const int clampedWidth = std::max(0, std::min(consumedWidth, source.size.width));
-        return makeRect(
-            source.position.x,
-            source.position.y,
-            source.size.width - clampedWidth,
-            source.size.height);
-    }
-
-    Rect PageComposer::remainderBelow(std::string_view sourceRegionName, int consumedHeight) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? remainderBelow(region->bounds, consumedHeight) : Rect{};
-    }
-
-    Rect PageComposer::remainderAbove(std::string_view sourceRegionName, int consumedHeight) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? remainderAbove(region->bounds, consumedHeight) : Rect{};
-    }
-
-    Rect PageComposer::remainderRightOf(std::string_view sourceRegionName, int consumedWidth) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? remainderRightOf(region->bounds, consumedWidth) : Rect{};
-    }
-
-    Rect PageComposer::remainderLeftOf(std::string_view sourceRegionName, int consumedWidth) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? remainderLeftOf(region->bounds, consumedWidth) : Rect{};
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitTop(const Rect& source, int height) const
-    {
-        return {
-            peekTop(source, height),
-            remainderBelow(source, height)
-        };
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitBottom(const Rect& source, int height) const
-    {
-        return {
-            peekBottom(source, height),
-            remainderAbove(source, height)
-        };
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitLeft(const Rect& source, int width) const
-    {
-        return {
-            peekLeft(source, width),
-            remainderRightOf(source, width)
-        };
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitRight(const Rect& source, int width) const
-    {
-        return {
-            peekRight(source, width),
-            remainderLeftOf(source, width)
-        };
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitTop(std::string_view sourceRegionName, int height) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return { Rect{}, Rect{} };
-        }
-
-        return splitTop(region->bounds, height);
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitBottom(std::string_view sourceRegionName, int height) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return { Rect{}, Rect{} };
-        }
-
-        return splitBottom(region->bounds, height);
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitLeft(std::string_view sourceRegionName, int width) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return { Rect{}, Rect{} };
-        }
-
-        return splitLeft(region->bounds, width);
-    }
-
-    std::pair<Rect, Rect> PageComposer::splitRight(std::string_view sourceRegionName, int width) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return { Rect{}, Rect{} };
-        }
-
-        return splitRight(region->bounds, width);
-    }
-
-    std::vector<Rect> PageComposer::splitGrid(const Rect& source, int rows, int cols) const
+    std::vector<Rect> PageComposer::splitGrid(const Rect& base, int rows, int cols) const
     {
         std::vector<Rect> cells;
 
-        if (rows <= 0 || cols <= 0 || source.size.width < 0 || source.size.height < 0)
+        if (rows <= 0 || cols <= 0)
         {
             return cells;
         }
 
         cells.reserve(static_cast<std::size_t>(rows * cols));
-
-        const int baseCellWidth = source.size.width / cols;
-        const int extraWidth = source.size.width % cols;
-
-        const int baseCellHeight = source.size.height / rows;
-        const int extraHeight = source.size.height % rows;
-
-        int y = source.position.y;
         for (int row = 0; row < rows; ++row)
         {
-            const int cellHeight = baseCellHeight + (row < extraHeight ? 1 : 0);
-
-            int x = source.position.x;
             for (int col = 0; col < cols; ++col)
             {
-                const int cellWidth = baseCellWidth + (col < extraWidth ? 1 : 0);
-
-                cells.push_back(makeRect(x, y, cellWidth, cellHeight));
-                x += cellWidth;
+                cells.push_back(gridCell(base, rows, cols, row, col));
             }
-
-            y += cellHeight;
         }
 
         return cells;
     }
 
-    std::vector<Rect> PageComposer::splitGrid(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols) const
+    Rect PageComposer::gridCell(const Rect& base, int rows, int cols, int row, int col) const
     {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? splitGrid(region->bounds, rows, cols) : std::vector<Rect>{};
-    }
-
-    Rect PageComposer::gridCell(
-        const Rect& source,
-        int rows,
-        int cols,
-        int row,
-        int col) const
-    {
-        if (rows <= 0 || cols <= 0 || row < 0 || col < 0 || row >= rows || col >= cols)
+        if (rows <= 0 || cols <= 0 || row < 0 || row >= rows || col < 0 || col >= cols)
         {
             return Rect{};
         }
 
-        const std::vector<Rect> cells = splitGrid(source, rows, cols);
-        const std::size_t index = static_cast<std::size_t>(row * cols + col);
-
-        return index < cells.size() ? cells[index] : Rect{};
+        const int x = base.position.x + ((col * base.size.width) / cols);
+        const int nextX = base.position.x + (((col + 1) * base.size.width) / cols);
+        const int y = base.position.y + ((row * base.size.height) / rows);
+        const int nextY = base.position.y + (((row + 1) * base.size.height) / rows);
+        return makeRectValue(x, y, nextX - x, nextY - y);
     }
 
-    Rect PageComposer::gridCell(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        int row,
-        int col) const
+    Rect PageComposer::gridRow(const Rect& base, int rows, int row) const
     {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? gridCell(region->bounds, rows, cols, row, col) : Rect{};
-    }
-
-    std::vector<Rect> PageComposer::gridRow(
-        const Rect& source,
-        int rows,
-        int cols,
-        int row) const
-    {
-        std::vector<Rect> result;
-
-        if (rows <= 0 || cols <= 0 || row < 0 || row >= rows)
+        if (rows <= 0 || row < 0 || row >= rows)
         {
-            return result;
+            return Rect{};
         }
 
-        const std::vector<Rect> cells = splitGrid(source, rows, cols);
-        result.reserve(static_cast<std::size_t>(cols));
+        const int y = base.position.y + ((row * base.size.height) / rows);
+        const int nextY = base.position.y + (((row + 1) * base.size.height) / rows);
+        return makeRectValue(base.position.x, y, base.size.width, nextY - y);
+    }
 
-        const std::size_t startIndex = static_cast<std::size_t>(row * cols);
-        for (int col = 0; col < cols; ++col)
+    Rect PageComposer::gridColumn(const Rect& base, int cols, int col) const
+    {
+        if (cols <= 0 || col < 0 || col >= cols)
         {
-            const std::size_t index = startIndex + static_cast<std::size_t>(col);
-            if (index < cells.size())
+            return Rect{};
+        }
+
+        const int x = base.position.x + ((col * base.size.width) / cols);
+        const int nextX = base.position.x + (((col + 1) * base.size.width) / cols);
+        return makeRectValue(x, base.position.y, nextX - x, base.size.height);
+    }
+
+    void PageComposer::placeSource(
+        const ObjectSource& source,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        const ResolvedObjectSource resolved = resolveObjectSource(source, m_assetLibrary);
+        if (!resolved.hasObject())
+        {
+            return;
+        }
+
+        writeObject(resolved.object, placement, policy);
+    }
+
+    void PageComposer::writeObject(
+        const TextObject& object,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        if (!object.isLoaded())
+        {
+            return;
+        }
+
+        refreshFromTarget();
+
+        const PlacementResult result = resolvePlacementResult(
+            placement,
+            Size{ object.getWidth(), object.getHeight() });
+
+        object.draw(m_buffer, result.origin.x, result.origin.y, policy);
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::writeText(
+        std::string_view text,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        const std::u32string firstLine = extractFirstLine(UnicodeConversion::utf8ToU32(text));
+        writeObject(TextObject::fromU32(firstLine), makeTopLeftPlacement(placement), policy);
+    }
+
+    void PageComposer::writeTextBlock(
+        std::string_view text,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        writeObject(TextObject::fromUtf8(text), makeTopLeftPlacement(placement), policy);
+    }
+
+    void PageComposer::writeAlignedText(
+        std::string_view text,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        const std::u32string firstLine = extractFirstLine(UnicodeConversion::utf8ToU32(text));
+        writeObject(TextObject::fromU32(firstLine), placement, policy);
+    }
+
+    void PageComposer::writeAlignedTextBlock(
+        std::string_view text,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        writeObject(TextObject::fromUtf8(text), placement, policy);
+    }
+
+    void PageComposer::writeWrappedText(
+        std::string_view text,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        const std::u32string u32Text = UnicodeConversion::utf8ToU32(text);
+        const Rect targetRegion = resolvePlacementRegion(placement);
+
+        if (targetRegion.size.width <= 0)
+        {
+            writeObject(TextObject::fromU32(extractFirstLine(u32Text)), placement, policy);
+            return;
+        }
+
+        const std::vector<std::u32string> wrappedLines = wrapTextToLines(u32Text, targetRegion.size.width);
+        writeObject(TextObject::fromU32([&]() {
+            std::u32string joined;
+            for (std::size_t i = 0; i < wrappedLines.size(); ++i)
             {
-                result.push_back(cells[index]);
-            }
-        }
-
-        return result;
-    }
-
-    std::vector<Rect> PageComposer::gridRow(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        int row) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? gridRow(region->bounds, rows, cols, row) : std::vector<Rect>{};
-    }
-
-    std::vector<Rect> PageComposer::gridColumn(
-        const Rect& source,
-        int rows,
-        int cols,
-        int col) const
-    {
-        std::vector<Rect> result;
-
-        if (rows <= 0 || cols <= 0 || col < 0 || col >= cols)
-        {
-            return result;
-        }
-
-        const std::vector<Rect> cells = splitGrid(source, rows, cols);
-        result.reserve(static_cast<std::size_t>(rows));
-
-        for (int row = 0; row < rows; ++row)
-        {
-            const std::size_t index = static_cast<std::size_t>(row * cols + col);
-            if (index < cells.size())
-            {
-                result.push_back(cells[index]);
-            }
-        }
-
-        return result;
-    }
-
-    std::vector<Rect> PageComposer::gridColumn(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        int col) const
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        return region != nullptr ? gridColumn(region->bounds, rows, cols, col) : std::vector<Rect>{};
-    }
-
-    bool PageComposer::registerGrid(
-        const Rect& source,
-        int rows,
-        int cols,
-        const std::vector<std::string>& names)
-    {
-        if (rows <= 0 || cols <= 0)
-        {
-            return false;
-        }
-
-        const std::size_t expectedCount = static_cast<std::size_t>(rows * cols);
-        if (names.size() != expectedCount)
-        {
-            return false;
-        }
-
-        const std::vector<Rect> cells = splitGrid(source, rows, cols);
-        if (cells.size() != expectedCount)
-        {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < cells.size(); ++i)
-        {
-            if (!createRegion(cells[i], names[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool PageComposer::registerGrid(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        const std::vector<std::string>& names)
-    {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return false;
-        }
-
-        return registerGrid(region->bounds, rows, cols, names);
-    }
-
-    bool PageComposer::registerGrid(
-        const Rect& source,
-        int rows,
-        int cols,
-        std::string_view namePrefix)
-    {
-        if (rows <= 0 || cols <= 0)
-        {
-            return false;
-        }
-
-        const std::vector<Rect> cells = splitGrid(source, rows, cols);
-        const std::size_t expectedCount = static_cast<std::size_t>(rows * cols);
-        if (cells.size() != expectedCount)
-        {
-            return false;
-        }
-
-        std::size_t index = 0;
-        for (int row = 0; row < rows; ++row)
-        {
-            for (int col = 0; col < cols; ++col)
-            {
-                const std::string name =
-                    std::string(namePrefix) +
-                    "_r" + std::to_string(row) +
-                    "_c" + std::to_string(col);
-
-                if (!createRegion(cells[index], name))
+                if (i > 0)
                 {
-                    return false;
+                    joined.push_back(U'\n');
                 }
-
-                ++index;
+                joined += wrappedLines[i];
             }
-        }
-
-        return true;
+            return joined;
+            }()), placement, policy);
     }
 
-    bool PageComposer::registerGrid(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        std::string_view namePrefix)
+    void PageComposer::writeAt(
+        const TextObject& object,
+        int x,
+        int y,
+        const WritePolicy& policy)
     {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return false;
-        }
-
-        return registerGrid(region->bounds, rows, cols, namePrefix);
+        writeObject(object, PlacementSpec::at(x, y), policy);
     }
 
-    bool PageComposer::registerGridArea(
-        const Rect& source,
-        int rows,
-        int cols,
-        const std::vector<std::string>& areaNames)
+    void PageComposer::writeInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
     {
-        if (rows <= 0 || cols <= 0)
-        {
-            return false;
-        }
-
-        const std::size_t expectedCount = static_cast<std::size_t>(rows * cols);
-        if (areaNames.size() != expectedCount)
-        {
-            return false;
-        }
-
-        const std::vector<Rect> cells = splitGrid(source, rows, cols);
-        if (cells.size() != expectedCount)
-        {
-            return false;
-        }
-
-        struct AreaBounds
-        {
-            int minRow = 0;
-            int maxRow = 0;
-            int minCol = 0;
-            int maxCol = 0;
-            bool initialized = false;
-        };
-
-        std::map<std::string, AreaBounds> areas;
-
-        for (int row = 0; row < rows; ++row)
-        {
-            for (int col = 0; col < cols; ++col)
-            {
-                const std::size_t index = static_cast<std::size_t>(row * cols + col);
-                const std::string& name = areaNames[index];
-
-                if (name.empty())
-                {
-                    return false;
-                }
-
-                AreaBounds& bounds = areas[name];
-                if (!bounds.initialized)
-                {
-                    bounds.minRow = row;
-                    bounds.maxRow = row;
-                    bounds.minCol = col;
-                    bounds.maxCol = col;
-                    bounds.initialized = true;
-                }
-                else
-                {
-                    bounds.minRow = std::min(bounds.minRow, row);
-                    bounds.maxRow = std::max(bounds.maxRow, row);
-                    bounds.minCol = std::min(bounds.minCol, col);
-                    bounds.maxCol = std::max(bounds.maxCol, col);
-                }
-            }
-        }
-
-        for (const auto& entry : areas)
-        {
-            const std::string& name = entry.first;
-            const AreaBounds& bounds = entry.second;
-
-            for (int row = bounds.minRow; row <= bounds.maxRow; ++row)
-            {
-                for (int col = bounds.minCol; col <= bounds.maxCol; ++col)
-                {
-                    const std::size_t index = static_cast<std::size_t>(row * cols + col);
-                    if (areaNames[index] != name)
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            const Rect& topLeft =
-                cells[static_cast<std::size_t>(bounds.minRow * cols + bounds.minCol)];
-            const Rect& bottomRight =
-                cells[static_cast<std::size_t>(bounds.maxRow * cols + bounds.maxCol)];
-
-            const int x = topLeft.position.x;
-            const int y = topLeft.position.y;
-            const int width =
-                (bottomRight.position.x + bottomRight.size.width) - topLeft.position.x;
-            const int height =
-                (bottomRight.position.y + bottomRight.size.height) - topLeft.position.y;
-
-            if (!createRegion(x, y, width, height, name))
-            {
-                return false;
-            }
-        }
-
-        return true;
+        writeObject(
+            object,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
     }
 
-    bool PageComposer::registerGridArea(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        const std::vector<std::string>& areaNames)
+    void PageComposer::writeAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
     {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return false;
-        }
-
-        return registerGridArea(region->bounds, rows, cols, areaNames);
+        writeObject(
+            object,
+            PlacementSpec::inFullScreen(alignment, clampToRegion),
+            policy);
     }
 
-    bool PageComposer::registerGridArea(
-        const Rect& source,
-        int rows,
-        int cols,
-        std::initializer_list<std::string> areaNames)
+    void PageComposer::writeVisible(
+        const TextObject& object,
+        const PlacementSpec& placement)
     {
-        return registerGridArea(
-            source,
-            rows,
-            cols,
-            std::vector<std::string>(areaNames));
+        writeObject(object, placement, WritePresets::visibleObject());
     }
 
-    bool PageComposer::registerGridArea(
-        std::string_view sourceRegionName,
-        int rows,
-        int cols,
-        std::initializer_list<std::string> areaNames)
+    void PageComposer::writeSolid(
+        const TextObject& object,
+        const PlacementSpec& placement)
     {
-        return registerGridArea(
-            sourceRegionName,
-            rows,
-            cols,
-            std::vector<std::string>(areaNames));
+        writeObject(object, placement, WritePresets::solidObject());
     }
 
-    bool PageComposer::createInsetRegion(const Rect& source, int inset, std::string_view name)
+    void PageComposer::writeTextInRegion(
+        std::string_view text,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
     {
-        return createInsetRegion(source, inset, inset, inset, inset, name);
+        writeAlignedText(
+            text,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
     }
 
-    bool PageComposer::createInsetRegion(
-        std::string_view sourceRegionName,
-        int inset,
-        std::string_view name)
+    void PageComposer::writeTextBlockInRegion(
+        std::string_view text,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
     {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return false;
-        }
-
-        return createInsetRegion(region->bounds, inset, name);
+        writeAlignedTextBlock(
+            text,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
     }
 
-    bool PageComposer::createInsetRegion(
-        const Rect& source,
-        int left,
-        int top,
-        int right,
-        int bottom,
-        std::string_view name)
+    void PageComposer::writeWrappedTextInRegion(
+        std::string_view text,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
     {
-        const int clampedLeft = std::max(0, left);
-        const int clampedTop = std::max(0, top);
-        const int clampedRight = std::max(0, right);
-        const int clampedBottom = std::max(0, bottom);
-
-        const int insetX = source.position.x + clampedLeft;
-        const int insetY = source.position.y + clampedTop;
-        const int insetWidth = std::max(0, source.size.width - clampedLeft - clampedRight);
-        const int insetHeight = std::max(0, source.size.height - clampedTop - clampedBottom);
-
-        return createRegion(insetX, insetY, insetWidth, insetHeight, name);
+        writeWrappedText(
+            text,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
     }
 
-    bool PageComposer::createInsetRegion(
-        std::string_view sourceRegionName,
-        int left,
-        int top,
-        int right,
-        int bottom,
-        std::string_view name)
+    void PageComposer::writeCenteredText(
+        std::string_view text,
+        const WritePolicy& policy,
+        bool clampToRegion)
     {
-        const NamedRegion* region = getRegion(sourceRegionName);
-        if (region == nullptr)
-        {
-            return false;
-        }
-
-        return createInsetRegion(region->bounds, left, top, right, bottom, name);
+        writeAlignedText(
+            text,
+            PlacementSpec::inFullScreen(Align::center(), clampToRegion),
+            policy);
     }
 
-    bool PageComposer::insetAll(
-        const std::vector<std::string>& sourceNames,
-        int inset,
-        const std::vector<std::string>& destNames)
+    void PageComposer::setAssetLibrary(Assets::AssetLibrary* library)
     {
-        if (sourceNames.size() != destNames.size())
-        {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < sourceNames.size(); ++i)
-        {
-            if (!createInsetRegion(sourceNames[i], inset, destNames[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    bool PageComposer::insetAll(
-        const std::vector<std::string>& sourceNames,
-        int left,
-        int top,
-        int right,
-        int bottom,
-        const std::vector<std::string>& destNames)
-    {
-        if (sourceNames.size() != destNames.size())
-        {
-            return false;
-        }
-
-        for (std::size_t i = 0; i < sourceNames.size(); ++i)
-        {
-            if (!createInsetRegion(
-                sourceNames[i],
-                left,
-                top,
-                right,
-                bottom,
-                destNames[i]))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    void PageComposer::setAssetLibrary(Assets::AssetLibrary& assetLibrary)
-    {
-        m_assetLibrary = &assetLibrary;
+        m_assetLibrary = library;
     }
 
     void PageComposer::detachAssetLibrary()
@@ -1664,42 +791,37 @@ namespace Composition
         return m_assetLibrary;
     }
 
-    void PageComposer::setFrames(std::vector<TextObject> frames)
+    void PageComposer::setScreenTemplateLoader(ScreenTemplateLoader loader)
     {
-        m_frames = std::move(frames);
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::SetFrames,
-            "setFrames",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
+        m_templateLoader = std::move(loader);
+    }
+
+    std::optional<TextObject> PageComposer::loadScreenTemplate(std::string_view name) const
+    {
+        if (!m_templateLoader)
+        {
+            return std::nullopt;
+        }
+
+        return m_templateLoader(name, m_assetLibrary);
+    }
+
+    void PageComposer::loadScreen(
+        const TextObject& screen,
+        const PlacementSpec& placement,
+        const WritePolicy& policy)
+    {
+        writeObject(screen, placement, policy);
+    }
+
+    void PageComposer::setFrames(const std::vector<Frame>& frames)
+    {
+        m_frames = frames;
     }
 
     void PageComposer::clearFrames()
     {
         m_frames.clear();
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::ClearFrames,
-            "clearFrames",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true);
     }
 
     std::size_t PageComposer::getFrameCount() const
@@ -1707,26 +829,52 @@ namespace Composition
         return m_frames.size();
     }
 
-    bool PageComposer::hasFrame(int frameIndex) const
+    bool PageComposer::hasFrame(std::string_view name) const
     {
-        return getFrame(frameIndex) != nullptr;
+        return tryGetFrame(name) != nullptr;
     }
 
-    const TextObject* PageComposer::getFrame(int frameIndex) const
+    const PageComposer::Frame* PageComposer::tryGetFrame(std::string_view name) const
     {
-        if (frameIndex < 0 || static_cast<std::size_t>(frameIndex) >= m_frames.size())
+        for (const Frame& frame : m_frames)
         {
-            return nullptr;
+            if (frame.name == name)
+            {
+                return &frame;
+            }
         }
 
-        return &m_frames[static_cast<std::size_t>(frameIndex)];
+        return nullptr;
     }
 
-
-    void PageComposer::setDiagnostics(PageCompositionDiagnostics& diagnostics)
+    void PageComposer::beginFrame(std::string_view name)
     {
-        m_diagnostics = &diagnostics;
-        refreshDeterministicSignature();
+        m_frameContext.activeFrameName = std::string(name);
+        const Frame* frame = tryGetFrame(name);
+        m_frameContext.bounds = (frame != nullptr) ? frame->bounds : getFullScreenRegion();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::endFrame()
+    {
+        clearFrameContext();
+    }
+
+    void PageComposer::clearFrameContext()
+    {
+        m_frameContext.activeFrameName.reset();
+        m_frameContext.bounds = getFullScreenRegion();
+        m_lastSignature = 0;
+    }
+
+    const PageComposer::FrameContext& PageComposer::getFrameContext() const
+    {
+        return m_frameContext;
+    }
+
+    void PageComposer::setDiagnostics(DiagnosticsContext* ctx)
+    {
+        m_diagnostics = ctx;
     }
 
     void PageComposer::detachDiagnostics()
@@ -1739,1329 +887,133 @@ namespace Composition
         return m_diagnostics != nullptr;
     }
 
-    PageCompositionDiagnostics* PageComposer::tryGetDiagnostics()
+    PageComposer::DiagnosticsContext* PageComposer::tryGetDiagnostics()
     {
         return m_diagnostics;
     }
 
-    const PageCompositionDiagnostics* PageComposer::tryGetDiagnostics() const
+    const PageComposer::DiagnosticsContext* PageComposer::tryGetDiagnostics() const
     {
         return m_diagnostics;
-    }
-
-    void PageComposer::beginFrame(
-        int frameIndex,
-        std::string_view channel,
-        std::string_view tag)
-    {
-        m_frameContext.frameIndex = frameIndex;
-        m_frameContext.channel = std::string(channel);
-        m_frameContext.tag = std::string(tag);
-
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::BeginFrame,
-            "beginFrame",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true,
-            {},
-            {},
-            {});
-        refreshDeterministicSignature();
-    }
-
-    void PageComposer::endFrame()
-    {
-        refreshDeterministicSignature();
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::EndFrame,
-            "endFrame",
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            nullptr,
-            false,
-            false,
-            false,
-            false,
-            true,
-            {},
-            {},
-            {});
-    }
-
-    void PageComposer::clearFrameContext()
-    {
-        m_frameContext = {};
-        refreshDeterministicSignature();
-    }
-
-    const PageCompositionDiagnostics::FrameContext& PageComposer::frameContext() const
-    {
-        return m_frameContext;
     }
 
     std::uint64_t PageComposer::computeDeterministicSignature() const
     {
-        return PageCompositionDiagnostics::computeStableSignature(
-            getWidth(),
-            getHeight(),
-            renderToU32String(),
-            m_frameContext);
-    }
+        const PageCompositionDiagnostics::FrameContext diagnosticsFrameContext = [&]() {
+            PageCompositionDiagnostics::FrameContext ctx;
+            if (m_frameContext.activeFrameName.has_value())
+            {
+                ctx.tag = *m_frameContext.activeFrameName;
+            }
+            return ctx;
+            }();
 
-    bool PageComposer::verifyDeterministicSignature(std::uint64_t expectedSignature) const
-    {
-        return computeDeterministicSignature() == expectedSignature;
-    }
+        m_lastSignature = PageCompositionDiagnostics::computeStableSignature(
+            m_buffer.getWidth(),
+            m_buffer.getHeight(),
+            m_buffer.renderToU32String(),
+            diagnosticsFrameContext);
 
-    std::uint64_t PageComposer::lastDeterministicSignature() const
-    {
         if (m_diagnostics != nullptr)
         {
-            return m_diagnostics->lastDeterministicSignature();
+            m_diagnostics->setLastDeterministicSignature(m_lastSignature);
         }
 
-        return computeDeterministicSignature();
+        return m_lastSignature;
     }
 
-    int PageComposer::centerX(int contentWidth) const
+    bool PageComposer::verifyDeterministicSignature(std::uint64_t expected) const
     {
-        return Composition::centerX(getFullScreenRegion(), contentWidth);
+        return computeDeterministicSignature() == expected;
     }
 
-    int PageComposer::centerY(int contentHeight) const
+    std::uint64_t PageComposer::getLastDeterministicSignature() const
     {
-        return Composition::centerY(getFullScreenRegion(), contentHeight);
+        if (m_lastSignature == 0)
+        {
+            return computeDeterministicSignature();
+        }
+
+        return m_lastSignature;
     }
 
-    Point PageComposer::centerInFullScreen(const Size& contentSize) const
+    Rect PageComposer::resolveRegionOrFullScreen(std::string_view name) const
     {
-        return Composition::centerInRegion(getFullScreenRegion(), contentSize);
+        if (name.empty())
+        {
+            return getFullScreenRegion();
+        }
+
+        const std::optional<Rect> region = tryGetRegion(name);
+        return region.has_value() ? *region : getFullScreenRegion();
     }
 
-    Point PageComposer::anchorInFullScreen(AnchorPoint anchor) const
-    {
-        return anchorPointInRegion(getFullScreenRegion(), anchor);
-    }
-
-    int PageComposer::centerX(std::string_view regionName, int contentWidth) const
-    {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? Composition::centerX(region->bounds, contentWidth) : 0;
-    }
-
-    int PageComposer::centerY(std::string_view regionName, int contentHeight) const
-    {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? Composition::centerY(region->bounds, contentHeight) : 0;
-    }
-
-    Point PageComposer::centerInRegion(std::string_view regionName, const Size& contentSize) const
-    {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? Composition::centerInRegion(region->bounds, contentSize) : Point{};
-    }
-
-    Point PageComposer::anchorInRegion(std::string_view regionName, AnchorPoint anchor) const
-    {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        return region != nullptr ? anchorPointInRegion(region->bounds, anchor) : Point{};
-    }
-
-    SourcePlacementResult PageComposer::placeSource(
-        const ObjectSource& source,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeResolvedSource(
-            resolveObjectSource(source, m_assetLibrary),
-            x,
-            y,
-            writePolicy,
-            overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeSource(
-        const ObjectSource& source,
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeResolvedSource(
-            resolveObjectSource(source, m_assetLibrary),
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-
-    SourcePlacementResult PageComposer::placeSource(
-        const ObjectSource& source,
-        const PlacementSpec& placement,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
+    Rect PageComposer::resolvePlacementRegion(const PlacementSpec& placement) const
     {
         switch (placement.mode)
         {
         case PlacementSpec::Mode::Point:
-            return placeSource(
-                source,
+            return makeRectValue(
                 placement.point.x,
                 placement.point.y,
-                writePolicy,
-                overrideStyle);
+                std::max(0, m_buffer.getWidth() - placement.point.x),
+                std::max(0, m_buffer.getHeight() - placement.point.y));
 
         case PlacementSpec::Mode::Region:
-            return placeSource(
-                source,
-                placement.region,
-                placement.alignment,
-                writePolicy,
-                overrideStyle,
-                placement.clampToRegion);
+            return placement.region;
 
-        case PlacementSpec::Mode::RegionName:
-            return placeSourceInRegion(
-                source,
-                placement.regionName,
-                placement.alignment,
-                writePolicy,
-                overrideStyle,
-                placement.clampToRegion);
+        case PlacementSpec::Mode::NamedRegion:
+            return resolveRegionOrFullScreen(placement.regionName);
 
-        case PlacementSpec::Mode::FullScreenAligned:
-            return placeSourceAligned(
-                source,
-                placement.alignment,
-                writePolicy,
-                overrideStyle,
-                placement.clampToRegion);
-
-        default:
-            return makeFailedSourcePlacement(resolveObjectSource(source, m_assetLibrary));
-        }
-    }
-
-    SourcePlacementResult PageComposer::placeSourceInRegion(
-        const ObjectSource& source,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        if (region == nullptr)
-        {
-            return makeFailedSourcePlacement(
-                resolveObjectSource(source, m_assetLibrary),
-                &alignment);
+        case PlacementSpec::Mode::FullScreen:
+            return getFullScreenRegion();
         }
 
-        return placeSource(
-            source,
-            region->bounds,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
+        return Rect{};
     }
 
-    SourcePlacementResult PageComposer::placeSourceAligned(
-        const ObjectSource& source,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSource(
-            source,
-            getFullScreenRegion(),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeAsset(
-        std::string_view assetName,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeSource(
-            ObjectSource::fromAsset(std::string(assetName)),
-            x,
-            y,
-            writePolicy,
-            overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeAsset(
-        std::string_view assetName,
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSource(
-            ObjectSource::fromAsset(std::string(assetName)),
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeAssetAligned(
-        std::string_view assetName,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeAsset(
-            assetName,
-            getFullScreenRegion(),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeFrame(
-        int frameIndex,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeSource(
-            ObjectSource::fromRegisteredFrame(m_frames, frameIndex),
-            x,
-            y,
-            writePolicy,
-            overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeFrame(
-        int frameIndex,
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSource(
-            ObjectSource::fromRegisteredFrame(m_frames, frameIndex),
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeFrameAligned(
-        int frameIndex,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeFrame(
-            frameIndex,
-            getFullScreenRegion(),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-
-    SourcePlacementResult PageComposer::placeActiveFrame(
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeFrame(resolveActiveFrameIndex(), x, y, writePolicy, overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeActiveFrame(
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeFrame(
-            resolveActiveFrameIndex(),
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeActiveFrameAligned(
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeFrameAligned(
-            resolveActiveFrameIndex(),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeSequenceFrame(
-        std::string_view assetName,
-        int frameIndex,
-        int x,
-        int y,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        ObjectSource source = ObjectSource::fromAssetFrame(std::string(assetName), frameIndex);
-        source.xpFrameOptions = frameOptions;
-        return placeSource(source, x, y, writePolicy, overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeSequenceFrame(
-        std::string_view assetName,
-        int frameIndex,
-        const Rect& region,
-        const Alignment& alignment,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        ObjectSource source = ObjectSource::fromAssetFrame(std::string(assetName), frameIndex);
-        source.xpFrameOptions = frameOptions;
-        return placeSource(
-            source,
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeSequenceFrameAligned(
-        std::string_view assetName,
-        int frameIndex,
-        const Alignment& alignment,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSequenceFrame(
-            assetName,
-            frameIndex,
-            getFullScreenRegion(),
-            alignment,
-            frameOptions,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-
-    SourcePlacementResult PageComposer::placeActiveSequenceFrame(
-        std::string_view assetName,
-        int x,
-        int y,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeSequenceFrame(
-            assetName,
-            m_frameContext.frameIndex,
-            x,
-            y,
-            frameOptions,
-            writePolicy,
-            overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeActiveSequenceFrame(
-        std::string_view assetName,
-        const Rect& region,
-        const Alignment& alignment,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSequenceFrame(
-            assetName,
-            m_frameContext.frameIndex,
-            region,
-            alignment,
-            frameOptions,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeActiveSequenceFrameAligned(
-        std::string_view assetName,
-        const Alignment& alignment,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSequenceFrameAligned(
-            assetName,
-            m_frameContext.frameIndex,
-            alignment,
-            frameOptions,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeXpDocument(
-        const XpArtLoader::XpDocument& document,
-        int x,
-        int y,
-        const XpArtLoader::LoadOptions& loadOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeSource(
-            ObjectSource::fromXpDocument(document, loadOptions),
-            x,
-            y,
-            writePolicy,
-            overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeXpFrame(
-        const XpArtLoader::XpFrame& frame,
-        int x,
-        int y,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return placeSource(
-            ObjectSource::fromXpFrame(frame, frameOptions),
-            x,
-            y,
-            writePolicy,
-            overrideStyle);
-    }
-
-    SourcePlacementResult PageComposer::placeXpDocumentAligned(
-        const XpArtLoader::XpDocument& document,
-        const Alignment& alignment,
-        const XpArtLoader::LoadOptions& loadOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSourceAligned(
-            ObjectSource::fromXpDocument(document, loadOptions),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    SourcePlacementResult PageComposer::placeXpFrameAligned(
-        const XpArtLoader::XpFrame& frame,
-        const Alignment& alignment,
-        const XpArtLoader::XpFrameConversionOptions& frameOptions,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return placeSourceAligned(
-            ObjectSource::fromXpFrame(frame, frameOptions),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    Point PageComposer::writeObject(
-        const TextObject& object,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        return drawObjectAt(object, x, y, writePolicy, overrideStyle);
-    }
-
-    PlacementResult PageComposer::writeObject(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeObjectInFullScreen(
-        const TextObject& object,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
-            getFullScreenRegion(),
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeSolidObjectInFullScreen(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInFullScreen(
-            object,
-            alignment,
-            WritePresets::solidObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeVisibleObjectInFullScreen(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInFullScreen(
-            object,
-            alignment,
-            WritePresets::visibleObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeGlyphsOnlyInFullScreen(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInFullScreen(
-            object,
-            alignment,
-            WritePresets::glyphsOnly(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleMaskInFullScreen(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInFullScreen(
-            object,
-            alignment,
-            WritePresets::styleMask(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleBlockInFullScreen(
-        const TextObject& object,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInFullScreen(
-            object,
-            alignment,
-            WritePresets::styleBlock(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    Point PageComposer::writeSolidObject(
-        const TextObject& object,
-        int x,
-        int y,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, x, y, WritePresets::solidObject(), overrideStyle);
-    }
-
-    Point PageComposer::writeVisibleObject(
-        const TextObject& object,
-        int x,
-        int y,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, x, y, WritePresets::visibleObject(), overrideStyle);
-    }
-
-    Point PageComposer::writeGlyphsOnly(
-        const TextObject& object,
-        int x,
-        int y,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, x, y, WritePresets::glyphsOnly(), overrideStyle);
-    }
-
-    Point PageComposer::writeStyleMask(
-        const TextObject& object,
-        int x,
-        int y,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, x, y, WritePresets::styleMask(), overrideStyle);
-    }
-
-    Point PageComposer::writeStyleBlock(
-        const TextObject& object,
-        int x,
-        int y,
-        const std::optional<Style>& overrideStyle)
-    {
-        return writeObject(object, x, y, WritePresets::styleBlock(), overrideStyle);
-    }
-
-    PlacementResult PageComposer::writeObject(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        PlacementRequest request;
-        request.region = region;
-        request.contentSize = measureObject(object);
-        request.alignment = alignment;
-        request.clampToRegion = clampToRegion;
-
-        PlacementResult result = resolvePlacement(request);
-        drawObjectAt(
-            object,
-            result.origin.x,
-            result.origin.y,
-            writePolicy,
-            overrideStyle);
-
-        return result;
-    }
-
-
-    PlacementResult PageComposer::writeObject(
-        const TextObject& object,
+    PlacementResult PageComposer::resolvePlacementResult(
         const PlacementSpec& placement,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
+        const Size& contentSize) const
     {
-        switch (placement.mode)
-        {
-        case PlacementSpec::Mode::Point:
+        if (placement.mode == PlacementSpec::Mode::Point)
         {
             PlacementResult result;
-            result.origin = writeObject(
-                object,
-                placement.point.x,
-                placement.point.y,
-                writePolicy,
-                overrideStyle);
-            result.region = makeRect(placement.point.x, placement.point.y, 0, 0);
-            result.contentSize = measureObject(object);
+            result.origin = placement.point;
+            result.region = makeRectValue(placement.point.x, placement.point.y, contentSize.width, contentSize.height);
+            result.contentSize = contentSize;
             result.alignment = Align::topLeft();
-            result.clamped = false;
             return result;
         }
 
-        case PlacementSpec::Mode::Region:
-            return writeObject(
-                object,
-                placement.region,
-                placement.alignment,
-                writePolicy,
-                overrideStyle,
-                placement.clampToRegion);
-
-        case PlacementSpec::Mode::RegionName:
-            return writeObjectInRegion(
-                object,
-                placement.regionName,
-                placement.alignment,
-                writePolicy,
-                overrideStyle,
-                placement.clampToRegion);
-
-        case PlacementSpec::Mode::FullScreenAligned:
-            return writeObjectInFullScreen(
-                object,
-                placement.alignment,
-                writePolicy,
-                overrideStyle,
-                placement.clampToRegion);
-
-        default:
-            return makeUnresolvedPlacementResult(object, Align::topLeft());
-        }
-    }
-
-    PlacementResult PageComposer::writeSolidObject(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
+        const Rect region = resolvePlacementRegion(placement);
+        return resolvePlacement(makePlacementRequest(
             region,
-            alignment,
-            WritePresets::solidObject(),
-            overrideStyle,
-            clampToRegion);
+            contentSize,
+            placement.alignment,
+            placement.clampToRegion));
     }
 
-    PlacementResult PageComposer::writeVisibleObject(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
+    void PageComposer::ensureBufferInitialized() const
     {
-        return writeObject(
-            object,
-            region,
-            alignment,
-            WritePresets::visibleObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeGlyphsOnly(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
-            region,
-            alignment,
-            WritePresets::glyphsOnly(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleMask(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
-            region,
-            alignment,
-            WritePresets::styleMask(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleBlock(
-        const TextObject& object,
-        const Rect& region,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObject(
-            object,
-            region,
-            alignment,
-            WritePresets::styleBlock(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeObjectInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        const NamedRegion* region = m_regions.getRegion(regionName);
-        if (region == nullptr)
+        if (m_target == nullptr && m_buffer.getWidth() <= 0 && m_buffer.getHeight() <= 0)
         {
-            return makeUnresolvedPlacementResult(object, alignment);
+            throw std::runtime_error(
+                "PageComposer has no attached target and no initialized internal buffer.");
         }
-
-        return writeObject(
-            object,
-            region->bounds,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
     }
 
-    PlacementResult PageComposer::writeSolidObjectInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
+    void PageComposer::synchronizeTarget()
     {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            WritePresets::solidObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeVisibleObjectInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            WritePresets::visibleObject(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeGlyphsOnlyInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            WritePresets::glyphsOnly(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleMaskInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            WritePresets::styleMask(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    PlacementResult PageComposer::writeStyleBlockInRegion(
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        return writeObjectInRegion(
-            object,
-            regionName,
-            alignment,
-            WritePresets::styleBlock(),
-            overrideStyle,
-            clampToRegion);
-    }
-
-    void PageComposer::writeText(int x, int y, std::u32string_view text, const Style& style)
-    {
-        writeText(x, y, text, std::optional<Style>(style));
-    }
-
-    void PageComposer::writeText(
-        int x,
-        int y,
-        std::u32string_view text,
-        const std::optional<Style>& styleOverride)
-    {
-        if (y < 0 || y >= m_composedBuffer.getHeight())
+        if (m_target != nullptr)
         {
-            return;
-        }
-
-        const std::u32string line = extractFirstLine(text);
-        writeSegmentedLine(x, y, line, styleOverride);
-        synchronizeTarget();
-
-        const Point origin{ x, y };
-        const Size contentSize{ measureDisplayWidth(line), 1 };
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextLine,
-            "writeText",
-            nullptr,
-            nullptr,
-            &origin,
-            &contentSize,
-            nullptr,
-            nullptr,
-            false,
-            styleOverride.has_value(),
-            false,
-            false,
-            true);
-    }
-
-    void PageComposer::writeTextUtf8(
-        int x,
-        int y,
-        std::string_view utf8Text,
-        const Style& style)
-    {
-        writeText(x, y, UnicodeConversion::utf8ToU32(utf8Text), style);
-    }
-
-    void PageComposer::writeTextUtf8(
-        int x,
-        int y,
-        std::string_view utf8Text,
-        const std::optional<Style>& styleOverride)
-    {
-        writeText(x, y, UnicodeConversion::utf8ToU32(utf8Text), styleOverride);
-    }
-
-    void PageComposer::writeTextBlock(
-        int x,
-        int y,
-        std::u32string_view block,
-        const Style& style)
-    {
-        writeTextBlock(x, y, block, std::optional<Style>(style));
-    }
-
-    void PageComposer::writeTextBlock(
-        int x,
-        int y,
-        std::u32string_view block,
-        const std::optional<Style>& styleOverride)
-    {
-        if (m_composedBuffer.getWidth() <= 0 || m_composedBuffer.getHeight() <= 0)
-        {
-            return;
-        }
-
-        const std::vector<std::u32string> lines = splitLines(block);
-        int currentY = y;
-
-        for (const std::u32string& line : lines)
-        {
-            if (currentY >= m_composedBuffer.getHeight())
-            {
-                break;
-            }
-
-            if (currentY >= 0)
-            {
-                writeSegmentedLine(x, currentY, line, styleOverride);
-            }
-
-            ++currentY;
-        }
-
-        synchronizeTarget();
-
-        const Point origin{ x, y };
-        const Size contentSize = measureTextBlockDisplay(lines);
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-            "writeTextBlock",
-            nullptr,
-            nullptr,
-            &origin,
-            &contentSize,
-            nullptr,
-            nullptr,
-            false,
-            styleOverride.has_value(),
-            false,
-            false,
-            true);
-    }
-
-    void PageComposer::writeTextBlockUtf8(
-        int x,
-        int y,
-        std::string_view utf8Block,
-        const Style& style)
-    {
-        writeTextBlock(x, y, UnicodeConversion::utf8ToU32(utf8Block), style);
-    }
-
-    void PageComposer::writeTextBlockUtf8(
-        int x,
-        int y,
-        std::string_view utf8Block,
-        const std::optional<Style>& styleOverride)
-    {
-        writeTextBlock(x, y, UnicodeConversion::utf8ToU32(utf8Block), styleOverride);
-    }
-
-
-    SourcePlacementResult PageComposer::placeResolvedSource(
-        const ResolvedObjectSource& resolvedSource,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        if (!resolvedSource.hasObject())
-        {
-            const SourcePlacementResult result = makeFailedSourcePlacement(resolvedSource);
-            recordSourcePlacement(
-                PageCompositionDiagnostics::OperationKind::PlaceSourceAtPoint,
-                "placeSource",
-                resolvedSource,
-                nullptr,
-                result,
-                writePolicy,
-                false,
-                overrideStyle.has_value(),
-                false);
-            return result;
-        }
-
-        SourcePlacementResult result;
-        result.source = resolvedSource;
-        result.placement.origin = drawObjectAt(
-            resolvedSource.object,
-            x,
-            y,
-            writePolicy,
-            overrideStyle);
-        result.placement.region = makeRect(x, y, 0, 0);
-        result.placement.contentSize = measureObject(resolvedSource.object);
-        result.placement.alignment = Alignment{};
-        result.placement.clamped = false;
-        result.success = true;
-        recordSourcePlacement(
-            PageCompositionDiagnostics::OperationKind::PlaceSourceAtPoint,
-            "placeSource",
-            resolvedSource,
-            nullptr,
-            result,
-            writePolicy,
-            false,
-            overrideStyle.has_value(),
-            false);
-        return result;
-    }
-
-    SourcePlacementResult PageComposer::placeResolvedSource(
-        const ResolvedObjectSource& resolvedSource,
-        const Rect& region,
-        const Alignment& alignment,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle,
-        bool clampToRegion)
-    {
-        if (!resolvedSource.hasObject())
-        {
-            const SourcePlacementResult result = makeFailedSourcePlacement(resolvedSource, &alignment);
-            recordSourcePlacement(
-                PageCompositionDiagnostics::OperationKind::PlaceSourceInRegion,
-                "placeSource",
-                resolvedSource,
-                &region,
-                result,
-                writePolicy,
-                true,
-                overrideStyle.has_value(),
-                clampToRegion);
-            return result;
-        }
-
-        SourcePlacementResult result;
-        result.source = resolvedSource;
-        result.placement = writeObject(
-            resolvedSource.object,
-            region,
-            alignment,
-            writePolicy,
-            overrideStyle,
-            clampToRegion);
-        result.success = true;
-        recordSourcePlacement(
-            PageCompositionDiagnostics::OperationKind::PlaceSourceInRegion,
-            "placeSource",
-            resolvedSource,
-            &region,
-            result,
-            writePolicy,
-            true,
-            overrideStyle.has_value(),
-            clampToRegion);
-        return result;
-    }
-
-    SourcePlacementResult PageComposer::makeFailedSourcePlacement(
-        const ResolvedObjectSource& resolvedSource,
-        const Alignment* alignment)
-    {
-        SourcePlacementResult result;
-        result.source = resolvedSource;
-        result.success = false;
-        result.placement.origin = Point{};
-        result.placement.region = makeRect(0, 0, 0, 0);
-        result.placement.contentSize = measureObject(resolvedSource.object);
-        result.placement.alignment = alignment != nullptr ? *alignment : Alignment{};
-        result.placement.clamped = false;
-        return result;
-    }
-
-    Point PageComposer::drawObjectAt(
-        const TextObject& object,
-        int x,
-        int y,
-        const WritePolicy& writePolicy,
-        const std::optional<Style>& overrideStyle)
-    {
-        Point origin;
-        origin.x = x;
-        origin.y = y;
-
-        if (!object.isLoaded())
-        {
-            return origin;
-        }
-
-        object.draw(m_composedBuffer, x, y, writePolicy, overrideStyle);
-        synchronizeTarget();
-        return origin;
-    }
-
-    PlacementResult PageComposer::makeUnresolvedPlacementResult(
-        const TextObject& object,
-        const Alignment& alignment)
-    {
-        PlacementResult result;
-        result.origin = Point{};
-        result.region = makeRect(0, 0, 0, 0);
-        result.contentSize = measureObject(object);
-        result.alignment = alignment;
-        result.clamped = false;
-        return result;
-    }
-
-    void PageComposer::writeSegmentedLine(
-        int x,
-        int y,
-        std::u32string_view line,
-        const std::optional<Style>& styleOverride)
-    {
-        if (m_composedBuffer.getWidth() <= 0 ||
-            m_composedBuffer.getHeight() <= 0 ||
-            y < 0 ||
-            y >= m_composedBuffer.getHeight())
-        {
-            return;
-        }
-
-        int cursorX = x;
-        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(line);
-
-        for (const TextCluster& cluster : clusters)
-        {
-            if (cluster.codePoints.empty())
-            {
-                continue;
-            }
-
-            if (cursorX >= m_composedBuffer.getWidth())
-            {
-                break;
-            }
-
-            for (char32_t codePoint : cluster.codePoints)
-            {
-                if (cursorX < 0)
-                {
-                    continue;
-                }
-
-                m_composedBuffer.writeCodePoint(cursorX, y, codePoint, styleOverride);
-            }
-
-            if (cluster.displayWidth > 0)
-            {
-                cursorX += cluster.displayWidth;
-            }
+            *m_target = m_buffer;
         }
     }
 
     std::u32string PageComposer::extractFirstLine(std::u32string_view text)
     {
         std::u32string line;
-        line.reserve(text.size());
 
         for (char32_t ch : text)
         {
@@ -3080,7 +1032,6 @@ namespace Composition
     {
         std::vector<std::u32string> lines;
         std::u32string current;
-        current.reserve(text.size());
 
         for (std::size_t i = 0; i < text.size(); ++i)
         {
@@ -3088,13 +1039,14 @@ namespace Composition
 
             if (ch == U'\r')
             {
-                if (i + 1 < text.size() && text[i + 1] == U'\n')
+                lines.push_back(current);
+                current.clear();
+
+                if ((i + 1) < text.size() && text[i + 1] == U'\n')
                 {
                     ++i;
                 }
 
-                lines.push_back(current);
-                current.clear();
                 continue;
             }
 
@@ -3111,309 +1063,153 @@ namespace Composition
         lines.push_back(current);
         return lines;
     }
-    void PageComposer::writeAlignedText(
-        const Rect& target,
-        const Alignment& alignment,
-        std::string_view text,
-        const Style& style)
-    {
-        writeAlignedTextUtf32(
-            target,
-            alignment,
-            UnicodeConversion::utf8ToU32(text),
-            std::optional<Style>(style));
-    }
 
-    void PageComposer::writeAlignedText(
-        std::string_view targetRegionName,
-        const Alignment& alignment,
-        std::string_view text,
-        const Style& style)
+    bool PageComposer::isWrapWhitespaceText(std::u32string_view text)
     {
-        const NamedRegion* region = getRegion(targetRegionName);
-        if (region == nullptr)
+        if (text.empty())
         {
-            return;
+            return false;
         }
 
-        writeAlignedText(region->bounds, alignment, text, style);
-    }
-
-    void PageComposer::writeAlignedTextInFullScreen(
-        const Alignment& alignment,
-        std::string_view text,
-        const Style& style)
-    {
-        writeAlignedText(getFullScreenRegion(), alignment, text, style);
-    }
-
-    void PageComposer::writeAlignedTextBlock(
-        const Rect& target,
-        const Alignment& alignment,
-        std::string_view textBlock,
-        const Style& style)
-    {
-        writeAlignedTextBlockUtf32(
-            target,
-            alignment,
-            UnicodeConversion::utf8ToU32(textBlock),
-            std::optional<Style>(style),
-            "writeAlignedTextBlock");
-    }
-
-    void PageComposer::writeAlignedTextBlock(
-        std::string_view targetRegionName,
-        const Alignment& alignment,
-        std::string_view textBlock,
-        const Style& style)
-    {
-        const NamedRegion* region = getRegion(targetRegionName);
-        if (region == nullptr)
+        for (char32_t ch : text)
         {
-            return;
-        }
-
-        writeAlignedTextBlock(region->bounds, alignment, textBlock, style);
-    }
-
-    void PageComposer::writeAlignedTextBlockInFullScreen(
-        const Alignment& alignment,
-        std::string_view textBlock,
-        const Style& style)
-    {
-        writeAlignedTextBlock(getFullScreenRegion(), alignment, textBlock, style);
-    }
-
-    void PageComposer::writeWrappedText(
-        const Rect& target,
-        const Alignment& alignment,
-        std::string_view text,
-        const Style& style)
-    {
-        writeWrappedTextUtf32(
-            target,
-            alignment,
-            UnicodeConversion::utf8ToU32(text),
-            std::optional<Style>(style));
-    }
-
-    void PageComposer::writeWrappedText(
-        std::string_view targetRegionName,
-        const Alignment& alignment,
-        std::string_view text,
-        const Style& style)
-    {
-        const NamedRegion* region = getRegion(targetRegionName);
-        if (region == nullptr)
-        {
-            return;
-        }
-
-        writeWrappedText(region->bounds, alignment, text, style);
-    }
-
-    void PageComposer::writeWrappedTextInFullScreen(
-        const Alignment& alignment,
-        std::string_view text,
-        const Style& style)
-    {
-        writeWrappedText(getFullScreenRegion(), alignment, text, style);
-    }
-
-    void PageComposer::writeAlignedTextUtf32(
-        const Rect& target,
-        const Alignment& alignment,
-        std::u32string_view text,
-        const std::optional<Style>& styleOverride)
-    {
-        if (target.size.width <= 0 || target.size.height <= 0)
-        {
-            return;
-        }
-
-        const std::u32string line = extractFirstLine(text);
-        const Size contentSize{ measureDisplayWidth(line), 1 };
-
-        const PlacementResult placement = resolvePlacement(
-            makePlacementRequest(target, contentSize, alignment, false));
-
-        writeSegmentedLine(
-            placement.origin.x,
-            placement.origin.y,
-            line,
-            styleOverride);
-
-        synchronizeTarget();
-
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextLine,
-            "writeAlignedText",
-            &target,
-            &placement.region,
-            &placement.origin,
-            &placement.contentSize,
-            &alignment,
-            nullptr,
-            true,
-            styleOverride.has_value(),
-            false,
-            placement.clamped,
-            true);
-    }
-
-    void PageComposer::writeAlignedTextBlockUtf32(
-        const Rect& target,
-        const Alignment& alignment,
-        std::u32string_view textBlock,
-        const std::optional<Style>& styleOverride,
-        std::string_view operationName)
-    {
-        if (target.size.width <= 0 || target.size.height <= 0)
-        {
-            return;
-        }
-
-        const std::vector<std::u32string> lines = splitLines(textBlock);
-        const Size contentSize = measureTextBlockDisplay(lines);
-
-        const PlacementResult placement = resolvePlacement(
-            makePlacementRequest(target, contentSize, alignment, false));
-
-        for (std::size_t i = 0; i < lines.size(); ++i)
-        {
-            const int y = placement.origin.y + static_cast<int>(i);
-            if (y < 0 || y >= m_composedBuffer.getHeight())
+            if (ch != U' ' && ch != U'\t' && ch != U'\v' && ch != U'\f')
             {
-                continue;
+                return false;
             }
-
-            const int lineWidth = measureDisplayWidth(lines[i]);
-            const Rect lineRegion = makeRect(
-                placement.region.position.x,
-                y,
-                placement.region.size.width,
-                1);
-
-            const Point lineOrigin = resolveAlignedOrigin(
-                lineRegion,
-                Size{ lineWidth, 1 },
-                alignment.horizontal,
-                VerticalAlign::Top);
-
-            writeSegmentedLine(
-                lineOrigin.x,
-                y,
-                lines[i],
-                styleOverride);
         }
 
-        synchronizeTarget();
-
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-            operationName,
-            &target,
-            &placement.region,
-            &placement.origin,
-            &placement.contentSize,
-            &alignment,
-            nullptr,
-            true,
-            styleOverride.has_value(),
-            false,
-            placement.clamped,
-            true);
+        return true;
     }
 
-    void PageComposer::writeWrappedTextUtf32(
-        const Rect& target,
-        const Alignment& alignment,
-        std::u32string_view text,
-        const std::optional<Style>& styleOverride)
+    std::u32string PageComposer::trimTrailingWrapWhitespace(std::u32string_view text)
     {
-        if (target.size.width <= 0 || target.size.height <= 0)
-        {
-            return;
-        }
-
-        const std::vector<std::u32string> wrappedLines =
-            wrapTextToLines(text, target.size.width);
-
-        const Size contentSize = measureTextBlockDisplay(wrappedLines);
-        const PlacementResult placement = resolvePlacement(
-            makePlacementRequest(target, contentSize, alignment, false));
-
-        for (std::size_t i = 0; i < wrappedLines.size(); ++i)
-        {
-            const int y = placement.origin.y + static_cast<int>(i);
-            if (y < 0 || y >= m_composedBuffer.getHeight())
-            {
-                continue;
-            }
-
-            const int lineWidth = measureDisplayWidth(wrappedLines[i]);
-            const Rect lineRegion = makeRect(
-                placement.region.position.x,
-                y,
-                placement.region.size.width,
-                1);
-
-            const Point lineOrigin = resolveAlignedOrigin(
-                lineRegion,
-                Size{ lineWidth, 1 },
-                alignment.horizontal,
-                VerticalAlign::Top);
-
-            writeSegmentedLine(
-                lineOrigin.x,
-                y,
-                wrappedLines[i],
-                styleOverride);
-        }
-
-        synchronizeTarget();
-
-        recordOperation(
-            PageCompositionDiagnostics::OperationKind::WriteTextBlock,
-            "writeWrappedText",
-            &target,
-            &placement.region,
-            &placement.origin,
-            &placement.contentSize,
-            &alignment,
-            nullptr,
-            true,
-            styleOverride.has_value(),
-            false,
-            placement.clamped,
-            true);
-    }
-
-    int PageComposer::measureDisplayWidth(std::u32string_view text)
-    {
-        int width = 0;
         const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
-
-        for (const TextCluster& cluster : clusters)
+        if (clusters.empty())
         {
-            width += std::max(0, static_cast<int>(cluster.displayWidth));
+            return std::u32string(text);
         }
 
-        return width;
+        std::size_t end = clusters.size();
+        while (end > 0 && isWrapWhitespaceText(clusters[end - 1].codePoints))
+        {
+            --end;
+        }
+
+        std::u32string result;
+        for (std::size_t i = 0; i < end; ++i)
+        {
+            result += clusters[i].codePoints;
+        }
+
+        return result;
     }
 
-    Size PageComposer::measureTextBlockDisplay(const std::vector<std::u32string>& lines)
+    std::vector<std::u32string> PageComposer::wrapSingleLineToLines(
+        std::u32string_view text,
+        int maxWidth)
     {
-        Size size;
-        size.width = 0;
-        size.height = static_cast<int>(lines.size());
+        std::vector<std::u32string> lines;
 
-        for (const std::u32string& line : lines)
+        if (maxWidth <= 0)
         {
-            size.width = std::max(size.width, measureDisplayWidth(line));
+            return lines;
         }
 
-        return size;
+        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
+        if (clusters.empty())
+        {
+            lines.push_back(U"");
+            return lines;
+        }
+
+        auto buildClusterRange =
+            [&](std::size_t startIndex,
+                std::size_t endIndexExclusive,
+                bool trimTrailingWhitespace) -> std::u32string
+            {
+                std::u32string result;
+                for (std::size_t i = startIndex; i < endIndexExclusive; ++i)
+                {
+                    result += clusters[i].codePoints;
+                }
+
+                if (trimTrailingWhitespace)
+                {
+                    result = trimTrailingWrapWhitespace(result);
+                }
+
+                return result;
+            };
+
+        std::size_t lineStart = 0;
+
+        while (lineStart < clusters.size())
+        {
+            while (lineStart < clusters.size() && isWrapWhitespaceText(clusters[lineStart].codePoints))
+            {
+                ++lineStart;
+            }
+
+            if (lineStart >= clusters.size())
+            {
+                lines.push_back(U"");
+                break;
+            }
+
+            std::size_t index = lineStart;
+            std::size_t lastBreak = static_cast<std::size_t>(-1);
+            int currentWidth = 0;
+
+            while (index < clusters.size())
+            {
+                const int clusterWidth = std::max(0, static_cast<int>(clusters[index].displayWidth));
+                const bool breakableWhitespace = isWrapWhitespaceText(clusters[index].codePoints);
+
+                if (currentWidth > 0 && (currentWidth + clusterWidth) > maxWidth)
+                {
+                    break;
+                }
+
+                currentWidth += clusterWidth;
+                if (breakableWhitespace)
+                {
+                    lastBreak = index;
+                }
+
+                ++index;
+            }
+
+            if (index >= clusters.size())
+            {
+                lines.push_back(buildClusterRange(lineStart, clusters.size(), true));
+                break;
+            }
+
+            if (currentWidth == 0)
+            {
+                lines.push_back(buildClusterRange(lineStart, lineStart + 1, false));
+                lineStart = lineStart + 1;
+                continue;
+            }
+
+            if (lastBreak != static_cast<std::size_t>(-1) && lastBreak >= lineStart)
+            {
+                lines.push_back(buildClusterRange(lineStart, lastBreak, true));
+                lineStart = lastBreak + 1;
+                continue;
+            }
+
+            lines.push_back(buildClusterRange(lineStart, index, true));
+            lineStart = index;
+        }
+
+        if (lines.empty())
+        {
+            lines.push_back(U"");
+        }
+
+        return lines;
     }
 
     std::vector<std::u32string> PageComposer::wrapTextToLines(
@@ -3421,19 +1217,15 @@ namespace Composition
         int maxWidth)
     {
         std::vector<std::u32string> wrappedLines;
-
         if (maxWidth <= 0)
         {
             return wrappedLines;
         }
 
         const std::vector<std::u32string> sourceLines = splitLines(text);
-
         for (const std::u32string& sourceLine : sourceLines)
         {
-            std::vector<std::u32string> paragraphLines =
-                wrapSingleLineToLines(sourceLine, maxWidth);
-
+            std::vector<std::u32string> paragraphLines = wrapSingleLineToLines(sourceLine, maxWidth);
             if (paragraphLines.empty())
             {
                 wrappedLines.push_back(U"");
@@ -3449,147 +1241,15 @@ namespace Composition
         return wrappedLines;
     }
 
-    int PageComposer::resolveActiveFrameIndex() const
+    int PageComposer::measureDisplayWidth(std::u32string_view text)
     {
-        return m_frameContext.frameIndex;
-    }
-
-    void PageComposer::recordOperation(
-        PageCompositionDiagnostics::OperationKind operation,
-        std::string_view operationName,
-        const Rect* requestedRegion,
-        const Rect* resolvedRegion,
-        const Point* origin,
-        const Size* contentSize,
-        const Alignment* alignment,
-        const WritePolicy* writePolicy,
-        bool usedAlignment,
-        bool usedOverrideStyle,
-        bool clampRequested,
-        bool clamped,
-        bool success,
-        std::string_view regionName,
-        std::string_view detail,
-        std::string_view errorMessage)
-    {
-        if (m_diagnostics == nullptr)
+        int width = 0;
+        const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(text);
+        for (const TextCluster& cluster : clusters)
         {
-            return;
+            width += std::max(0, static_cast<int>(cluster.displayWidth));
         }
 
-        PageCompositionDiagnostics::Entry entry;
-        entry.operation = operation;
-        entry.operationName = std::string(operationName);
-        entry.regionName = std::string(regionName);
-        entry.detail = std::string(detail);
-        entry.errorMessage = std::string(errorMessage);
-        entry.usedAlignment = usedAlignment;
-        entry.usedOverrideStyle = usedOverrideStyle;
-        entry.clampRequested = clampRequested;
-        entry.clamped = clamped;
-        entry.success = success;
-        entry.frameContext = m_frameContext;
-
-        if (requestedRegion != nullptr)
-        {
-            entry.requestedRegion = *requestedRegion;
-        }
-
-        if (resolvedRegion != nullptr)
-        {
-            entry.resolvedRegion = *resolvedRegion;
-        }
-
-        if (origin != nullptr)
-        {
-            entry.origin = *origin;
-        }
-
-        if (contentSize != nullptr)
-        {
-            entry.contentSize = *contentSize;
-        }
-
-        if (alignment != nullptr)
-        {
-            entry.alignment = *alignment;
-        }
-
-        if (writePolicy != nullptr)
-        {
-            entry.writePolicy = *writePolicy;
-        }
-
-        m_diagnostics->record(std::move(entry));
-    }
-
-    void PageComposer::recordSourcePlacement(
-        PageCompositionDiagnostics::OperationKind operation,
-        std::string_view operationName,
-        const ResolvedObjectSource& resolvedSource,
-        const Rect* requestedRegion,
-        const SourcePlacementResult& result,
-        const WritePolicy& writePolicy,
-        bool usedAlignment,
-        bool usedOverrideStyle,
-        bool clampRequested,
-        std::string_view regionName)
-    {
-        if (m_diagnostics == nullptr)
-        {
-            return;
-        }
-
-        PageCompositionDiagnostics::Entry entry;
-        entry.operation = operation;
-        entry.operationName = std::string(operationName);
-        entry.sourceKind = [&]() -> std::string
-            {
-                if (resolvedSource.usedAssetLibrary)
-                {
-                    return "asset";
-                }
-                if (resolvedSource.usedXpConversion)
-                {
-                    return "xp";
-                }
-                return "object";
-            }();
-        entry.regionName = std::string(regionName);
-        entry.usedAlignment = usedAlignment;
-        entry.usedOverrideStyle = usedOverrideStyle;
-        entry.usedAssetLibrary = resolvedSource.usedAssetLibrary;
-        entry.usedXpConversion = resolvedSource.usedXpConversion;
-        entry.clampRequested = clampRequested;
-        entry.clamped = result.placement.clamped;
-        entry.success = result.success;
-        entry.resolvedFrameIndex = resolvedSource.resolvedFrameIndex;
-        entry.errorMessage = resolvedSource.errorMessage;
-        entry.frameContext = m_frameContext;
-        entry.requestedRegion = requestedRegion != nullptr ? *requestedRegion : Rect{};
-        entry.resolvedRegion = result.placement.region;
-        entry.origin = result.placement.origin;
-        entry.contentSize = result.placement.contentSize;
-        entry.alignment = result.placement.alignment;
-        entry.writePolicy = writePolicy;
-        m_diagnostics->record(std::move(entry));
-    }
-
-    void PageComposer::refreshDeterministicSignature()
-    {
-        if (m_diagnostics != nullptr)
-        {
-            m_diagnostics->setLastDeterministicSignature(computeDeterministicSignature());
-        }
-    }
-
-    void PageComposer::synchronizeTarget()
-    {
-        if (m_target != nullptr)
-        {
-            *m_target = m_composedBuffer;
-        }
-
-        refreshDeterministicSignature();
+        return width;
     }
 }
