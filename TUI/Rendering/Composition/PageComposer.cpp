@@ -668,6 +668,104 @@ namespace Composition
             }()), placement, policy);
     }
 
+    void PageComposer::writeAt(
+        const TextObject& object,
+        int x,
+        int y,
+        const WritePolicy& policy)
+    {
+        writeObject(object, PlacementSpec::at(x, y), policy);
+    }
+
+    void PageComposer::writeInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeObject(
+            object,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
+    }
+
+    void PageComposer::writeAligned(
+        const TextObject& object,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeObject(
+            object,
+            PlacementSpec::inFullScreen(alignment, clampToRegion),
+            policy);
+    }
+
+    void PageComposer::writeVisible(
+        const TextObject& object,
+        const PlacementSpec& placement)
+    {
+        writeObject(object, placement, WritePresets::visibleObject());
+    }
+
+    void PageComposer::writeSolid(
+        const TextObject& object,
+        const PlacementSpec& placement)
+    {
+        writeObject(object, placement, WritePresets::solidObject());
+    }
+
+    void PageComposer::writeTextInRegion(
+        std::string_view text,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeAlignedText(
+            text,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
+    }
+
+    void PageComposer::writeTextBlockInRegion(
+        std::string_view text,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeAlignedTextBlock(
+            text,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
+    }
+
+    void PageComposer::writeWrappedTextInRegion(
+        std::string_view text,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeWrappedText(
+            text,
+            PlacementSpec::inNamedRegion(regionName, alignment, clampToRegion),
+            policy);
+    }
+
+    void PageComposer::writeCenteredText(
+        std::string_view text,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeAlignedText(
+            text,
+            PlacementSpec::inFullScreen(Align::center(), clampToRegion),
+            policy);
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary* library)
     {
         m_assetLibrary = library;

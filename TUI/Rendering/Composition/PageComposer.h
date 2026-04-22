@@ -12,6 +12,7 @@
 #include "Rendering/Composition/Placement.h"
 #include "Rendering/Composition/RegionRegistry.h"
 #include "Rendering/Composition/WritePolicy.h"
+#include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Diagnostics/PageCompositionDiagnostics.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/ScreenBuffer.h"
@@ -81,9 +82,12 @@ namespace Composition
         PageComposer();
         explicit PageComposer(ScreenBuffer& target);
 
+        // ---------------------------------------------------------------------
+        // Target / buffer lifecycle
+        // ---------------------------------------------------------------------
+
         void setTarget(ScreenBuffer& target);
         void detachTarget();
-        void refreshFromTarget();
 
         bool hasTarget() const;
         ScreenBuffer* tryGetTarget();
@@ -102,6 +106,10 @@ namespace Composition
         std::u32string renderToU32String() const;
         std::string renderToUtf8String() const;
 
+        // ---------------------------------------------------------------------
+        // Region / layout system
+        // ---------------------------------------------------------------------
+
         void createRegion(std::string_view name, const Rect& rect);
         void replaceRegion(std::string_view name, const Rect& rect);
         void removeRegion(std::string_view name);
@@ -110,8 +118,8 @@ namespace Composition
 
         bool hasRegion(std::string_view name) const;
         std::optional<Rect> tryGetRegion(std::string_view name) const;
-
         Rect resolveRegion(std::string_view name) const;
+
         Rect getFullScreenRegion() const;
 
         void createFullScreenRegion(std::string_view name);
@@ -130,6 +138,7 @@ namespace Composition
             std::string_view innerName,
             int horizontalThickness,
             int verticalThickness);
+
         void registerGrid(
             std::string_view baseName,
             const Rect& bounds,
@@ -162,6 +171,10 @@ namespace Composition
         Rect gridRow(const Rect& base, int rows, int row) const;
         Rect gridColumn(const Rect& base, int cols, int col) const;
 
+        // ---------------------------------------------------------------------
+        // Core composition API
+        // ---------------------------------------------------------------------
+
         void placeSource(
             const ObjectSource& source,
             const PlacementSpec& placement,
@@ -176,22 +189,89 @@ namespace Composition
             std::string_view text,
             const PlacementSpec& placement,
             const WritePolicy& policy);
+
         void writeTextBlock(
             std::string_view text,
             const PlacementSpec& placement,
             const WritePolicy& policy);
+
         void writeAlignedText(
             std::string_view text,
             const PlacementSpec& placement,
             const WritePolicy& policy);
+
         void writeAlignedTextBlock(
             std::string_view text,
             const PlacementSpec& placement,
             const WritePolicy& policy);
+
         void writeWrappedText(
             std::string_view text,
             const PlacementSpec& placement,
             const WritePolicy& policy);
+
+        // ---------------------------------------------------------------------
+        // Earned sugar layer
+        // ---------------------------------------------------------------------
+
+        // Object placement sugar
+        void writeAt(
+            const TextObject& object,
+            int x,
+            int y,
+            const WritePolicy& policy);
+
+        void writeInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& policy,
+            bool clampToRegion = false);
+
+        void writeAligned(
+            const TextObject& object,
+            const Alignment& alignment,
+            const WritePolicy& policy,
+            bool clampToRegion = false);
+
+        void writeVisible(
+            const TextObject& object,
+            const PlacementSpec& placement);
+
+        void writeSolid(
+            const TextObject& object,
+            const PlacementSpec& placement);
+
+        // Text sugar
+        void writeTextInRegion(
+            std::string_view text,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& policy,
+            bool clampToRegion = false);
+
+        void writeTextBlockInRegion(
+            std::string_view text,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& policy,
+            bool clampToRegion = false);
+
+        void writeWrappedTextInRegion(
+            std::string_view text,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& policy,
+            bool clampToRegion = false);
+
+        void writeCenteredText(
+            std::string_view text,
+            const WritePolicy& policy,
+            bool clampToRegion = false);
+
+        // ---------------------------------------------------------------------
+        // Asset / template hooks
+        // ---------------------------------------------------------------------
 
         void setAssetLibrary(Assets::AssetLibrary* library);
         void detachAssetLibrary();
@@ -202,10 +282,15 @@ namespace Composition
 
         void setScreenTemplateLoader(ScreenTemplateLoader loader);
         std::optional<TextObject> loadScreenTemplate(std::string_view name) const;
+
         void loadScreen(
             const TextObject& screen,
             const PlacementSpec& placement,
             const WritePolicy& policy);
+
+        // ---------------------------------------------------------------------
+        // Frame / deterministic context hooks
+        // ---------------------------------------------------------------------
 
         void setFrames(const std::vector<Frame>& frames);
         void clearFrames();
@@ -217,6 +302,10 @@ namespace Composition
         void endFrame();
         void clearFrameContext();
         const FrameContext& getFrameContext() const;
+
+        // ---------------------------------------------------------------------
+        // Diagnostics hooks
+        // ---------------------------------------------------------------------
 
         void setDiagnostics(DiagnosticsContext* ctx);
         void detachDiagnostics();
@@ -235,6 +324,7 @@ namespace Composition
             const PlacementSpec& placement,
             const Size& contentSize) const;
         void ensureBufferInitialized() const;
+        void refreshFromTarget();
         void synchronizeTarget();
 
         static std::u32string extractFirstLine(std::u32string_view text);
