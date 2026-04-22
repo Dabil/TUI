@@ -317,16 +317,23 @@ void Application::configureAssetLibrary()
 {
     m_assetLibrary.setAssetsRoot("Assets");
 
-    // Preferred canonical keys
-    m_assetLibrary.registerCanonicalAsset(
+    m_assetLibrary.registerAsset(
         "banner.fire_font_k",
         "Fonts/FIGlet/Fire Font-k.flf");
 
-    m_assetLibrary.registerCanonicalAsset(
+    m_assetLibrary.registerAsset(
+        "banner.ansi_shadow",
+        "Fonts/FIGlet/ANSI Shadow.flf");
+
+    m_assetLibrary.registerAsset(
+        "banner.computer",
+        "Fonts/Figlet/Computer.flf");
+
+    m_assetLibrary.registerAsset(
         "pfont.assemble_box",
         "Fonts/pFont/AssembleBox.pfont");
 
-    m_assetLibrary.registerCanonicalAsset(
+    m_assetLibrary.registerAsset(
         "xp.retro_terminal_1",
         "xp/retroTerm1.xp");
 }

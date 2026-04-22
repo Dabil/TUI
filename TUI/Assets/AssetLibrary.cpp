@@ -182,7 +182,7 @@ namespace Assets
         return m_options.assetsRoot;
     }
 
-    void AssetLibrary::registerCanonicalAsset(const std::string& assetKey, const std::string& assetPath)
+    void AssetLibrary::registerAsset(const std::string& assetKey, const std::string& assetPath)
     {
         const std::string normalizedKey = normalizeAssetKey(assetKey);
         const std::string normalizedPath = AssetPaths::normalizePath(assetPath);
@@ -214,12 +214,12 @@ namespace Assets
     }
 
     void AssetLibrary::registerAliases(
-        const std::string& canonicalAssetKey,
+        const std::string& AssetKey,
         const std::vector<std::string>& aliases)
     {
         for (const std::string& alias : aliases)
         {
-            registerAlias(alias, canonicalAssetKey);
+            registerAlias(alias, AssetKey);
         }
     }
 
