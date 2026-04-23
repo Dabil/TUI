@@ -352,26 +352,28 @@ namespace
     const TextObject& cubeObject()
     {
         static const TextObject object = TextObject::fromUtf8(
-            "       _________      \n"
-            "      / _______/|     \n"
-            "     / /______/ |     \n"
-            "    /_/______/  |     \n"
-            "    |   TUI  |  |     \n"
-            "    | ENGINE |  /     \n"
-            "    |________|_/      ");
+            "   _________ \n"
+            "  / _______/|\n"
+            " / /______/ |\n"
+            "/_/______/  |\n"
+            "|  TUI   |  |\n"
+            "| ENGINE | / \n"
+            "|________|/  ");
         return object;
     }
 
     const TextObject& chipObject()
     {
         static const TextObject object = TextObject::fromUtf8(
-            "  .---------------. \n"
-            " /  TUI BUS      /| \n"
-            "+--------------+/ | \n"
-            "| LAYOUT TEXT  |  | \n"
-            "| OBJECT STYLE |  | \n"
-            "| PANELS THEMES| /  \n"
-            "+--------------+/    ");
+            "   .--------------.\n"
+            "  /     TUI      /|\n"
+            " / BuildS with: / |\n"
+            "+--------------+  |\n"
+            "| TEXT OBJECTS |  |\n"
+            "| COLOR STYLES |  .\n"
+            "|  .XP FILES   | / \n"
+            "|   WIDGETS    |/  \n"
+            "+--------------+  ");
         return object;
     }
 
@@ -703,7 +705,7 @@ void ControlDeckScreen::draw(Surface& surface)
     page.createRegion("HeaderContent", insetRect(header, 2, 1, 2, 1));
     page.createRegion("LeftContent", insetRect(leftPane, 2, 3, 2, 2));
     page.createRegion("PipelineContent", insetRect(pipelinePane, 2, 3, 2, 1));
-    page.createRegion("ModesContent", insetRect(modesPane, 2, 3, 2, 1));
+    page.createRegion("ModesContent", insetRect(modesPane, 2, 2, 2, 1));
     page.createRegion("NotesContent", insetRect(notesPane, 2, 3, 2, 1));
     page.createRegion("TickerContent", insetRect(tickerPane, 2, 1, 2, 1));
     page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
@@ -963,14 +965,18 @@ void NeonDialogScreen::draw(Surface& surface)
     page.clearRegions();
 
     const Rect screen = page.getFullScreenRegion();
-    const Rect dialog = Rect{
+    const Rect dialog = Rect
+    {
         Point{ std::max(2, (screen.size.width - 96) / 2), std::max(2, (screen.size.height - 26) / 2) },
-        Size{ std::min(96, screen.size.width - 4), std::min(26, screen.size.height - 4) }
+        Size { std::min(96, screen.size.width), std::min(26, screen.size.height) }
     };
 
     paintPanel(buffer, dialog, NeonDialogFill, NeonFrame, ObjectFactory::roundedBorder());
 
-    const auto [header, afterHeader] = page.splitTop(dialog, 6);
+    // neon size
+    const Rect safe = insetRect(dialog, 1, 1, 1, 1);
+
+    const auto [header, afterHeader] = page.splitTop(safe, 6);
     const auto [footer, body] = page.splitBottom(afterHeader, 4);
     const auto [previewPane, copyPane] = page.splitLeft(body, std::max(32, body.size.width / 2));
 
@@ -999,23 +1005,24 @@ void NeonDialogScreen::draw(Surface& surface)
             static_cast<std::uint8_t>(84 + std::round(shimmer * 24.0))),
         true);
 
-    const TextObject orb = TextObject::fromUtf8(
-        "      .-''''-.      \n"
-        "    .'  .--.  '.    \n"
-        "   /   ( () )   \\  \n"
-        "  |   .-====-.   |  \n"
-        "   \\  '.__.'  /    \n"
-        "    '.  '--' .'     \n"
-        "      '-..-'         ",
-        orbStyle);
-
-    writeObject(page, orb, "PreviewContent", Composition::Align::topCenter(), solidObject());
     writeObject(page, satelliteObject(), "PreviewContent", Composition::Align::bottomCenter());
     writeWrapped(
         page,
         "The dialog scene works well for launchers, settings panes, and modal workflows. Extracting it into its own class makes it easier to evolve separately from the other showcase looks.",
         "PreviewContent",
         makeAlignment(Composition::HorizontalAlign::Center, Composition::VerticalAlign::Center));
+    
+    const TextObject orb = TextObject::fromUtf8(
+        "    .-''''-.    \n"
+        "  .'  .--.  '.  \n"
+        " /   ( () )   \\\n"
+        "|   .-====-.   |\n"
+        " \\  '.__.'  /  \n"
+        "  '.  '--' .'   \n"
+        "    '-..-'      ",
+        orbStyle);
+
+    writeObject(page, orb, "CopyContent", Composition::Align::topCenter(), solidObject());
 
     writeTextBlock(
         page,
@@ -1137,4 +1144,3 @@ void OpsWallScreen::draw(Surface& surface)
         }
     }
 }
-
