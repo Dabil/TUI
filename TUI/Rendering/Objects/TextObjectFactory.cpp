@@ -6,7 +6,7 @@
 #include <vector>
 
 /*
-When ObjectFactory method's should use TextObjectBuilder.h instead of TextObject.h
+Concrete Rule: When ObjectFactory method's should use TextObjectBuilder.h instead of TextObject.h
 
 A new or revised ObjectFactory method should use TextObjectBuilder when any of these are true:
 - it must place a wide glyph and also emit the required trailing cell correctly
@@ -20,6 +20,11 @@ A new or revised ObjectFactory method should use TextObjectBuilder when any of t
 /*
 * Concrete Rule: preserve the integrity of the motif, even if that means leaving 
 * space or shortening the repeat
+*/
+
+/*
+* Concrete Rule: All TextObjectFactory functions must return fully authored TextObjects. 
+* This includes placing U' ' instead of leaving cells empty
 */
 
 namespace
@@ -1417,8 +1422,11 @@ namespace
 
         const NormalizedFramePattern normalized = normalizeFramePattern(pattern);
 
-        // Frame-producing helpers must return fully-authored rectangular objects so
-        // retained composition can apply solid-object writes across the entire box.
+        /*
+        Concrete rule :
+        Frame-producing helpers must return fully-authored rectangular objects so
+        retained composition can apply solid-object writes across the entire box.
+        */
         TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
 
         auto writeRowsAt = [&](int startX, int startY, const std::vector<std::u32string>& rows)
@@ -1567,333 +1575,6 @@ namespace
         }
 
         // Right vertical repeat, aligned to the polished frame width instead of requested width.
-        if (normalized.rightWidth > 0 && normalized.middleHeight > 0)
-        {
-            const int rightX = std::max(0, frameUsedWidth - normalized.rightWidth);
-
-            int y = verticalLayout.repeatStartY;
-            for (int i = 0; i < verticalLayout.repeatCount; ++i)
-            {
-                writeRowsAt(rightX, y, normalized.rightRows);
-                y += normalized.middleHeight;
-            }
-        }
-
-        return builder.build();
-    }
-    TextObject buildPatternFilledFrameObject(
-        int width,
-        int height,
-        const FramePattern& framePattern,
-        const PatternTile& fillPattern,
-        const std::optional<Style>& style)
-    {
-        if (width <= 0 || height <= 0)
-        {
-            return TextObject();
-        }
-
-        const NormalizedFramePattern normalized = normalizeFramePattern(framePattern);
-
-        // Pattern-backed frame helpers follow the same authored-rectangle rule as
-        // simple frames so uncovered cells still carry valid authored space content.
-        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
-
-        // Compute polished frame extents first.
-        const HorizontalAppendLayout topLayout = computeHorizontalAppendLayout(
-            width,
-            normalized.topLeftWidth,
-            normalized.topWidth,
-            normalized.topRightWidth);
-
-        int frameUsedWidth = topLayout.usedWidth;
-
-        if (frameUsedWidth <= 0)
-        {
-            const HorizontalAppendLayout bottomFallback = computeHorizontalAppendLayout(
-                width,
-                normalized.bottomLeftWidth,
-                normalized.bottomWidth,
-                normalized.bottomRightWidth);
-
-            frameUsedWidth = bottomFallback.usedWidth;
-        }
-
-        if (frameUsedWidth <= 0)
-        {
-            frameUsedWidth = std::max({
-                normalized.topLeftWidth,
-                normalized.topRightWidth,
-                normalized.leftWidth,
-                normalized.rightWidth,
-                normalized.bottomLeftWidth,
-                normalized.bottomRightWidth
-                });
-        }
-
-        frameUsedWidth = std::min(frameUsedWidth, width);
-
-        const VerticalAppendLayout verticalLayout = computeVerticalAppendLayout(
-            height,
-            normalized.topHeight,
-            normalized.middleHeight,
-            normalized.bottomHeight);
-
-        int frameUsedHeight = verticalLayout.usedHeight;
-        if (frameUsedHeight <= 0)
-        {
-            frameUsedHeight = std::max(normalized.topHeight, normalized.bottomHeight);
-        }
-
-        frameUsedHeight = std::min(frameUsedHeight, height);
-
-        const HorizontalAppendLayout bottomLayout = computeHorizontalAppendLayout(
-            frameUsedWidth,
-            normalized.bottomLeftWidth,
-            normalized.bottomWidth,
-            normalized.bottomRightWidth);
-
-        auto writeRowsAt = [&](int startX, int startY, const std::vector<std::u32string>& rows)
-            {
-                for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
-                {
-                    const int destY = startY + rowIndex;
-                    if (destY < 0 || destY >= height)
-                    {
-                        continue;
-                    }
-
-                    const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
-                    for (int x = 0; x < static_cast<int>(row.size()); ++x)
-                    {
-                        const int destX = startX + x;
-                        if (destX < 0 || destX >= width)
-                        {
-                            continue;
-                        }
-
-                        const char32_t glyph = row[static_cast<std::size_t>(x)];
-
-                        if (style.has_value())
-                        {
-                            builder.setGlyph(destX, destY, glyph, *style);
-                        }
-                        else
-                        {
-                            builder.setGlyph(destX, destY, glyph);
-                        }
-                    }
-                }
-            };
-
-        auto writePatternFillRegion = [&](int startX, int startY, int regionWidth, int regionHeight)
-            {
-                if (regionWidth <= 0 || regionHeight <= 0)
-                {
-                    return;
-                }
-
-                const PatternTile normalizedTile = normalizePatternTile(fillPattern);
-                if (normalizedTile.rows.empty())
-                {
-                    return;
-                }
-
-                const int tileHeight = static_cast<int>(normalizedTile.rows.size());
-                const int tileWidth = static_cast<int>(normalizedTile.rows.front().size());
-
-                if (tileHeight <= 0 || tileWidth <= 0)
-                {
-                    return;
-                }
-
-                int repeatStart = 0;
-                int repeatEndExclusive = tileHeight;
-
-                switch (normalizedTile.capMode)
-                {
-                case PatternCapMode::None:
-                    repeatStart = 0;
-                    repeatEndExclusive = tileHeight;
-                    break;
-
-                case PatternCapMode::Top:
-                    repeatStart = 1;
-                    repeatEndExclusive = tileHeight;
-                    break;
-
-                case PatternCapMode::Bottom:
-                    repeatStart = 0;
-                    repeatEndExclusive = tileHeight - 1;
-                    break;
-
-                case PatternCapMode::TopAndBottom:
-                    repeatStart = 1;
-                    repeatEndExclusive = tileHeight - 1;
-                    break;
-                }
-
-                const bool hasTopCap =
-                    normalizedTile.capMode == PatternCapMode::Top ||
-                    normalizedTile.capMode == PatternCapMode::TopAndBottom;
-
-                const bool hasBottomCap =
-                    normalizedTile.capMode == PatternCapMode::Bottom ||
-                    normalizedTile.capMode == PatternCapMode::TopAndBottom;
-
-                const int repeatRowCount = std::max(0, repeatEndExclusive - repeatStart);
-
-                auto writePatternRow = [&](int destY, const std::u32string& sourceRow)
-                    {
-                        for (int x = 0; x < regionWidth; ++x)
-                        {
-                            const int destX = startX + x;
-                            if (destX < 0 || destX >= width || destY < 0 || destY >= height)
-                            {
-                                continue;
-                            }
-
-                            const char32_t glyph = sourceRow[static_cast<std::size_t>(x % tileWidth)];
-
-                            if (style.has_value())
-                            {
-                                builder.setGlyph(destX, destY, glyph, *style);
-                            }
-                            else
-                            {
-                                builder.setGlyph(destX, destY, glyph);
-                            }
-                        }
-                    };
-
-                int localY = 0;
-
-                if (hasTopCap&& localY < regionHeight)
-                {
-                    writePatternRow(startY + localY, normalizedTile.rows.front());
-                    ++localY;
-                }
-
-                const int lastLocalRow = regionHeight - 1;
-                const bool reserveBottomRow = hasBottomCap && regionHeight > 0;
-                const int repeatableEndY = reserveBottomRow ? lastLocalRow : regionHeight;
-
-                if (repeatRowCount > 0)
-                {
-                    while (localY < repeatableEndY)
-                    {
-                        const int repeatIndex = (localY - (hasTopCap ? 1 : 0)) % repeatRowCount;
-                        const int sourceIndex = repeatStart + repeatIndex;
-                        writePatternRow(
-                            startY + localY,
-                            normalizedTile.rows[static_cast<std::size_t>(sourceIndex)]);
-                        ++localY;
-                    }
-                }
-                else
-                {
-                    while (localY < repeatableEndY)
-                    {
-                        const std::u32string& fallbackRow =
-                            hasTopCap ? normalizedTile.rows.front() : normalizedTile.rows.back();
-
-                        writePatternRow(startY + localY, fallbackRow);
-                        ++localY;
-                    }
-                }
-
-                if (hasBottomCap && regionHeight > 0)
-                {
-                    writePatternRow(startY + lastLocalRow, normalizedTile.rows.back());
-                }
-            };
-
-        const int leftInset = std::max({
-            normalized.topLeftWidth,
-            normalized.leftWidth,
-            normalized.bottomLeftWidth
-            });
-
-        const int rightInset = std::max({
-            normalized.topRightWidth,
-            normalized.rightWidth,
-            normalized.bottomRightWidth
-            });
-
-        const int topInset = normalized.topHeight;
-        const int bottomInset = normalized.bottomHeight;
-
-        const int interiorWidth = std::max(0, frameUsedWidth - leftInset - rightInset);
-        const int interiorHeight = std::max(0, frameUsedHeight - topInset - bottomInset);
-
-        // Fill the actual polished interior first.
-        if (interiorWidth > 0 && interiorHeight > 0)
-        {
-            writePatternFillRegion(
-                leftInset,
-                topInset,
-                interiorWidth,
-                interiorHeight);
-        }
-
-        // Draw frame pieces over the fill.
-
-        // Top corners
-        if (!normalized.topLeftRows.empty())
-        {
-            writeRowsAt(0, 0, normalized.topLeftRows);
-        }
-
-        if (topLayout.hasEnd && !normalized.topRightRows.empty())
-        {
-            writeRowsAt(topLayout.endX, 0, normalized.topRightRows);
-        }
-
-        // Top horizontal repeat
-        if (normalized.topWidth > 0 && normalized.topHeight > 0)
-        {
-            int x = topLayout.repeatStartX;
-            for (int i = 0; i < topLayout.repeatCount; ++i)
-            {
-                writeRowsAt(x, 0, normalized.topRows);
-                x += normalized.topWidth;
-            }
-        }
-
-        // Bottom corners
-        if (!normalized.bottomLeftRows.empty() && verticalLayout.hasBottom)
-        {
-            writeRowsAt(0, verticalLayout.bottomY, normalized.bottomLeftRows);
-        }
-
-        if (bottomLayout.hasEnd && verticalLayout.hasBottom && !normalized.bottomRightRows.empty())
-        {
-            writeRowsAt(bottomLayout.endX, verticalLayout.bottomY, normalized.bottomRightRows);
-        }
-
-        // Bottom horizontal repeat
-        if (normalized.bottomWidth > 0 && normalized.bottomHeight > 0 && verticalLayout.hasBottom)
-        {
-            int x = bottomLayout.repeatStartX;
-            for (int i = 0; i < bottomLayout.repeatCount; ++i)
-            {
-                writeRowsAt(x, verticalLayout.bottomY, normalized.bottomRows);
-                x += normalized.bottomWidth;
-            }
-        }
-
-        // Left vertical repeat
-        if (normalized.leftWidth > 0 && normalized.middleHeight > 0)
-        {
-            int y = verticalLayout.repeatStartY;
-            for (int i = 0; i < verticalLayout.repeatCount; ++i)
-            {
-                writeRowsAt(0, y, normalized.leftRows);
-                y += normalized.middleHeight;
-            }
-        }
-
-        // Right vertical repeat
         if (normalized.rightWidth > 0 && normalized.middleHeight > 0)
         {
             const int rightX = std::max(0, frameUsedWidth - normalized.rightWidth);
