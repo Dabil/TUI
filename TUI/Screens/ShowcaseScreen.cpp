@@ -983,7 +983,7 @@ void NeonDialogScreen::draw(Surface& surface)
     paintPanel(buffer, previewPane, NeonDialogFill, NeonFrame, ObjectFactory::singleLineBorder());
     paintPanel(buffer, copyPane, NeonDialogFill, NeonFrame, ObjectFactory::singleLineBorder());
 
-    page.createRegion("HeaderContent", insetRect(header, 2, 1, 2, 1));
+    page.createRegion("HeaderContent", insetRect(header, 2, 0, 2, 0));
     page.createRegion("PreviewContent", insetRect(previewPane, 2, 3, 2, 2));
     page.createRegion("CopyContent", insetRect(copyPane, 2, 3, 2, 2));
     page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
@@ -991,39 +991,26 @@ void NeonDialogScreen::draw(Surface& surface)
     buffer.writeString(previewPane.position.x + 2, previewPane.position.y + 1, "PREVIEW", NeonGold);
     buffer.writeString(copyPane.position.x + 2, copyPane.position.y + 1, "FEATURES", NeonGold);
 
-    const TextObject banner = makeBanner("Slant.flf", "Neon UI", NeonAccent);
-    writeObject(page, banner, "HeaderContent", Composition::Align::center());
-
     const double shimmer = pulse(elapsedSeconds(), 1.35);
-    const Style orbStyle = makeStyle(
+
+    const Style bannerStyle = makeStyle(
         makeThemeColor(Color::Basic::BrightCyan, 123, 155, 250, 255),
-        makeThemeColor(
-            Color::Basic::Magenta,
-            91,
+        makeThemeColor(Color::Basic::Magenta, 91,
             static_cast<std::uint8_t>(55 + std::round(shimmer * 30.0)),
             22,
             static_cast<std::uint8_t>(84 + std::round(shimmer * 24.0))),
         true);
 
-    writeObject(page, satelliteObject(), "PreviewContent", Composition::Align::bottomCenter());
+
+    const TextObject banner = makeBanner("Slant.flf", "Neon UI", bannerStyle);
+    writeObject(page, banner, "HeaderContent", Composition::Align::topCenter());
+
     writeWrapped(
         page,
         "The dialog scene works well for launchers, settings panes, and modal workflows. Extracting it into its own class makes it easier to evolve separately from the other showcase looks.",
         "PreviewContent",
         makeAlignment(Composition::HorizontalAlign::Center, Composition::VerticalAlign::Center));
     
-    const TextObject orb = TextObject::fromUtf8(
-        "    .-''''-.    \n"
-        "  .'  .--.  '.  \n"
-        " /   ( () )   \\\n"
-        "|   .-====-.   |\n"
-        " \\  '.__.'  /  \n"
-        "  '.  '--' .'   \n"
-        "    '-..-'      ",
-        orbStyle);
-
-    writeObject(page, orb, "CopyContent", Composition::Align::topCenter(), solidObject());
-
     writeTextBlock(
         page,
         "• dedicated modal-style screen\n"
