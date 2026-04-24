@@ -1,6 +1,29 @@
 #include "Rendering/Objects/TextObjectBuilder.h"
 
 #include "Utilities/Unicode/UnicodeConversion.h"
+#include "Utilities/Unicode/UnicodeWidth.h"
+
+/*
+TODO: Next clean-up
+
+Current: Added explicit authroed/transparent vocabulary while preserving old calls:
+
+New:
+setAuthoredSpace(...)      // writes CellKind::Glyph + U' '
+setTransparent(...)        // writes CellKind::Empty
+fillAuthoredSpace(...)     // fills entire surface with authored spaces
+fillTransparent(...)       // fills entire surface with transparent Empty cells
+
+Removed:
+setEmpty(...) and replaced with setTransparent(...) at all call-sites
+
+Existing Compatibility:
+
+fill(...)                  // remains available as the low-level generic fill
+reset(...)                 // still defaults to transparent cells
+
+Next clean-up check to see if the compatibility layer should be enhanced
+*/
 
 TextObjectBuilder::TextObjectBuilder(int width, int height)
 {
@@ -22,7 +45,7 @@ void TextObjectBuilder::reset(int width, int height)
     }
 
     m_object.m_cells.resize(static_cast<std::size_t>(m_object.m_width * m_object.m_height));
-    fill(U' ', CellKind::Empty, CellWidth::One, std::nullopt);
+    fillTransparent();
 }
 
 void TextObjectBuilder::clear()
@@ -88,6 +111,20 @@ bool TextObjectBuilder::setGlyph(
     char32_t glyph,
     const std::optional<Style>& style)
 {
+    glyph = UnicodeConversion::sanitizeCodePoint(glyph);
+
+    const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(glyph);
+
+    if (measuredWidth == CellWidth::Zero)
+    {
+        return false;
+    }
+
+    if (measuredWidth == CellWidth::Two)
+    {
+        return setWideGlyph(x, y, glyph, style);
+    }
+
     return setCell(x, y, glyph, CellKind::Glyph, CellWidth::One, style);
 }
 
@@ -102,6 +139,8 @@ bool TextObjectBuilder::setWideGlyph(
         return false;
     }
 
+    glyph = UnicodeConversion::sanitizeCodePoint(glyph);
+
     if (!setCell(x, y, glyph, CellKind::Glyph, CellWidth::Two, style))
     {
         return false;
@@ -110,7 +149,15 @@ bool TextObjectBuilder::setWideGlyph(
     return setCell(x + 1, y, U' ', CellKind::WideTrailing, CellWidth::Zero, style);
 }
 
-bool TextObjectBuilder::setEmpty(
+bool TextObjectBuilder::setAuthoredSpace(
+    int x,
+    int y,
+    const std::optional<Style>& style)
+{
+    return setCell(x, y, U' ', CellKind::Glyph, CellWidth::One, style);
+}
+
+bool TextObjectBuilder::setTransparent(
     int x,
     int y,
     const std::optional<Style>& style)
@@ -136,6 +183,16 @@ void TextObjectBuilder::fill(
             setCell(x, y, glyph, kind, width, style);
         }
     }
+}
+
+void TextObjectBuilder::fillAuthoredSpace(const std::optional<Style>& style)
+{
+    fill(U' ', CellKind::Glyph, CellWidth::One, style);
+}
+
+void TextObjectBuilder::fillTransparent(const std::optional<Style>& style)
+{
+    fill(U' ', CellKind::Empty, CellWidth::One, style);
 }
 
 TextObject TextObjectBuilder::build() const

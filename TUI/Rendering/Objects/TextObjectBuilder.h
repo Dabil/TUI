@@ -40,7 +40,12 @@ public:
         char32_t glyph,
         const std::optional<Style>& style = std::nullopt);
 
-    bool setEmpty(
+    bool setAuthoredSpace(
+        int x,
+        int y,
+        const std::optional<Style>& style = std::nullopt);
+
+    bool setTransparent(
         int x,
         int y,
         const std::optional<Style>& style = std::nullopt);
@@ -50,6 +55,9 @@ public:
         CellKind kind = CellKind::Glyph,
         CellWidth width = CellWidth::One,
         const std::optional<Style>& style = std::nullopt);
+
+    void fillAuthoredSpace(const std::optional<Style>& style = std::nullopt);
+    void fillTransparent(const std::optional<Style>& style = std::nullopt);
 
     TextObject build() const;
     TextObject buildAndReset();

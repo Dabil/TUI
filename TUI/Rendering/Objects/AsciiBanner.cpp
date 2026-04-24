@@ -592,13 +592,13 @@ void AsciiBanner::appendRenderedLineToBuilder(
         {
             if (measuredWidth == CellWidth::Two)
             {
-                builder.setEmpty(x, y);
-                builder.setEmpty(x + 1, y);
+                builder.setTransparent(x, y);
+                builder.setTransparent(x + 1, y);
                 x += 2;
             }
             else
             {
-                builder.setEmpty(x, y);
+                builder.setTransparent(x, y);
                 x += 1;
             }
 

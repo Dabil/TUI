@@ -721,7 +721,7 @@ namespace
                 {
                     if (!transparentSpaces)
                     {
-                        builder.setEmpty(outX, outY, styleToApply);
+                        builder.setTransparent(outX, outY, styleToApply);
                     }
                     continue;
                 }

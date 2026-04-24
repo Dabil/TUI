@@ -114,7 +114,7 @@ namespace TextObjectBlitter
                     break;
 
                 case CellKind::Empty:
-                    builder.setEmpty(destX, destY, styleToApply);
+                    builder.setTransparent(destX, destY, styleToApply);
                     break;
 
                 default:

@@ -1124,7 +1124,7 @@ namespace XpArtLoader
                 }
                 else if (options.baseStyle.has_value())
                 {
-                    builder.setEmpty(x, y, style);
+                    builder.setTransparent(x, y, style);
                 }
             }
         }
