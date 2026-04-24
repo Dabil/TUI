@@ -32,7 +32,7 @@ namespace
     using Composition::Alignment;
     using Composition::PageComposer;
     using Composition::WritePresets::solidObject;
-    using Composition::WritePresets::visibleObject;
+    using Composition::WritePresets::authoredOnly;
 
     constexpr int MinimumSceneWidth = 84;
     constexpr int MinimumSceneHeight = 28;
@@ -252,7 +252,7 @@ namespace
         std::string_view text,
         std::string_view regionName,
         const Alignment& alignment,
-        const Composition::WritePolicy& policy = visibleObject())
+        const Composition::WritePolicy& policy = authoredOnly())
     {
         page.writeAlignedText(
             text,
@@ -265,7 +265,7 @@ namespace
         std::string_view text,
         std::string_view regionName,
         const Alignment& alignment,
-        const Composition::WritePolicy& policy = visibleObject())
+        const Composition::WritePolicy& policy = authoredOnly())
     {
         page.writeAlignedTextBlock(
             text,
@@ -278,7 +278,7 @@ namespace
         std::string_view text,
         std::string_view regionName,
         const Alignment& alignment,
-        const Composition::WritePolicy& policy = visibleObject())
+        const Composition::WritePolicy& policy = authoredOnly())
     {
         page.writeWrappedText(
             text,
@@ -291,7 +291,7 @@ namespace
         const TextObject& object,
         std::string_view regionName,
         const Alignment& alignment,
-        const Composition::WritePolicy& policy = visibleObject())
+        const Composition::WritePolicy& policy = authoredOnly())
     {
         page.writeObject(
             object,
@@ -911,7 +911,7 @@ void RetroTerminalScreen::draw(Surface& surface)
         page.writeAlignedTextBlock(
             logBlock,
             PageComposer::PlacementSpec::inNamedRegion("ConsoleContent", Composition::Align::topLeft(), true),
-            visibleObject());
+            authoredOnly());
     }
 
     writeWrapped(

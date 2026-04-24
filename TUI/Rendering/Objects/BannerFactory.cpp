@@ -51,7 +51,7 @@ namespace BannerFactory
                 mainObject,
                 0,
                 0,
-                Composition::WritePresets::visibleObject(),
+                Composition::WritePresets::authoredOnly(),
                 1,
                 "main");
 
@@ -79,7 +79,7 @@ namespace BannerFactory
                 mainObject,
                 0,
                 0,
-                Composition::WritePresets::visibleObject(),
+                Composition::WritePresets::authoredOnly(),
                 0,
                 "main");
 
@@ -107,7 +107,7 @@ namespace BannerFactory
                 mainObject,
                 0,
                 0,
-                Composition::WritePresets::visibleObject(),
+                Composition::WritePresets::authoredOnly(),
                 1,
                 "main");
 
@@ -134,7 +134,7 @@ namespace BannerFactory
                 mainObject,
                 0,
                 0,
-                Composition::WritePresets::visibleObject(),
+                Composition::WritePresets::authoredOnly(),
                 0,
                 "main");
 

@@ -145,17 +145,17 @@ const TextObjectCell* TextObject::tryGetCell(int x, int y) const
 
 void TextObject::draw(ScreenBuffer& target, int x, int y) const
 {
-    draw(target, x, y, Composition::WritePresets::visibleObject(), std::nullopt);
+    draw(target, x, y, Composition::WritePresets::authoredOnly(), std::nullopt);
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const Style& overrideStyle) const
 {
-    draw(target, x, y, Composition::WritePresets::visibleObject(), std::optional<Style>(overrideStyle));
+    draw(target, x, y, Composition::WritePresets::authoredOnly(), std::optional<Style>(overrideStyle));
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const std::optional<Style>& overrideStyle) const
 {
-    draw(target, x, y, Composition::WritePresets::visibleObject(), overrideStyle);
+    draw(target, x, y, Composition::WritePresets::authoredOnly(), overrideStyle);
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const Composition::WritePolicy& writePolicy) const
