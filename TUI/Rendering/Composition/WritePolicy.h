@@ -8,20 +8,9 @@
 
 namespace Composition
 {
-    /*
-        WritePolicy is the core engine-facing composition policy object.
-
-        It fully describes how a write pass should behave without relying on:
-        - hidden mutable writer state
-        - ambiguous legacy mode flags
-        - backend-specific rendering assumptions
-
-        The intent is that future semantic wrappers translate into one of these
-        explicit policies before any actual composition work is performed.
-    */
     struct WritePolicy
     {
-        GlyphPolicy glyphPolicy = GlyphPolicy::All;
+        GlyphPolicy glyphPolicy = GlyphPolicy::SolidObject;
         StylePolicy stylePolicy = StylePolicy::Apply;
         SourceMask sourceMask = SourceMask::AllCells;
 
@@ -30,8 +19,11 @@ namespace Composition
 
         DepthPolicy depthPolicy = DepthPolicy::Ignore;
 
+        static WritePolicy VisibleOnly();
+        static WritePolicy AuthoredOnly();
+        static WritePolicy SolidObject();
+
         static WritePolicy ReplaceAll();
-        static WritePolicy TransparentGlyphOverlay();
         static WritePolicy StyleOnly();
         static WritePolicy NoWrite();
 

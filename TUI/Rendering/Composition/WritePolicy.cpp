@@ -4,14 +4,19 @@
 
 namespace Composition
 {
-    WritePolicy WritePolicy::ReplaceAll()
+    WritePolicy WritePolicy::VisibleOnly()
     {
-        return WritePresets::solidObject();
+        return WritePresets::visibleOnly();
     }
 
-    WritePolicy WritePolicy::TransparentGlyphOverlay()
+    WritePolicy WritePolicy::AuthoredOnly()
     {
-        return WritePresets::transparentGlyphOverlay();
+        return WritePresets::authoredOnly();
+    }
+
+    WritePolicy WritePolicy::SolidObject()
+    {
+        return WritePresets::solidObject();
     }
 
     WritePolicy WritePolicy::StyleOnly()

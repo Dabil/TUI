@@ -5,22 +5,34 @@ namespace Composition
     /*
         GlyphPolicy answers:
 
-            "If a participating source cell is considered, what glyph-writing
-             intent should the engine apply?"
+            "Which source cells are allowed to write glyph content?"
 
         Semantics:
         - None:
-            Never write glyph content from the source.
-        - NonSpaceOnly:
-            Write source glyphs only when the source cell represents a non-space glyph.
-            Source spaces do not replace destination glyphs.
-        - All:
-            Write all eligible source glyphs, including spaces.
+            Never write glyph content.
+
+        - VisibleOnly:
+            Write only visible non-space Glyph cells.
+            Skips authored spaces and Empty cells.
+
+        - AuthoredOnly:
+            Write all authored Glyph cells, including U' '.
+            Skips Empty cells.
+
+        - SolidObject:
+            Write the full source object footprint.
+            Glyph cells write normally.
+            Empty cells participate as clearing authored spaces.
+
+        Compatibility aliases:
+        - NonSpaceOnly maps to VisibleOnly.
+        - All maps to SolidObject, preserving the old "all source cells" meaning.
     */
     enum class GlyphPolicy
     {
         None,
-        NonSpaceOnly,
-        All
+        VisibleOnly,
+        AuthoredOnly,
+        SolidObject
     };
 }

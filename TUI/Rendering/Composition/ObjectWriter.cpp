@@ -305,10 +305,13 @@ namespace Composition
 
                 if (canWriteGlyph)
                 {
+                    const TextObjectCell writeCell =
+                        WritePolicyUtils::resolveGlyphWriteCell(*sourceCell, policy);
+
                     ScreenCell destinationCell;
-                    destinationCell.glyph = sourceCell->glyph;
-                    destinationCell.kind = sourceCell->kind;
-                    destinationCell.width = sourceCell->width;
+                    destinationCell.glyph = writeCell.glyph;
+                    destinationCell.kind = writeCell.kind;
+                    destinationCell.width = writeCell.width;
                     destinationCell.style = canWriteStyle
                         ? *resolvedSourceStyle
                         : resolveLogicalDestinationStyle(m_target, destinationX, destinationY);

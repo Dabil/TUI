@@ -114,7 +114,14 @@ namespace TextObjectBlitter
                     break;
 
                 case CellKind::Empty:
-                    builder.setTransparent(destX, destY, styleToApply);
+                    if (options.writePolicy.glyphPolicy == Composition::GlyphPolicy::SolidObject)
+                    {
+                        builder.setAuthoredSpace(destX, destY, styleToApply);
+                    }
+                    else
+                    {
+                        builder.setTransparent(destX, destY, styleToApply);
+                    }
                     break;
 
                 default:

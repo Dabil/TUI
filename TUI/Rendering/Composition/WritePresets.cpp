@@ -2,10 +2,34 @@
 
 namespace Composition::WritePresets
 {
+    WritePolicy visibleOnly(DepthPolicy depthPolicy)
+    {
+        WritePolicy policy;
+        policy.glyphPolicy = GlyphPolicy::VisibleOnly;
+        policy.stylePolicy = StylePolicy::Apply;
+        policy.sourceMask = SourceMask::GlyphCellsOnly;
+        policy.glyphOverwriteRule = OverwriteRule::Always;
+        policy.styleOverwriteRule = OverwriteRule::Always;
+        policy.depthPolicy = depthPolicy;
+        return policy;
+    }
+
+    WritePolicy authoredOnly(DepthPolicy depthPolicy)
+    {
+        WritePolicy policy;
+        policy.glyphPolicy = GlyphPolicy::AuthoredOnly;
+        policy.stylePolicy = StylePolicy::Apply;
+        policy.sourceMask = SourceMask::GlyphCellsOnly;
+        policy.glyphOverwriteRule = OverwriteRule::Always;
+        policy.styleOverwriteRule = OverwriteRule::Always;
+        policy.depthPolicy = depthPolicy;
+        return policy;
+    }
+
     WritePolicy solidObject(DepthPolicy depthPolicy)
     {
         WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::All;
+        policy.glyphPolicy = GlyphPolicy::SolidObject;
         policy.stylePolicy = StylePolicy::Apply;
         policy.sourceMask = SourceMask::AllCells;
         policy.glyphOverwriteRule = OverwriteRule::Always;
@@ -14,39 +38,26 @@ namespace Composition::WritePresets
         return policy;
     }
 
+    WritePolicy transparentOverlay(DepthPolicy depthPolicy)
+    {
+        return visibleOnly(depthPolicy);
+    }
+
     WritePolicy visibleObject(DepthPolicy depthPolicy)
     {
-        WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::All;
-        policy.stylePolicy = StylePolicy::Apply;
-        policy.sourceMask = SourceMask::GlyphCellsOnly;
-        policy.glyphOverwriteRule = OverwriteRule::Always;
-        policy.styleOverwriteRule = OverwriteRule::Always;
-        policy.depthPolicy = depthPolicy;
-        return policy;
+        return authoredOnly(depthPolicy);
     }
 
     WritePolicy transparentGlyphOverlay(DepthPolicy depthPolicy)
     {
-        WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::NonSpaceOnly;
-        policy.stylePolicy = StylePolicy::Apply;
-        policy.sourceMask = SourceMask::GlyphCellsOnly;
-        policy.glyphOverwriteRule = OverwriteRule::Always;
-        policy.styleOverwriteRule = OverwriteRule::Always;
-        policy.depthPolicy = depthPolicy;
-        return policy;
+        return transparentOverlay(depthPolicy);
     }
 
     WritePolicy glyphsOnly(DepthPolicy depthPolicy)
     {
-        WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::All;
+        WritePolicy policy = authoredOnly(depthPolicy);
         policy.stylePolicy = StylePolicy::None;
-        policy.sourceMask = SourceMask::GlyphCellsOnly;
-        policy.glyphOverwriteRule = OverwriteRule::Always;
         policy.styleOverwriteRule = OverwriteRule::Never;
-        policy.depthPolicy = depthPolicy;
         return policy;
     }
 

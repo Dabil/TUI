@@ -30,12 +30,17 @@ namespace Composition::WritePolicyUtils
         case GlyphPolicy::None:
             return false;
 
-        case GlyphPolicy::NonSpaceOnly:
+        case GlyphPolicy::VisibleOnly:
             return cell.kind == CellKind::Glyph && cell.glyph != U' ';
 
-        case GlyphPolicy::All:
-        default:
+        case GlyphPolicy::AuthoredOnly:
+            return cell.kind == CellKind::Glyph;
+
+        case GlyphPolicy::SolidObject:
             return cell.kind == CellKind::Glyph || cell.kind == CellKind::Empty;
+
+        default:
+            return false;
         }
     }
 
@@ -63,6 +68,22 @@ namespace Composition::WritePolicyUtils
         }
 
         return policy.stylePolicy == StylePolicy::Apply;
+    }
+
+    TextObjectCell resolveGlyphWriteCell(const TextObjectCell& sourceCell, const WritePolicy& policy)
+    {
+        if (policy.glyphPolicy == GlyphPolicy::SolidObject &&
+            sourceCell.kind == CellKind::Empty)
+        {
+            TextObjectCell authoredSpace;
+            authoredSpace.glyph = U' ';
+            authoredSpace.kind = CellKind::Glyph;
+            authoredSpace.width = CellWidth::One;
+            authoredSpace.style = sourceCell.style;
+            return authoredSpace;
+        }
+
+        return sourceCell;
     }
 
     bool isBuilderCompatible(const WritePolicy& policy)

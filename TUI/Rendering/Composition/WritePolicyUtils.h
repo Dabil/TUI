@@ -12,5 +12,7 @@ namespace Composition::WritePolicyUtils
     bool sourceCellParticipates(const TextObjectCell& cell, const WritePolicy& policy);
     bool sourceCellCanWriteGlyph(const TextObjectCell& cell, const WritePolicy& policy);
 
+    TextObjectCell resolveGlyphWriteCell(const TextObjectCell& sourceCell, const WritePolicy& policy);
+
     bool isBuilderCompatible(const WritePolicy& policy);
 }
