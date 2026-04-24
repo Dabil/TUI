@@ -7,24 +7,79 @@
 
 namespace
 {
-    bool shouldSkipCell(
-        const TextObjectCell& cell,
-        const TextObjectBlitter::BlitOptions& options)
+    bool isVisibleGlyph(const TextObjectCell& cell)
     {
-        if (options.skipStructuralContinuationCells)
-        {
-            if (cell.kind == CellKind::WideTrailing)
-            {
-                return true;
-            }
+        return cell.kind == CellKind::Glyph && cell.glyph != U' ';
+    }
 
-            if (cell.kind == CellKind::CombiningContinuation)
-            {
-                return true;
-            }
+    bool isAuthoredGlyph(const TextObjectCell& cell)
+    {
+        return cell.kind == CellKind::Glyph;
+    }
+
+    bool isValidWideLead(const TextObject& source, int x, int y, const TextObjectCell& cell)
+    {
+        if (cell.kind != CellKind::Glyph || cell.width != CellWidth::Two)
+        {
+            return false;
         }
 
-        return false;
+        const TextObjectCell* trailing = source.tryGetCell(x + 1, y);
+        return trailing != nullptr && trailing->kind == CellKind::WideTrailing;
+    }
+
+    bool shouldSkipCell(
+        const TextObject& source,
+        int sourceX,
+        int sourceY,
+        const TextObjectCell& cell,
+        const Composition::WritePolicy& policy)
+    {
+        if (cell.kind == CellKind::WideTrailing)
+        {
+            return true;
+        }
+
+        if (cell.kind == CellKind::Glyph && cell.width == CellWidth::Two)
+        {
+            return !isValidWideLead(source, sourceX, sourceY, cell);
+        }
+
+        switch (policy.glyphPolicy)
+        {
+        case Composition::GlyphPolicy::None:
+            return true;
+
+        case Composition::GlyphPolicy::VisibleOnly:
+            return !isVisibleGlyph(cell);
+
+        case Composition::GlyphPolicy::AuthoredOnly:
+            return !isAuthoredGlyph(cell);
+
+        case Composition::GlyphPolicy::SolidObject:
+            return cell.kind != CellKind::Glyph && cell.kind != CellKind::Empty;
+
+        default:
+            return true;
+        }
+    }
+
+    TextObjectCell resolveBuilderWriteCell(
+        const TextObjectCell& sourceCell,
+        const Composition::WritePolicy& policy)
+    {
+        if (policy.glyphPolicy == Composition::GlyphPolicy::SolidObject &&
+            sourceCell.kind == CellKind::Empty)
+        {
+            TextObjectCell authoredSpace;
+            authoredSpace.glyph = U' ';
+            authoredSpace.kind = CellKind::Glyph;
+            authoredSpace.width = CellWidth::One;
+            authoredSpace.style = sourceCell.style;
+            return authoredSpace;
+        }
+
+        return sourceCell;
     }
 
     std::optional<Style> resolveBuilderStyle(
@@ -68,12 +123,12 @@ namespace TextObjectBlitter
             for (int x = 0; x < source.getWidth(); ++x)
             {
                 const TextObjectCell* cell = source.tryGetCell(x, y);
-                if (cell == nullptr || shouldSkipCell(*cell, options))
+                if (cell == nullptr)
                 {
                     continue;
                 }
 
-                if (!Composition::WritePolicyUtils::sourceCellCanWriteGlyph(*cell, options.writePolicy))
+                if (shouldSkipCell(source, x, y, *cell, options.writePolicy))
                 {
                     continue;
                 }
@@ -85,6 +140,7 @@ namespace TextObjectBlitter
 
                 const int destX = offsetX + x;
                 const int destY = offsetY + y;
+
                 if (!builder.inBounds(destX, destY))
                 {
                     continue;
@@ -101,15 +157,13 @@ namespace TextObjectBlitter
                     }
                     else
                     {
-                        builder.setGlyph(destX, destY, cell->glyph, styleToApply);
-                    }
-                    break;
-
-                case CellKind::WideTrailing:
-                case CellKind::CombiningContinuation:
-                    if (!options.skipStructuralContinuationCells)
-                    {
-                        builder.setCell(destX, destY, cell->glyph, cell->kind, cell->width, styleToApply);
+                        builder.setCell(
+                            destX,
+                            destY,
+                            cell->glyph,
+                            CellKind::Glyph,
+                            CellWidth::One,
+                            styleToApply);
                     }
                     break;
 
@@ -121,6 +175,20 @@ namespace TextObjectBlitter
                     else
                     {
                         builder.setTransparent(destX, destY, styleToApply);
+                    }
+                    break;
+
+                case CellKind::WideTrailing:
+                case CellKind::CombiningContinuation:
+                    if (!options.skipStructuralContinuationCells)
+                    {
+                        builder.setCell(
+                            destX,
+                            destY,
+                            cell->glyph,
+                            cell->kind,
+                            cell->width,
+                            styleToApply);
                     }
                     break;
 
