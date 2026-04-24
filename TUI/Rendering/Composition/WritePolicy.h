@@ -23,7 +23,6 @@ namespace Composition
         static WritePolicy AuthoredOnly();
         static WritePolicy SolidObject();
 
-        static WritePolicy ReplaceAll();
         static WritePolicy StyleOnly();
         static WritePolicy NoWrite();
 
