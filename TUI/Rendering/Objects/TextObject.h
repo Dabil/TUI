@@ -116,7 +116,7 @@ private:
     static std::vector<std::u32string> splitLines(std::u32string_view text);
     static int measureLineWidth(std::u32string_view line);
 
-    static void appendLineCells(
+    void TextObject::appendLineCells(
         std::vector<TextObjectCell>& outCells,
         std::u32string_view line,
         int paddedWidth,

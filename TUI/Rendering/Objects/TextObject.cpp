@@ -10,6 +10,14 @@
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
+/*
+    Concrete rule:
+        - Glyph + U' ' = authored space
+        - Empty        = intentional transparent cell
+        - SolidObject  = whole footprint participates, Empties wrote as U' '
+        - AuthoredOnly = authored cells participate, Empty skips
+*/
+
 namespace
 {
     int cellWidthToInt(CellWidth width)
@@ -304,12 +312,12 @@ void TextObject::appendLineCells(
 
     while (writtenWidth < paddedWidth)
     {
-        TextObjectCell empty;
-        empty.glyph = U' ';
-        empty.kind = CellKind::Empty;
-        empty.width = CellWidth::One;
-        empty.style.reset();
-        outCells.push_back(empty);
+        TextObjectCell space;
+        space.glyph = U' ';
+        space.kind = CellKind::Glyph;
+        space.width = CellWidth::One;
+        space.style = defaultStyle;
+        outCells.push_back(space);
 
         ++writtenWidth;
     }
