@@ -1509,6 +1509,7 @@ namespace PseudoFont
         }
 
         TextObjectBuilder builder(outputWidth, outputHeight);
+        builder.fillTransparent();
 
         int yBase = 0;
         for (const std::u32string& line : lines)
@@ -1694,6 +1695,7 @@ namespace PseudoFont
                     }
 
                     TextObjectBuilder builder(outputLayer->object.getWidth(), outputLayer->object.getHeight());
+                    builder.fillTransparent();
 
                     for (int y = 0; y < outputLayer->object.getHeight(); ++y)
                     {

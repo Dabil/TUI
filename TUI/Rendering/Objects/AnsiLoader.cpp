@@ -171,6 +171,7 @@ namespace
             }
 
             TextObjectBuilder builder(m_width, m_height);
+            builder.fillAuthoredSpace(m_cursorStyle);
 
             for (std::size_t i = 0; i < bytes.size(); ++i)
             {

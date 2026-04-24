@@ -402,6 +402,7 @@ namespace
 
         const int height = static_cast<int>(cellCount / static_cast<std::size_t>(width));
         TextObjectBuilder builder(width, height);
+        builder.fillAuthoredSpace(options.baseStyle);
 
         std::size_t offset = 0;
         for (int y = 0; y < height; ++y)
@@ -415,7 +416,12 @@ namespace
                     styleFromDosAttribute(attrByte, options.baseStyle, usedIceColors);
 
                 const char32_t glyph = decodeCp437Byte(glyphByte);
-                if (!builder.setGlyph(x, y, glyph, style))
+
+                const bool wroteCell = (glyph == U' ')
+                    ? builder.setAuthoredSpace(x, y, style)
+                    : builder.setGlyph(x, y, glyph, style);
+
+                if (!wroteCell)
                 {
                     return fail(
                         fileType,

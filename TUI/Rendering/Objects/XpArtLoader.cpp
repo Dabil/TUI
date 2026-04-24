@@ -1103,6 +1103,7 @@ namespace XpArtLoader
 
         FlattenResult flattened = flattenRetainedDocument(result.retainedDocument, options);
         TextObjectBuilder builder(result.retainedDocument.width, result.retainedDocument.height);
+        builder.fillTransparent();
 
         for (int y = 0; y < result.retainedDocument.height; ++y)
         {
@@ -1116,13 +1117,20 @@ namespace XpArtLoader
 
                 if (cell.hasGlyph)
                 {
-                    builder.setGlyph(x, y, cell.glyph, style);
+                    if (cell.glyph == U' ')
+                    {
+                        builder.setAuthoredSpace(x, y, style);
+                    }
+                    else
+                    {
+                        builder.setGlyph(x, y, cell.glyph, style);
+                    }
                 }
                 else if (cell.hasBackground)
                 {
-                    builder.setGlyph(x, y, U' ', style);
+                    builder.setAuthoredSpace(x, y, style);
                 }
-                else if (options.baseStyle.has_value())
+                else
                 {
                     builder.setTransparent(x, y, style);
                 }

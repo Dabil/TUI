@@ -535,6 +535,15 @@ TextObject AsciiBanner::generateTextObject(
 
     TextObjectBuilder builder(width, height);
 
+    if (options.transparentSpaces)
+    {
+        builder.fillTransparent();
+    }
+    else
+    {
+        builder.fillAuthoredSpace(style);
+    }
+
     for (int y = 0; y < height; ++y)
     {
         appendRenderedLineToBuilder(
@@ -588,20 +597,18 @@ void AsciiBanner::appendRenderedLineToBuilder(
             continue;
         }
 
-        if (cp == U' ' && transparentSpaces)
+        if (cp == U' ')
         {
-            if (measuredWidth == CellWidth::Two)
+            if (transparentSpaces)
             {
-                builder.setTransparent(x, y);
-                builder.setTransparent(x + 1, y);
-                x += 2;
+                builder.setTransparent(x, y, style);
             }
             else
             {
-                builder.setTransparent(x, y);
-                x += 1;
+                builder.setAuthoredSpace(x, y, style);
             }
 
+            x += 1;
             continue;
         }
 
