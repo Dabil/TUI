@@ -527,21 +527,68 @@ namespace
         return builder;
     }
 
-    TextObject buildPatternFillObject(
-        int width,
-        int height,
+    void writePatternRowToBuilder(
+        TextObjectBuilder& builder,
+        int objectWidth,
+        int objectHeight,
+        int startX,
+        int destY,
+        int regionWidth,
+        const std::u32string& sourceRow,
+        int tileWidth,
+        const std::optional<Style>& style)
+    {
+        if (regionWidth <= 0 || tileWidth <= 0)
+        {
+            return;
+        }
+
+        if (destY < 0 || destY >= objectHeight)
+        {
+            return;
+        }
+
+        for (int x = 0; x < regionWidth; ++x)
+        {
+            const int destX = startX + x;
+            if (destX < 0 || destX >= objectWidth)
+            {
+                continue;
+            }
+
+            const char32_t glyph = sourceRow[static_cast<std::size_t>(x % tileWidth)];
+
+            if (style.has_value())
+            {
+                builder.setGlyph(destX, destY, glyph, *style);
+            }
+            else
+            {
+                builder.setGlyph(destX, destY, glyph);
+            }
+        }
+    }
+
+    void writePatternFillRegion(
+        TextObjectBuilder& builder,
+        int objectWidth,
+        int objectHeight,
+        int startX,
+        int startY,
+        int regionWidth,
+        int regionHeight,
         const PatternTile& tile,
         const std::optional<Style>& style)
     {
-        if (width <= 0 || height <= 0)
+        if (regionWidth <= 0 || regionHeight <= 0)
         {
-            return TextObject();
+            return;
         }
 
         const PatternTile normalizedTile = normalizePatternTile(tile);
         if (normalizedTile.rows.empty())
         {
-            return TextObject();
+            return;
         }
 
         const int tileHeight = static_cast<int>(normalizedTile.rows.size());
@@ -549,7 +596,7 @@ namespace
 
         if (tileHeight <= 0 || tileWidth <= 0)
         {
-            return TextObject();
+            return;
         }
 
         int repeatStart = 0;
@@ -588,65 +635,115 @@ namespace
 
         const int repeatRowCount = std::max(0, repeatEndExclusive - repeatStart);
 
-        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
+        int localY = 0;
 
-        auto writePatternRow = [&](int destY, const std::u32string& sourceRow)
-            {
-                for (int x = 0; x < width; ++x)
-                {
-                    const char32_t glyph = sourceRow[static_cast<std::size_t>(x % tileWidth)];
-
-                    if (style.has_value())
-                    {
-                        builder.setGlyph(x, destY, glyph, *style);
-                    }
-                    else
-                    {
-                        builder.setGlyph(x, destY, glyph);
-                    }
-                }
-            };
-
-        int y = 0;
-
-        if (hasTopCap&& y < height)
+        if (hasTopCap&& localY < regionHeight)
         {
-            writePatternRow(y, normalizedTile.rows.front());
-            ++y;
+            writePatternRowToBuilder(
+                builder,
+                objectWidth,
+                objectHeight,
+                startX,
+                startY + localY,
+                regionWidth,
+                normalizedTile.rows.front(),
+                tileWidth,
+                style);
+
+            ++localY;
         }
 
-        const int lastRowY = height - 1;
-        const bool reserveBottomRow = hasBottomCap && height > 0;
-
-        const int repeatableEndY = reserveBottomRow ? lastRowY : height;
+        const int lastLocalRow = regionHeight - 1;
+        const bool reserveBottomRow = hasBottomCap && regionHeight > 0;
+        const int repeatableEndY = reserveBottomRow ? lastLocalRow : regionHeight;
 
         if (repeatRowCount > 0)
         {
-            while (y < repeatableEndY)
+            while (localY < repeatableEndY)
             {
-                const int repeatIndex = (y - (hasTopCap ? 1 : 0)) % repeatRowCount;
+                const int repeatIndex = (localY - (hasTopCap ? 1 : 0)) % repeatRowCount;
                 const int sourceIndex = repeatStart + repeatIndex;
-                writePatternRow(y, normalizedTile.rows[static_cast<std::size_t>(sourceIndex)]);
-                ++y;
+
+                writePatternRowToBuilder(
+                    builder,
+                    objectWidth,
+                    objectHeight,
+                    startX,
+                    startY + localY,
+                    regionWidth,
+                    normalizedTile.rows[static_cast<std::size_t>(sourceIndex)],
+                    tileWidth,
+                    style);
+
+                ++localY;
             }
         }
         else
         {
-            // No repeat body exists. If needed, extend caps to fill the space.
-            while (y < repeatableEndY)
+            while (localY < repeatableEndY)
             {
                 const std::u32string& fallbackRow =
                     hasTopCap ? normalizedTile.rows.front() : normalizedTile.rows.back();
 
-                writePatternRow(y, fallbackRow);
-                ++y;
+                writePatternRowToBuilder(
+                    builder,
+                    objectWidth,
+                    objectHeight,
+                    startX,
+                    startY + localY,
+                    regionWidth,
+                    fallbackRow,
+                    tileWidth,
+                    style);
+
+                ++localY;
             }
         }
 
-        if (hasBottomCap && height > 0)
+        if (hasBottomCap && regionHeight > 0)
         {
-            writePatternRow(lastRowY, normalizedTile.rows.back());
+            writePatternRowToBuilder(
+                builder,
+                objectWidth,
+                objectHeight,
+                startX,
+                startY + lastLocalRow,
+                regionWidth,
+                normalizedTile.rows.back(),
+                tileWidth,
+                style);
         }
+    }
+
+    TextObject buildPatternFillObject(
+        int width,
+        int height,
+        const PatternTile& tile,
+        const std::optional<Style>& style)
+    {
+        if (width <= 0 || height <= 0)
+        {
+            return TextObject();
+        }
+
+        const PatternTile normalizedTile = normalizePatternTile(tile);
+        if (normalizedTile.rows.empty())
+        {
+            return TextObject();
+        }
+
+        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
+
+        writePatternFillRegion(
+            builder,
+            width,
+            height,
+            0,
+            0,
+            width,
+            height,
+            normalizedTile,
+            style);
 
         return builder.build();
     }
@@ -736,6 +833,48 @@ namespace
 
         return normalized;
     }
+
+    void writeRowsToBuilder(
+        TextObjectBuilder& builder,
+        int objectWidth,
+        int objectHeight,
+        int startX,
+        int startY,
+        const std::vector<std::u32string>& rows,
+        const std::optional<Style>& style)
+    {
+        for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
+        {
+            const int destY = startY + rowIndex;
+            if (destY < 0 || destY >= objectHeight)
+            {
+                continue;
+            }
+
+            const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
+
+            for (int x = 0; x < static_cast<int>(row.size()); ++x)
+            {
+                const int destX = startX + x;
+                if (destX < 0 || destX >= objectWidth)
+                {
+                    continue;
+                }
+
+                const char32_t glyph = row[static_cast<std::size_t>(x)];
+
+                if (style.has_value())
+                {
+                    builder.setGlyph(destX, destY, glyph, *style);
+                }
+                else
+                {
+                    builder.setGlyph(destX, destY, glyph);
+                }
+            }
+        }
+    }
+
     /*
      Horizontal pattern line behavior:
     
@@ -773,44 +912,22 @@ namespace
 
         TextObjectBuilder builder = makeAuthoredRectBuilder(width, normalized.height, style);
 
-        auto writeRowsAtX = [&](int startX, const std::vector<std::u32string>& rows)
-            {
-                for (int y = 0; y < normalized.height; ++y)
-                {
-                    const std::u32string& row = rows[static_cast<std::size_t>(y)];
-
-                    for (int i = 0; i < static_cast<int>(row.size()); ++i)
-                    {
-                        const int destX = startX + i;
-                        if (destX < 0 || destX >= width)
-                        {
-                            continue;
-                        }
-
-                        const char32_t glyph = row[static_cast<std::size_t>(i)];
-
-                        if (style.has_value())
-                        {
-                            builder.setGlyph(destX, y, glyph, *style);
-                        }
-                        else
-                        {
-                            builder.setGlyph(destX, y, glyph);
-                        }
-                    }
-                }
-            };
-
         int x = 0;
 
-        // Write begin once.
         if (normalized.beginWidth > 0)
         {
-            writeRowsAtX(0, normalized.beginRows);
+            writeRowsToBuilder(
+                builder,
+                width,
+                normalized.height,
+                0,
+                0,
+                normalized.beginRows,
+                style);
+
             x += normalized.beginWidth;
         }
 
-        // Reserve room for a full end if it can fit.
         int reservedEndWidth = 0;
         if (normalized.endWidth > 0 && x + normalized.endWidth <= width)
         {
@@ -819,21 +936,33 @@ namespace
 
         const int repeatLimit = width - reservedEndWidth;
 
-        // Only place full repeat blocks before the reserved end area.
         if (normalized.repeatWidth > 0)
         {
             while (x + normalized.repeatWidth <= repeatLimit)
             {
-                writeRowsAtX(x, normalized.repeatRows);
+                writeRowsToBuilder(
+                    builder,
+                    width,
+                    normalized.height,
+                    x,
+                    0,
+                    normalized.repeatRows,
+                    style);
+
                 x += normalized.repeatWidth;
             }
         }
 
-        // Write end immediately after the last full repeat.
-        // If it extends past width, it clips on the right, preserving the leading characters.
         if (normalized.endWidth > 0)
         {
-            writeRowsAtX(x, normalized.endRows);
+            writeRowsToBuilder(
+                builder,
+                width,
+                normalized.height,
+                x,
+                0,
+                normalized.endRows,
+                style);
         }
 
         return builder.build();
@@ -928,44 +1057,22 @@ namespace
 
         TextObjectBuilder builder = makeAuthoredRectBuilder(normalized.width, height, style);
 
-        auto writeRowsAtY = [&](int startY, const std::vector<std::u32string>& rows)
-            {
-                for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
-                {
-                    const int destY = startY + rowIndex;
-                    if (destY < 0 || destY >= height)
-                    {
-                        continue;
-                    }
-
-                    const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
-
-                    for (int x = 0; x < static_cast<int>(row.size()); ++x)
-                    {
-                        const char32_t glyph = row[static_cast<std::size_t>(x)];
-
-                        if (style.has_value())
-                        {
-                            builder.setGlyph(x, destY, glyph, *style);
-                        }
-                        else
-                        {
-                            builder.setGlyph(x, destY, glyph);
-                        }
-                    }
-                }
-            };
-
         int y = 0;
 
-        // Write TOP once.
         if (normalized.topHeight > 0)
         {
-            writeRowsAtY(0, normalized.topRows);
+            writeRowsToBuilder(
+                builder,
+                normalized.width,
+                height,
+                0,
+                0,
+                normalized.topRows,
+                style);
+
             y += normalized.topHeight;
         }
 
-        // Reserve room for a full BOTTOM if it can fit.
         int reservedBottomHeight = 0;
         if (normalized.bottomHeight > 0 && y + normalized.bottomHeight <= height)
         {
@@ -974,22 +1081,34 @@ namespace
 
         const int repeatLimit = height - reservedBottomHeight;
 
-        // Only place full repeat blocks before the reserved bottom area.
         if (normalized.repeatHeight > 0)
         {
             while (y + normalized.repeatHeight <= repeatLimit)
             {
-                writeRowsAtY(y, normalized.repeatRows);
+                writeRowsToBuilder(
+                    builder,
+                    normalized.width,
+                    height,
+                    0,
+                    y,
+                    normalized.repeatRows,
+                    style);
+
                 y += normalized.repeatHeight;
             }
         }
 
-        // Write BOTTOM immediately after the last full repeat.
-        // If it does not fully fit, it is omitted rather than partially clipped.
         if (normalized.bottomHeight > 0 &&
             y + normalized.bottomHeight <= height)
         {
-            writeRowsAtY(y, normalized.bottomRows);
+            writeRowsToBuilder(
+                builder,
+                normalized.width,
+                height,
+                0,
+                y,
+                normalized.bottomRows,
+                style);
         }
 
         return builder.build();
@@ -1104,183 +1223,6 @@ namespace
             normalizeRowsToHeightAndWidth(pattern.bottomRightRows, normalized.bottomHeight, normalized.bottomRightWidth);
 
         return normalized;
-    }
-
-    void writeRowsToBuilder(
-        TextObjectBuilder& builder,
-        int objectWidth,
-        int objectHeight,
-        int startX,
-        int startY,
-        const std::vector<std::u32string>& rows,
-        const std::optional<Style>& style)
-    {
-        for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
-        {
-            const int destY = startY + rowIndex;
-            if (destY < 0 || destY >= objectHeight)
-            {
-                continue;
-            }
-
-            const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
-
-            for (int x = 0; x < static_cast<int>(row.size()); ++x)
-            {
-                const int destX = startX + x;
-                if (destX < 0 || destX >= objectWidth)
-                {
-                    continue;
-                }
-
-                const char32_t glyph = row[static_cast<std::size_t>(x)];
-
-                if (style.has_value())
-                {
-                    builder.setGlyph(destX, destY, glyph, *style);
-                }
-                else
-                {
-                    builder.setGlyph(destX, destY, glyph);
-                }
-            }
-        }
-    }
-
-    void writePatternFillRegion(
-        TextObjectBuilder& builder,
-        int objectWidth,
-        int objectHeight,
-        int startX,
-        int startY,
-        int regionWidth,
-        int regionHeight,
-        const PatternTile& tile,
-        const std::optional<Style>& style)
-    {
-        if (regionWidth <= 0 || regionHeight <= 0)
-        {
-            return;
-        }
-
-        const PatternTile normalizedTile = normalizePatternTile(tile);
-        if (normalizedTile.rows.empty())
-        {
-            return;
-        }
-
-        const int tileHeight = static_cast<int>(normalizedTile.rows.size());
-        const int tileWidth = static_cast<int>(normalizedTile.rows.front().size());
-
-        if (tileHeight <= 0 || tileWidth <= 0)
-        {
-            return;
-        }
-
-        int repeatStart = 0;
-        int repeatEndExclusive = tileHeight;
-
-        switch (normalizedTile.capMode)
-        {
-        case PatternCapMode::None:
-            repeatStart = 0;
-            repeatEndExclusive = tileHeight;
-            break;
-
-        case PatternCapMode::Top:
-            repeatStart = 1;
-            repeatEndExclusive = tileHeight;
-            break;
-
-        case PatternCapMode::Bottom:
-            repeatStart = 0;
-            repeatEndExclusive = tileHeight - 1;
-            break;
-
-        case PatternCapMode::TopAndBottom:
-            repeatStart = 1;
-            repeatEndExclusive = tileHeight - 1;
-            break;
-        }
-
-        const bool hasTopCap =
-            normalizedTile.capMode == PatternCapMode::Top ||
-            normalizedTile.capMode == PatternCapMode::TopAndBottom;
-
-        const bool hasBottomCap =
-            normalizedTile.capMode == PatternCapMode::Bottom ||
-            normalizedTile.capMode == PatternCapMode::TopAndBottom;
-
-        const int repeatRowCount = std::max(0, repeatEndExclusive - repeatStart);
-
-        auto writePatternRow = [&](int destY, const std::u32string& sourceRow)
-            {
-                for (int x = 0; x < regionWidth; ++x)
-                {
-                    const int destX = startX + x;
-                    if (destX < 0 || destX >= objectWidth)
-                    {
-                        continue;
-                    }
-
-                    if (destY < 0 || destY >= objectHeight)
-                    {
-                        continue;
-                    }
-
-                    const char32_t glyph = sourceRow[static_cast<std::size_t>(x % tileWidth)];
-
-                    if (style.has_value())
-                    {
-                        builder.setGlyph(destX, destY, glyph, *style);
-                    }
-                    else
-                    {
-                        builder.setGlyph(destX, destY, glyph);
-                    }
-                }
-            };
-
-        int localY = 0;
-
-        if (hasTopCap&& localY < regionHeight)
-        {
-            writePatternRow(startY + localY, normalizedTile.rows.front());
-            ++localY;
-        }
-
-        const int lastLocalRow = regionHeight - 1;
-        const bool reserveBottomRow = hasBottomCap && regionHeight > 0;
-        const int repeatableEndY = reserveBottomRow ? lastLocalRow : regionHeight;
-
-        if (repeatRowCount > 0)
-        {
-            while (localY < repeatableEndY)
-            {
-                const int repeatIndex = (localY - (hasTopCap ? 1 : 0)) % repeatRowCount;
-                const int sourceIndex = repeatStart + repeatIndex;
-                writePatternRow(
-                    startY + localY,
-                    normalizedTile.rows[static_cast<std::size_t>(sourceIndex)]);
-                ++localY;
-            }
-        }
-        else
-        {
-            while (localY < repeatableEndY)
-            {
-                const std::u32string& fallbackRow =
-                    hasTopCap ? normalizedTile.rows.front() : normalizedTile.rows.back();
-
-                writePatternRow(startY + localY, fallbackRow);
-                ++localY;
-            }
-        }
-
-        if (hasBottomCap && regionHeight > 0)
-        {
-            writePatternRow(startY + lastLocalRow, normalizedTile.rows.back());
-        }
     }
 
     struct HorizontalAppendLayout
@@ -1429,38 +1371,7 @@ namespace
         */
         TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
 
-        auto writeRowsAt = [&](int startX, int startY, const std::vector<std::u32string>& rows)
-            {
-                for (int rowIndex = 0; rowIndex < static_cast<int>(rows.size()); ++rowIndex)
-                {
-                    const int destY = startY + rowIndex;
-                    if (destY < 0 || destY >= height)
-                    {
-                        continue;
-                    }
 
-                    const std::u32string& row = rows[static_cast<std::size_t>(rowIndex)];
-                    for (int x = 0; x < static_cast<int>(row.size()); ++x)
-                    {
-                        const int destX = startX + x;
-                        if (destX < 0 || destX >= width)
-                        {
-                            continue;
-                        }
-
-                        const char32_t glyph = row[static_cast<std::size_t>(x)];
-
-                        if (style.has_value())
-                        {
-                            builder.setGlyph(destX, destY, glyph, *style);
-                        }
-                        else
-                        {
-                            builder.setGlyph(destX, destY, glyph);
-                        }
-                    }
-                }
-            };
 
         // Compute polished top-edge layout first.
         const HorizontalAppendLayout topLayout = computeHorizontalAppendLayout(
@@ -1522,12 +1433,12 @@ namespace
         // Top corners
         if (!normalized.topLeftRows.empty())
         {
-            writeRowsAt(0, 0, normalized.topLeftRows);
+            writeRowsToBuilder(builder, width, height, 0, 0, normalized.topLeftRows, style);
         }
 
         if (topLayout.hasEnd && !normalized.topRightRows.empty())
         {
-            writeRowsAt(topLayout.endX, 0, normalized.topRightRows);
+            writeRowsToBuilder(builder, width, height, topLayout.endX, 0, normalized.topRightRows, style);
         }
 
         // Top horizontal repeat
@@ -1536,7 +1447,7 @@ namespace
             int x = topLayout.repeatStartX;
             for (int i = 0; i < topLayout.repeatCount; ++i)
             {
-                writeRowsAt(x, 0, normalized.topRows);
+                writeRowsToBuilder(builder, width, height, x, 0, normalized.topRows, style);
                 x += normalized.topWidth;
             }
         }
@@ -1544,12 +1455,12 @@ namespace
         // Bottom corners
         if (!normalized.bottomLeftRows.empty() && verticalLayout.hasBottom)
         {
-            writeRowsAt(0, verticalLayout.bottomY, normalized.bottomLeftRows);
+            writeRowsToBuilder(builder, width, height, 0, verticalLayout.bottomY, normalized.bottomLeftRows, style);
         }
 
         if (bottomLayout.hasEnd && verticalLayout.hasBottom && !normalized.bottomRightRows.empty())
         {
-            writeRowsAt(bottomLayout.endX, verticalLayout.bottomY, normalized.bottomRightRows);
+            writeRowsToBuilder(builder, width, height, bottomLayout.endX, verticalLayout.bottomY, normalized.bottomRightRows, style);
         }
 
         // Bottom horizontal repeat
@@ -1558,7 +1469,7 @@ namespace
             int x = bottomLayout.repeatStartX;
             for (int i = 0; i < bottomLayout.repeatCount; ++i)
             {
-                writeRowsAt(x, verticalLayout.bottomY, normalized.bottomRows);
+                writeRowsToBuilder(builder, width, height, x, verticalLayout.bottomY, normalized.bottomRows, style);
                 x += normalized.bottomWidth;
             }
         }
@@ -1569,7 +1480,7 @@ namespace
             int y = verticalLayout.repeatStartY;
             for (int i = 0; i < verticalLayout.repeatCount; ++i)
             {
-                writeRowsAt(0, y, normalized.leftRows);
+                writeRowsToBuilder(builder, width, height, 0, y, normalized.leftRows, style);
                 y += normalized.middleHeight;
             }
         }
@@ -1582,7 +1493,7 @@ namespace
             int y = verticalLayout.repeatStartY;
             for (int i = 0; i < verticalLayout.repeatCount; ++i)
             {
-                writeRowsAt(rightX, y, normalized.rightRows);
+                writeRowsToBuilder(builder, width, height, rightX, y, normalized.rightRows, style);
                 y += normalized.middleHeight;
             }
         }
@@ -1805,7 +1716,7 @@ namespace ObjectFactory
             U"| )(  )(  )(  )(  )(  )(  )( |",
             U"|(  )(  )(  )(  )(  )(  )(  )|",
             U"| )(  )(  )(  )(  )(  )(  )( |",
-            U"|/  \\/  \\/  \\/  \\/  \\/  \\/  \|",
+            U"|/  \\/  \\/  \\/  \\/  \\/  \\/  \\|",
             U"'----------------------------'"
             },
             PatternCapMode::None
