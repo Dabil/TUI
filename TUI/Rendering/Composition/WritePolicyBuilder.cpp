@@ -2,11 +2,11 @@
 
 /*
     Usage Example:
-        
+
     using namespace Composition;
 
     WritePolicy customPolicy = WritePolicyBuilder()
-        .glyphPolicy(GlyphPolicy::NonSpaceOnly)
+        .glyphPolicy(GlyphPolicy::VisibleOnly)
         .stylePolicy(StylePolicy::Apply)
         .sourceMask(SourceMask::GlyphCellsOnly)
         .glyphOverwrite(OverwriteRule::IfTargetEmpty)
@@ -15,10 +15,10 @@
         .build();
 
     Usage Example 2:
-    
+
     using namespace Composition;
 
-    WritePolicy visibleBehind = WritePolicyBuilder::fromPreset(WritePresets::visibleObject())
+    WritePolicy visibleBehind = WritePolicyBuilder::fromPreset(WritePresets::visibleOnly())
         .depthPolicy(DepthPolicy::BehindOnly)
         .build();
 */
