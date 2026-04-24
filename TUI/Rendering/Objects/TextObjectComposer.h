@@ -42,7 +42,8 @@ public:
         std::optional<Style> overrideStyle;
 
         // Fallback policy used when an entry does not specify its own write policy.
-        // Default is solid because buildTextObject() produces one materialized surface.
+        // Default is authoredOnly() so composed TextObjects preserve authored cells
+        // while keeping Empty cells transparent.
         Composition::WritePolicy writePolicy = Composition::WritePresets::authoredOnly();
     };
 
