@@ -40,7 +40,9 @@ public:
     {
         bool visibleOnly = true;
         std::optional<Style> overrideStyle;
-        // Legacy/default fallback used when an entry did not specify its own policy.
+
+        // Fallback policy used when an entry does not specify its own write policy.
+        // Default is solid because buildTextObject() produces one materialized surface.
         Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
     };
 

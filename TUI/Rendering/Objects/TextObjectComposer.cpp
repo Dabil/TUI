@@ -156,7 +156,7 @@ TextObjectComposer& TextObjectComposer::addVisibleObject(
         object,
         x,
         y,
-        Composition::WritePresets::visibleObject(),
+        Composition::WritePresets::visibleOnly(),
         zIndex,
         name,
         visible);
@@ -469,7 +469,7 @@ TextObjectComposer& TextObjectComposer::addFrame(
         zIndex,
         name,
         visible,
-        std::nullopt);
+        Composition::WritePresets::visibleOnly());
 }
 
 TextObjectComposer& TextObjectComposer::addFrame(
@@ -579,7 +579,7 @@ TextObjectComposer& TextObjectComposer::addVisibleFrame(
         width,
         height,
         border,
-        Composition::WritePresets::visibleObject(),
+        Composition::WritePresets::visibleOnly(),
         zIndex,
         name,
         visible);
@@ -687,6 +687,8 @@ TextObject TextObjectComposer::buildTextObject(const BuildTextObjectOptions& opt
     }
 
     TextObjectBuilder builder(bounds.width(), bounds.height());
+    builder.fillTransparent();
+
     const std::vector<const Entry*> buildEntries = collectBuildEntries(m_entries, options.visibleOnly);
 
     for (const Entry* entry : buildEntries)
@@ -811,16 +813,23 @@ std::string TextObjectComposer::makeUniqueEntryName(std::string_view requestedNa
 
 TextObject TextObjectComposer::makeGlyphObject(char32_t glyph, const std::optional<Style>& style)
 {
-    TextObjectBuilder builder(2, 1);
     const CellWidth width = UnicodeWidth::measureCodePointWidth(glyph);
+
+    if (width == CellWidth::Zero)
+    {
+        return TextObject();
+    }
 
     if (width == CellWidth::Two)
     {
+        TextObjectBuilder builder(2, 1);
+        builder.fillTransparent();
         builder.setWideGlyph(0, 0, glyph, style);
         return builder.build();
     }
 
-    builder.reset(1, 1);
+    TextObjectBuilder builder(1, 1);
+    builder.fillTransparent();
     builder.setGlyph(0, 0, glyph, style);
     return builder.build();
 }
@@ -837,6 +846,7 @@ TextObject TextObjectComposer::makeTransparentFrameObject(
     }
 
     TextObjectBuilder builder(width, height);
+    builder.fillTransparent();
 
     if (width == 1 && height == 1)
     {
