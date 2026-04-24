@@ -24,6 +24,15 @@ namespace Composition
             Glyph cells write normally.
             Empty cells participate as clearing authored spaces.
     */
+
+    /*
+    * TODO:
+        Now that the full glyph policy refactor is done
+        bring back naming consistency:
+            - VisibleOnly = VisibleObject
+            - AuthoredOnly = AuthoredObject
+    */
+
     enum class GlyphPolicy
     {
         None,
