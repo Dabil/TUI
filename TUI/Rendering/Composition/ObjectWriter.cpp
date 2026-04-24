@@ -139,9 +139,6 @@ namespace
             return true;
 
         case Composition::DepthPolicy::BehindOnly:
-            // Explicit extension seam for future true depth ownership.
-            // Phase 4 does not yet have source-side depth data, so we avoid
-            // inventing fake comparisons that would become a hidden policy trap.
             return false;
 
         default:
@@ -175,6 +172,29 @@ namespace
         }
 
         return sourceCell.style;
+    }
+
+    ScreenCell makeGlyphWriteCell(
+        const TextObjectCell& sourceCell,
+        const Style& style,
+        Composition::GlyphPolicy glyphPolicy)
+    {
+        ScreenCell destinationCell;
+        destinationCell.style = style;
+
+        if (glyphPolicy == Composition::GlyphPolicy::SolidObject &&
+            sourceCell.kind == CellKind::Empty)
+        {
+            destinationCell.glyph = U' ';
+            destinationCell.kind = CellKind::Glyph;
+            destinationCell.width = CellWidth::One;
+            return destinationCell;
+        }
+
+        destinationCell.glyph = sourceCell.glyph;
+        destinationCell.kind = sourceCell.kind;
+        destinationCell.width = sourceCell.width;
+        return destinationCell;
     }
 
     void writeWithPreset(
@@ -245,7 +265,12 @@ namespace Composition
             for (int sourceX = 0; sourceX < source.getWidth(); ++sourceX)
             {
                 const TextObjectCell* sourceCell = source.tryGetCell(sourceX, sourceY);
-                if (sourceCell == nullptr || !WritePolicyUtils::isSourceLeadingCell(*sourceCell))
+                if (sourceCell == nullptr)
+                {
+                    continue;
+                }
+
+                if (!WritePolicyUtils::isSourceLeadingCell(*sourceCell))
                 {
                     continue;
                 }
@@ -258,15 +283,19 @@ namespace Composition
                 const int destinationX = m_offsetX + sourceX;
                 const int destinationY = m_offsetY + sourceY;
 
-                const int writeWidth = sourceCell->width == CellWidth::Two ? 2 : 1;
+                const bool sourceIsWideGlyph =
+                    sourceCell->kind == CellKind::Glyph &&
+                    sourceCell->width == CellWidth::Two;
+
+                const int writeWidth = sourceIsWideGlyph ? 2 : 1;
+
                 if (!m_target.inBounds(destinationX, destinationY) ||
                     !m_target.inBounds(destinationX + writeWidth - 1, destinationY))
                 {
                     continue;
                 }
 
-                if (sourceCell->width == CellWidth::Two &&
-                    !isValidSourceWideGlyph(source, sourceX, sourceY))
+                if (sourceIsWideGlyph && !isValidSourceWideGlyph(source, sourceX, sourceY))
                 {
                     continue;
                 }
@@ -305,16 +334,12 @@ namespace Composition
 
                 if (canWriteGlyph)
                 {
-                    const TextObjectCell writeCell =
-                        WritePolicyUtils::resolveGlyphWriteCell(*sourceCell, policy);
-
-                    ScreenCell destinationCell;
-                    destinationCell.glyph = writeCell.glyph;
-                    destinationCell.kind = writeCell.kind;
-                    destinationCell.width = writeCell.width;
-                    destinationCell.style = canWriteStyle
+                    const Style writeStyle = canWriteStyle
                         ? *resolvedSourceStyle
                         : resolveLogicalDestinationStyle(m_target, destinationX, destinationY);
+
+                    const ScreenCell destinationCell =
+                        makeGlyphWriteCell(*sourceCell, writeStyle, policy.glyphPolicy);
 
                     m_target.setCell(destinationX, destinationY, destinationCell);
                     continue;
@@ -323,6 +348,52 @@ namespace Composition
                 m_target.setCellStyle(destinationX, destinationY, *resolvedSourceStyle);
             }
         }
+    }
+
+    void ObjectWriter::writeVisibleOnly(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeVisibleOnly(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeVisibleOnly(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeVisibleOnly(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeVisibleOnly(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::visibleOnly(depthPolicy));
+    }
+
+    void ObjectWriter::writeAuthoredOnly(
+        const TextObject& source,
+        DepthPolicy depthPolicy)
+    {
+        writeAuthoredOnly(source, std::nullopt, depthPolicy);
+    }
+
+    void ObjectWriter::writeAuthoredOnly(
+        const TextObject& source,
+        const Style& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeAuthoredOnly(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
+    }
+
+    void ObjectWriter::writeAuthoredOnly(
+        const TextObject& source,
+        const std::optional<Style>& sourceStyleOverride,
+        DepthPolicy depthPolicy)
+    {
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::authoredOnly(depthPolicy));
     }
 
     void ObjectWriter::writeSolidObject(
@@ -346,29 +417,6 @@ namespace Composition
         DepthPolicy depthPolicy)
     {
         writeWithPreset(*this, source, sourceStyleOverride, WritePresets::solidObject(depthPolicy));
-    }
-
-    void ObjectWriter::writeVisibleObject(
-        const TextObject& source,
-        DepthPolicy depthPolicy)
-    {
-        writeVisibleObject(source, std::nullopt, depthPolicy);
-    }
-
-    void ObjectWriter::writeVisibleObject(
-        const TextObject& source,
-        const Style& sourceStyleOverride,
-        DepthPolicy depthPolicy)
-    {
-        writeVisibleObject(source, std::optional<Style>(sourceStyleOverride), depthPolicy);
-    }
-
-    void ObjectWriter::writeVisibleObject(
-        const TextObject& source,
-        const std::optional<Style>& sourceStyleOverride,
-        DepthPolicy depthPolicy)
-    {
-        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::visibleObject(depthPolicy));
     }
 
     void ObjectWriter::writeGlyphsOnly(

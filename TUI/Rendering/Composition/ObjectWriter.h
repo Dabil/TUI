@@ -26,26 +26,38 @@ namespace Composition
             const WritePolicy& policy,
             const std::optional<Style>& sourceStyleOverride);
 
-        void writeSolidObject(
+        void writeVisibleOnly(
             const TextObject& source,
             DepthPolicy depthPolicy = DepthPolicy::Ignore);
-        void writeSolidObject(
+        void writeVisibleOnly(
             const TextObject& source,
             const Style& sourceStyleOverride,
             DepthPolicy depthPolicy = DepthPolicy::Ignore);
-        void writeSolidObject(
+        void writeVisibleOnly(
             const TextObject& source,
             const std::optional<Style>& sourceStyleOverride,
             DepthPolicy depthPolicy = DepthPolicy::Ignore);
 
-        void writeVisibleObject(
+        void writeAuthoredOnly(
             const TextObject& source,
             DepthPolicy depthPolicy = DepthPolicy::Ignore);
-        void writeVisibleObject(
+        void writeAuthoredOnly(
             const TextObject& source,
             const Style& sourceStyleOverride,
             DepthPolicy depthPolicy = DepthPolicy::Ignore);
-        void writeVisibleObject(
+        void writeAuthoredOnly(
+            const TextObject& source,
+            const std::optional<Style>& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+
+        void writeSolidObject(
+            const TextObject& source,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeSolidObject(
+            const TextObject& source,
+            const Style& sourceStyleOverride,
+            DepthPolicy depthPolicy = DepthPolicy::Ignore);
+        void writeSolidObject(
             const TextObject& source,
             const std::optional<Style>& sourceStyleOverride,
             DepthPolicy depthPolicy = DepthPolicy::Ignore);
