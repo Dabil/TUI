@@ -38,21 +38,6 @@ namespace Composition::WritePresets
         return policy;
     }
 
-    WritePolicy transparentOverlay(DepthPolicy depthPolicy)
-    {
-        return visibleOnly(depthPolicy);
-    }
-
-    WritePolicy visibleObject(DepthPolicy depthPolicy)
-    {
-        return authoredOnly(depthPolicy);
-    }
-
-    WritePolicy transparentGlyphOverlay(DepthPolicy depthPolicy)
-    {
-        return transparentOverlay(depthPolicy);
-    }
-
     WritePolicy glyphsOnly(DepthPolicy depthPolicy)
     {
         WritePolicy policy = authoredOnly(depthPolicy);
