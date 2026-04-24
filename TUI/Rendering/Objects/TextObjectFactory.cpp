@@ -517,6 +517,16 @@ namespace
         return normalized;
     }
 
+    TextObjectBuilder makeAuthoredRectBuilder(
+        int width,
+        int height,
+        const std::optional<Style>& style)
+    {
+        TextObjectBuilder builder(width, height);
+        builder.fillAuthoredSpace(style);
+        return builder;
+    }
+
     TextObject buildPatternFillObject(
         int width,
         int height,
@@ -578,7 +588,7 @@ namespace
 
         const int repeatRowCount = std::max(0, repeatEndExclusive - repeatStart);
 
-        TextObjectBuilder builder(width, height);
+        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
 
         auto writePatternRow = [&](int destY, const std::u32string& sourceRow)
             {
@@ -639,16 +649,6 @@ namespace
         }
 
         return builder.build();
-    }
-
-    TextObjectBuilder makeAuthoredRectBuilder(
-        int width,
-        int height,
-        const std::optional<Style>& style)
-    {
-        TextObjectBuilder builder(width, height);
-        builder.fill(U' ', CellKind::Glyph, CellWidth::One, style);
-        return builder;
     }
 
     int maxRowWidth(const std::vector<std::u32string>& rows)
@@ -771,7 +771,7 @@ namespace
             return TextObject();
         }
 
-        TextObjectBuilder builder(width, normalized.height);
+        TextObjectBuilder builder = makeAuthoredRectBuilder(width, normalized.height, style);
 
         auto writeRowsAtX = [&](int startX, const std::vector<std::u32string>& rows)
             {
@@ -926,7 +926,7 @@ namespace
             return TextObject();
         }
 
-        TextObjectBuilder builder(normalized.width, height);
+        TextObjectBuilder builder = makeAuthoredRectBuilder(normalized.width, height, style);
 
         auto writeRowsAtY = [&](int startY, const std::vector<std::u32string>& rows)
             {
