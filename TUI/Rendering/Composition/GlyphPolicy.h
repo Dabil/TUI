@@ -23,10 +23,6 @@ namespace Composition
             Write the full source object footprint.
             Glyph cells write normally.
             Empty cells participate as clearing authored spaces.
-
-        Compatibility aliases:
-        - NonSpaceOnly maps to VisibleOnly.
-        - All maps to SolidObject, preserving the old "all source cells" meaning.
     */
     enum class GlyphPolicy
     {
