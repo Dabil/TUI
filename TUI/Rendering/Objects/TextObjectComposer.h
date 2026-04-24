@@ -43,7 +43,7 @@ public:
 
         // Fallback policy used when an entry does not specify its own write policy.
         // Default is solid because buildTextObject() produces one materialized surface.
-        Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
+        Composition::WritePolicy writePolicy = Composition::WritePresets::authoredOnly();
     };
 
     struct BuildLayeredTextObjectOptions

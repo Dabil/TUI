@@ -345,6 +345,13 @@ namespace Composition
                     continue;
                 }
 
+                // Empty cells are transparent/no-op cells.
+                // They must not mutate the destination through style-only writes.
+                if (sourceCell->kind == CellKind::Empty)
+                {
+                    continue;
+                }
+
                 m_target.setCellStyle(destinationX, destinationY, *resolvedSourceStyle);
             }
         }
