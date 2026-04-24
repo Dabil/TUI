@@ -219,6 +219,11 @@ namespace Rendering
                 continue;
             }
 
+            if (!layer.object.isLoaded() || layer.object.getWidth() <= 0 || layer.object.getHeight() <= 0)
+            {
+                continue;
+            }
+
             sortedLayers.push_back(&layer);
         }
 
@@ -244,19 +249,15 @@ namespace Rendering
             return TextObject{};
         }
 
+        TextObjectBuilder builder(width, height);
+        builder.fillTransparent();
+
         const std::vector<const TextObjectLayer*> sortedLayers =
             collectFlattenLayers(layers, options);
 
-        if (sortedLayers.empty())
-        {
-            return TextObjectBuilder(width, height).build();
-        }
-
-        TextObjectBuilder builder(width, height);
-
         for (const TextObjectLayer* layer : sortedLayers)
         {
-            if (layer == nullptr || layer->object.isEmpty())
+            if (layer == nullptr)
             {
                 continue;
             }
@@ -264,7 +265,7 @@ namespace Rendering
             TextObjectBlitter::BlitOptions blitOptions;
             blitOptions.overrideStyle = options.overrideStyle;
             blitOptions.writePolicy = options.writePolicy;
-            blitOptions.skipStructuralContinuationCells = false;
+            blitOptions.skipStructuralContinuationCells = true;
 
             TextObjectBlitter::blitToBuilder(
                 builder,

@@ -37,10 +37,19 @@ namespace Rendering
     public:
         struct FlattenOptions
         {
+            // Controls whether invisible layers are excluded from flattening.
+            // This is layer visibility, not glyph visibility.
             bool visibleOnly = true;
+
             std::optional<Style> overrideStyle;
-            // Flattening a retained layered asset should preserve the full authored
-            // source surface unless the caller explicitly requests a different preset.
+
+            // Flattening is policy-driven. The default preserves the historic
+            // "flatten the retained layered asset into a complete surface" behavior.
+            //
+            // Use:
+            // - visibleOnly()   for visual non-space glyph overlays
+            // - authoredOnly()  for authored Glyph cells, including U' ', while skipping Empty
+            // - solidObject()   for full-footprint writes where Empty clears to authored space
             Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
         };
 
