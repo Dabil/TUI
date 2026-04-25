@@ -12,11 +12,31 @@ The engine is evolving into a flexible **terminal UI framework** for building co
 
 *Reminder from Dabil: (Add screenshots or animated GIFs here once you have something exciting to share)*
 ```
-    ┌─────────────────────────────────────────────┐
-    │ TUI **text-mode UI Engine                   │
-    │                                             │
-    │ Press Any Key To Continue...                │
-    └─────────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────────────────────────────────────┐
+│ ┌──────────────────────────────────────────────────────────────────────────────────────────┐ │
+│ │                                 SYSTEM MONITOR                                  [ ]      │ │
+│ └──────────────────────────────────────────────────────────────────────────────────────────┘ │
+│ ┌──────────────────────┐ ┌──────────────────────────────────────────────┐ ┌──────────────┐   │
+│ │ SECTIONS             │ │ OVERVIEW                                     │ │ ALERTS       │   │
+│ │                      │ │                                              │ │              │   │
+│ │   > Overview         │ │              CPU Usage      37%              │ │ - Warning:   │   │
+│ │     Processes        │ │              Memory Usage   61%              │ │   Log volume │   │
+│ │     Memory           │ │              Disk Usage     48%              │ │   high       │   │
+│ │     Network          │ │              Net Throughput 125 MB/s         │ │ - Notice:    │   │
+│ │     Storage          │ │                                              │ │   Backup     │   │
+│ │     Logs             │ │                                              │ │   running    │   │
+│ │                      │ │ All monitored subsystems are responding      │ │ - OK:        │   │
+│ │                      │ │ normally. No thermal or storage thresholds   │ │   Network    │   │
+│ │                      │ │ exceeded. Background maintenance jobs are    │ │   stable     │   │
+│ │                      │ │ currently active.                            │ │ - OK:        │   │
+│ │                      │ │                                              │ │   Storage    │   │
+│ │                      │ │                                              │ │   healthy    │   │
+│ └──────────────────────┘ └──────────────────────────────────────────────┘ └──────────────┘   │
+│ ┌──────────────────────────────────────────────────────────────────────────────────────────┐ │
+│ │                      F1 Help   F2 Refresh   F3 Logs   ESC Exit                           │ │
+│ └──────────────────────────────────────────────────────────────────────────────────────────┘ │
+└──────────────────────────────────────────────────────────────────────────────────────────────┘
+
 ```
 # Features
 
