@@ -132,7 +132,7 @@ bool Application::initialize()
     }
     else
     {
-//        m_currentScreenType = ScreenType::DigitalRain;
+        // Start Sccren Selection
         m_currentScreenType = ScreenType::ControlDeck;
     }
     m_screenCycleElapsedSeconds = 0.0;
