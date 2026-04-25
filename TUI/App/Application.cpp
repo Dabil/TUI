@@ -6,6 +6,7 @@
 #include <thread>
 #include <windows.h>
 
+#include "Input/Event.h"
 #include "Rendering/ConsoleRenderer.h"
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/Themes.h"
@@ -168,14 +169,24 @@ void Application::run()
         {
             m_inputManager->poll();
 
-            // Phase 7 Tier 1 only establishes the low-level input queue.
-            // Later tiers should route drained events into command mapping or screen dispatch.
-            m_inputManager->clear();
+            std::vector<Input::Event> events;
+
+            for (const Input::KeyEvent& keyEvent : m_inputManager->drainEvents())
+            {
+                events.push_back(Input::Event::key(keyEvent));
+            }
+
+            events.push_back(Input::Event::tick(delta.count(), m_frameIndex));
+
+            // TODO:
+            // map KeyEvent -> CommandEvent and dispatch this event
+            // list to the active screen/page.
         }
 
         update(delta.count());
         render();
 
+        ++m_frameIndex;
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 }
@@ -207,10 +218,18 @@ void Application::handleResize()
 {
     if (m_renderer->pollResize())
     {
+        const Size previousSize{ m_width, m_height };
+
         m_width = m_renderer->getConsoleWidth();
         m_height = m_renderer->getConsoleHeight();
 
+        const Size currentSize{ m_width, m_height };
+
         m_surface->resize(m_width, m_height);
+
+        Input::Event resizeEvent = Input::Event::resize(previousSize, currentSize);
+
+        // TODO: dispatch resizeEvent to the active screen/page.
     }
 }
 

@@ -145,6 +145,7 @@
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
     <ClInclude Include="Input\Command.h" />
+    <ClInclude Include="Input\Event.h" />
     <ClInclude Include="Input\InputManager.h" />
     <ClInclude Include="Input\KeyCodes.h" />
     <ClInclude Include="Input\KeyEvent.h" />

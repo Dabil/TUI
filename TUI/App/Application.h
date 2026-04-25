@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <cstdint>
 
 #include "App/TerminalLauncher.h"
 #include "Assets/AssetLibrary.h"
@@ -70,6 +71,9 @@ private:
 
     int m_width = 0;
     int m_height = 0;
+
+    // input loop integration
+    std::uint64_t m_frameIndex = 0;
 
     // default start-up screen, but the actual is declared in Application.cpp/initialize
     ScreenType m_currentScreenType = ScreenType::ControlDeck;
