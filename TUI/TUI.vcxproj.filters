@@ -351,6 +351,18 @@
     <ClInclude Include="Rendering\Diagnostics\PageCompositionDiagnostics.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Input\KeyEvent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\RawKeyboardSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\InputManager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\WindowsConsoleKeyboardSource.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -657,6 +669,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Diagnostics\PageCompositionDiagnostics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Input\InputManager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Input\WindowsConsoleKeyboardSource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

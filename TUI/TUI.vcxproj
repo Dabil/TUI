@@ -144,6 +144,10 @@
     <ClInclude Include="Core\Point.h" />
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
+    <ClInclude Include="Input\InputManager.h" />
+    <ClInclude Include="Input\KeyEvent.h" />
+    <ClInclude Include="Input\RawKeyboardSource.h" />
+    <ClInclude Include="Input\WindowsConsoleKeyboardSource.h" />
     <ClInclude Include="Rendering\Backends\ConsoleCapabilityDetector.h" />
     <ClInclude Include="Rendering\Backends\RendererCapabilityDetector.h" />
     <ClInclude Include="Rendering\Backends\TerminalCapabilityDetector.h">
@@ -273,6 +277,8 @@
     <ClCompile Include="App\TerminalLauncher.cpp" />
     <ClCompile Include="Assets\AssetLibrary.cpp" />
     <ClCompile Include="Assets\Loaders\AsciiBannerFontLoader.cpp" />
+    <ClCompile Include="Input\InputManager.cpp" />
+    <ClCompile Include="Input\WindowsConsoleKeyboardSource.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Rendering\Backends\ConsoleCapabilityDetector.cpp" />
     <ClCompile Include="Rendering\Backends\RendererCapabiltiyDetector.cpp" />

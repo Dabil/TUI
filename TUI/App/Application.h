@@ -10,6 +10,11 @@ class ScreenManager;
 class IRenderer;
 class Surface;
 
+namespace Input
+{
+    class InputManager;
+}
+
 class Application
 {
 public:
@@ -57,6 +62,7 @@ private:
     std::unique_ptr<ScreenManager> m_screenManager;
     std::unique_ptr<IRenderer> m_renderer;
     std::unique_ptr<Surface> m_surface;
+    std::unique_ptr<Input::InputManager> m_inputManager;
 
     Assets::AssetLibrary m_assetLibrary;
 
@@ -65,7 +71,7 @@ private:
     int m_width = 0;
     int m_height = 0;
 
-//    ScreenType m_currentScreenType = ScreenType::DigitalRain;
+    // default start-up screen, but the actual is declared in Application.cpp/initialize
     ScreenType m_currentScreenType = ScreenType::ControlDeck;
     double m_screenCycleElapsedSeconds = 0.0;
     double m_screenCycleIntervalSeconds = 20.0;

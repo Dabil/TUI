@@ -1,5 +1,6 @@
 #include "App/Application.h"
 #include "App/ScreenManager.h"
+#include "Input/InputManager.h"
 
 #include <chrono>
 #include <thread>
@@ -124,6 +125,12 @@ bool Application::initialize()
     m_surface = std::make_unique<Surface>(m_width, m_height);
     m_screenManager = std::make_unique<ScreenManager>();
 
+    m_inputManager = std::make_unique<Input::InputManager>();
+    if (!m_inputManager->initialize())
+    {
+        return false;
+    }
+
     configureAssetLibrary();
 
     if (m_validationScreenStart == StartupValidationScreenPreference::ValidationStartTrue)
@@ -157,6 +164,15 @@ void Application::run()
 
         handleResize();
 
+        if (m_inputManager)
+        {
+            m_inputManager->poll();
+
+            // Phase 7 Tier 1 only establishes the low-level input queue.
+            // Later tiers should route drained events into command mapping or screen dispatch.
+            m_inputManager->clear();
+        }
+
         update(delta.count());
         render();
 
@@ -178,6 +194,12 @@ void Application::shutdown()
     if (m_renderer)
     {
         m_renderer->shutdown();
+    }
+
+    if (m_inputManager)
+    {
+        m_inputManager->shutdown();
+        m_inputManager.reset();
     }
 }
 
