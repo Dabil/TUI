@@ -2,7 +2,6 @@
 
 #include <chrono>
 #include <cstdint>
-#include <optional>
 #include <variant>
 
 #include "Core/Size.h"
@@ -55,6 +54,7 @@ namespace Input
     };
 
     using EventPayload = std::variant<
+        std::monostate,
         KeyEvent,
         CommandEvent,
         ResizeEvent,
