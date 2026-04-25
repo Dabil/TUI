@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <optional>
 
-#include "Input/KeyEvent.h"
+#include "Input/KeyCodes.h"
 
 namespace Input
 {
