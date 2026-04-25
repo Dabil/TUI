@@ -145,6 +145,7 @@
     <ClInclude Include="Core\Rect.h" />
     <ClInclude Include="Core\Size.h" />
     <ClInclude Include="Input\Command.h" />
+    <ClInclude Include="Input\CommandMap.h" />
     <ClInclude Include="Input\Event.h" />
     <ClInclude Include="Input\InputManager.h" />
     <ClInclude Include="Input\KeyCodes.h" />
@@ -280,6 +281,7 @@
     <ClCompile Include="App\TerminalLauncher.cpp" />
     <ClCompile Include="Assets\AssetLibrary.cpp" />
     <ClCompile Include="Assets\Loaders\AsciiBannerFontLoader.cpp" />
+    <ClCompile Include="Input\CommandMap.cpp" />
     <ClCompile Include="Input\InputManager.cpp" />
     <ClCompile Include="Input\WindowsConsoleKeyboardSource.cpp" />
     <ClCompile Include="main.cpp" />
