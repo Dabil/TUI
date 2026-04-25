@@ -44,6 +44,18 @@ Screen* ScreenManager::currentScreen()
     return m_screenStack.back().get();
 }
 
+bool ScreenManager::dispatchEvent(const Input::Event& event)
+{
+    Screen* screen = currentScreen();
+
+    if (!screen)
+    {
+        return false;
+    }
+
+    return screen->handleEvent(event);
+}
+
 void ScreenManager::update(double deltaTime)
 {
     Screen* screen = currentScreen();

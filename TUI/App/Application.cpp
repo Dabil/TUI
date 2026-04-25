@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <thread>
+#include <vector>
 #include <windows.h>
 
 #include "Input/Event.h"
@@ -127,10 +128,13 @@ bool Application::initialize()
     m_screenManager = std::make_unique<ScreenManager>();
 
     m_inputManager = std::make_unique<Input::InputManager>();
+    
     if (!m_inputManager->initialize())
     {
         return false;
     }
+
+    m_commandMap = Input::CommandMap::createDefault();
 
     configureAssetLibrary();
 
@@ -149,6 +153,58 @@ bool Application::initialize()
 
     m_running = true;
     return true;
+}
+
+bool Application::dispatchEvent(const Input::Event& event)
+{
+    if (dispatchToActiveScreen(event))
+    {
+        return true;
+    }
+
+    if (const Input::CommandEvent* commandEvent = event.asCommand())
+    {
+        return handleApplicationCommand(*commandEvent);
+    }
+
+    return false;
+}
+
+bool Application::dispatchToActiveScreen(const Input::Event& event)
+{
+    if (!m_screenManager)
+    {
+        return false;
+    }
+
+    return m_screenManager->dispatchEvent(event);
+}
+
+bool Application::handleApplicationCommand(const Input::CommandEvent& commandEvent)
+{
+    switch (commandEvent.command.code)
+    {
+    case Input::CommandCode::Quit:
+    case Input::CommandCode::Close:
+        shutdown();
+        return true;
+
+    case Input::CommandCode::Confirm:
+    case Input::CommandCode::Forward:
+        advanceScreen();
+        return true;
+
+    case Input::CommandCode::Back:
+        // Future tier: route to previous screen/page history.
+        return false;
+
+    case Input::CommandCode::Refresh:
+        render();
+        return true;
+
+    default:
+        return false;
+    }
 }
 
 void Application::run()
@@ -174,13 +230,30 @@ void Application::run()
             for (const Input::KeyEvent& keyEvent : m_inputManager->drainEvents())
             {
                 events.push_back(Input::Event::key(keyEvent));
+
+                std::optional<Input::Command> command = m_commandMap.map(keyEvent);
+                if (command.has_value())
+                {
+                    events.push_back(Input::Event::command(command.value()));
+                }
             }
 
             events.push_back(Input::Event::tick(delta.count(), m_frameIndex));
 
-            // TODO:
-            // map KeyEvent -> CommandEvent and dispatch this event
-            // list to the active screen/page.
+            for (const Input::Event& event : events)
+            {
+                dispatchEvent(event);
+
+                if (!m_running)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (!m_running)
+        {
+            break;
         }
 
         update(delta.count());
@@ -228,8 +301,7 @@ void Application::handleResize()
         m_surface->resize(m_width, m_height);
 
         Input::Event resizeEvent = Input::Event::resize(previousSize, currentSize);
-
-        // TODO: dispatch resizeEvent to the active screen/page.
+        dispatchEvent(resizeEvent);
     }
 }
 
