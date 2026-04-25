@@ -6,7 +6,7 @@ namespace Input
 {
     namespace
     {
-        KeyCode mapVirtualKey(std::uint16_t virtualKey, char32_t character)
+        KeyCode mapVirtualKey(std::uint16_t virtualKey, char32_t character, const KeyModifiers& modifiers)
         {
             if (character != U'\0')
             {
@@ -27,7 +27,7 @@ namespace Input
 
                 if (character == U'\t')
                 {
-                    return KeyCode::Tab;
+                    return modifiers.shift ? KeyCode::Backtab : KeyCode::Tab;
                 }
 
                 if (character == U'\x1B')
@@ -43,7 +43,7 @@ namespace Input
             case 0x1B: return KeyCode::Escape;
             case 0x0D: return KeyCode::Enter;
             case 0x08: return KeyCode::Backspace;
-            case 0x09: return KeyCode::Tab;
+            case 0x09: return modifiers.shift ? KeyCode::Backtab : KeyCode::Tab;
             case 0x20: return KeyCode::Space;
 
             case 0x25: return KeyCode::Left;
@@ -180,8 +180,8 @@ namespace Input
     KeyEvent InputManager::normalizeRawKey(const RawKeyEvent& raw) const
     {
         KeyEvent event;
-        event.code = mapVirtualKey(raw.virtualKey, raw.character);
-        event.character = raw.character;
+        event.code = mapVirtualKey(raw.virtualKey, raw.character, raw.modifiers);
+        event.character = event.code == KeyCode::Character ? raw.character : U'\0';
         event.modifiers = raw.modifiers;
         event.pressed = raw.pressed;
         event.repeatCount = raw.repeatCount == 0 ? 1 : raw.repeatCount;
