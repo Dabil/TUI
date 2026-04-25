@@ -40,6 +40,9 @@ namespace Input
         }
     }
 
+    // Remember than command codes will overwrite previous behavior. 
+    // so you can only have each KeyCode defined once. 
+    // Because if you redefine, it will just overwrite the 1st binding
     CommandMap CommandMap::createDefault()
     {
         CommandMap map;
