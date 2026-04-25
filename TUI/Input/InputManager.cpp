@@ -183,6 +183,19 @@ namespace Input
         event.code = mapVirtualKey(raw.virtualKey, raw.character, raw.modifiers);
         event.character = event.code == KeyCode::Character ? raw.character : U'\0';
         event.modifiers = raw.modifiers;
+
+        // Windows console reports Ctrl+A through Ctrl+Z as ASCII control
+        // characters 1 through 26. Normalize them back into the project's
+        // normal Character + ctrl modifier form so CommandMap bindings such as
+        // Ctrl+Q can match bindCharacter(U'q', ctrlModifier(), ...).
+        if (event.code == KeyCode::Character
+            && event.character >= 1
+            && event.character <= 26)
+        {
+            event.character = U'a' + (event.character - 1);
+            event.modifiers.ctrl = true;
+        }
+
         event.pressed = raw.pressed;
         event.repeatCount = raw.repeatCount == 0 ? 1 : raw.repeatCount;
 
