@@ -186,17 +186,20 @@ bool Application::handleApplicationCommand(const Input::CommandEvent& commandEve
     {
     case Input::CommandCode::Quit:
     case Input::CommandCode::Close:
+    case Input::CommandCode::Cancel:
         shutdown();
         return true;
 
     case Input::CommandCode::Confirm:
     case Input::CommandCode::Forward:
+    case Input::CommandCode::MoveRight:
         advanceScreen();
         return true;
 
     case Input::CommandCode::Back:
-        // Future tier: route to previous screen/page history.
-        return false;
+    case Input::CommandCode::MoveLeft:
+        previousScreen();
+        return true;
 
     case Input::CommandCode::Refresh:
         render();
@@ -367,6 +370,7 @@ void Application::switchToScreen(ScreenType screenType)
     }
 
     m_currentScreenType = screenType;
+    m_screenCycleElapsedSeconds = 0.0;
 }
 
 void Application::advanceScreen()
@@ -403,6 +407,52 @@ void Application::advanceScreen()
 
     case ScreenType::Fire:
         switchToScreen(ScreenType::ControlDeck);
+        break;
+
+    case ScreenType::TerminalCapabilities:
+        switchToScreen(ScreenType::RendererDiagnostics);
+        break;
+
+    case ScreenType::RendererDiagnostics:
+        switchToScreen(ScreenType::TerminalCapabilities);
+        break;
+    }
+}
+
+void Application::previousScreen()
+{
+    switch (m_currentScreenType)
+    {
+    case ScreenType::ControlDeck:
+        switchToScreen(ScreenType::Fire);
+        break;
+
+    case ScreenType::RetroTerminal:
+        switchToScreen(ScreenType::ControlDeck);
+        break;
+
+    case ScreenType::NeonDialog:
+        switchToScreen(ScreenType::RetroTerminal);
+        break;
+
+    case ScreenType::OpsWall:
+        switchToScreen(ScreenType::NeonDialog);
+        break;
+
+    case ScreenType::DigitalRain:
+        switchToScreen(ScreenType::OpsWall);
+        break;
+
+    case ScreenType::WaterEffect:
+        switchToScreen(ScreenType::DigitalRain);
+        break;
+
+    case ScreenType::Donut3D:
+        switchToScreen(ScreenType::WaterEffect);
+        break;
+
+    case ScreenType::Fire:
+        switchToScreen(ScreenType::Donut3D);
         break;
 
     case ScreenType::TerminalCapabilities:

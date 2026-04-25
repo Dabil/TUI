@@ -50,9 +50,16 @@ namespace Input
         m_originalMode = mode;
 
         DWORD rawMode = mode;
+
+        // Keyboard polling should own only keyboard/window input for Phase 7.
+        // Do not preserve mouse or VT input here; mouse support is not implemented yet,
+        // and VT mouse/escape sequences can be misread as Escape -> Cancel -> Quit.
         rawMode &= ~ENABLE_LINE_INPUT;
         rawMode &= ~ENABLE_ECHO_INPUT;
         rawMode &= ~ENABLE_PROCESSED_INPUT;
+        rawMode &= ~ENABLE_MOUSE_INPUT;
+        rawMode &= ~ENABLE_VIRTUAL_TERMINAL_INPUT;
+
         rawMode |= ENABLE_WINDOW_INPUT;
 
         if (!SetConsoleMode(handle, rawMode))

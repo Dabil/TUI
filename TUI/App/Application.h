@@ -59,6 +59,7 @@ private:
 
     void switchToScreen(ScreenType screenType);
     void advanceScreen();
+    void previousScreen();
     void updateScreenCycle(double deltaTime);
 
     void configureAssetLibrary();
