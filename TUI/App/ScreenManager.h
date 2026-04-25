@@ -6,6 +6,11 @@
 class Screen;
 class Surface;
 
+namespace Input
+{
+    class Event;
+}
+
 class ScreenManager
 {
 public:
@@ -19,6 +24,8 @@ public:
     bool hasScreens() const;
 
     Screen* currentScreen();
+
+    bool dispatchEvent(const Input::Event& event);
 
     void update(double deltaTime);
     void drawCurrentScreen(Surface& surface);

@@ -2,6 +2,11 @@
 
 class Surface;
 
+namespace Input
+{
+    class Event;
+}
+
 /*
     Base interface for all screens in the TUI.
 
@@ -11,6 +16,7 @@ class Surface;
     - Game Screen
     - Pause Screen
 */
+
 class Screen
 {
 public:
@@ -21,6 +27,14 @@ public:
 
     // Called once when the screen is removed
     virtual void onExit() {}
+
+    // Called when the active screen receives an input/lifecycle event.
+    // Return true when the screen consumes the event.
+    virtual bool handleEvent(const Input::Event& event)
+    {
+        (void)event;
+        return false;
+    }
 
     // Called every frame
     virtual void update(double deltaTime) {}

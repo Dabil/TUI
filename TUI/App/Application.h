@@ -5,6 +5,7 @@
 
 #include "App/TerminalLauncher.h"
 #include "Assets/AssetLibrary.h"
+#include "Input/CommandMap.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 
 class ScreenManager;
@@ -13,6 +14,9 @@ class Surface;
 
 namespace Input
 {
+    class Event;
+    struct CommandEvent;
+
     class InputManager;
 }
 
@@ -49,6 +53,10 @@ private:
     void update(double deltaTime);
     void render();
 
+    bool dispatchEvent(const Input::Event& event);
+    bool dispatchToActiveScreen(const Input::Event& event);
+    bool handleApplicationCommand(const Input::CommandEvent& commandEvent);
+
     void switchToScreen(ScreenType screenType);
     void advanceScreen();
     void updateScreenCycle(double deltaTime);
@@ -65,6 +73,7 @@ private:
     std::unique_ptr<Surface> m_surface;
     std::unique_ptr<Input::InputManager> m_inputManager;
 
+    Input::CommandMap m_commandMap;
     Assets::AssetLibrary m_assetLibrary;
 
     bool m_running = false;
@@ -72,10 +81,8 @@ private:
     int m_width = 0;
     int m_height = 0;
 
-    // input loop integration
     std::uint64_t m_frameIndex = 0;
 
-    // default start-up screen, but the actual is declared in Application.cpp/initialize
     ScreenType m_currentScreenType = ScreenType::ControlDeck;
     double m_screenCycleElapsedSeconds = 0.0;
     double m_screenCycleIntervalSeconds = 20.0;
