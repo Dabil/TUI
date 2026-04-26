@@ -5,6 +5,18 @@
 #include "Rendering/Composition/WritePolicyUtils.h"
 #include "Rendering/Composition/WritePresets.h"
 
+/*
+   Concrete Rule:
+ 
+    Object glyph presets:
+        - write glyph + style together
+        - never write style alone
+
+    Style presets:
+        - write style alone intentionally
+        - never imply glyph writes
+*/
+
 namespace
 {
     struct LogicalCellRef
@@ -320,6 +332,7 @@ namespace Composition
                     resolveSourceStyle(*sourceCell, sourceStyleOverride);
 
                 const bool canWriteStyle =
+                    canWriteGlyph &&
                     policy.stylePolicy == Composition::StylePolicy::Apply &&
                     resolvedSourceStyle.has_value() &&
                     overwriteRuleAllows(
@@ -353,8 +366,6 @@ namespace Composition
                 {
                     continue;
                 }
-
-                m_target.setCellStyle(destinationX, destinationY, *resolvedSourceStyle);
             }
         }
     }
