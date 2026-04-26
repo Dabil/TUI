@@ -188,8 +188,8 @@ void DigitalRainScreen::draw(Surface& surface)
     ensureLayout(screenWidth, screenHeight);
     ensureStaticUiCache();
 
-    m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::visibleObject());
     drawRain(buffer);
+    m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::visibleObject());
 
     const TextObject contractPanel = buildUnicodeContractPanelTextObject();
     const int panelX = std::max(4, m_screenWidth - contractPanel.getWidth() - 4);
