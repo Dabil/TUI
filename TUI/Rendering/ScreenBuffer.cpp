@@ -46,6 +46,7 @@
 
 /*
     Concrete rule:
+    Every buffer coordinate must produce exactly one terminal cell.
 
     Composition semantics:
         Empty = do not mutate destination.

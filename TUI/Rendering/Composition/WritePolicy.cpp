@@ -19,6 +19,14 @@
         - cursor advancement
         - measured width
         - object bounds
+
+    Object glyph presets:
+        - write glyph + style together
+        - never write style alone
+
+    Style presets:
+        - write style alone intentionally
+        - never imply glyph writes
 */
 
 namespace Composition
