@@ -331,8 +331,15 @@ namespace Composition
                 const std::optional<Style> resolvedSourceStyle =
                     resolveSourceStyle(*sourceCell, sourceStyleOverride);
 
+                const bool isExplicitStyleOnlyPreset =
+                    policy.glyphPolicy == Composition::GlyphPolicy::None &&
+                    policy.stylePolicy == Composition::StylePolicy::Apply;
+
+                const bool styleSourceCellAllowed =
+                    isExplicitStyleOnlyPreset || canWriteGlyph;
+
                 const bool canWriteStyle =
-                    canWriteGlyph &&
+                    styleSourceCellAllowed &&
                     policy.stylePolicy == Composition::StylePolicy::Apply &&
                     resolvedSourceStyle.has_value() &&
                     overwriteRuleAllows(
@@ -358,6 +365,11 @@ namespace Composition
 
                     m_target.setCell(destinationX, destinationY, destinationCell);
                     continue;
+                }
+
+                if (isExplicitStyleOnlyPreset && canWriteStyle)
+                {
+                    m_target.setCellStyle(destinationX, destinationY, *resolvedSourceStyle);
                 }
 
                 // Empty cells are transparent/no-op cells.
