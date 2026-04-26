@@ -2,6 +2,22 @@
 
 #include "Rendering/Composition/WritePresets.h"
 
+/*
+    Concrete Rules:
+    
+    TextObject cell coordinates are absolute within the TextObject.
+
+    WritePolicy may decide:
+        - whether a source cell mutates the destination cell
+        - whether glyph/style/depth writes are allowed
+
+    WritePolicy must never decide:
+        - the source coordinate of later cells
+        - cursor advancement
+        - measured width
+        - object bounds
+*/
+
 namespace Composition
 {
     WritePolicy WritePolicy::VisibleObject()
