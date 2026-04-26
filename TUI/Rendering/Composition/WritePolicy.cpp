@@ -7,6 +7,9 @@
     
     TextObject cell coordinates are absolute within the TextObject.
 
+    Write presets never change where things get drawn to the screen,
+    they only change what gets drawn to the screen.
+
     WritePolicy may decide:
         - whether a source cell mutates the destination cell
         - whether glyph/style/depth writes are allowed
