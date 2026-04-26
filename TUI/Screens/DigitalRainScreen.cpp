@@ -188,16 +188,12 @@ void DigitalRainScreen::draw(Surface& surface)
     ensureLayout(screenWidth, screenHeight);
     ensureStaticUiCache();
 
-    m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::solidObject());
+    m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::visibleObject());
     drawRain(buffer);
 
-    if (m_screenWidth >= 76 && m_screenHeight >= 22)
-    {
-        const TextObject contractPanel = buildUnicodeContractPanelTextObject();
-        const int panelX = std::max(4, m_screenWidth - contractPanel.getWidth() - 4);
-        contractPanel.draw(buffer, panelX, 2);
-    }
-
+    const TextObject contractPanel = buildUnicodeContractPanelTextObject();
+    const int panelX = std::max(4, m_screenWidth - contractPanel.getWidth() - 4);
+    contractPanel.draw(buffer, panelX, 2, Composition::WritePresets::solidObject());
 
     const int footerLabelY = m_screenHeight - 3;
     drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
