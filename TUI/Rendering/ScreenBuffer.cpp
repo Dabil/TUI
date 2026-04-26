@@ -44,6 +44,16 @@
     A good next cleanup step would be to update higher-level page/object write helpers to call these new optional-style overloads in the places where older preserve-formatting behavior is expected.
 */
 
+/*
+    Concrete rule:
+
+    Composition semantics:
+        Empty = do not mutate destination.
+
+    Presentation semantics:
+        Empty = render as blank space.
+*/
+
 namespace
 {
     int cellWidthToInt(CellWidth width)
@@ -186,6 +196,12 @@ std::u32string ScreenBuffer::getDisplayCluster(int x, int y) const
     }
 
     const ScreenCell& cell = getLogicalCellInternal(x, y);
+
+    if (cell.kind == CellKind::Empty)
+    {
+        return std::u32string(1, U' ');
+    }
+
     if (cell.kind != CellKind::Glyph)
     {
         return {};
