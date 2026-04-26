@@ -11,11 +11,11 @@ namespace Composition
         - None:
             Never write glyph content.
 
-        - VisibleOnly:
+        - VisibleObject:
             Write only visible non-space Glyph cells.
             Skips authored spaces and Empty cells.
 
-        - AuthoredOnly:
+        - AuthoredObject:
             Write all authored Glyph cells, including U' '.
             Skips Empty cells.
 
@@ -25,19 +25,11 @@ namespace Composition
             Empty cells participate as clearing authored spaces.
     */
 
-    /*
-    * TODO:
-        Now that the full glyph policy refactor is done
-        bring back naming consistency:
-            - VisibleOnly = VisibleObject
-            - AuthoredOnly = AuthoredObject
-    */
-
     enum class GlyphPolicy
     {
         None,
-        VisibleOnly,
-        AuthoredOnly,
+        VisibleObject,
+        AuthoredObject,
         SolidObject
     };
 }

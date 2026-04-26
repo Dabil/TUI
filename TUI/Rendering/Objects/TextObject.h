@@ -21,6 +21,7 @@ class TextObjectBuilder;
 struct TextObjectCell
 {
     char32_t glyph = U' ';
+    std::u32string cluster{};
     CellKind kind = CellKind::Empty;
     CellWidth width = CellWidth::One;
     std::optional<Style> style;

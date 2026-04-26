@@ -86,5 +86,5 @@ private:
 
     ScreenType m_currentScreenType = ScreenType::ControlDeck;
     double m_screenCycleElapsedSeconds = 0.0;
-    double m_screenCycleIntervalSeconds = 20.0;
+    double m_screenCycleIntervalSeconds = 60.0;
 };

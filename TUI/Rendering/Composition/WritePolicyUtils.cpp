@@ -30,10 +30,10 @@ namespace Composition::WritePolicyUtils
         case GlyphPolicy::None:
             return false;
 
-        case GlyphPolicy::VisibleOnly:
+        case GlyphPolicy::VisibleObject:
             return cell.kind == CellKind::Glyph && cell.glyph != U' ';
 
-        case GlyphPolicy::AuthoredOnly:
+        case GlyphPolicy::AuthoredObject:
             return cell.kind == CellKind::Glyph;
 
         case GlyphPolicy::SolidObject:

@@ -47,8 +47,8 @@ namespace Rendering
             // "flatten the retained layered asset into a complete surface" behavior.
             //
             // Use:
-            // - visibleOnly()   for visual non-space glyph overlays
-            // - authoredOnly()  for authored Glyph cells, including U' ', while skipping Empty
+            // - visibleObject()   for visual non-space glyph overlays
+            // - authoredObject()  for authored Glyph cells, including U' ', while skipping Empty
             // - solidObject()   for full-footprint writes where Empty clears to authored space
             Composition::WritePolicy writePolicy = Composition::WritePresets::solidObject();
         };

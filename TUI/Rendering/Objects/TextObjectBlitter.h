@@ -13,7 +13,7 @@ namespace TextObjectBlitter
     struct BlitOptions
     {
         std::optional<Style> overrideStyle;
-        Composition::WritePolicy writePolicy = Composition::WritePresets::authoredOnly();
+        Composition::WritePolicy writePolicy = Composition::WritePresets::authoredObject();
         bool skipStructuralContinuationCells = true;
     };
 

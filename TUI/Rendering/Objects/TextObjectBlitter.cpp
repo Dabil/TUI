@@ -50,10 +50,10 @@ namespace
         case Composition::GlyphPolicy::None:
             return true;
 
-        case Composition::GlyphPolicy::VisibleOnly:
+        case Composition::GlyphPolicy::VisibleObject:
             return !isVisibleGlyph(cell);
 
-        case Composition::GlyphPolicy::AuthoredOnly:
+        case Composition::GlyphPolicy::AuthoredObject:
             return !isAuthoredGlyph(cell);
 
         case Composition::GlyphPolicy::SolidObject:

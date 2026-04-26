@@ -19,8 +19,8 @@ namespace Composition
 
         DepthPolicy depthPolicy = DepthPolicy::Ignore;
 
-        static WritePolicy VisibleOnly();
-        static WritePolicy AuthoredOnly();
+        static WritePolicy VisibleObject();
+        static WritePolicy AuthoredObject();
         static WritePolicy SolidObject();
 
         static WritePolicy StyleOnly();

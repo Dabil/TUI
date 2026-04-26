@@ -156,7 +156,7 @@ TextObjectComposer& TextObjectComposer::addVisibleObject(
         object,
         x,
         y,
-        Composition::WritePresets::visibleOnly(),
+        Composition::WritePresets::visibleObject(),
         zIndex,
         name,
         visible);
@@ -469,7 +469,7 @@ TextObjectComposer& TextObjectComposer::addFrame(
         zIndex,
         name,
         visible,
-        Composition::WritePresets::visibleOnly());
+        Composition::WritePresets::visibleObject());
 }
 
 TextObjectComposer& TextObjectComposer::addFrame(
@@ -579,7 +579,7 @@ TextObjectComposer& TextObjectComposer::addVisibleFrame(
         width,
         height,
         border,
-        Composition::WritePresets::visibleOnly(),
+        Composition::WritePresets::visibleObject(),
         zIndex,
         name,
         visible);

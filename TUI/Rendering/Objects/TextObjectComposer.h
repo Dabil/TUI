@@ -44,7 +44,7 @@ public:
         // Fallback policy used when an entry does not specify its own write policy.
         // Default is authoredOnly() so composed TextObjects preserve authored cells
         // while keeping Empty cells transparent.
-        Composition::WritePolicy writePolicy = Composition::WritePresets::authoredOnly();
+        Composition::WritePolicy writePolicy = Composition::WritePresets::authoredObject();
     };
 
     struct BuildLayeredTextObjectOptions

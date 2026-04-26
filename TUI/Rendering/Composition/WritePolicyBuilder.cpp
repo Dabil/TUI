@@ -6,7 +6,7 @@
     using namespace Composition;
 
     WritePolicy customPolicy = WritePolicyBuilder()
-        .glyphPolicy(GlyphPolicy::VisibleOnly)
+        .glyphPolicy(GlyphPolicy::VisibleObject)
         .stylePolicy(StylePolicy::Apply)
         .sourceMask(SourceMask::GlyphCellsOnly)
         .glyphOverwrite(OverwriteRule::IfTargetEmpty)
@@ -18,7 +18,7 @@
 
     using namespace Composition;
 
-    WritePolicy visibleBehind = WritePolicyBuilder::fromPreset(WritePresets::visibleOnly())
+    WritePolicy visibleBehind = WritePolicyBuilder::fromPreset(WritePresets::visibleObject())
         .depthPolicy(DepthPolicy::BehindOnly)
         .build();
 */

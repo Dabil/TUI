@@ -706,7 +706,7 @@ namespace Composition
         const TextObject& object,
         const PlacementSpec& placement)
     {
-        writeObject(object, placement, WritePresets::authoredOnly());
+        writeObject(object, placement, WritePresets::authoredObject());
     }
 
     void PageComposer::writeSolid(

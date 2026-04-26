@@ -186,12 +186,14 @@ namespace
             sourceCell.kind == CellKind::Empty)
         {
             destinationCell.glyph = U' ';
+            destinationCell.cluster = std::u32string(1, U' ');
             destinationCell.kind = CellKind::Glyph;
             destinationCell.width = CellWidth::One;
             return destinationCell;
         }
 
         destinationCell.glyph = sourceCell.glyph;
+        destinationCell.cluster = sourceCell.cluster;
         destinationCell.kind = sourceCell.kind;
         destinationCell.width = sourceCell.width;
         return destinationCell;
@@ -377,7 +379,7 @@ namespace Composition
         const std::optional<Style>& sourceStyleOverride,
         DepthPolicy depthPolicy)
     {
-        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::visibleOnly(depthPolicy));
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::visibleObject(depthPolicy));
     }
 
     void ObjectWriter::writeAuthoredOnly(
@@ -400,7 +402,7 @@ namespace Composition
         const std::optional<Style>& sourceStyleOverride,
         DepthPolicy depthPolicy)
     {
-        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::authoredOnly(depthPolicy));
+        writeWithPreset(*this, source, sourceStyleOverride, WritePresets::authoredObject(depthPolicy));
     }
 
     void ObjectWriter::writeSolidObject(

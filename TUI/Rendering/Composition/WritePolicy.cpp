@@ -4,14 +4,14 @@
 
 namespace Composition
 {
-    WritePolicy WritePolicy::VisibleOnly()
+    WritePolicy WritePolicy::VisibleObject()
     {
-        return WritePresets::visibleOnly();
+        return WritePresets::visibleObject();
     }
 
-    WritePolicy WritePolicy::AuthoredOnly()
+    WritePolicy WritePolicy::AuthoredObject()
     {
-        return WritePresets::authoredOnly();
+        return WritePresets::authoredObject();
     }
 
     WritePolicy WritePolicy::SolidObject()

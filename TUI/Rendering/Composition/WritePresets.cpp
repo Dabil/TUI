@@ -2,10 +2,10 @@
 
 namespace Composition::WritePresets
 {
-    WritePolicy visibleOnly(DepthPolicy depthPolicy)
+    WritePolicy visibleObject(DepthPolicy depthPolicy)
     {
         WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::VisibleOnly;
+        policy.glyphPolicy = GlyphPolicy::VisibleObject;
         policy.stylePolicy = StylePolicy::Apply;
         policy.sourceMask = SourceMask::GlyphCellsOnly;
         policy.glyphOverwriteRule = OverwriteRule::Always;
@@ -14,10 +14,10 @@ namespace Composition::WritePresets
         return policy;
     }
 
-    WritePolicy authoredOnly(DepthPolicy depthPolicy)
+    WritePolicy authoredObject(DepthPolicy depthPolicy)
     {
         WritePolicy policy;
-        policy.glyphPolicy = GlyphPolicy::AuthoredOnly;
+        policy.glyphPolicy = GlyphPolicy::AuthoredObject;
         policy.stylePolicy = StylePolicy::Apply;
         policy.sourceMask = SourceMask::GlyphCellsOnly;
         policy.glyphOverwriteRule = OverwriteRule::Always;
@@ -40,7 +40,7 @@ namespace Composition::WritePresets
 
     WritePolicy glyphsOnly(DepthPolicy depthPolicy)
     {
-        WritePolicy policy = authoredOnly(depthPolicy);
+        WritePolicy policy = authoredObject(depthPolicy);
         policy.stylePolicy = StylePolicy::None;
         policy.styleOverwriteRule = OverwriteRule::Never;
         return policy;

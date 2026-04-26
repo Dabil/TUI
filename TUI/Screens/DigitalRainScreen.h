@@ -66,6 +66,9 @@ private:
 
     TextObject buildStaticUiTextObject() const;
     TextObject buildMinimumScreenTextObject(int screenWidth, int screenHeight) const;
+    TextObject buildUnicodeContractPanelTextObject() const;
+
+    std::vector<std::u32string> buildUnicodeContractPanelRows() const;
 
     std::u32string buildTitleText() const;
     std::u32string buildFooterDescriptionText() const;

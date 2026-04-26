@@ -93,6 +93,11 @@ bool TextObjectBuilder::setCell(
 
     TextObjectCell& cell = m_object.m_cells[static_cast<std::size_t>(index(x, y))];
     cell.glyph = UnicodeConversion::sanitizeCodePoint(glyph);
+    cell.cluster.clear();
+    if (kind == CellKind::Glyph)
+    {
+        cell.cluster.push_back(cell.glyph);
+    }
     cell.kind = kind;
     cell.width = width;
     cell.style = style;

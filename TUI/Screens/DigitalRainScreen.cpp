@@ -191,6 +191,14 @@ void DigitalRainScreen::draw(Surface& surface)
     m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::solidObject());
     drawRain(buffer);
 
+    if (m_screenWidth >= 76 && m_screenHeight >= 22)
+    {
+        const TextObject contractPanel = buildUnicodeContractPanelTextObject();
+        const int panelX = std::max(4, m_screenWidth - contractPanel.getWidth() - 4);
+        contractPanel.draw(buffer, panelX, 2);
+    }
+
+
     const int footerLabelY = m_screenHeight - 3;
     drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
 }
@@ -365,6 +373,104 @@ TextObject DigitalRainScreen::buildMinimumScreenTextObject(int screenWidth, int 
     TextObjectComposer::BuildTextObjectOptions options;
     options.writePolicy = Composition::WritePresets::solidObject();
     return composer.buildTextObject(options);
+}
+
+TextObject DigitalRainScreen::buildUnicodeContractPanelTextObject() const
+{
+    const std::vector<std::u32string> rows = buildUnicodeContractPanelRows();
+    const int panelWidth = 52;
+    const int panelHeight = static_cast<int>(rows.size()) + 2;
+
+    TextObjectComposer composer;
+    composer.addFilledRect(0, 0, panelWidth, panelHeight, U' ', m_backgroundStyle, 0, "contractPanelBackground");
+    composer.addFrame(
+        0,
+        0,
+        panelWidth,
+        panelHeight,
+        m_tailStyle,
+        ObjectFactory::singleLineBorder(),
+        10,
+        "contractPanelFrame");
+
+    for (std::size_t rowIndex = 0; rowIndex < rows.size(); ++rowIndex)
+    {
+        const Style& rowStyle = (rowIndex == 0) ? m_labelStyle : m_previewStyle;
+        composer.addText(rows[rowIndex], 1, static_cast<int>(rowIndex) + 1, rowStyle, 20, "contractPanelRow");
+    }
+
+    TextObjectComposer::BuildTextObjectOptions options;
+    options.writePolicy = Composition::WritePresets::solidObject();
+    return composer.buildTextObject(options);
+}
+
+std::vector<std::u32string> DigitalRainScreen::buildUnicodeContractPanelRows() const
+{
+    const auto statusPrefix = [](bool passed) -> std::u32string
+        {
+            return passed ? U"[PASS] " : U"[FAIL] ";
+        };
+
+    const TextObject combiningObject = TextObject::fromU32(U"a\u0301");
+    const bool combiningPassed =
+        combiningObject.getWidth() == 1 &&
+        combiningObject.getHeight() == 1 &&
+        combiningObject.getCell(0, 0).isGlyph() &&
+        combiningObject.getCell(0, 0).cluster == U"a\u0301" &&
+        combiningObject.getCell(0, 0).cluster.size() == 2;
+
+    const TextObject wideObject = TextObject::fromU32(U"界");
+    const bool widePassed =
+        wideObject.getWidth() == 2 &&
+        wideObject.getHeight() == 1 &&
+        wideObject.getCell(0, 0).isGlyph() &&
+        wideObject.getCell(0, 0).width == CellWidth::Two &&
+        wideObject.getCell(0, 0).cluster == U"界" &&
+        wideObject.getCell(1, 0).isWideTrailing() &&
+        wideObject.getCell(1, 0).width == CellWidth::Zero;
+
+    const TextObject spaceObject = TextObject::fromU32(U" ");
+    const bool spacePassed =
+        spaceObject.getWidth() == 1 &&
+        spaceObject.getHeight() == 1 &&
+        spaceObject.getCell(0, 0).isGlyph() &&
+        !spaceObject.getCell(0, 0).isEmpty() &&
+        spaceObject.getCell(0, 0).glyph == U' ' &&
+        spaceObject.getCell(0, 0).cluster == U" ";
+
+    const TextObject emptyObject = TextObject::fromU32(U"");
+    const bool emptyPassed =
+        emptyObject.getWidth() == 0 &&
+        emptyObject.isEmpty();
+
+    const TextObject mixedObject = TextObject::fromU32(U"a\u0301界");
+    const bool mixedPassed =
+        mixedObject.getWidth() == 3 &&
+        mixedObject.getHeight() == 1 &&
+        mixedObject.getCell(0, 0).isGlyph() &&
+        mixedObject.getCell(0, 0).cluster == U"a\u0301" &&
+        mixedObject.getCell(1, 0).isGlyph() &&
+        mixedObject.getCell(1, 0).width == CellWidth::Two &&
+        mixedObject.getCell(1, 0).cluster == U"界" &&
+        mixedObject.getCell(2, 0).isWideTrailing();
+
+    std::vector<std::u32string> rows;
+    rows.push_back(U"UNICODE CONTRACT CHECKS");
+    rows.push_back(statusPrefix(combiningPassed) + U"Combining mark preserved");
+    rows.push_back(U"       input: a + U+0301");
+    rows.push_back(U"       expected: one cell with cluster á");
+    rows.push_back(statusPrefix(widePassed) + U"Wide glyph creates trail");
+    rows.push_back(U"       input: 界");
+    rows.push_back(U"       expected: Glyph + WideTrail");
+    rows.push_back(statusPrefix(spacePassed) + U"Authored space is not Empty");
+    rows.push_back(U"       input: \" \"");
+    rows.push_back(U"       expected: Glyph U' '");
+    rows.push_back(statusPrefix(emptyPassed) + U"Empty stays transparent");
+    rows.push_back(U"       expected: no authored cell");
+    rows.push_back(statusPrefix(mixedPassed) + U"Cluster boundaries preserved");
+    rows.push_back(U"       input: a + U+0301 + 界");
+    rows.push_back(U"       expected: cluster, wide glyph, trail");
+    return rows;
 }
 
 std::u32string DigitalRainScreen::buildTitleText() const

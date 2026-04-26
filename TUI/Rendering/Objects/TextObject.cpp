@@ -8,14 +8,16 @@
 #include "Rendering/Objects/TextObjectBlitter.h"
 #include "Rendering/Objects/TextObjectExporter.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
+#include "Utilities/Unicode/GraphemeSegmentation.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
 /*
     Concrete rule:
+        - Skipping a cell must skip only the mutation, not the coordinate footprint.
         - Glyph + U' ' = authored space
         - Empty        = intentional transparent cell
         - SolidObject  = whole footprint participates, Empties wrote as U' '
-        - AuthoredOnly = authored cells participate, Empty skips
+        - AuthoredObject = authored cells participate, Empty skips
 */
 
 namespace
@@ -145,17 +147,17 @@ const TextObjectCell* TextObject::tryGetCell(int x, int y) const
 
 void TextObject::draw(ScreenBuffer& target, int x, int y) const
 {
-    draw(target, x, y, Composition::WritePresets::authoredOnly(), std::nullopt);
+    draw(target, x, y, Composition::WritePresets::authoredObject(), std::nullopt);
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const Style& overrideStyle) const
 {
-    draw(target, x, y, Composition::WritePresets::authoredOnly(), std::optional<Style>(overrideStyle));
+    draw(target, x, y, Composition::WritePresets::authoredObject(), std::optional<Style>(overrideStyle));
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const std::optional<Style>& overrideStyle) const
 {
-    draw(target, x, y, Composition::WritePresets::authoredOnly(), overrideStyle);
+    draw(target, x, y, Composition::WritePresets::authoredObject(), overrideStyle);
 }
 
 void TextObject::draw(ScreenBuffer& target, int x, int y, const Composition::WritePolicy& writePolicy) const
@@ -240,17 +242,10 @@ int TextObject::measureLineWidth(std::u32string_view line)
 {
     int width = 0;
 
-    for (char32_t glyph : line)
+    const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(line);
+    for (const TextCluster& cluster : clusters)
     {
-        glyph = UnicodeConversion::sanitizeCodePoint(glyph);
-
-        if (glyph == U'\r' || glyph == U'\n')
-        {
-            continue;
-        }
-
-        const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(glyph);
-        width += cellWidthToInt(measuredWidth);
+        width += cluster.displayWidth;
     }
 
     return width;
@@ -264,26 +259,21 @@ void TextObject::appendLineCells(
 {
     int writtenWidth = 0;
 
-    for (char32_t glyph : line)
+    const std::vector<TextCluster> clusters = GraphemeSegmentation::segment(line);
+    for (const TextCluster& cluster : clusters)
     {
-        glyph = UnicodeConversion::sanitizeCodePoint(glyph);
-
-        if (glyph == U'\r' || glyph == U'\n')
+        if (cluster.codePoints.empty() || cluster.displayWidth <= 0)
         {
             continue;
         }
 
-        const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(glyph);
+        const char32_t glyph = UnicodeConversion::sanitizeCodePoint(cluster.codePoints.front());
 
-        if (measuredWidth == CellWidth::Zero)
-        {
-            continue;
-        }
-
-        if (measuredWidth == CellWidth::Two)
+        if (cluster.displayWidth >= 2)
         {
             TextObjectCell leading;
             leading.glyph = glyph;
+            leading.cluster = cluster.codePoints;
             leading.kind = CellKind::Glyph;
             leading.width = CellWidth::Two;
             leading.style = defaultStyle;
@@ -302,6 +292,7 @@ void TextObject::appendLineCells(
 
         TextObjectCell single;
         single.glyph = glyph;
+        single.cluster = cluster.codePoints;
         single.kind = CellKind::Glyph;
         single.width = CellWidth::One;
         single.style = defaultStyle;
@@ -314,6 +305,7 @@ void TextObject::appendLineCells(
     {
         TextObjectCell space;
         space.glyph = U' ';
+        space.cluster = std::u32string(1, U' ');
         space.kind = CellKind::Glyph;
         space.width = CellWidth::One;
         space.style = defaultStyle;
@@ -322,7 +314,6 @@ void TextObject::appendLineCells(
         ++writtenWidth;
     }
 }
-
 int TextObject::index(int x, int y) const
 {
     return y * m_width + x;
