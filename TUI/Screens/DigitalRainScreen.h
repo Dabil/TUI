@@ -107,6 +107,8 @@ private:
     Style m_labelStyle;
     Style m_previewStyle;
     Style m_borderStyle;
+    Style m_xRayBoxStyle;
+    Style m_xRayPanelStyle;
 
     bool m_staticUiDirty = true;
     bool m_minimumScreenUiDirty = true;

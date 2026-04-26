@@ -8,6 +8,7 @@
 #include "Core/Rect.h"
 #include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Objects/TextObjectComposer.h"
+#include "Rendering/Objects/TextObjectFactory.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/StyleBuilder.h"
@@ -63,6 +64,7 @@ std::u32string DigitalRainScreen::buildConsoleGlyphPool()
 }
 
 //        U"♜♞♝♛♚♝♞♜♖♘♗♕♔♗♘♖"
+//        + std::u32string(1, RabbitGlyph)
 std::u32string DigitalRainScreen::buildTerminalGlyphPool()
 {
     return std::u32string(
@@ -73,8 +75,7 @@ std::u32string DigitalRainScreen::buildTerminalGlyphPool()
         U"オォコソトノホモヨョロヲゴゾドボポヴッン"
         U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
         U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           // greek alphabet
-        U"♪♫⌘₿äü∄∃ƒ±£µℇ")
-        + std::u32string(1, RabbitGlyph);
+        U"♪♫⌘₿äü∄∃ƒ±£µℇ");
 }
 
 std::u32string DigitalRainScreen::buildGlyphPoolForHost(TerminalHostKind hostKind)
@@ -144,6 +145,13 @@ DigitalRainScreen::DigitalRainScreen(TerminalHostKind hostKind)
     m_borderStyle =
         style::Fg(Color::FromBasic(Color::Basic::Green))
         + style::Bg(black);
+
+    m_xRayBoxStyle =
+        style::Fg(Color::FromBasic(Color::Basic::Green))
+        + style::Bg(black);
+    m_xRayPanelStyle =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(black);
 }
 
 void DigitalRainScreen::onEnter()
@@ -191,12 +199,39 @@ void DigitalRainScreen::draw(Surface& surface)
     drawRain(buffer);
     m_staticUiObject.draw(buffer, 0, 0, Composition::WritePresets::visibleObject());
 
+    const int footerLabelY = m_screenHeight - 3;
+    drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
+
     const TextObject contractPanel = buildUnicodeContractPanelTextObject();
     const int panelX = std::max(4, m_screenWidth - contractPanel.getWidth() - 4);
     contractPanel.draw(buffer, panelX, 2, Composition::WritePresets::solidObject());
 
-    const int footerLabelY = m_screenHeight - 3;
-    drawPreviewLine(buffer, 8, footerLabelY, std::max(0, m_screenWidth - 10), m_previewOffset);
+
+    // Digital Rain X-Ray Effect
+
+    const int xRayX = 40;
+    const int xRayY = 10;
+
+    const int xRayBoxX = (screenWidth - xRayX) / 2;
+    const int xRayBoxY = (screenHeight - xRayY) / 2;
+
+    const TextObject rainXRayBox =
+        ObjectFactory::makeBorderedBox(xRayX, xRayY, U' ', m_xRayBoxStyle, ObjectFactory::roundedBorder());
+
+    const TextObject rainXRayPanel =
+        ObjectFactory::makeFilledRect(xRayX - 2, xRayY - 2, U' ', m_xRayPanelStyle);
+
+    rainXRayBox.draw(
+        buffer,
+        xRayBoxX,
+        xRayBoxY,
+        Composition::WritePresets::visibleObject());
+
+    rainXRayPanel.draw(
+        buffer,
+        xRayBoxX + 1,
+        xRayBoxY + 1,
+        Composition::WritePresets::styleBlock());
 }
 
 void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
