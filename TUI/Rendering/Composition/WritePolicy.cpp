@@ -4,7 +4,7 @@
 
 /*
     Concrete Rules:
-    
+
     TextObject cell coordinates are absolute within the TextObject.
 
     Write presets never change where things get drawn to the screen,
@@ -20,8 +20,14 @@
         - measured width
         - object bounds
 
+    Glyph layer defines structure.
+    Style layer defines appearance.
+
+    They must be independently composable.
+
     Object glyph presets:
-        - write glyph + style together
+        - write glyph + style together when the source cell is accepted
+        - rejected source cells write neither glyph nor style
         - never write style alone
 
     Style presets:
