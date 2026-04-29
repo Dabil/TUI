@@ -44,16 +44,20 @@ private:
 private:
     Assets::AssetLibrary& m_assetLibrary;
 
-    const Style m_bannerStyle = style::Fg(Color::FromBasic(Color::Basic::Yellow))
+    const Style m_bannerStyle = 
+          style::Fg(Color::FromBasic(Color::Basic::Yellow))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
-    const Style m_bannerStyleShadow = style::Fg(Color::FromBasic(Color::Basic::Red))
+    const Style m_bannerStyleShadow = 
+          style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
-    const Style m_outerFrameStyle = style::Fg(Color::FromBasic(Color::Basic::Red))
+    const Style m_outerFrameStyle = 
+          style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
-    const Style m_borderTextStyle = style::Fg(Color::FromBasic(Color::Basic::Yellow))
+    const Style m_borderTextStyle = 
+          style::Fg(Color::FromBasic(Color::Basic::Yellow))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     const Composition::WritePolicy m_solidUiWritePolicy = Composition::WritePresets::solidObject();
