@@ -735,7 +735,7 @@ void ControlDeckScreen::draw(Surface& surface)
 
     writeTextBlock(
         page,
-        "All write modes answer one question: What parts of this object are allowed to affect the screen?\n"
+        "All write modes answer one question: What parts of this object are allowed to affect the screen?\n\n"
         "SOLID OBJECT:Everything, including spaces, empty cells, and style\n"
         "VISIBLE OBJECT: Only visible glyphs and Style, no spaces or empty cells\n"
         "AUTHORED OBJECT: Only authored cells and Style (Glyphs + spaces, no empty cells)\n"
