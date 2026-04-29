@@ -13,6 +13,41 @@
 class Surface;
 class ScreenBuffer;
 
+class rainXRay
+{
+public:
+    rainXRay();
+   ~rainXRay();
+
+    void draw(ScreenBuffer& buffer);
+    void move(int screenWidth, int screenHeight, double deltaTime);
+    void reset(int screenWidth, int screenHeight);
+    void invalidateXray();
+    bool initialized();
+
+private:
+    float m_xRayX;
+    float m_xRayY;
+    float m_xRayDx;
+    float m_xRayDy;
+
+    int m_xRayWidth;
+    int m_xRayHeight;
+
+    int m_TopBounds;
+    int m_BottomBounds;
+    int m_LeftBounds;
+    int m_RightBounds;
+
+    bool m_xRay_initialized = false;
+
+    TextObject m_RainXRayBox;
+    TextObject m_RainXRayPanel;
+
+    Style m_xRayBoxStyle;
+    Style m_xRayPanelStyle;
+};
+
 class DigitalRainScreen : public Screen
 {
 public:
@@ -121,4 +156,6 @@ private:
     TextObject m_minimumScreenUiObject;
 
     std::mt19937 m_rng;
+
+    rainXRay m_xRayMachine;
 };

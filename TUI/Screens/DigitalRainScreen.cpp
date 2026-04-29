@@ -46,6 +46,117 @@ namespace
     double m_deadGlyphSpawnAccumulator = 0.0;
 }
 
+rainXRay::rainXRay()
+{
+    m_xRayBoxStyle =
+          style::Fg(Color::FromBasic(Color::Basic::Green))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    m_xRayPanelStyle =
+          style::Bold
+        + style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    m_xRayX = -100;
+    m_xRayY = -100;
+
+    // cells per second
+    m_xRayDx = 2.0f;
+    m_xRayDy = 2.0f;
+
+    m_TopBounds = 1;
+    m_BottomBounds = 3;
+    m_LeftBounds = 2;
+    m_RightBounds = 2;
+    
+    m_xRayWidth  = 0;
+    m_xRayHeight = 0;
+}
+
+rainXRay::~rainXRay()
+{
+    m_RainXRayBox.clear();
+    m_RainXRayPanel.clear();
+}
+
+void rainXRay::draw(ScreenBuffer& buffer)
+{
+    m_RainXRayBox.draw(
+        buffer,
+        static_cast<int>(m_xRayX),
+        static_cast<int>(m_xRayY),
+        Composition::WritePresets::visibleObject());
+
+    m_RainXRayPanel.draw(
+        buffer,
+        static_cast<int>(m_xRayX) + 1,
+        static_cast<int>(m_xRayY) + 1,
+        Composition::WritePresets::styleBlock());
+}
+
+void rainXRay::move(int screenWidth, int screenHeight, double deltaTime)
+{
+    m_xRayX += m_xRayDx * static_cast<float>(deltaTime);
+    m_xRayY += m_xRayDy * static_cast<float>(deltaTime);
+
+    const float minX = static_cast<float>(m_LeftBounds);
+    const float maxX = static_cast<float>(screenWidth - m_RightBounds - m_xRayWidth);
+    const float minY = static_cast<float>(m_TopBounds);
+    const float maxY = static_cast<float>(screenHeight - m_BottomBounds - m_xRayHeight);
+
+    if (m_xRayX <= minX || m_xRayX >= maxX)
+    {
+        m_xRayX = std::clamp(m_xRayX, minX, maxX);
+        m_xRayDx *= -1.0f;
+    }
+
+    if (m_xRayY <= minY || m_xRayY >= maxY)
+    {
+        m_xRayY = std::clamp(m_xRayY, minY, maxY);
+        m_xRayDy *= -1.0f;
+    }
+}
+
+void rainXRay::reset(int screenWidth, int screenHeight)
+{
+    m_xRayWidth = screenWidth / 4;
+    m_xRayHeight = screenHeight / 4;
+
+    m_xRayX = (screenWidth - m_xRayWidth) / 2;
+    m_xRayY = (screenHeight - m_xRayHeight) / 2;
+
+    TextObjectComposer composer;
+    composer.addSolidFrame(
+        0,
+        0,
+        m_xRayWidth,
+        m_xRayHeight,
+        m_xRayBoxStyle,
+        ObjectFactory::roundedBorder(),
+        10,
+        "outerFrame");
+    composer.addText(U"[DigiX-Ray]", (m_xRayWidth / 2) - 5, 0, m_xRayBoxStyle, 20, "title");
+    m_RainXRayBox = composer.buildTextObject();
+
+    m_RainXRayPanel = ObjectFactory::makeFilledRect(
+        m_xRayWidth - 2,
+        m_xRayHeight - 2,
+        U' ',
+        m_xRayPanelStyle);
+
+    m_xRay_initialized = true;
+}
+
+void rainXRay::invalidateXray()
+{
+    m_xRay_initialized = false;
+}
+
+bool rainXRay::initialized()
+{
+    return m_xRay_initialized;
+}
+
 std::u32string DigitalRainScreen::buildConsoleGlyphPool()
 {
     return std::u32string(
@@ -145,13 +256,6 @@ DigitalRainScreen::DigitalRainScreen(TerminalHostKind hostKind)
     m_borderStyle =
         style::Fg(Color::FromBasic(Color::Basic::Green))
         + style::Bg(black);
-
-    m_xRayBoxStyle =
-        style::Fg(Color::FromBasic(Color::Basic::Green))
-        + style::Bg(black);
-    m_xRayPanelStyle =
-        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
-        + style::Bg(black);
 }
 
 void DigitalRainScreen::onEnter()
@@ -163,6 +267,7 @@ void DigitalRainScreen::onEnter()
 
     invalidateStaticUiCache();
     invalidateMinimumScreenUiCache();
+    m_xRayMachine.invalidateXray();
 }
 
 void DigitalRainScreen::update(double deltaTime)
@@ -177,6 +282,7 @@ void DigitalRainScreen::update(double deltaTime)
     updateStreams(deltaTime);
     spawnDeadGlyphs(deltaTime);
     updatePreview(deltaTime);
+    m_xRayMachine.move(m_screenWidth, m_screenHeight, deltaTime);
 }
 
 void DigitalRainScreen::draw(Surface& surface)
@@ -206,32 +312,12 @@ void DigitalRainScreen::draw(Surface& surface)
     const int panelX = std::max(4, m_screenWidth - contractPanel.getWidth() - 4);
     contractPanel.draw(buffer, panelX, 2, Composition::WritePresets::solidObject());
 
+    if (!m_xRayMachine.initialized())
+    {
+        m_xRayMachine.reset(screenWidth, screenHeight);
+    }
 
-    // Digital Rain X-Ray Effect
-
-    const int xRayX = 40;
-    const int xRayY = 10;
-
-    const int xRayBoxX = (screenWidth - xRayX) / 2;
-    const int xRayBoxY = (screenHeight - xRayY) / 2;
-
-    const TextObject rainXRayBox =
-        ObjectFactory::makeBorderedBox(xRayX, xRayY, U' ', m_xRayBoxStyle, ObjectFactory::roundedBorder());
-
-    const TextObject rainXRayPanel =
-        ObjectFactory::makeFilledRect(xRayX - 2, xRayY - 2, U' ', m_xRayPanelStyle);
-
-    rainXRayBox.draw(
-        buffer,
-        xRayBoxX,
-        xRayBoxY,
-        Composition::WritePresets::visibleObject());
-
-    rainXRayPanel.draw(
-        buffer,
-        xRayBoxX + 1,
-        xRayBoxY + 1,
-        Composition::WritePresets::styleBlock());
+    m_xRayMachine.draw(buffer);
 }
 
 void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
@@ -257,6 +343,7 @@ void DigitalRainScreen::ensureLayout(int screenWidth, int screenHeight)
     m_rainHeight = newRainHeight;
 
     invalidateStaticUiCache();
+    m_xRayMachine.invalidateXray();
     rebuildStreams();
 }
 
