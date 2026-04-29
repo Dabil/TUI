@@ -27,9 +27,9 @@ namespace
     constexpr float SecondaryDropDelaySeconds = 45.0f / 60.0f;
     constexpr float SecondaryDropStrengthScale = 0.5f;
 
-    constexpr double WaterTitleAssembleDurationSeconds = 1.0;
+    constexpr double WaterTitleAssembleDurationSeconds = 1.5;
     constexpr double WaterTitleHoldDurationSeconds = 5.0;
-    constexpr double WaterTitleReverseDurationSeconds = 1.0;
+    constexpr double WaterTitleReverseDurationSeconds = 1.5;
     constexpr double WaterTitleRepeatDelaySeconds = 10.0;
     constexpr double WaterTitleCycleDurationSeconds =
         WaterTitleAssembleDurationSeconds +
