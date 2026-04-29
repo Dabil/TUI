@@ -875,99 +875,6 @@ namespace
         }
     }
 
-    /*
-     Horizontal pattern line behavior:
-    
-     - BEGIN is written once at the left.
-     - REPEAT tiles in full blocks only.
-     - END is written only if it fully fits.
-     - The repeat region may truncate to preserve a complete END.
-     - Partial END rendering is intentionally not supported.
-    */
-
-    TextObject buildHorizontalPatternLineObject(
-        int width,
-        const HorizontalLinePattern& pattern,
-        const std::optional<Style>& style)
-    {
-        if (width <= 0)
-        {
-            return TextObject();
-        }
-
-        const NormalizedHorizontalLinePattern normalized =
-            normalizeHorizontalLinePattern(pattern);
-
-        if (normalized.height <= 0)
-        {
-            return TextObject();
-        }
-
-        if (normalized.beginWidth <= 0 &&
-            normalized.repeatWidth <= 0 &&
-            normalized.endWidth <= 0)
-        {
-            return TextObject();
-        }
-
-        TextObjectBuilder builder = makeAuthoredRectBuilder(width, normalized.height, style);
-
-        int x = 0;
-
-        if (normalized.beginWidth > 0)
-        {
-            writeRowsToBuilder(
-                builder,
-                width,
-                normalized.height,
-                0,
-                0,
-                normalized.beginRows,
-                style);
-
-            x += normalized.beginWidth;
-        }
-
-        int reservedEndWidth = 0;
-        if (normalized.endWidth > 0 && x + normalized.endWidth <= width)
-        {
-            reservedEndWidth = normalized.endWidth;
-        }
-
-        const int repeatLimit = width - reservedEndWidth;
-
-        if (normalized.repeatWidth > 0)
-        {
-            while (x + normalized.repeatWidth <= repeatLimit)
-            {
-                writeRowsToBuilder(
-                    builder,
-                    width,
-                    normalized.height,
-                    x,
-                    0,
-                    normalized.repeatRows,
-                    style);
-
-                x += normalized.repeatWidth;
-            }
-        }
-
-        if (normalized.endWidth > 0)
-        {
-            writeRowsToBuilder(
-                builder,
-                width,
-                normalized.height,
-                x,
-                0,
-                normalized.endRows,
-                style);
-        }
-
-        return builder.build();
-    }
-
     struct NormalizedVerticalLinePattern
     {
         std::vector<std::u32string> topRows;
@@ -1028,90 +935,6 @@ namespace
         normalized.bottomHeight = static_cast<int>(normalized.bottomRows.size());
 
         return normalized;
-    }
-
-    TextObject buildVerticalPatternLineObject(
-        int height,
-        const VerticalLinePattern& pattern,
-        const std::optional<Style>& style)
-    {
-        if (height <= 0)
-        {
-            return TextObject();
-        }
-
-        const NormalizedVerticalLinePattern normalized =
-            normalizeVerticalLinePattern(pattern);
-
-        if (normalized.width <= 0)
-        {
-            return TextObject();
-        }
-
-        if (normalized.topHeight <= 0 &&
-            normalized.repeatHeight <= 0 &&
-            normalized.bottomHeight <= 0)
-        {
-            return TextObject();
-        }
-
-        TextObjectBuilder builder = makeAuthoredRectBuilder(normalized.width, height, style);
-
-        int y = 0;
-
-        if (normalized.topHeight > 0)
-        {
-            writeRowsToBuilder(
-                builder,
-                normalized.width,
-                height,
-                0,
-                0,
-                normalized.topRows,
-                style);
-
-            y += normalized.topHeight;
-        }
-
-        int reservedBottomHeight = 0;
-        if (normalized.bottomHeight > 0 && y + normalized.bottomHeight <= height)
-        {
-            reservedBottomHeight = normalized.bottomHeight;
-        }
-
-        const int repeatLimit = height - reservedBottomHeight;
-
-        if (normalized.repeatHeight > 0)
-        {
-            while (y + normalized.repeatHeight <= repeatLimit)
-            {
-                writeRowsToBuilder(
-                    builder,
-                    normalized.width,
-                    height,
-                    0,
-                    y,
-                    normalized.repeatRows,
-                    style);
-
-                y += normalized.repeatHeight;
-            }
-        }
-
-        if (normalized.bottomHeight > 0 &&
-            y + normalized.bottomHeight <= height)
-        {
-            writeRowsToBuilder(
-                builder,
-                normalized.width,
-                height,
-                0,
-                y,
-                normalized.bottomRows,
-                style);
-        }
-
-        return builder.build();
     }
 
     struct NormalizedFramePattern
@@ -1288,6 +1111,102 @@ namespace
         return layout;
     }
 
+    /*
+ Horizontal pattern line behavior:
+
+ - BEGIN is written once at the left.
+ - REPEAT tiles in full blocks only.
+ - END is written only if it fully fits.
+ - The repeat region may truncate to preserve a complete END.
+ - Partial END rendering is intentionally not supported.
+*/
+
+    TextObject buildHorizontalPatternLineObject(
+        int width,
+        const HorizontalLinePattern& pattern,
+        const std::optional<Style>& style)
+    {
+        if (width <= 0)
+        {
+            return TextObject();
+        }
+
+        const NormalizedHorizontalLinePattern normalized =
+            normalizeHorizontalLinePattern(pattern);
+
+        if (normalized.height <= 0)
+        {
+            return TextObject();
+        }
+
+        if (normalized.beginWidth <= 0 &&
+            normalized.repeatWidth <= 0 &&
+            normalized.endWidth <= 0)
+        {
+            return TextObject();
+        }
+
+        const HorizontalAppendLayout layout = computeHorizontalAppendLayout(
+            width,
+            normalized.beginWidth,
+            normalized.repeatWidth,
+            normalized.endWidth);
+
+        const int objectWidth = std::min(width, layout.usedWidth);
+        if (objectWidth <= 0)
+        {
+            return TextObject();
+        }
+
+        TextObjectBuilder builder =
+            makeAuthoredRectBuilder(objectWidth, normalized.height, style);
+
+        if (normalized.beginWidth > 0)
+        {
+            writeRowsToBuilder(
+                builder,
+                objectWidth,
+                normalized.height,
+                0,
+                0,
+                normalized.beginRows,
+                style);
+        }
+
+        if (normalized.repeatWidth > 0)
+        {
+            int x = layout.repeatStartX;
+
+            for (int i = 0; i < layout.repeatCount; ++i)
+            {
+                writeRowsToBuilder(
+                    builder,
+                    objectWidth,
+                    normalized.height,
+                    x,
+                    0,
+                    normalized.repeatRows,
+                    style);
+
+                x += normalized.repeatWidth;
+            }
+        }
+
+        if (layout.hasEnd && normalized.endWidth > 0)
+        {
+            writeRowsToBuilder(
+                builder,
+                objectWidth,
+                normalized.height,
+                layout.endX,
+                0,
+                normalized.endRows,
+                style);
+        }
+
+        return builder.build();
+    }
+
     struct VerticalAppendLayout
     {
         int topY = 0;
@@ -1351,6 +1270,94 @@ namespace
         return layout;
     }
 
+    TextObject buildVerticalPatternLineObject(
+        int height,
+        const VerticalLinePattern& pattern,
+        const std::optional<Style>& style)
+    {
+        if (height <= 0)
+        {
+            return TextObject();
+        }
+
+        const NormalizedVerticalLinePattern normalized =
+            normalizeVerticalLinePattern(pattern);
+
+        if (normalized.width <= 0)
+        {
+            return TextObject();
+        }
+
+        if (normalized.topHeight <= 0 &&
+            normalized.repeatHeight <= 0 &&
+            normalized.bottomHeight <= 0)
+        {
+            return TextObject();
+        }
+
+        const VerticalAppendLayout layout = computeVerticalAppendLayout(
+            height,
+            normalized.topHeight,
+            normalized.repeatHeight,
+            normalized.bottomHeight);
+
+        const int objectHeight = std::min(height, layout.usedHeight);
+        if (objectHeight <= 0)
+        {
+            return TextObject();
+        }
+
+        TextObjectBuilder builder =
+            makeAuthoredRectBuilder(normalized.width, objectHeight, style);
+
+        if (normalized.topHeight > 0)
+        {
+            writeRowsToBuilder(
+                builder,
+                normalized.width,
+                objectHeight,
+                0,
+                0,
+                normalized.topRows,
+                style);
+        }
+
+        if (normalized.repeatHeight > 0)
+        {
+            int y = layout.repeatStartY;
+
+            for (int i = 0; i < layout.repeatCount; ++i)
+            {
+                writeRowsToBuilder(
+                    builder,
+                    normalized.width,
+                    objectHeight,
+                    0,
+                    y,
+                    normalized.repeatRows,
+                    style);
+
+                y += normalized.repeatHeight;
+            }
+        }
+
+        if (layout.hasBottom && normalized.bottomHeight > 0)
+        {
+            writeRowsToBuilder(
+                builder,
+                normalized.width,
+                objectHeight,
+                0,
+                layout.bottomY,
+                normalized.bottomRows,
+                style);
+        }
+
+        return builder.build();
+    }
+
+
+
     TextObject buildPatternFrameObject(
         int width,
         int height,
@@ -1363,15 +1370,6 @@ namespace
         }
 
         const NormalizedFramePattern normalized = normalizeFramePattern(pattern);
-
-        /*
-        Concrete rule :
-        Frame-producing helpers must return fully-authored rectangular objects so
-        retained composition can apply solid-object writes across the entire box.
-        */
-        TextObjectBuilder builder = makeAuthoredRectBuilder(width, height, style);
-
-
 
         // Compute polished top-edge layout first.
         const HorizontalAppendLayout topLayout = computeHorizontalAppendLayout(
@@ -1423,6 +1421,14 @@ namespace
 
         frameUsedHeight = std::min(frameUsedHeight, height);
 
+        if (frameUsedWidth <= 0 || frameUsedHeight <= 0)
+        {
+            return TextObject();
+        }
+
+        TextObjectBuilder builder =
+            makeAuthoredRectBuilder(frameUsedWidth, frameUsedHeight, style);
+
         // Recompute bottom layout against the actual used frame width so it stays polished too.
         const HorizontalAppendLayout bottomLayout = computeHorizontalAppendLayout(
             frameUsedWidth,
@@ -1433,12 +1439,12 @@ namespace
         // Top corners
         if (!normalized.topLeftRows.empty())
         {
-            writeRowsToBuilder(builder, width, height, 0, 0, normalized.topLeftRows, style);
+            writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, 0, 0, normalized.topLeftRows, style);
         }
 
         if (topLayout.hasEnd && !normalized.topRightRows.empty())
         {
-            writeRowsToBuilder(builder, width, height, topLayout.endX, 0, normalized.topRightRows, style);
+            writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, topLayout.endX, 0, normalized.topRightRows, style);
         }
 
         // Top horizontal repeat
@@ -1447,7 +1453,7 @@ namespace
             int x = topLayout.repeatStartX;
             for (int i = 0; i < topLayout.repeatCount; ++i)
             {
-                writeRowsToBuilder(builder, width, height, x, 0, normalized.topRows, style);
+                writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, x, 0, normalized.topRows, style);
                 x += normalized.topWidth;
             }
         }
@@ -1455,12 +1461,12 @@ namespace
         // Bottom corners
         if (!normalized.bottomLeftRows.empty() && verticalLayout.hasBottom)
         {
-            writeRowsToBuilder(builder, width, height, 0, verticalLayout.bottomY, normalized.bottomLeftRows, style);
+            writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, 0, verticalLayout.bottomY, normalized.bottomLeftRows, style);
         }
 
         if (bottomLayout.hasEnd && verticalLayout.hasBottom && !normalized.bottomRightRows.empty())
         {
-            writeRowsToBuilder(builder, width, height, bottomLayout.endX, verticalLayout.bottomY, normalized.bottomRightRows, style);
+            writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, bottomLayout.endX, verticalLayout.bottomY, normalized.bottomRightRows, style);
         }
 
         // Bottom horizontal repeat
@@ -1469,7 +1475,7 @@ namespace
             int x = bottomLayout.repeatStartX;
             for (int i = 0; i < bottomLayout.repeatCount; ++i)
             {
-                writeRowsToBuilder(builder, width, height, x, verticalLayout.bottomY, normalized.bottomRows, style);
+                writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, x, verticalLayout.bottomY, normalized.bottomRows, style);
                 x += normalized.bottomWidth;
             }
         }
@@ -1480,7 +1486,7 @@ namespace
             int y = verticalLayout.repeatStartY;
             for (int i = 0; i < verticalLayout.repeatCount; ++i)
             {
-                writeRowsToBuilder(builder, width, height, 0, y, normalized.leftRows, style);
+                writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, 0, y, normalized.leftRows, style);
                 y += normalized.middleHeight;
             }
         }
@@ -1493,7 +1499,7 @@ namespace
             int y = verticalLayout.repeatStartY;
             for (int i = 0; i < verticalLayout.repeatCount; ++i)
             {
-                writeRowsToBuilder(builder, width, height, rightX, y, normalized.rightRows, style);
+                writeRowsToBuilder(builder, frameUsedWidth, frameUsedHeight, rightX, y, normalized.rightRows, style);
                 y += normalized.middleHeight;
             }
         }
@@ -1888,6 +1894,34 @@ namespace ObjectFactory
         };
     }
 
+    HorizontalLinePattern puzzleLinePattern()
+    {
+        return HorizontalLinePattern
+        {   {
+                U"     _ ",
+                U"   _( )",
+                U" _|    ",
+                U"(_   _ ",
+                U" |__( )"
+            },
+            {
+                U"     _ ",
+                U"__ _( )",
+                U" _|    ",
+                U"(_   _ ",
+                U"_|__( )"
+            },
+            {
+                U"     _    ",
+                U"__ _( )__ ",
+                U" _|     _|",
+                U"(_   _ (_ ",
+                U"_|__( )_| "
+            }
+        };
+    }
+
+
     HorizontalLinePattern scrollSemetricPattern()
     {
         return HorizontalLinePattern
@@ -1938,7 +1972,7 @@ namespace ObjectFactory
                 UR"PATTERN((         ))PATTERN",
                 UR"PATTERN( `.     .' )PATTERN",
                 UR"PATTERN(   `._.'   )PATTERN",
-                UR"PATTERN(    ( (    )PATTERN"
+                UR"PATTERN(   ( (     )PATTERN"
             },
             {
                 UR"PATTERN(    ) )    )PATTERN",

@@ -107,6 +107,7 @@ namespace ObjectFactory
     HorizontalLinePattern orbChainLinePattern();
     HorizontalLinePattern rightAroundPattern();
     HorizontalLinePattern dnaPattern();
+    HorizontalLinePattern puzzleLinePattern();
     HorizontalLinePattern scrollSemetricPattern();
 
     VerticalLinePattern heartChainVerticalPattern();
