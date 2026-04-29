@@ -220,6 +220,58 @@ namespace
     {
         writer.writeObject(source, policy, sourceStyleOverride);
     }
+
+    Style mergeObjectGlyphStyle(
+        const Style& destinationStyle,
+        const Style& sourceStyle)
+    {
+        Style result = StyleMerge::merge(
+            destinationStyle,
+            sourceStyle,
+            StyleMergeMode::MergePreserveDestination);
+
+        if (!sourceStyle.boldState().has_value())
+        {
+            result = result.withBold(false);
+        }
+
+        if (!sourceStyle.dimState().has_value())
+        {
+            result = result.withDim(false);
+        }
+
+        if (!sourceStyle.underlineState().has_value())
+        {
+            result = result.withUnderline(false);
+        }
+
+        if (!sourceStyle.slowBlinkState().has_value())
+        {
+            result = result.withSlowBlink(false);
+        }
+
+        if (!sourceStyle.fastBlinkState().has_value())
+        {
+            result = result.withFastBlink(false);
+        }
+
+        if (!sourceStyle.reverseState().has_value())
+        {
+            result = result.withReverse(false);
+        }
+
+        if (!sourceStyle.invisibleState().has_value())
+        {
+            result = result.withInvisible(false);
+        }
+
+        if (!sourceStyle.strikeState().has_value())
+        {
+            result = result.withStrike(false);
+        }
+
+        return result;
+    }
 }
 
 namespace Composition
@@ -358,10 +410,9 @@ namespace Composition
                 if (canWriteGlyph)
                 {
                     const Style writeStyle = canWriteStyle
-                        ? StyleMerge::merge(
+                        ? mergeObjectGlyphStyle(
                             resolveLogicalDestinationStyle(m_target, destinationX, destinationY),
-                            *resolvedSourceStyle,
-                            StyleMergeMode::MergePreserveDestination)
+                            *resolvedSourceStyle)
                         : resolveLogicalDestinationStyle(m_target, destinationX, destinationY);
 
                     const ScreenCell destinationCell =
