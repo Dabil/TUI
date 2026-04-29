@@ -963,10 +963,25 @@ void NeonDialogScreen::draw(Surface& surface)
 
     const Rect screen = page.getFullScreenRegion();
     page.createRegion("FullPage", screen);
+  
+    const Style fullOuterFrameStyle =
+        style::Fg(makeThemeColor(Color::Basic::BrightMagenta, 213, 255, 86, 214))
+        + style::Bold;
 
-    TextObject fullOuterFrame = ObjectFactory::makePatternFrame(screen.size.width, screen.size.height, ObjectFactory::heartFramePattern());
-    writeObject(page, fullOuterFrame, "FullPage", Composition::Align::center(), visibleObject());
-    
+    TextObject fullOuterFrame =
+        ObjectFactory::makePatternFrame(
+            screen.size.width,
+            screen.size.height,
+            ObjectFactory::heartFramePattern(),
+            fullOuterFrameStyle);
+
+    writeObject(
+        page,
+        fullOuterFrame,
+        "FullPage",
+        Composition::Align::center(),
+        visibleObject());
+
     const Rect dialog = Rect
     {
         Point{ std::max(2, (screen.size.width - 96) / 2), std::max(2, (screen.size.height - 26) / 2) },
