@@ -32,6 +32,7 @@ namespace
     using Composition::Alignment;
     using Composition::PageComposer;
     using Composition::WritePresets::solidObject;
+    using Composition::WritePresets::visibleObject;
     using Composition::WritePresets::authoredObject;
 
     constexpr int MinimumSceneWidth = 84;
@@ -388,19 +389,6 @@ namespace
         return object;
     }
 
-    const TextObject& satelliteObject()
-    {
-        static const TextObject object = TextObject::fromUtf8(
-            "        .-.        \n"
-            "    --- ( ) ---    \n"
-            "        `-'        \n"
-            "     .--| |--.     \n"
-            "    /___| |___\\   \n"
-            "        / \\       \n"
-            "       /___\\      ");
-        return object;
-    }
-
     const TextObject& verticalMeterObject()
     {
         static const TextObject object = TextObject::fromUtf8(
@@ -722,15 +710,16 @@ void ControlDeckScreen::draw(Surface& surface)
     buffer.writeString(leftPane.position.x + 2, leftPane.position.y + 1, "LAYOUT + PANELS", ControlAccent);
     buffer.writeString(pipelinePane.position.x + 2, pipelinePane.position.y + 1, "PIPELINES", ControlAccent);
     buffer.writeString(modesPane.position.x + 2, modesPane.position.y + 1, "OBJECT MODES", ControlAccent);
-    buffer.writeString(notesPane.position.x + 2, notesPane.position.y + 1, "WHY THIS PORT FITS THE NEW REPO", ControlAccent);
+    buffer.writeString(notesPane.position.x + 2, notesPane.position.y + 1, "What API's new developers should learn", ControlAccent);
 
     writeWrapped(
         page,
-        "The old combined showcase scene becomes a dedicated ControlDeck screen. This version leans harder into the new repository's richer color pipeline, clearer panel hierarchy, and placement-based composition instead of keeping all four looks inside one cycling screen.",
+        "TUI is not a layout engine - it's a composition engine.\n\nYou explicitly create and place everything. There are no hidden systems reflowing or shifting your UI.Nothing moves unless you tell it to.\n\nThis is what allows TUI applications to scale cleanly and remain predictable.\n\nThe Control Deck screen demonstrates how to organize a full application screen using simple, composable primitives.\n\nThe TUI Philosophy\n\nSimple primitives build complex screens.\n\nInstead of relying on complex frameworks with fragile behavior,\nTUI favors explicit composition and deterministic results.",
         "LeftContent",
         makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top));
 
-    writeObject(page, cubeObject(), "LeftContent", Composition::Align::bottomCenter());
+    TextObject puzzleLine = ObjectFactory::makeHorizontalPatternLine(leftPane.size.width, ObjectFactory::puzzleLinePattern(), ControlAccent);
+    writeObject(page, puzzleLine, "LeftContent", Composition::Align::bottomLeft());
 
     const double ingestRatio = pulse(elapsedSeconds(), 0.85, 0.2);
     const double composeRatio = pulse(elapsedSeconds(), 1.20, 1.1);
@@ -738,29 +727,31 @@ void ControlDeckScreen::draw(Surface& surface)
 
     writeTextBlock(
         page,
-        "ASSET INGEST   " + makeProgressBar(22, ingestRatio, '#') + "\n"
-        "PAGE COMPOSE   " + makeProgressBar(22, composeRatio, '=') + "\n"
-        "PRESENT PASS   " + makeProgressBar(22, renderRatio, '>'),
+        "BUILD OBJECTS        " + makeProgressBar(22, ingestRatio, '#') + "\n"
+        "COMPOSE PAGES        " + makeProgressBar(22, composeRatio, '=') + "\n"
+        "CREATE EXPERIENCES   " + makeProgressBar(22, renderRatio, '>'),
         "PipelineContent",
         makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
 
-    writeObject(page, chipObject(), "ModesContent", Composition::Align::centerLeft());
     writeTextBlock(
         page,
-        "SOLID OBJECT\n"
-        "VISIBLE OBJECT\n"
-        "GLYPHS ONLY\n"
-        "STYLE MASK",
+        "All write modes answer one question: What parts of this object are allowed to affect the screen?\n"
+        "SOLID OBJECT:Everything, including spaces, empty cells, and style\n"
+        "VISIBLE OBJECT: Only visible glyphs and Style, no spaces or empty cells\n"
+        "AUTHORED OBJECT: Only authored cells and Style (Glyphs + spaces, no empty cells)\n"
+        "GLYPHS ONLY: Glyphs only (No spaces, Empties, or Style)\n"
+        "STYLE MASK: Apply style where the object has shape\n"
+        "STYLE BLOCK: Apply style over a rectangle",
         "ModesContent",
-        makeAlignment(Composition::HorizontalAlign::Right, Composition::VerticalAlign::Center));
+        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
 
     writeTextBlock(
         page,
-        "• split into its own screen class\n"
-        "• richer RGB-themed panels\n"
-        "• clearer content regions\n"
-        "• cleaner integration path into ScreenManager\n"
-        "• no dependency on a 4-scene timer hub",
+        "• TextObject, ObjectFactory, ObjectComposer pipeline: How to build things\n"
+        "• ScreenComposer, Draw Modes, Write Policy: How to place things\n"
+        "• Layering and Style Effects: How to make things pretty\n"
+        "• Asset Manager: How to load external assets like .xp files\n"
+        "• Final mental model: Build objects. Control how they write. Draw them.",
         "NotesContent",
         makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
 
@@ -774,7 +765,7 @@ void ControlDeckScreen::draw(Surface& surface)
         "TickerContent",
         Composition::Align::centerLeft());
 
-    writeText(page, "ControlDeckScreen  |  extracted from the original multi-scene ShowcaseScreen", "FooterContent", Composition::Align::centerLeft());
+    writeText(page, "ControlDeckScreen  |  Page 1 of a Multi-Scene Showcase", "FooterContent", Composition::Align::centerLeft());
     writeText(page, "24-bit gradient background + dedicated scene class", "FooterContent", Composition::Align::centerRight());
 }
 
@@ -820,7 +811,7 @@ void RetroTerminalScreen::draw(Surface& surface)
         drawTooSmallMessage(buffer, "RetroTerminal", TerminalFrame);
         return;
     }
-
+    
     fillVerticalGradient(
         buffer,
         Rect{ Point{ 0, 0 }, Size{ buffer.getWidth(), buffer.getHeight() } },
@@ -848,11 +839,14 @@ void RetroTerminalScreen::draw(Surface& surface)
 
     page.createRegion("HeaderContent", insetRect(header, 2, 0, 2, 0));
     page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
-    page.createRegion("ConsoleContent", insetRect(consolePane, 2, 3, 2, 2));
+    page.createRegion("ConsoleContent", insetRect(consolePane, 2, 2, 2, 2));
     page.createRegion("TelemetryContent", insetRect(telemetryPane, 2, 3, 2, 2));
 
     buffer.writeString(consolePane.position.x + 2, consolePane.position.y + 1, ".xp Styled Components", TerminalFrame);
     buffer.writeString(telemetryPane.position.x + 2, telemetryPane.position.y + 1, "SIGNAL ANALYSIS", TerminalFrame);
+
+    TextObject heartColumn = ObjectFactory::makeVerticalPatternLine(consolePane.size.height, ObjectFactory::heartChainVerticalPattern());
+    writeObject(page, heartColumn, "ConsoleContent", Composition::Align::topRight());
 
     const TextObject banner = makeBanner("Computer.flf", "retro terminal", TerminalHeaderSurface);
     writeObject(page, banner, "HeaderContent", Composition::Align::topCenter());
@@ -872,12 +866,15 @@ void RetroTerminalScreen::draw(Surface& surface)
     };
 
     const int baseIndex = static_cast<int>(elapsedSeconds() * 4.0);
-    const Rect consoleContent = page.resolveRegion("ConsoleContent");
+    Rect consoleContent = page.resolveRegion("ConsoleContent");
+
+    consoleContent.position.y++;
 
     RetroTerminalComponent retroTerminal
     {
         m_retroTerminalObject,
-        Rect{
+        Rect
+        {
             Point{ 2, 1 },
             Size{ 35, 10 }
         }
@@ -916,7 +913,7 @@ void RetroTerminalScreen::draw(Surface& surface)
 
     writeWrapped(
         page,
-        "This extracted screen keeps the old monochrome-terminal mood but upgrades it with richer greens, softer background falloff, and a cleaner split between console output and side telemetry.",
+        "TUI can emulate a terminal-style text-driven experience using the same primitives as UI. Create a clean split between console output and side telemetry. Use FIGlet, TOIlet, and Psuedo fonts to create eye catching titles. All with character level control. Dynamic rendering, not just static layouts.",
         "TelemetryContent",
         makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top));
 
@@ -965,6 +962,11 @@ void NeonDialogScreen::draw(Surface& surface)
     page.clearRegions();
 
     const Rect screen = page.getFullScreenRegion();
+    page.createRegion("FullPage", screen);
+
+    TextObject fullOuterFrame = ObjectFactory::makePatternFrame(screen.size.width, screen.size.height, ObjectFactory::heartFramePattern());
+    writeObject(page, fullOuterFrame, "FullPage", Composition::Align::center(), visibleObject());
+    
     const Rect dialog = Rect
     {
         Point{ std::max(2, (screen.size.width - 96) / 2), std::max(2, (screen.size.height - 26) / 2) },
@@ -1119,8 +1121,6 @@ void OpsWallScreen::draw(Surface& surface)
             static_cast<int>(elapsedSeconds() * 10.0)),
         "FooterContent",
         Composition::Align::centerLeft());
-
-    writeText(page, "SHOWCASE / OPS WALL", "FooterContent", Composition::Align::centerRight());
 
     for (int x = 3; x < buffer.getWidth() - 3; x += 8)
     {
