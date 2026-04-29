@@ -1060,7 +1060,7 @@ void OpsWallScreen::draw(Surface& surface)
         buffer,
         Rect{ Point{ 0, 0 }, Size{ buffer.getWidth(), buffer.getHeight() } },
         makeThemeColor(Color::Basic::BrightWhite, 255, 240, 240, 240),
-        { Color::RgbValue{ 8, 8, 10 }, Color::RgbValue{ 24, 18, 18 } },
+        { Color::RgbValue{ 8, 8, 10 }, Color::RgbValue{ 28, 18, 18 } },
         Color::Basic::Black,
         16);
 
@@ -1069,80 +1069,187 @@ void OpsWallScreen::draw(Surface& surface)
 
     const Rect screen = page.getFullScreenRegion();
     const Rect canvas = insetRect(screen, 1, 1, 1, 1);
+
     const auto [header, afterHeader] = page.splitTop(canvas, 8);
-    const auto [footer, body] = page.splitBottom(afterHeader, 5);
-    const auto [topBand, bottomBand] = page.splitTop(body, std::max(10, body.size.height / 2));
-    const auto [topLeft, topRight] = page.splitLeft(topBand, std::max(36, topBand.size.width / 2));
-    const auto [bottomLeft, bottomRight] = page.splitLeft(bottomBand, std::max(36, bottomBand.size.width / 2));
+    const auto [footer, body] = page.splitBottom(afterHeader, 4);
+    const auto [leftColumn, rightColumn] = page.splitLeft(body, std::max(40, (body.size.width * 2) / 3));
+    const auto [statusPanel, heatPanel] = page.splitTop(leftColumn, std::max(9, leftColumn.size.height / 2));
+    const auto [metricsPanel, alertPanel] = page.splitTop(rightColumn, rightColumn.size.height - 10);
 
     paintPanel(buffer, header, OpsPanel, OpsFrame, ObjectFactory::doubleLineBorder());
+    paintPanel(buffer, statusPanel, OpsPanel, OpsFrame);
+    paintPanel(buffer, heatPanel, OpsPanel, OpsFrame);
+    paintPanel(buffer, metricsPanel, OpsPanel, OpsFrame);
+    paintPanel(buffer, alertPanel, OpsPanel, OpsFrame);
     paintPanel(buffer, footer, OpsPanel, OpsFrame, ObjectFactory::doubleLineBorder());
-    paintPanel(buffer, topLeft, OpsPanel, OpsFrame);
-    paintPanel(buffer, topRight, OpsPanel, OpsFrame);
-    paintPanel(buffer, bottomLeft, OpsPanel, OpsFrame);
-    paintPanel(buffer, bottomRight, OpsPanel, OpsFrame);
 
     page.createRegion("HeaderContent", insetRect(header, 2, 1, 2, 1));
+    page.createRegion("StatusContent", insetRect(statusPanel, 2, 3, 2, 1));
+    page.createRegion("HeatContent", insetRect(heatPanel, 2, 3, 2, 1));
+    page.createRegion("MetricsContent", insetRect(metricsPanel, 2, 3, 2, 1));
+    page.createRegion("AlertContent", insetRect(alertPanel, 2, 3, 2, 1));
     page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
-    page.createRegion("TopLeftContent", insetRect(topLeft, 2, 3, 2, 2));
-    page.createRegion("TopRightContent", insetRect(topRight, 2, 3, 2, 2));
-    page.createRegion("BottomLeftContent", insetRect(bottomLeft, 2, 3, 2, 2));
-    page.createRegion("BottomRightContent", insetRect(bottomRight, 2, 3, 2, 2));
 
-    buffer.writeString(topLeft.position.x + 2, topLeft.position.y + 1, "ACTIVE PANELS", OpsAmber);
-    buffer.writeString(topRight.position.x + 2, topRight.position.y + 1, "BUILD STATUS", OpsAmber);
-    buffer.writeString(bottomLeft.position.x + 2, bottomLeft.position.y + 1, "OBJECT PREVIEW", OpsAmber);
-    buffer.writeString(bottomRight.position.x + 2, bottomRight.position.y + 1, "SITUATION SUMMARY", OpsAmber);
+    buffer.writeString(statusPanel.position.x + 2, statusPanel.position.y + 1, "NODE STATUS GRID", OpsAmber);
+    buffer.writeString(heatPanel.position.x + 2, heatPanel.position.y + 1, "LOAD HEAT MAP", OpsAmber);
+    buffer.writeString(metricsPanel.position.x + 2, metricsPanel.position.y + 1, "SYSTEM METRICS", OpsAmber);
+    buffer.writeString(alertPanel.position.x + 2, alertPanel.position.y + 1, "ALERT CHANNEL", OpsAmber);
 
     const TextObject banner = makeBanner(
         "Small Shadow.flf",
         "TUI Ops Wall",
         OpsAmber,
         AsciiBanner::ComposeMode::FullWidth);
-    writeObject(page, banner, "HeaderContent", Composition::Align::center());
+
+    writeObject(page, banner, "HeaderContent", Composition::Align::centerLeft());
+
+    const int modeIndex = static_cast<int>(elapsedSeconds() / 10.0) % 3;
+    const char* modeName = (modeIndex == 0) ? "CALM" : (modeIndex == 1) ? "BUSY" : "CHAOTIC";
+    const double modeLoad = (modeIndex == 0) ? 0.28 : (modeIndex == 1) ? 0.62 : 0.86;
+
+    const double cpu = std::clamp(modeLoad + (pulse(elapsedSeconds(), 1.7, 0.0) - 0.5) * 0.34, 0.0, 1.0);
+    const double memory = std::clamp(modeLoad + (pulse(elapsedSeconds(), 1.1, 1.2) - 0.5) * 0.26, 0.0, 1.0);
+    const double network = std::clamp(modeLoad + (pulse(elapsedSeconds(), 2.2, 2.0) - 0.5) * 0.42, 0.0, 1.0);
+    const double queue = std::clamp(modeLoad + (pulse(elapsedSeconds(), 0.9, 3.4) - 0.5) * 0.50, 0.0, 1.0);
+
+    const bool cpuAlert = cpu >= 0.82;
+    const bool memoryAlert = memory >= 0.78;
+    const bool networkAlert = network >= 0.88;
+    const bool queueAlert = queue >= 0.80;
+    const bool anyAlert = cpuAlert || memoryAlert || networkAlert || queueAlert;
+
+    const Style alertStyle = anyAlert ? OpsFrame + style::SlowBlink : OpsAmber;
+    const Style hotStyle = OpsFrame + style::Bold;
+    const Style warmStyle = OpsAmber;
+    const Style coolStyle = OpsCyan;
+
+    buffer.writeString(header.position.x + header.size.width - 24, header.position.y + 2, std::string("SIM MODE: ") + modeName, alertStyle);
+
+    const Rect statusContent = page.resolveRegion("StatusContent");
+    const TextObject dividerBox = ObjectFactory::makeDividerBox(
+        statusContent.size.width,
+        statusContent.size.height,
+        3,
+        2,
+        U' ',
+        OpsCyan,
+        ObjectFactory::singleLineGlyphs());
+
+    writeObject(page, dividerBox, "StatusContent", Composition::Align::topLeft(), visibleObject());
+
+    const std::array<std::string, 12> nodeLabels =
+    {
+        "API", "DB", "CACHE", "BUS",
+        "AUTH", "JOBS", "CDN", "MQ",
+        "GPU", "LOG", "AI", "EDGE"
+    };
+
+    const int nodeCellWidth = std::max(1, statusContent.size.width / 4);
+    const int nodeCellHeight = std::max(1, statusContent.size.height / 3);
+
+    for (int i = 0; i < 12; ++i)
+    {
+        const int col = i % 4;
+        const int row = i / 4;
+        const double load = std::clamp(
+            modeLoad + (pulse(elapsedSeconds(), 0.75 + (i * 0.11), i * 0.73) - 0.5) * 0.55,
+            0.0,
+            1.0);
+
+        const Style nodeStyle = (load > 0.82) ? hotStyle : (load > 0.58) ? warmStyle : coolStyle;
+        const int x = statusContent.position.x + (col * nodeCellWidth) + 1;
+        const int y = statusContent.position.y + (row * nodeCellHeight) + std::max(0, nodeCellHeight / 2);
+
+        buffer.writeString(x, y, nodeLabels[static_cast<std::size_t>(i)], nodeStyle);
+    }
+
+    const Rect heatContent = page.resolveRegion("HeatContent");
+    const int heatColumns = std::max(4, std::min(16, heatContent.size.width / 2));
+    const int heatRows = std::max(3, std::min(7, heatContent.size.height));
+
+    const TextObject heatGrid = ObjectFactory::makeGrid(
+        heatColumns,
+        heatRows,
+        1,
+        1,
+        OpsCyan,
+        ObjectFactory::singleLineGlyphs());
+
+    writeObject(page, heatGrid, "HeatContent", Composition::Align::topLeft(), visibleObject());
+
+    for (int y = 0; y < heatRows; ++y)
+    {
+        for (int x = 0; x < heatColumns; ++x)
+        {
+            const double intensity = std::clamp(
+                modeLoad + (pulse(elapsedSeconds(), 1.0 + (x * 0.13), y * 0.91) - 0.5) * 0.70,
+                0.0,
+                1.0);
+
+            const char glyph = (intensity > 0.82) ? '#' : (intensity > 0.58) ? '+' : '.';
+            const Style cellStyle = (intensity > 0.82) ? hotStyle : (intensity > 0.58) ? warmStyle : coolStyle;
+
+            const int drawX = heatContent.position.x + 1 + (x * 2);
+            const int drawY = heatContent.position.y + 1 + (y * 2);
+
+            if (buffer.inBounds(drawX, drawY))
+            {
+                buffer.writeChar(drawX, drawY, glyph, cellStyle);
+            }
+        }
+    }
+
+    const std::string metricsBlock =
+        std::string("CPU     ") + makeProgressBar(18, cpu, '#') + "\n"
+        + "MEMORY  " + makeProgressBar(18, memory, '=') + "\n"
+        + "NET I/O " + makeProgressBar(18, network, '>') + "\n"
+        + "QUEUE   " + makeProgressBar(18, queue, '*') + "\n\n"
+        + "Simulation mode cycles every 10 seconds.\n"
+        + "Calm -> Busy -> Chaotic";
 
     writeTextBlock(
         page,
-        "Build Queue\nAsset Pipeline\nTheme Preview\nFrame Diff\nRenderer Trace\nUnicode Audit",
-        "TopLeftContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
+        metricsBlock,
+        "MetricsContent",
+        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top));
 
-    const std::string progressBlock =
-        std::string("Layout  ") + makeProgressBar(18, pulse(elapsedSeconds(), 0.70), '=') + "\n"
-        + "Objects " + makeProgressBar(18, pulse(elapsedSeconds(), 1.10, 0.8), '=') + "\n"
-        + "Themes  " + makeProgressBar(18, pulse(elapsedSeconds(), 0.90, 1.6), '=');
+    std::string alertText;
+    if (!anyAlert)
+    {
+        alertText = "All systems nominal\nNo active threshold events";
+    }
+    else
+    {
+        alertText = "ACTIVE ALERTS\n";
+        if (cpuAlert) { alertText += "- CPU saturation rising\n"; }
+        if (memoryAlert) { alertText += "- Memory pressure high\n"; }
+        if (networkAlert) { alertText += "- Network burst detected\n"; }
+        if (queueAlert) { alertText += "- Work queue backing up\n"; }
+    }
 
     writeTextBlock(
         page,
-        progressBlock,
-        "TopRightContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
-
-    writeObject(page, cubeObject(), "BottomLeftContent", Composition::Align::centerLeft());
-    writeObject(page, chipObject(), "BottomLeftContent", Composition::Align::centerRight());
-
-    writeWrapped(
-        page,
-        "The OpsWall scene is now a standalone screen rather than a timed phase inside one monolithic showcase. That makes it much easier to plug into menus, diagnostics flows, or future demo navigation without carrying the other three layouts around with it.",
-        "BottomRightContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
+        alertText,
+        "AlertContent",
+        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center),
+        authoredObject());
 
     const int footerWidth = std::max(1, page.resolveRegion("FooterContent").size.width);
     writeText(
         page,
         makeMarquee(
-            "ops wall  •  four panel command board  •  retained objects  •  figlet banner  •  rgb accents  •  extracted screen class",
+            "ops wall  |  divider boxes  |  grid heat maps  |  live metrics  |  alert thresholds  |  procedural overlays",
             footerWidth,
-            static_cast<int>(elapsedSeconds() * 10.0)),
+            static_cast<int>(elapsedSeconds() * (anyAlert ? 20.0 : 10.0))),
         "FooterContent",
         Composition::Align::centerLeft());
 
-    for (int x = 3; x < buffer.getWidth() - 3; x += 8)
+    for (int x = 3; x < buffer.getWidth() - 3; x += 9)
     {
-        const int y = static_cast<int>(2 + std::fmod(elapsedSeconds() * 6.0 + static_cast<double>(x), 6.0));
+        const int y = static_cast<int>(2 + std::fmod(elapsedSeconds() * (anyAlert ? 9.0 : 4.0) + static_cast<double>(x), 6.0));
         if (buffer.inBounds(x, y))
         {
-            buffer.writeChar(x, y, '*', OpsCyan);
+            buffer.writeChar(x, y, anyAlert ? '!' : '*', anyAlert ? hotStyle : OpsCyan);
         }
     }
 }
