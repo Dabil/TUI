@@ -4,6 +4,7 @@
 
 #include "Rendering/Composition/WritePolicyUtils.h"
 #include "Rendering/Composition/WritePresets.h"
+#include "Rendering/Styles/StyleMerge.h"
 
 /*
    Concrete Rule:
@@ -357,7 +358,10 @@ namespace Composition
                 if (canWriteGlyph)
                 {
                     const Style writeStyle = canWriteStyle
-                        ? *resolvedSourceStyle
+                        ? StyleMerge::merge(
+                            resolveLogicalDestinationStyle(m_target, destinationX, destinationY),
+                            *resolvedSourceStyle,
+                            StyleMergeMode::MergePreserveDestination)
                         : resolveLogicalDestinationStyle(m_target, destinationX, destinationY);
 
                     const ScreenCell destinationCell =
@@ -369,7 +373,13 @@ namespace Composition
 
                 if (isExplicitStyleOnlyPreset && canWriteStyle)
                 {
-                    m_target.setCellStyle(destinationX, destinationY, *resolvedSourceStyle);
+                    m_target.setCellStyle(
+                        destinationX,
+                        destinationY,
+                        StyleMerge::merge(
+                            resolveLogicalDestinationStyle(m_target, destinationX, destinationY),
+                            *resolvedSourceStyle,
+                            StyleMergeMode::MergePreserveDestination));
                 }
 
                 // Empty cells are transparent/no-op cells.
