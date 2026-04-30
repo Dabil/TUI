@@ -177,16 +177,6 @@ namespace
         false,
         true);
 
-    void fillRect(ScreenBuffer& buffer, const Rect& rect, const Style& style, char32_t glyph = U' ')
-    {
-        if (rect.size.width <= 0 || rect.size.height <= 0)
-        {
-            return;
-        }
-
-        buffer.fillRect(rect, glyph, style);
-    }
-
     void fillVerticalGradient(
         ScreenBuffer& buffer,
         const Rect& rect,
@@ -226,19 +216,6 @@ namespace
                 U' ',
                 rowStyle);
         }
-    }
-
-    void drawFrame(ScreenBuffer& buffer, const Rect& rect, const Style& style, const ObjectFactory::BorderGlyphs& glyphs)
-    {
-        buffer.drawFrame(
-            rect,
-            style,
-            glyphs.topLeft,
-            glyphs.topRight,
-            glyphs.bottomLeft,
-            glyphs.bottomRight,
-            glyphs.horizontal,
-            glyphs.vertical);
     }
 
     std::string makeProgressBar(int width, double ratio, char fillGlyph, char emptyGlyph = '.')
@@ -395,38 +372,6 @@ namespace
             5,
             "Recommended minimum: 84 x 28",
             Themes::Subtitle);
-    }
-
-    Rect insetRect(const Rect& rect, int left, int top, int right, int bottom)
-    {
-        return Rect{
-            Point{ rect.position.x + left, rect.position.y + top },
-            Size{ std::max(0, rect.size.width - left - right), std::max(0, rect.size.height - top - bottom) }
-        };
-    }
-
-    void paintPanel(
-        ScreenBuffer& buffer,
-        const Rect& rect,
-        const Style& fillStyle,
-        const Style& frameStyle,
-        const ObjectFactory::BorderGlyphs& glyphs = ObjectFactory::singleLineBorder())
-    {
-        fillRect(buffer, rect, fillStyle);
-        drawFrame(buffer, rect, frameStyle, glyphs);
-    }
-
-    Rect drawPanelTitleBar(
-        ScreenBuffer& buffer,
-        const Rect& rect,
-        std::string_view title,
-        const Style& titleStyle,
-        const Style& barStyle)
-    {
-        const Rect titleBar{ rect.position, Size{ rect.size.width, std::min(3, rect.size.height) } };
-        fillRect(buffer, titleBar, barStyle);
-        buffer.writeString(titleBar.position.x + 2, titleBar.position.y + 1, std::string(title), titleStyle);
-        return insetRect(rect, 2, titleBar.size.height + 1, 2, 1);
     }
 
     struct RetroTerminalComponent
