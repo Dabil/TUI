@@ -351,6 +351,27 @@ namespace Composition
                 base.size.height - (inset * 2)));
     }
 
+    void PageComposer::createInsetRegion(
+        std::string_view name,
+        std::string_view parent,
+        int left,
+        int top,
+        int right,
+        int bottom)
+    {
+        const Rect parentRect = resolveRegion(parent);
+
+        Rect inset{
+            Point{ parentRect.position.x + left, parentRect.position.y + top },
+            Size{
+                std::max(0, parentRect.size.width - left - right),
+                std::max(0, parentRect.size.height - top - bottom)
+            }
+        };
+
+        createRegion(name, inset);
+    }
+
     void PageComposer::createFramedScreenRegions(
         std::string_view outerName,
         std::string_view innerName,
@@ -690,6 +711,21 @@ namespace Composition
             policy);
     }
 
+    void PageComposer::writeObjectInRegion(
+        const TextObject& object,
+        std::string_view regionName,
+        const Alignment& alignment,
+        const WritePolicy& policy,
+        bool clampToRegion)
+    {
+        writeInRegion(
+            object,
+            regionName,
+            alignment,
+            policy,
+            clampToRegion);
+    }
+
     void PageComposer::writeAligned(
         const TextObject& object,
         const Alignment& alignment,
@@ -714,6 +750,37 @@ namespace Composition
         const PlacementSpec& placement)
     {
         writeObject(object, placement, WritePresets::solidObject());
+    }
+
+    void PageComposer::drawPanel(
+        std::string_view regionName,
+        const Style& fillStyle,
+        const Style& frameStyle,
+        const ObjectFactory::BorderGlyphs& glyphs)
+    {
+        const Rect rect = resolveRegion(regionName);
+
+        if (rect.size.width <= 0 || rect.size.height <= 0)
+        {
+            return;
+        }
+
+        refreshFromTarget();
+
+        m_buffer.fillRect(rect, U' ', fillStyle);
+
+        m_buffer.drawFrame(
+            rect,
+            frameStyle,
+            glyphs.topLeft,
+            glyphs.topRight,
+            glyphs.bottomLeft,
+            glyphs.bottomRight,
+            glyphs.horizontal,
+            glyphs.vertical);
+
+        synchronizeTarget();
+        m_lastSignature = 0;
     }
 
     void PageComposer::writeTextInRegion(
@@ -764,6 +831,31 @@ namespace Composition
             text,
             PlacementSpec::inFullScreen(Align::center(), clampToRegion),
             policy);
+    }
+
+    void PageComposer::writePanelTitle(
+        std::string_view regionName,
+        std::string_view text,
+        const Style& style,
+        int insetX,
+        int insetY)
+    {
+        const Rect rect = resolveRegion(regionName);
+
+        if (rect.size.width <= 0 || rect.size.height <= 0)
+        {
+            return;
+        }
+
+        const int x = rect.position.x + insetX;
+        const int y = rect.position.y + insetY;
+
+        refreshFromTarget();
+
+        m_buffer.writeString(x, y, std::string(text), style);
+
+        synchronizeTarget();
+        m_lastSignature = 0;
     }
 
     void PageComposer::setAssetLibrary(Assets::AssetLibrary* library)

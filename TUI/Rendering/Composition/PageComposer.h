@@ -13,8 +13,9 @@
 #include "Rendering/Composition/RegionRegistry.h"
 #include "Rendering/Composition/WritePolicy.h"
 #include "Rendering/Composition/WritePresets.h"
-#include "Rendering/Diagnostics/PageCompositionDiagnostics.h"
 #include "Rendering/Objects/TextObject.h"
+#include "Rendering/Objects/TextObjectFactory.h"
+#include "Rendering/Diagnostics/PageCompositionDiagnostics.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
 
@@ -125,10 +126,20 @@ namespace Composition
         void createFullScreenRegion(std::string_view name);
         void createCenteredRegion(std::string_view name, int width, int height);
         void createCenteredRegion(std::string_view name, const Size& size);
+        
         void createInsetRegion(
             std::string_view name,
             std::string_view parent,
             int inset);
+
+        void createInsetRegion(
+            std::string_view name,
+            std::string_view parent,
+            int left,
+            int top,
+            int right,
+            int bottom);
+
         void createFramedScreenRegions(
             std::string_view outerName,
             std::string_view innerName,
@@ -219,20 +230,27 @@ namespace Composition
             const TextObject& object,
             int x,
             int y,
-            const WritePolicy& policy);
+            const WritePolicy& policy = WritePresets::authoredObject());
 
         void writeInRegion(
             const TextObject& object,
             std::string_view regionName,
             const Alignment& alignment,
-            const WritePolicy& policy,
-            bool clampToRegion = false);
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
+
+        void writeObjectInRegion(
+            const TextObject& object,
+            std::string_view regionName,
+            const Alignment& alignment,
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
 
         void writeAligned(
             const TextObject& object,
             const Alignment& alignment,
-            const WritePolicy& policy,
-            bool clampToRegion = false);
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
 
         void writeVisible(
             const TextObject& object,
@@ -242,32 +260,45 @@ namespace Composition
             const TextObject& object,
             const PlacementSpec& placement);
 
+        void drawPanel(
+            std::string_view regionName,
+            const Style& fillStyle,
+            const Style& frameStyle,
+            const ObjectFactory::BorderGlyphs& glyphs = ObjectFactory::singleLineBorder());
+
         // Text sugar
         void writeTextInRegion(
             std::string_view text,
             std::string_view regionName,
             const Alignment& alignment,
-            const WritePolicy& policy,
-            bool clampToRegion = false);
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
 
         void writeTextBlockInRegion(
             std::string_view text,
             std::string_view regionName,
             const Alignment& alignment,
-            const WritePolicy& policy,
-            bool clampToRegion = false);
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
 
         void writeWrappedTextInRegion(
             std::string_view text,
             std::string_view regionName,
             const Alignment& alignment,
-            const WritePolicy& policy,
-            bool clampToRegion = false);
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
 
         void writeCenteredText(
             std::string_view text,
-            const WritePolicy& policy,
-            bool clampToRegion = false);
+            const WritePolicy& policy = WritePresets::authoredObject(),
+            bool clampToRegion = true);
+
+        void writePanelTitle(
+            std::string_view regionName,
+            std::string_view text,
+            const Style& style,
+            int insetX = 2,
+            int insetY = 1);
 
         // ---------------------------------------------------------------------
         // Asset / template hooks
