@@ -828,8 +828,8 @@ void NeonDialogScreen::draw(Surface& surface)
     page.clearRegions();
 
     const Rect screen = page.getFullScreenRegion();
-    page.createRegion("FullPage", screen);
-  
+    page.createFullScreenRegion("FullPage");
+
     const Style fullOuterFrameStyle =
         style::Fg(makeThemeColor(Color::Basic::BrightMagenta, 213, 255, 86, 214))
         + style::Bold;
@@ -998,7 +998,13 @@ void OpsWallScreen::draw(Surface& surface)
     const Style warmStyle = OpsAmber;
     const Style coolStyle = OpsCyan;
 
-    buffer.writeString(header.position.x + header.size.width - 24, header.position.y + 2, std::string("SIM MODE: ") + modeName, alertStyle);
+    page.createInsetRegion("HeaderStatus", "Header", 2, 2, 2, 1);
+
+    page.writeTextInRegion(
+        std::string("SIM MODE: ") + modeName,
+        "HeaderStatus",
+        Composition::Align::centerRight(),
+        authoredObject());
 
     const Rect statusContent = page.resolveRegion("StatusContent");
     const TextObject dividerBox = ObjectFactory::makeDividerBox(
