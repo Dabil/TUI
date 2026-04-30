@@ -177,13 +177,6 @@ namespace
         false,
         true);
 
-    Alignment makeAlignment(
-        Composition::HorizontalAlign horizontal,
-        Composition::VerticalAlign vertical)
-    {
-        return { horizontal, vertical };
-    }
-
     void fillRect(ScreenBuffer& buffer, const Rect& rect, const Style& style, char32_t glyph = U' ')
     {
         if (rect.size.width <= 0 || rect.size.height <= 0)
@@ -248,58 +241,6 @@ namespace
             glyphs.vertical);
     }
 
-    void writeText(
-        PageComposer& page,
-        std::string_view text,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const Composition::WritePolicy& policy = authoredObject())
-    {
-        page.writeAlignedText(
-            text,
-            PageComposer::PlacementSpec::inNamedRegion(regionName, alignment, true),
-            policy);
-    }
-
-    void writeTextBlock(
-        PageComposer& page,
-        std::string_view text,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const Composition::WritePolicy& policy = authoredObject())
-    {
-        page.writeAlignedTextBlock(
-            text,
-            PageComposer::PlacementSpec::inNamedRegion(regionName, alignment, true),
-            policy);
-    }
-
-    void writeWrapped(
-        PageComposer& page,
-        std::string_view text,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const Composition::WritePolicy& policy = authoredObject())
-    {
-        page.writeWrappedText(
-            text,
-            PageComposer::PlacementSpec::inNamedRegion(regionName, alignment, true),
-            policy);
-    }
-
-    void writeObject(
-        PageComposer& page,
-        const TextObject& object,
-        std::string_view regionName,
-        const Alignment& alignment,
-        const Composition::WritePolicy& policy = authoredObject())
-    {
-        page.writeObject(
-            object,
-            PageComposer::PlacementSpec::inNamedRegion(regionName, alignment, true),
-            policy);
-    }
-
     std::string makeProgressBar(int width, double ratio, char fillGlyph, char emptyGlyph = '.')
     {
         ratio = std::clamp(ratio, 0.0, 1.0);
@@ -348,34 +289,6 @@ namespace
     double pulse(double timeSeconds, double speed, double phase = 0.0)
     {
         return (std::sin((timeSeconds * speed) + phase) + 1.0) * 0.5;
-    }
-
-    const TextObject& cubeObject()
-    {
-        static const TextObject object = TextObject::fromUtf8(
-            "   _________ \n"
-            "  / _______/|\n"
-            " / /______/ |\n"
-            "/_/______/  |\n"
-            "|  TUI   |  |\n"
-            "| ENGINE | / \n"
-            "|________|/  ");
-        return object;
-    }
-
-    const TextObject& chipObject()
-    {
-        static const TextObject object = TextObject::fromUtf8(
-            "   .--------------.\n"
-            "  /     TUI      /|\n"
-            " / BuildS with: / |\n"
-            "+--------------+  |\n"
-            "| TEXT OBJECTS |  |\n"
-            "| COLOR STYLES |  .\n"
-            "|  .XP FILES   | / \n"
-            "|   WIDGETS    |/  \n"
-            "+--------------+  ");
-        return object;
     }
 
     const TextObject& waveObject()
@@ -666,8 +579,10 @@ void ControlDeckScreen::draw(Surface& surface)
     PageComposer page(buffer);
     page.clearRegions();
 
-    const Rect screen = page.getFullScreenRegion();
-    const Rect safe = insetRect(screen, 2, 1, 2, 1);
+    page.createFullScreenRegion("Screen");
+    page.createInsetRegion("Safe", "Screen", 2, 1, 2, 1);
+
+    const Rect safe = page.resolveRegion("Safe");
     const auto [header, afterHeader] = page.splitTop(safe, 9);
     const auto [footer, body] = page.splitBottom(afterHeader, 4);
     const auto [leftPane, rightPane] = page.splitLeft(body, std::max(34, body.size.width / 2 - 3));
@@ -677,26 +592,31 @@ void ControlDeckScreen::draw(Surface& surface)
     page.createRegion("LeftPane", leftPane);
     page.createRegion("RightPane", rightPane);
 
-    const auto [pipelinePane, afterPipeline] = page.splitTop(insetRect(rightPane, 0, 0, 0, 0), 8);
+    const auto [pipelinePane, afterPipeline] = page.splitTop(rightPane, 8);
     const auto [modesPane, authorPane] = page.splitTop(afterPipeline, 12);
     const Rect tickerPane = page.peekBottom(authorPane, 3);
     const Rect notesPane = page.remainderAbove(authorPane, 3);
 
-    paintPanel(buffer, header, ControlPanel, ControlFrame, ObjectFactory::doubleLineBorder());
-    paintPanel(buffer, leftPane, ControlPanel, ControlFrame);
-    paintPanel(buffer, pipelinePane, ControlPanel, ControlFrame);
-    paintPanel(buffer, modesPane, ControlPanel, ControlFrame);
-    paintPanel(buffer, notesPane, ControlPanel, ControlFrame);
-    paintPanel(buffer, tickerPane, ControlPanel, ControlFrame);
-    paintPanel(buffer, footer, ControlPanel, ControlFrame, ObjectFactory::roundedBorder());
+    page.createRegion("PipelinePane", pipelinePane);
+    page.createRegion("ModesPane", modesPane);
+    page.createRegion("NotesPane", notesPane);
+    page.createRegion("TickerPane", tickerPane);
 
-    page.createRegion("HeaderContent", insetRect(header, 2, 1, 2, 1));
-    page.createRegion("LeftContent", insetRect(leftPane, 2, 3, 2, 2));
-    page.createRegion("PipelineContent", insetRect(pipelinePane, 2, 3, 2, 1));
-    page.createRegion("ModesContent", insetRect(modesPane, 2, 2, 2, 1));
-    page.createRegion("NotesContent", insetRect(notesPane, 2, 3, 2, 1));
-    page.createRegion("TickerContent", insetRect(tickerPane, 2, 1, 2, 1));
-    page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
+    page.drawPanel("Header", ControlPanel, ControlFrame, ObjectFactory::doubleLineBorder());
+    page.drawPanel("LeftPane", ControlPanel, ControlFrame);
+    page.drawPanel("PipelinePane", ControlPanel, ControlFrame);
+    page.drawPanel("ModesPane", ControlPanel, ControlFrame);
+    page.drawPanel("NotesPane", ControlPanel, ControlFrame);
+    page.drawPanel("TickerPane", ControlPanel, ControlFrame);
+    page.drawPanel("Footer", ControlPanel, ControlFrame, ObjectFactory::roundedBorder());
+
+    page.createInsetRegion("HeaderContent", "Header", 2, 1, 2, 1);
+    page.createInsetRegion("LeftContent", "LeftPane", 2, 3, 2, 2);
+    page.createInsetRegion("PipelineContent", "PipelinePane", 2, 3, 2, 1);
+    page.createInsetRegion("ModesContent", "ModesPane", 2, 2, 2, 1);
+    page.createInsetRegion("NotesContent", "NotesPane", 2, 3, 2, 1);
+    page.createInsetRegion("TickerContent", "TickerPane", 2, 1, 2, 1);
+    page.createInsetRegion("FooterContent", "Footer", 2, 1, 2, 1);
 
     const TextObject banner = makeBanner(
         "ANSI Shadow.flf",
@@ -704,37 +624,37 @@ void ControlDeckScreen::draw(Surface& surface)
         ControlInfo,
         AsciiBanner::ComposeMode::FullWidth);
 
-    writeObject(page, banner, "HeaderContent", Composition::Align::topCenter());
-    writeText(page, "Layout Authoring / 24-bit Panels / Retained Objects", "HeaderContent", Composition::Align::bottomCenter());
+    page.writeObjectInRegion(banner, "HeaderContent", Composition::Align::topCenter());
+    page.writeTextInRegion("Layout Authoring / 24-bit Panels / Retained Objects", "HeaderContent", Composition::Align::bottomCenter());
 
-    buffer.writeString(leftPane.position.x + 2, leftPane.position.y + 1, "LAYOUT + PANELS", ControlAccent);
-    buffer.writeString(pipelinePane.position.x + 2, pipelinePane.position.y + 1, "PIPELINES", ControlAccent);
-    buffer.writeString(modesPane.position.x + 2, modesPane.position.y + 1, "OBJECT MODES", ControlAccent);
-    buffer.writeString(notesPane.position.x + 2, notesPane.position.y + 1, "What API's new developers should learn", ControlAccent);
+    page.writePanelTitle("LeftPane", "LAYOUT + PANELS", ControlAccent);
+    page.writePanelTitle("PipelinePane", "PIPELINES", ControlAccent);
+    page.writePanelTitle("ModesPane", "OBJECT MODES", ControlAccent);
+    page.writePanelTitle("NotesPane", "What API's new developers should learn", ControlAccent);
 
-    writeWrapped(
-        page,
+    page.writeWrappedTextInRegion(
         "TUI is not a layout engine - it's a composition engine.\n\nYou explicitly create and place everything. There are no hidden systems reflowing or shifting your UI.Nothing moves unless you tell it to.\n\nThis is what allows TUI applications to scale cleanly and remain predictable.\n\nThe Control Deck screen demonstrates how to organize a full application screen using simple, composable primitives.\n\nThe TUI Philosophy\n\nSimple primitives build complex screens.\n\nInstead of relying on complex frameworks with fragile behavior,\nTUI favors explicit composition and deterministic results.",
         "LeftContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top });
+    TextObject puzzleLine = ObjectFactory::makeHorizontalPatternLine(
+        page.resolveRegion("LeftContent").size.width,
+        ObjectFactory::puzzleLinePattern(),
+        ControlAccent);
 
-    TextObject puzzleLine = ObjectFactory::makeHorizontalPatternLine(leftPane.size.width, ObjectFactory::puzzleLinePattern(), ControlAccent);
-    writeObject(page, puzzleLine, "LeftContent", Composition::Align::bottomLeft());
+    page.writeObjectInRegion(puzzleLine, "LeftContent", Composition::Align::bottomLeft());
 
     const double ingestRatio = pulse(elapsedSeconds(), 0.85, 0.2);
     const double composeRatio = pulse(elapsedSeconds(), 1.20, 1.1);
     const double renderRatio = pulse(elapsedSeconds(), 0.55, 2.1);
 
-    writeTextBlock(
-        page,
+    page.writeTextBlockInRegion(
         "BUILD OBJECTS        " + makeProgressBar(22, ingestRatio, '#') + "\n"
         "COMPOSE PAGES        " + makeProgressBar(22, composeRatio, '=') + "\n"
         "CREATE EXPERIENCES   " + makeProgressBar(22, renderRatio, '>'),
         "PipelineContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center });
 
-    writeTextBlock(
-        page,
+    page.writeTextBlockInRegion(
         "All write modes answer one question: What parts of this object are allowed to affect the screen?\n\n"
         "SOLID OBJECT:Everything, including spaces, empty cells, and style\n"
         "VISIBLE OBJECT: Only visible glyphs and Style, no spaces or empty cells\n"
@@ -743,21 +663,19 @@ void ControlDeckScreen::draw(Surface& surface)
         "STYLE MASK: Apply style where the object has shape\n"
         "STYLE BLOCK: Apply style over a rectangle",
         "ModesContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center });
 
-    writeTextBlock(
-        page,
+    page.writeTextBlockInRegion(
         "• TextObject, ObjectFactory, ObjectComposer pipeline: How to build things\n"
         "• ScreenComposer, Draw Modes, Write Policy: How to place things\n"
         "• Layering and Style Effects: How to make things pretty\n"
         "• Asset Manager: How to load external assets like .xp files\n"
         "• Final mental model: Build objects. Control how they write. Draw them.",
         "NotesContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center });
 
     const int tickerWidth = std::max(1, page.resolveRegion("TickerContent").size.width);
-    writeText(
-        page,
+    page.writeTextInRegion(
         makeMarquee(
             "control deck  •  layouts  •  banners  •  wrapped copy  •  framed telemetry  •  rgb accents",
             tickerWidth,
@@ -765,8 +683,8 @@ void ControlDeckScreen::draw(Surface& surface)
         "TickerContent",
         Composition::Align::centerLeft());
 
-    writeText(page, "ControlDeckScreen  |  Page 1 of a Multi-Scene Showcase", "FooterContent", Composition::Align::centerLeft());
-    writeText(page, "24-bit gradient background + dedicated scene class", "FooterContent", Composition::Align::centerRight());
+    page.writeTextInRegion("ControlDeckScreen  |  Page 1 of a Multi-Scene Showcase", "FooterContent", Composition::Align::centerLeft());
+    page.writeTextInRegion("24-bit gradient background + dedicated scene class", "FooterContent", Composition::Align::centerRight());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -822,34 +740,39 @@ void RetroTerminalScreen::draw(Surface& surface)
 
     PageComposer page(buffer);
     page.clearRegions();
+    page.createFullScreenRegion("Screen");
+    page.createInsetRegion("Safe", "Screen", 2, 1, 2, 1);
 
-    const Rect screen = page.getFullScreenRegion();
-    const Rect safe = insetRect(screen, 2, 1, 2, 1);
+    const Rect safe = page.resolveRegion("Safe");
     const auto [header, afterHeader] = page.splitTop(safe, 7);
     const auto [footer, body] = page.splitBottom(afterHeader, 5);
-    const auto [consolePane, telemetryPane] = page.splitLeft(body, std::max(44, (body.size.width * 3) / 5));
+    const auto [consolePane, telemetryPane] =
+        page.splitLeft(body, std::max(44, (body.size.width * 3) / 5));
 
-    TextObject headerObject = ObjectFactory::makeFrame(header.size.width, header.size.height, TerminalHeaderSurface, ObjectFactory::doubleLineBorder());
+    page.createRegion("Header", header);
+    page.createRegion("Footer", footer);
+    page.createRegion("ConsolePane", consolePane);
+    page.createRegion("TelemetryPane", telemetryPane);
 
-    headerObject.draw(buffer, header.position.x, header.position.y);
+    page.drawPanel("Header", TerminalHeaderSurface, TerminalHeaderSurface, ObjectFactory::doubleLineBorder());
+    page.drawPanel("Footer", TerminalPanel, TerminalFrame, ObjectFactory::doubleLineBorder());
+    page.drawPanel("ConsolePane", TerminalPanel, TerminalFrame);
+    page.drawPanel("TelemetryPane", TerminalPanel, TerminalFrame);
 
-    paintPanel(buffer, footer, TerminalPanel, TerminalFrame, ObjectFactory::doubleLineBorder());
-    paintPanel(buffer, consolePane, TerminalPanel, TerminalFrame, ObjectFactory::singleLineBorder());
-    paintPanel(buffer, telemetryPane, TerminalPanel, TerminalFrame, ObjectFactory::singleLineBorder());
+    page.createInsetRegion("HeaderContent", "Header", 2, 0, 2, 0);
+    page.createInsetRegion("FooterContent", "Footer", 2, 1, 2, 1);
+    page.createInsetRegion("ConsoleContent", "ConsolePane", 2, 2, 2, 2);
+    page.createInsetRegion("TelemetryContent", "TelemetryPane", 2, 3, 2, 2);
 
-    page.createRegion("HeaderContent", insetRect(header, 2, 0, 2, 0));
-    page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
-    page.createRegion("ConsoleContent", insetRect(consolePane, 2, 2, 2, 2));
-    page.createRegion("TelemetryContent", insetRect(telemetryPane, 2, 3, 2, 2));
+    page.writePanelTitle("ConsolePane", ".xp Styled Components", TerminalFrame);
+    page.writePanelTitle("TelemetryPane", "SIGNAL ANALYSIS", TerminalFrame);
 
-    buffer.writeString(consolePane.position.x + 2, consolePane.position.y + 1, ".xp Styled Components", TerminalFrame);
-    buffer.writeString(telemetryPane.position.x + 2, telemetryPane.position.y + 1, "SIGNAL ANALYSIS", TerminalFrame);
-
-    TextObject heartColumn = ObjectFactory::makeVerticalPatternLine(consolePane.size.height, ObjectFactory::heartChainVerticalPattern());
-    writeObject(page, heartColumn, "ConsoleContent", Composition::Align::topRight());
+    const Rect consoleContentRegion = page.resolveRegion("ConsoleContent");
+    const TextObject heartColumn = ObjectFactory::makeVerticalPatternLine(consoleContentRegion.size.height, ObjectFactory::heartChainVerticalPattern());
+    page.writeObjectInRegion(heartColumn, "ConsoleContent", Composition::Align::topRight());
 
     const TextObject banner = makeBanner("Computer.flf", "retro terminal", TerminalHeaderSurface);
-    writeObject(page, banner, "HeaderContent", Composition::Align::topCenter());
+    page.writeObjectInRegion(banner, "HeaderContent", Composition::Align::topCenter());
 
     const std::vector<std::string> logLines =
     {
@@ -905,29 +828,27 @@ void RetroTerminalScreen::draw(Surface& surface)
             }
         }
 
-        page.writeAlignedTextBlock(
+        page.writeTextBlockInRegion(
             logBlock,
-            PageComposer::PlacementSpec::inNamedRegion("ConsoleContent", Composition::Align::topLeft(), true),
+            "ConsoleContent",
+            Composition::Align::topLeft(),
             authoredObject());
     }
 
-    writeWrapped(
-        page,
+    page.writeWrappedTextInRegion(
         "TUI can emulate a terminal-style text-driven experience using the same primitives as UI. Create a clean split between console output and side telemetry. Use FIGlet, TOIlet, and Psuedo fonts to create eye catching titles. All with character level control. Dynamic rendering, not just static layouts.",
         "TelemetryContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top });
 
-    writeObject(page, waveObject(), "TelemetryContent", Composition::Align::center());
-    writeObject(page, verticalMeterObject(), "TelemetryContent", Composition::Align::centerRight());
-    writeText(
-        page,
+    page.writeObjectInRegion(waveObject(), "TelemetryContent", Composition::Align::center());
+    page.writeObjectInRegion(verticalMeterObject(), "TelemetryContent", Composition::Align::centerRight());
+    page.writeTextInRegion(
         makeProgressBar(24, pulse(elapsedSeconds(), 0.65), '*', ' '),
         "TelemetryContent",
         Composition::Align::bottomLeft());
 
     const int footerWidth = std::max(1, page.resolveRegion("FooterContent").size.width);
-    writeText(
-        page,
+    page.writeTextInRegion(
         makeMarquee(
             "monochrome terminal mode  •  retained text objects  •  status scan  •  telemetry overlay  •  new dedicated screen",
             footerWidth,
@@ -935,7 +856,7 @@ void RetroTerminalScreen::draw(Surface& surface)
         "FooterContent",
         Composition::Align::centerLeft());
 
-    buffer.writeString(footer.position.x + 2, footer.position.y + 1, "SHOWCASE / RETRO TERMINAL", TerminalInverse);
+    page.writePanelTitle("Footer", "SHOWCASE / RETRO TERMINAL", TerminalInverse);
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -975,8 +896,7 @@ void NeonDialogScreen::draw(Surface& surface)
             ObjectFactory::heartFramePattern(),
             fullOuterFrameStyle);
 
-    writeObject(
-        page,
+    page.writeObjectInRegion(
         fullOuterFrame,
         "FullPage",
         Composition::Align::center(),
@@ -988,25 +908,9 @@ void NeonDialogScreen::draw(Surface& surface)
         Size { std::min(96, screen.size.width), std::min(26, screen.size.height) }
     };
 
-    paintPanel(buffer, dialog, NeonDialogFill, NeonFrame, ObjectFactory::roundedBorder());
-
-    // neon size
-    const Rect safe = insetRect(dialog, 1, 1, 1, 1);
-
-    const auto [header, afterHeader] = page.splitTop(safe, 6);
-    const auto [footer, body] = page.splitBottom(afterHeader, 4);
-    const auto [previewPane, copyPane] = page.splitLeft(body, std::max(32, body.size.width / 2));
-
-    paintPanel(buffer, previewPane, NeonDialogFill, NeonFrame, ObjectFactory::singleLineBorder());
-    paintPanel(buffer, copyPane, NeonDialogFill, NeonFrame, ObjectFactory::singleLineBorder());
-
-    page.createRegion("HeaderContent", insetRect(header, 2, 0, 2, 0));
-    page.createRegion("PreviewContent", insetRect(previewPane, 2, 3, 2, 2));
-    page.createRegion("CopyContent", insetRect(copyPane, 2, 3, 2, 2));
-    page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
-
-    buffer.writeString(previewPane.position.x + 2, previewPane.position.y + 1, "PREVIEW", NeonGold);
-    buffer.writeString(copyPane.position.x + 2, copyPane.position.y + 1, "FEATURES", NeonGold);
+    page.createRegion("Dialog", dialog);
+    page.drawPanel("Dialog", NeonDialogFill, NeonFrame, ObjectFactory::roundedBorder());
+    page.createInsetRegion("DialogSafe", "Dialog", 1, 1, 1, 1);
 
     const double shimmer = pulse(elapsedSeconds(), 1.35);
 
@@ -1018,30 +922,48 @@ void NeonDialogScreen::draw(Surface& surface)
             static_cast<std::uint8_t>(84 + std::round(shimmer * 24.0))),
         true);
 
+    const Rect safe = page.resolveRegion("DialogSafe");
+    const auto [header, afterHeader] = page.splitTop(safe, 6);
+    const auto [footer, body] = page.splitBottom(afterHeader, 4);
+    const auto [previewPane, copyPane] =
+        page.splitLeft(body, std::max(32, body.size.width / 2));
+
+    page.createRegion("Header", header);
+    page.createRegion("Footer", footer);
+    page.createRegion("PreviewPane", previewPane);
+    page.createRegion("CopyPane", copyPane);
+
+    page.drawPanel("PreviewPane", NeonDialogFill, NeonFrame);
+    page.drawPanel("CopyPane", NeonDialogFill, NeonFrame);
+
+    page.createInsetRegion("HeaderContent", "Header", 2, 0, 2, 0);
+    page.createInsetRegion("PreviewContent", "PreviewPane", 2, 3, 2, 2);
+    page.createInsetRegion("CopyContent", "CopyPane", 2, 3, 2, 2);
+    page.createInsetRegion("FooterContent", "Footer", 2, 1, 2, 1);
+
+    page.writePanelTitle("PreviewPane", "PREVIEW", NeonGold);
+    page.writePanelTitle("CopyPane", "FEATURES", NeonGold);
+    page.writePanelTitle("Dialog", "SHOWCASE / NEON DIALOG", NeonGold, 3, -1);
 
     const TextObject banner = makeBanner("Slant.flf", "Neon UI", bannerStyle);
-    writeObject(page, banner, "HeaderContent", Composition::Align::topCenter());
+    page.writeObjectInRegion(banner, "HeaderContent", Composition::Align::topCenter());
 
-    writeWrapped(
-        page,
+    page.writeWrappedTextInRegion(
         "The dialog scene works well for launchers, settings panes, and modal workflows. Extracting it into its own class makes it easier to evolve separately from the other showcase looks.",
         "PreviewContent",
-        makeAlignment(Composition::HorizontalAlign::Center, Composition::VerticalAlign::Center));
+        Alignment{ Composition::HorizontalAlign::Center, Composition::VerticalAlign::Center });
     
-    writeTextBlock(
-        page,
+    page.writeTextBlockInRegion(
         "• dedicated modal-style screen\n"
         "• stronger 24-bit magenta / cyan identity\n"
         "• clean header-body-footer split\n"
         "• separate preview and copy panels\n"
         "• easier future expansion into real menus",
         "CopyContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center });
 
-    writeText(page, makeProgressBar(24, pulse(elapsedSeconds(), 0.95, 1.0), '@', '.'), "FooterContent", Composition::Align::centerLeft());
-    writeText(page, "[ ENTER ] Launch   [ TAB ] Theme   [ ESC ] Back", "FooterContent", Composition::Align::centerRight());
-
-    buffer.writeString(dialog.position.x + 3, dialog.position.y - 1, "SHOWCASE / NEON DIALOG", NeonGold);
+    page.writeTextInRegion(makeProgressBar(24, pulse(elapsedSeconds(), 0.95, 1.0), '@', '.'), "FooterContent", Composition::Align::centerLeft());
+    page.writeTextInRegion("[ ENTER ] Launch   [ TAB ] Theme   [ ESC ] Back", "FooterContent", Composition::Align::centerRight());
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
@@ -1067,33 +989,41 @@ void OpsWallScreen::draw(Surface& surface)
     PageComposer page(buffer);
     page.clearRegions();
 
-    const Rect screen = page.getFullScreenRegion();
-    const Rect canvas = insetRect(screen, 1, 1, 1, 1);
+    page.createFullScreenRegion("Screen");
+    page.createInsetRegion("Canvas", "Screen", 1, 1, 1, 1);
 
+    const Rect canvas = page.resolveRegion("Canvas");
     const auto [header, afterHeader] = page.splitTop(canvas, 8);
     const auto [footer, body] = page.splitBottom(afterHeader, 4);
     const auto [leftColumn, rightColumn] = page.splitLeft(body, std::max(40, (body.size.width * 2) / 3));
     const auto [statusPanel, heatPanel] = page.splitTop(leftColumn, std::max(9, leftColumn.size.height / 2));
     const auto [metricsPanel, alertPanel] = page.splitTop(rightColumn, rightColumn.size.height - 10);
 
-    paintPanel(buffer, header, OpsPanel, OpsFrame, ObjectFactory::doubleLineBorder());
-    paintPanel(buffer, statusPanel, OpsPanel, OpsFrame);
-    paintPanel(buffer, heatPanel, OpsPanel, OpsFrame);
-    paintPanel(buffer, metricsPanel, OpsPanel, OpsFrame);
-    paintPanel(buffer, alertPanel, OpsPanel, OpsFrame);
-    paintPanel(buffer, footer, OpsPanel, OpsFrame, ObjectFactory::doubleLineBorder());
+    page.createRegion("Header", header);
+    page.createRegion("Footer", footer);
+    page.createRegion("StatusPanel", statusPanel);
+    page.createRegion("HeatPanel", heatPanel);
+    page.createRegion("MetricsPanel", metricsPanel);
+    page.createRegion("AlertPanel", alertPanel);
 
-    page.createRegion("HeaderContent", insetRect(header, 2, 1, 2, 1));
-    page.createRegion("StatusContent", insetRect(statusPanel, 2, 3, 2, 1));
-    page.createRegion("HeatContent", insetRect(heatPanel, 2, 3, 2, 1));
-    page.createRegion("MetricsContent", insetRect(metricsPanel, 2, 3, 2, 1));
-    page.createRegion("AlertContent", insetRect(alertPanel, 2, 3, 2, 1));
-    page.createRegion("FooterContent", insetRect(footer, 2, 1, 2, 1));
+    page.drawPanel("Header", OpsPanel, OpsFrame, ObjectFactory::doubleLineBorder());
+    page.drawPanel("StatusPanel", OpsPanel, OpsFrame);
+    page.drawPanel("HeatPanel", OpsPanel, OpsFrame);
+    page.drawPanel("MetricsPanel", OpsPanel, OpsFrame);
+    page.drawPanel("AlertPanel", OpsPanel, OpsFrame);
+    page.drawPanel("Footer", OpsPanel, OpsFrame, ObjectFactory::doubleLineBorder());
 
-    buffer.writeString(statusPanel.position.x + 2, statusPanel.position.y + 1, "NODE STATUS GRID", OpsAmber);
-    buffer.writeString(heatPanel.position.x + 2, heatPanel.position.y + 1, "LOAD HEAT MAP", OpsAmber);
-    buffer.writeString(metricsPanel.position.x + 2, metricsPanel.position.y + 1, "SYSTEM METRICS", OpsAmber);
-    buffer.writeString(alertPanel.position.x + 2, alertPanel.position.y + 1, "ALERT CHANNEL", OpsAmber);
+    page.createInsetRegion("HeaderContent", "Header", 2, 1, 2, 1);
+    page.createInsetRegion("StatusContent", "StatusPanel", 2, 3, 2, 1);
+    page.createInsetRegion("HeatContent", "HeatPanel", 2, 3, 2, 1);
+    page.createInsetRegion("MetricsContent", "MetricsPanel", 2, 3, 2, 1);
+    page.createInsetRegion("AlertContent", "AlertPanel", 2, 3, 2, 1);
+    page.createInsetRegion("FooterContent", "Footer", 2, 1, 2, 1);
+
+    page.writePanelTitle("StatusPanel", "NODE STATUS GRID", OpsAmber);
+    page.writePanelTitle("HeatPanel", "LOAD HEAT MAP", OpsAmber);
+    page.writePanelTitle("MetricsPanel", "SYSTEM METRICS", OpsAmber);
+    page.writePanelTitle("AlertPanel", "ALERT CHANNEL", OpsAmber);
 
     const TextObject banner = makeBanner(
         "Small Shadow.flf",
@@ -1101,7 +1031,7 @@ void OpsWallScreen::draw(Surface& surface)
         OpsAmber,
         AsciiBanner::ComposeMode::FullWidth);
 
-    writeObject(page, banner, "HeaderContent", Composition::Align::centerLeft());
+    page.writeObjectInRegion(banner, "HeaderContent", Composition::Align::centerLeft());
 
     const int modeIndex = static_cast<int>(elapsedSeconds() / 10.0) % 3;
     const char* modeName = (modeIndex == 0) ? "CALM" : (modeIndex == 1) ? "BUSY" : "CHAOTIC";
@@ -1135,7 +1065,7 @@ void OpsWallScreen::draw(Surface& surface)
         OpsCyan,
         ObjectFactory::singleLineGlyphs());
 
-    writeObject(page, dividerBox, "StatusContent", Composition::Align::topLeft(), visibleObject());
+    page.writeObjectInRegion(dividerBox, "StatusContent", Composition::Align::topLeft(), visibleObject());
 
     const std::array<std::string, 12> nodeLabels =
     {
@@ -1175,7 +1105,7 @@ void OpsWallScreen::draw(Surface& surface)
         OpsCyan,
         ObjectFactory::singleLineGlyphs());
 
-    writeObject(page, heatGrid, "HeatContent", Composition::Align::topLeft(), visibleObject());
+    page.writeObjectInRegion(heatGrid, "HeatContent", Composition::Align::topLeft(), visibleObject());
 
     for (int y = 0; y < heatRows; ++y)
     {
@@ -1207,11 +1137,10 @@ void OpsWallScreen::draw(Surface& surface)
         + "Simulation mode cycles every 10 seconds.\n"
         + "Calm -> Busy -> Chaotic";
 
-    writeTextBlock(
-        page,
+    page.writeTextBlockInRegion(
         metricsBlock,
         "MetricsContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top));
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Top });
 
     std::string alertText;
     if (!anyAlert)
@@ -1227,16 +1156,14 @@ void OpsWallScreen::draw(Surface& surface)
         if (queueAlert) { alertText += "- Work queue backing up\n"; }
     }
 
-    writeTextBlock(
-        page,
+    page.writeTextBlockInRegion(
         alertText,
         "AlertContent",
-        makeAlignment(Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center),
+        Alignment{ Composition::HorizontalAlign::Left, Composition::VerticalAlign::Center },
         authoredObject());
 
     const int footerWidth = std::max(1, page.resolveRegion("FooterContent").size.width);
-    writeText(
-        page,
+    page.writeTextInRegion(
         makeMarquee(
             "ops wall  |  divider boxes  |  grid heat maps  |  live metrics  |  alert thresholds  |  procedural overlays",
             footerWidth,
