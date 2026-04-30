@@ -802,7 +802,7 @@ void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer) const
     const int x = std::max(0, (buffer.getWidth() - waterTitle.getWidth()) / 2);
     const int y = std::max(2, (buffer.getHeight() / 3) - (waterTitle.getHeight() / 2));
 
-    waterTitle.draw(buffer, x, y);
+    waterTitle.draw(buffer, x, y, Composition::WritePresets::visibleObject());
 }
 
 int WaterEffectScreen::index(int x, int y) const
