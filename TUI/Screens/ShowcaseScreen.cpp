@@ -182,10 +182,10 @@ namespace
         false,
         true);
 
-    const Style hotStyle = OpsFrame + style::Bold;
+    const Style hotStyle  = OpsFrame + style::Bold;
     const Style warmStyle = OpsAmber;
     const Style coolStyle = OpsCyan;
-    const Style nodeHotStyle = OpsFrame + style::Reverse;
+    const Style nodeHotStyle  = OpsFrame + style::Reverse;
     const Style nodeWarmStyle = OpsAmber + style::Reverse;
     const Style nodeCoolStyle = OpsCyan;
 
@@ -983,8 +983,8 @@ void OpsWallScreen::draw(Surface& surface)
     page.writePanelTitle("AlertPanel", "ALERT CHANNEL", OpsAmber);
 
     const TextObject banner = makeBanner(
-        "Small Shadow.flf",
-        "TUI Ops Wall",
+        "Graffiti.flf",
+        "TUI - System Monitor",
         OpsAmber,
         AsciiBanner::ComposeMode::FullWidth);
 
