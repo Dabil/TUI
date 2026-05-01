@@ -200,32 +200,56 @@ namespace
         return lines;
     }
 
-    std::vector<int> computeDividerPositions(int interiorSize, int dividerCount)
+    struct UniformDividerLayout
     {
-        std::vector<int> positions;
+        int usedSize = 0;
+        std::vector<int> offsets;
+    };
 
-        if (interiorSize <= 0 || dividerCount <= 0)
+    UniformDividerLayout computeUniformDividerLayout(int requestedOuterSize, int dividerCount)
+    {
+        UniformDividerLayout layout;
+
+        if (requestedOuterSize <= 0)
         {
-            return positions;
+            return layout;
         }
 
-        positions.reserve(static_cast<std::size_t>(dividerCount));
+        if (dividerCount <= 0)
+        {
+            layout.usedSize = requestedOuterSize;
+            return layout;
+        }
 
         const int segmentCount = dividerCount + 1;
-        for (int i = 1; i <= dividerCount; ++i)
-        {
-            const int pos = (i * interiorSize) / segmentCount;
+        const int requestedInteriorSize = std::max(0, requestedOuterSize - 2);
 
-            if (pos > 0 && pos < interiorSize)
-            {
-                if (positions.empty() || positions.back() != pos)
-                {
-                    positions.push_back(pos);
-                }
-            }
+        // Interior must contain:
+        // - N uniform cell regions
+        // - dividerCount one-cell divider lines
+        const int availableCellSpace = requestedInteriorSize - dividerCount;
+        if (availableCellSpace < segmentCount)
+        {
+            return layout;
         }
 
-        return positions;
+        const int cellSize = availableCellSpace / segmentCount;
+        if (cellSize <= 0)
+        {
+            return layout;
+        }
+
+        layout.usedSize = 2 + (segmentCount * cellSize) + dividerCount;
+        layout.offsets.reserve(static_cast<std::size_t>(dividerCount));
+
+        int offset = cellSize;
+        for (int i = 0; i < dividerCount; ++i)
+        {
+            layout.offsets.push_back(offset);
+            offset += cellSize + 1;
+        }
+
+        return layout;
     }
 
     std::vector<int> normalizeExplicitOffsets(const std::vector<int>& offsets, int interiorSize)
@@ -2245,15 +2269,18 @@ namespace ObjectFactory
         char32_t fillGlyph,
         const LineGlyphs& glyphs)
     {
-        const int interiorWidth = std::max(0, width - 2);
-        const int interiorHeight = std::max(0, height - 2);
+        const UniformDividerLayout horizontalLayout =
+            computeUniformDividerLayout(width, verticalDividers);
+
+        const UniformDividerLayout verticalLayout =
+            computeUniformDividerLayout(height, horizontalDividers);
 
         return buildObjectFromLines(
             buildDividerBoxLinesFromOffsets(
-                width,
-                height,
-                computeDividerPositions(interiorWidth, verticalDividers),
-                computeDividerPositions(interiorHeight, horizontalDividers),
+                horizontalLayout.usedSize,
+                verticalLayout.usedSize,
+                horizontalLayout.offsets,
+                verticalLayout.offsets,
                 fillGlyph,
                 glyphs),
             std::nullopt);
@@ -2268,15 +2295,18 @@ namespace ObjectFactory
         const Style& style,
         const LineGlyphs& glyphs)
     {
-        const int interiorWidth = std::max(0, width - 2);
-        const int interiorHeight = std::max(0, height - 2);
+        const UniformDividerLayout horizontalLayout =
+            computeUniformDividerLayout(width, verticalDividers);
+
+        const UniformDividerLayout verticalLayout =
+            computeUniformDividerLayout(height, horizontalDividers);
 
         return buildObjectFromLines(
             buildDividerBoxLinesFromOffsets(
-                width,
-                height,
-                computeDividerPositions(interiorWidth, verticalDividers),
-                computeDividerPositions(interiorHeight, horizontalDividers),
+                horizontalLayout.usedSize,
+                verticalLayout.usedSize,
+                horizontalLayout.offsets,
+                verticalLayout.offsets,
                 fillGlyph,
                 glyphs),
             style);
