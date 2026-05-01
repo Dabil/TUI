@@ -4,6 +4,7 @@
 #include <stdexcept>
 
 #include "Utilities/Unicode/UnicodeConversion.h"
+#include "Utilities/Unicode/GraphemeSegmentation.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
 /*
@@ -34,9 +35,9 @@
 
     This now supports these logical cases:
         - Writing a glyph with an explicit Style still replaces the destination styling for that write
-        - Writing a glyph with std::optional<Style>{} preserves the destination cell’s existing logical style
-        - Writing text with no style override preserves each destination cell’s existing logical style cell-by-cell
-        - Filling a region with no style override preserves each destination cell’s existing logical style while changing glyphs
+        - Writing a glyph with std::optional<Style>{} preserves the destination cellís existing logical style
+        - Writing text with no style override preserves each destination cellís existing logical style cell-by-cell
+        - Filling a region with no style override preserves each destination cellís existing logical style while changing glyphs
         - Drawing a frame with no style override preserves whatever styling already exists under the frame path
         - Writing over the trailing half of a wide glyph preserves style from the owning leading cell
         - Renderer downgrade or omission still does not rewrite anything back into ScreenBuffer
@@ -517,39 +518,50 @@ void ScreenBuffer::writeText(int x, int y, std::u32string_view text, const std::
         return;
     }
 
-    int cursorX = x;
+    std::u32string line;
+    line.reserve(text.size());
 
-    for (char32_t glyph : text)
+    for (char32_t codePoint : text)
     {
-        glyph = UnicodeConversion::sanitizeCodePoint(glyph);
+        codePoint = UnicodeConversion::sanitizeCodePoint(codePoint);
 
-        if (glyph == U'\r')
+        if (codePoint == U'\r')
         {
             continue;
         }
 
-        if (glyph == U'\n')
+        if (codePoint == U'\n')
         {
             break;
         }
 
+        line.push_back(codePoint);
+    }
+
+    int cursorX = x;
+
+    for (const TextCluster& cluster : GraphemeSegmentation::segment(line))
+    {
         if (cursorX >= m_width)
         {
             break;
         }
 
-        const CellWidth width = UnicodeWidth::measureCodePointWidth(glyph);
-        const int advance = cellWidthToInt(width);
-
-        writeCodePoint(cursorX, y, glyph, styleOverride);
-
-        if (advance > 0)
+        if (cluster.displayWidth <= 0)
         {
-            cursorX += advance;
+            appendZeroWidthClusterToPreviousVisibleCell(cursorX, y, cluster.codePoints);
+            continue;
         }
+
+        if (cluster.displayWidth == 2 && cursorX + 1 >= m_width)
+        {
+            break;
+        }
+
+        writeCluster(cursorX, y, cluster, styleOverride);
+        cursorX += cluster.displayWidth;
     }
 }
-
 void ScreenBuffer::fillRect(const Rect& rect, char32_t glyph, const Style& style)
 {
     fillRect(rect, glyph, std::optional<Style>(style));
@@ -643,12 +655,25 @@ std::u32string ScreenBuffer::renderToU32String() const
 
             if (cell.kind == CellKind::Glyph)
             {
-                out.push_back(cell.glyph);
+                if (!cell.cluster.empty())
+                {
+                    out += cell.cluster;
+                }
+                else
+                {
+                    out.push_back(cell.glyph);
+                }
+
+                continue;
             }
-            else
+
+            if (cell.kind == CellKind::WideTrailing ||
+                cell.kind == CellKind::CombiningContinuation)
             {
-                out.push_back(U' ');
+                continue;
             }
+
+            out.push_back(U' ');
         }
 
         if (y + 1 < m_height)
@@ -659,7 +684,6 @@ std::u32string ScreenBuffer::renderToU32String() const
 
     return out;
 }
-
 std::string ScreenBuffer::renderToUtf8String() const
 {
     return UnicodeConversion::u32ToUtf8(renderToU32String());
@@ -845,6 +869,112 @@ void ScreenBuffer::writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const
     trailing.kind = CellKind::WideTrailing;
     trailing.width = CellWidth::Zero;
     trailing.metadata = ScreenCellMetadata{};
+}
+
+void ScreenBuffer::writeCluster(int x, int y, const TextCluster& cluster, const std::optional<Style>& styleOverride)
+{
+    if (cluster.codePoints.empty())
+    {
+        return;
+    }
+
+    if (cluster.displayWidth <= 0)
+    {
+        appendZeroWidthClusterToPreviousVisibleCell(x, y, cluster.codePoints);
+        return;
+    }
+
+    if (cluster.displayWidth == 2)
+    {
+        writeDoubleWidthCluster(x, y, cluster.codePoints, styleOverride);
+        return;
+    }
+
+    writeSingleWidthCluster(x, y, cluster.codePoints, styleOverride);
+}
+
+void ScreenBuffer::writeSingleWidthCluster(int x, int y, const std::u32string& clusterText, const std::optional<Style>& styleOverride)
+{
+    if (!inBounds(x, y) || clusterText.empty())
+    {
+        return;
+    }
+
+    const Style resolvedStyle = resolveWriteStyle(x, y, styleOverride);
+
+    clearOccupiedTrail(x, y);
+
+    ScreenCell& cell = m_cells[static_cast<std::size_t>(index(x, y))];
+    cell.glyph = UnicodeConversion::sanitizeCodePoint(clusterText.front());
+    cell.cluster = clusterText;
+    cell.style = resolvedStyle;
+    cell.kind = CellKind::Glyph;
+    cell.width = CellWidth::One;
+    cell.metadata = ScreenCellMetadata{};
+}
+
+void ScreenBuffer::writeDoubleWidthCluster(int x, int y, const std::u32string& clusterText, const std::optional<Style>& styleOverride)
+{
+    if (!inBounds(x, y) || !inBounds(x + 1, y) || clusterText.empty())
+    {
+        return;
+    }
+
+    const Style resolvedStyle = resolveWriteStyle(x, y, styleOverride);
+
+    clearOccupiedTrail(x, y);
+    clearOccupiedTrail(x + 1, y);
+
+    ScreenCell& leading = m_cells[static_cast<std::size_t>(index(x, y))];
+    leading.glyph = UnicodeConversion::sanitizeCodePoint(clusterText.front());
+    leading.cluster = clusterText;
+    leading.style = resolvedStyle;
+    leading.kind = CellKind::Glyph;
+    leading.width = CellWidth::Two;
+    leading.metadata = ScreenCellMetadata{};
+
+    ScreenCell& trailing = m_cells[static_cast<std::size_t>(index(x + 1, y))];
+    trailing.glyph = U' ';
+    trailing.cluster.clear();
+    trailing.style = resolvedStyle;
+    trailing.kind = CellKind::WideTrailing;
+    trailing.width = CellWidth::Zero;
+    trailing.metadata = ScreenCellMetadata{};
+}
+
+void ScreenBuffer::appendZeroWidthClusterToPreviousVisibleCell(int x, int y, const std::u32string& clusterText)
+{
+    if (clusterText.empty() || y < 0 || y >= m_height)
+    {
+        return;
+    }
+
+    const int startX = std::min(x - 1, m_width - 1);
+
+    for (int previousX = startX; previousX >= 0; --previousX)
+    {
+        ScreenCell& previousCell =
+            m_cells[static_cast<std::size_t>(index(previousX, y))];
+
+        if (previousCell.kind == CellKind::WideTrailing ||
+            previousCell.kind == CellKind::CombiningContinuation)
+        {
+            continue;
+        }
+
+        if (isVisibleLeadingCell(previousCell))
+        {
+            if (previousCell.cluster.empty())
+            {
+                previousCell.cluster.push_back(previousCell.glyph);
+            }
+
+            previousCell.cluster += clusterText;
+            return;
+        }
+
+        break;
+    }
 }
 
 Style ScreenBuffer::resolveWriteStyle(int x, int y, const std::optional<Style>& styleOverride) const

@@ -8,6 +8,7 @@
 #include "Core/Rect.h"
 #include "Rendering/ScreenCell.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Text/TextCluster.h"
 
 class ScreenBuffer
 {
@@ -99,6 +100,11 @@ private:
 
     void writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const Style& style);
     void writeDoubleWidthCodePoint(int x, int y, char32_t glyph, const std::optional<Style>& styleOverride);
+
+    void writeCluster(int x, int y, const TextCluster& cluster, const std::optional<Style>& styleOverride);
+    void writeSingleWidthCluster(int x, int y, const std::u32string& clusterText, const std::optional<Style>& styleOverride);
+    void writeDoubleWidthCluster(int x, int y, const std::u32string& clusterText, const std::optional<Style>& styleOverride);
+    void appendZeroWidthClusterToPreviousVisibleCell(int x, int y, const std::u32string& clusterText);
 
     Style resolveWriteStyle(int x, int y, const std::optional<Style>& styleOverride) const;
     const ScreenCell& getLogicalCellInternal(int x, int y) const;

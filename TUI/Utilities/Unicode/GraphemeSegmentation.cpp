@@ -43,7 +43,10 @@ namespace GraphemeSegmentation
         {
             codePoint = UnicodeConversion::sanitizeCodePoint(codePoint);
 
-            if (UnicodeWidth::isCombiningMark(codePoint))
+            const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(codePoint);
+            const int displayWidth = toDisplayWidth(measuredWidth);
+
+            if (displayWidth == 0)
             {
                 if (!clusters.empty())
                 {
@@ -62,8 +65,7 @@ namespace GraphemeSegmentation
 
             TextCluster cluster;
             cluster.codePoints.push_back(codePoint);
-            cluster.displayWidth =
-                toDisplayWidth(UnicodeWidth::measureCodePointWidth(codePoint));
+            cluster.displayWidth = displayWidth;
 
             clusters.push_back(cluster);
         }
