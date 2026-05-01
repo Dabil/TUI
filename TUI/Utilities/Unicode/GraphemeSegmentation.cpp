@@ -1,16 +1,22 @@
 #include "Utilities/Unicode/GraphemeSegmentation.h"
 
+#include <algorithm>
+
 #include "Utilities/Unicode/UnicodeConversion.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 
 /*
     Purpose:
 
-    Provides future-safe grapheme-like segmentation for writing and wrapping
+    Provides pragmatic grapheme-cluster segmentation for writing and wrapping.
 
-    Checklist:
-        - Add segmentation function
-        - Keep this as a helper layer, not part of ScreenCell
+    This is intentionally not a generated full Unicode text-segmentation engine.
+    It covers the cluster forms the TUI renderer/layout systems must not split:
+        - combining-mark sequences
+        - variation-selector sequences
+        - emoji modifier sequences
+        - zero-width-joiner emoji sequences
+        - regional-indicator flag pairs
 */
 
 namespace
@@ -30,6 +36,55 @@ namespace
             return 1;
         }
     }
+
+    bool isVariationSelector(char32_t codePoint)
+    {
+        return (codePoint >= 0xFE00 && codePoint <= 0xFE0F) ||
+            (codePoint >= 0xE0100 && codePoint <= 0xE01EF);
+    }
+
+    bool isEmojiModifier(char32_t codePoint)
+    {
+        return codePoint >= 0x1F3FB && codePoint <= 0x1F3FF;
+    }
+
+    bool isZeroWidthJoiner(char32_t codePoint)
+    {
+        return codePoint == 0x200D;
+    }
+
+    bool isRegionalIndicator(char32_t codePoint)
+    {
+        return codePoint >= 0x1F1E6 && codePoint <= 0x1F1FF;
+    }
+
+    bool isClusterExtender(char32_t codePoint)
+    {
+        return UnicodeWidth::isCombiningMark(codePoint) ||
+            isVariationSelector(codePoint) ||
+            isEmojiModifier(codePoint);
+    }
+
+    int measureClusterWidth(std::u32string_view cluster)
+    {
+        int width = 0;
+
+        for (char32_t codePoint : cluster)
+        {
+            codePoint = UnicodeConversion::sanitizeCodePoint(codePoint);
+            width = std::max(width, toDisplayWidth(UnicodeWidth::measureCodePointWidth(codePoint)));
+        }
+
+        return width;
+    }
+
+    TextCluster makeCluster(std::u32string codePoints)
+    {
+        TextCluster cluster;
+        cluster.codePoints = std::move(codePoints);
+        cluster.displayWidth = measureClusterWidth(cluster.codePoints);
+        return cluster;
+    }
 }
 
 namespace GraphemeSegmentation
@@ -39,37 +94,82 @@ namespace GraphemeSegmentation
         std::vector<TextCluster> clusters;
         clusters.reserve(text.size());
 
-        for (char32_t codePoint : text)
-        {
-            codePoint = UnicodeConversion::sanitizeCodePoint(codePoint);
+        std::u32string current;
+        bool previousWasZeroWidthJoiner = false;
+        int regionalIndicatorRunLength = 0;
 
-            const CellWidth measuredWidth = UnicodeWidth::measureCodePointWidth(codePoint);
-            const int displayWidth = toDisplayWidth(measuredWidth);
-
-            if (displayWidth == 0)
+        const auto flushCurrent = [&]()
             {
-                if (!clusters.empty())
+                if (!current.empty())
                 {
-                    clusters.back().codePoints.push_back(codePoint);
-                }
-                else
-                {
-                    TextCluster cluster;
-                    cluster.codePoints.push_back(codePoint);
-                    cluster.displayWidth = 0;
-                    clusters.push_back(cluster);
+                    clusters.push_back(makeCluster(std::move(current)));
+                    current.clear();
                 }
 
+                previousWasZeroWidthJoiner = false;
+                regionalIndicatorRunLength = 0;
+            };
+
+        for (char32_t rawCodePoint : text)
+        {
+            const char32_t codePoint = UnicodeConversion::sanitizeCodePoint(rawCodePoint);
+
+            if (current.empty())
+            {
+                current.push_back(codePoint);
+                previousWasZeroWidthJoiner = isZeroWidthJoiner(codePoint);
+                regionalIndicatorRunLength = isRegionalIndicator(codePoint) ? 1 : 0;
                 continue;
             }
 
-            TextCluster cluster;
-            cluster.codePoints.push_back(codePoint);
-            cluster.displayWidth = displayWidth;
+            if (previousWasZeroWidthJoiner)
+            {
+                current.push_back(codePoint);
+                previousWasZeroWidthJoiner = isZeroWidthJoiner(codePoint);
+                regionalIndicatorRunLength = 0;
+                continue;
+            }
 
-            clusters.push_back(cluster);
+            if (isZeroWidthJoiner(codePoint))
+            {
+                current.push_back(codePoint);
+                previousWasZeroWidthJoiner = true;
+                regionalIndicatorRunLength = 0;
+                continue;
+            }
+
+            if (isClusterExtender(codePoint))
+            {
+                current.push_back(codePoint);
+                previousWasZeroWidthJoiner = false;
+                continue;
+            }
+
+            if (isRegionalIndicator(codePoint))
+            {
+                if (regionalIndicatorRunLength == 1)
+                {
+                    current.push_back(codePoint);
+                    regionalIndicatorRunLength = 2;
+                    previousWasZeroWidthJoiner = false;
+                    continue;
+                }
+
+                flushCurrent();
+                current.push_back(codePoint);
+                regionalIndicatorRunLength = 1;
+                previousWasZeroWidthJoiner = false;
+                continue;
+            }
+
+            flushCurrent();
+            current.push_back(codePoint);
+            previousWasZeroWidthJoiner = false;
+            regionalIndicatorRunLength = 0;
         }
 
+        flushCurrent();
         return clusters;
     }
 }
+

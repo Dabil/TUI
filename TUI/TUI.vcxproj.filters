@@ -363,6 +363,21 @@
     <ClInclude Include="Input\WindowsConsoleKeyboardSource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Input\Command.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\CommandMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\Event.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Input\KeyCodes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Utilities\Unicode\GraphemeSegmentationTests.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -675,6 +690,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Input\WindowsConsoleKeyboardSource.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Input\CommandMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Utilities\Unicode\GraphemeSegmentationTests.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
