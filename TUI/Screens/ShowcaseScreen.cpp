@@ -586,7 +586,7 @@ void ControlDeckScreen::draw(Surface& surface)
 
     page.writePanelTitle("LeftPane", "LAYOUT + PANELS", ControlAccent);
     page.writePanelTitle("PipelinePane", "PIPELINES", ControlAccent);
-    page.writePanelTitle("ModesPane", "OBJECT MODES", ControlAccent);
+    page.writePanelTitle("ModesPane", "OBJECT & STYLE MODES", ControlAccent);
     page.writePanelTitle("NotesPane", "What API's new developers should learn", ControlAccent);
 
     page.writeWrappedTextInRegion(
