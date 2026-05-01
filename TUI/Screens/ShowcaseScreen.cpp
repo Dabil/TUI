@@ -171,11 +171,23 @@ namespace
         makeThemeColor(Color::Basic::Black, 235, 24, 24, 28),
         true);
 
+    const Style nodeOpsCyan = makeStyle(
+        makeThemeColor(Color::Basic::BrightCyan, 117, 108, 229, 255),
+        makeThemeColor(Color::Basic::Black, 235, 24, 24, 28),
+        true);
+
     const Style MutedOverlay = makeStyle(
         makeThemeColor(Color::Basic::White, 245, 144, 156, 176),
         makeThemeColor(Color::Basic::Black, 16, 7, 14, 28),
         false,
         true);
+
+    const Style hotStyle = OpsFrame + style::Bold;
+    const Style warmStyle = OpsAmber;
+    const Style coolStyle = OpsCyan;
+    const Style nodeHotStyle = OpsFrame + style::Reverse;
+    const Style nodeWarmStyle = OpsAmber + style::Reverse;
+    const Style nodeCoolStyle = OpsCyan + style::Reverse;
 
     void fillVerticalGradient(
         ScreenBuffer& buffer,
@@ -994,9 +1006,6 @@ void OpsWallScreen::draw(Surface& surface)
     const bool anyAlert = cpuAlert || memoryAlert || networkAlert || queueAlert;
 
     const Style alertStyle = anyAlert ? OpsFrame + style::SlowBlink : OpsAmber;
-    const Style hotStyle = OpsFrame + style::Bold;
-    const Style warmStyle = OpsAmber;
-    const Style coolStyle = OpsCyan;
 
     page.createInsetRegion("HeaderStatus", "Header", 2, 2, 2, 1);
 
@@ -1007,13 +1016,17 @@ void OpsWallScreen::draw(Surface& surface)
         authoredObject());
 
     const Rect statusContent = page.resolveRegion("StatusContent");
+    
+    // TODO: Use registerGrid or register grid area to make drawing into the 
+    // divider box easy
+    
     const TextObject dividerBox = ObjectFactory::makeDividerBox(
         statusContent.size.width,
         statusContent.size.height,
         3,
         2,
         U' ',
-        OpsCyan,
+        nodeOpsCyan,
         ObjectFactory::singleLineGlyphs());
 
     page.writeObjectInRegion(dividerBox, "StatusContent", Composition::Align::topLeft(), visibleObject());
@@ -1026,7 +1039,10 @@ void OpsWallScreen::draw(Surface& surface)
     };
 
     const int nodeCellWidth = std::max(1, statusContent.size.width / 4);
-    const int nodeCellHeight = std::max(1, statusContent.size.height / 3);
+    const int nodeCellHeight = std::max(1, statusContent.size.height / 3) - 1;
+    const int yPadding = std::max(0, nodeCellHeight / 2) - 1;
+
+    TextObject nodeCellBg = ObjectFactory::makeFilledRect(nodeCellWidth - 1, nodeCellHeight - 1);
 
     for (int i = 0; i < 12; ++i)
     {
@@ -1037,11 +1053,13 @@ void OpsWallScreen::draw(Surface& surface)
             0.0,
             1.0);
 
-        const Style nodeStyle = (load > 0.82) ? hotStyle : (load > 0.58) ? warmStyle : coolStyle;
+        const Style nodeStyle = (load > 0.82) ? nodeHotStyle : (load > 0.58) ? nodeWarmStyle : nodeCoolStyle;
+        const int xPadding = (nodeCellWidth - nodeLabels[static_cast<std::size_t>(i)].length()) / 2;
         const int x = statusContent.position.x + (col * nodeCellWidth) + 1;
-        const int y = statusContent.position.y + (row * nodeCellHeight) + std::max(0, nodeCellHeight / 2);
+        const int y = statusContent.position.y + (row * nodeCellHeight) + 1;
 
-        buffer.writeString(x, y, nodeLabels[static_cast<std::size_t>(i)], nodeStyle);
+        nodeCellBg.draw(buffer, x, y, Composition::WritePolicy::SolidObject(), nodeStyle);
+        buffer.writeString(xPadding + x, yPadding + y, nodeLabels[static_cast<std::size_t>(i)], nodeStyle);
     }
 
     const Rect heatContent = page.resolveRegion("HeatContent");
