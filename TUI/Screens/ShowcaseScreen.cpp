@@ -187,7 +187,7 @@ namespace
     const Style coolStyle = OpsCyan;
     const Style nodeHotStyle = OpsFrame + style::Reverse;
     const Style nodeWarmStyle = OpsAmber + style::Reverse;
-    const Style nodeCoolStyle = OpsCyan + style::Reverse;
+    const Style nodeCoolStyle = OpsCyan;
 
     void fillVerticalGradient(
         ScreenBuffer& buffer,
