@@ -13,7 +13,7 @@ class Donut3DScreen : public Screen
 {
 public:
     Donut3DScreen();
-    ~Donut3DScreen() override = default;
+    ~Donut3DScreen();
 
     void onEnter() override;
     void update(double deltaTime) override;
@@ -21,7 +21,7 @@ public:
 
 private:
     void ensureBuffers(int width, int height);
-    void renderDonut(Surface& surface, int left, int top, int width, int height);
+    void renderDonut(Surface& surface, const Rect& viewPort);
 
     void invalidateStaticUiCache();
     void ensureStaticUiCache(int screenWidth, int screenHeight);
@@ -40,13 +40,15 @@ private:
     std::vector<float> m_depthBuffer;
     std::vector<char32_t> m_glyphBuffer;
 
-    std::string m_titleText = "[ 3D ASCII Donut ]";
-    std::string m_footerText = "[ Hue Cycle + Depth Shading + Floor Shadow ]";
+    std::string m_titleText = "[ 3D ASCII Render Lab ]";
+    // std::string m_footerText = "[ Hue Cycle + Depth Shading + Floor Shadow ]";
     std::string m_minimumSizeMessage = "3D Donut needs a larger console window.";
 
     TextObject m_outerFrameObject;
+    TextObject m_previewPaneObject;
+    TextObject m_renderInfoPaneObject;
+    TextObject m_footerPaneObject;
     TextObject m_titleObject;
-    TextObject m_footerObject;
     TextObject m_minimumSizeWarningObject;
 
     int m_cachedScreenWidth = -1;
@@ -58,9 +60,6 @@ private:
 
     int m_titleX = 4;
     int m_titleY = 0;
-
-    int m_footerX = 4;
-    int m_footerY = 0;
 
     int m_warningX = 1;
     int m_warningY = 1;

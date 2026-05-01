@@ -5,16 +5,27 @@
 #include <cmath>
 #include <vector>
 
-#include "Core/Rect.h"
-#include "Rendering/Objects/TextObjectFactory.h"
 #include "Rendering/Surface.h"
 #include "Rendering/ScreenBuffer.h"
+
+#include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
-#include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
+#include "Rendering/Styles/StyleBuilder.h"
+
+#include "Rendering/Objects/TextObject.h"
+#include "Rendering/Objects/TextObjectFactory.h"
+#include "Rendering/Composition/Alignment.h"
+#include "Rendering/Composition/PageComposer.h"
 
 namespace
 {
+    using Composition::Alignment;
+    using Composition::PageComposer;
+    using Composition::WritePresets::solidObject;
+    using Composition::WritePresets::visibleObject;
+    using Composition::WritePresets::authoredObject;
+
     constexpr float Pi = 3.1415926535f;
     constexpr float ThetaSpacing = 0.07f;
     constexpr float PhiSpacing = 0.02f;
@@ -26,7 +37,7 @@ namespace
     constexpr float RotationASpeed = 1.15f;
     constexpr float RotationBSpeed = 0.45f;
 
-    constexpr float SizeScale = 0.25f;
+    constexpr float SizeScale = 0.5f;
 
     constexpr int MinimumScreenWidth = 30;
     constexpr int MinimumScreenHeight = 12;
@@ -57,7 +68,28 @@ namespace
     constexpr int CyclePaletteCount = static_cast<int>(sizeof(CyclePalette) / sizeof(CyclePalette[0]));
 }
 
+namespace DonutColors
+{
+    inline const Style Background =
+          style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style BorderColor =
+          style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+}
+
 Donut3DScreen::Donut3DScreen() = default;
+
+Donut3DScreen::~Donut3DScreen()
+{
+    m_outerFrameObject.clear();
+    m_previewPaneObject.clear();
+    m_renderInfoPaneObject.clear();
+    m_footerPaneObject.clear();
+    m_titleObject.clear();
+    m_minimumSizeWarningObject.clear();
+}
 
 void Donut3DScreen::onEnter()
 {
@@ -101,16 +133,32 @@ void Donut3DScreen::draw(Surface& surface)
         return;
     }
 
-    m_outerFrameObject.draw(buffer, 0, 0);
+    PageComposer page(buffer);
+    page.clearRegions();
+
+    page.createFullScreenRegion("Screen");
+    page.createInsetRegion("Safe", "Screen", 2, 1, 2, 1);
+
+    const Rect safe = page.resolveRegion("Safe");
+    const auto [footer, body] = page.splitBottom(safe, 5);
+    const auto [rightPane, leftPane] = page.splitRight(body, body.size.width / 3);
+
+    page.createRegion("LeftPane", leftPane);
+    page.createRegion("RightPane", rightPane);
+    page.createRegion("Footer", footer);
+
+    page.createInsetRegion("3dViewPort", "LeftPane", 2, 1, 2, 1);
+    const Rect viewPort = page.resolveRegion("3dViewPort");
+
+    page.writeObjectInRegion(m_outerFrameObject, "Screen", Composition::Align::center());
+
+    page.drawPanel("LeftPane", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
+    page.drawPanel("RightPane", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
+    page.drawPanel("Footer", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
+
     m_titleObject.draw(buffer, m_titleX, m_titleY);
-    m_footerObject.draw(buffer, m_footerX, m_footerY);
-
-    const int viewportLeft = 1;
-    const int viewportTop = 1;
-    const int viewportWidth = std::max(0, screenWidth - 2);
-    const int viewportHeight = std::max(0, screenHeight - 2);
-
-    renderDonut(surface, viewportLeft, viewportTop, viewportWidth, viewportHeight);
+        
+    renderDonut(surface, viewPort);
 }
 
 void Donut3DScreen::ensureBuffers(int width, int height)
@@ -146,14 +194,14 @@ void Donut3DScreen::invalidateStaticUiCache()
     m_cachedMinimumSizeMessage.clear();
 
     m_outerFrameObject.clear();
+    m_previewPaneObject.clear();
+    m_renderInfoPaneObject.clear();
+    m_footerPaneObject.clear();
     m_titleObject.clear();
-    m_footerObject.clear();
     m_minimumSizeWarningObject.clear();
 
     m_titleX = 4;
     m_titleY = 0;
-    m_footerX = 4;
-    m_footerY = 0;
     m_warningX = 1;
     m_warningY = 1;
 }
@@ -166,7 +214,7 @@ void Donut3DScreen::ensureStaticUiCache(int screenWidth, int screenHeight)
 
     const bool contentChanged =
         (m_titleText != m_cachedTitleText) ||
-        (m_footerText != m_cachedFooterText) ||
+        // (m_footerText != m_cachedFooterText) ||
         (m_minimumSizeMessage != m_cachedMinimumSizeMessage);
 
     if (!sizeChanged && !contentChanged)
@@ -183,12 +231,13 @@ void Donut3DScreen::rebuildStaticUiCache(int screenWidth, int screenHeight)
     m_cachedScreenHeight = screenHeight;
 
     m_cachedTitleText = m_titleText;
-    m_cachedFooterText = m_footerText;
     m_cachedMinimumSizeMessage = m_minimumSizeMessage;
 
     m_outerFrameObject.clear();
+    m_previewPaneObject.clear();
+    m_renderInfoPaneObject.clear();
+    m_footerPaneObject.clear();
     m_titleObject.clear();
-    m_footerObject.clear();
     m_minimumSizeWarningObject.clear();
 
     if (screenWidth > 0 && screenHeight > 0)
@@ -196,15 +245,12 @@ void Donut3DScreen::rebuildStaticUiCache(int screenWidth, int screenHeight)
         m_outerFrameObject = ObjectFactory::makeFrame(
             screenWidth,
             screenHeight,
-            Themes::Background);
+            Themes::Background,
+            ObjectFactory::doubleLineBorder());
     }
 
     m_titleObject = ObjectFactory::makeTextUtf8(
         m_titleText,
-        Themes::Subtitle);
-
-    m_footerObject = ObjectFactory::makeTextUtf8(
-        m_footerText,
         Themes::Subtitle);
 
     m_minimumSizeWarningObject = ObjectFactory::makeTextUtf8(
@@ -213,9 +259,6 @@ void Donut3DScreen::rebuildStaticUiCache(int screenWidth, int screenHeight)
 
     m_titleX = 4;
     m_titleY = 0;
-
-    m_footerX = 4;
-    m_footerY = std::max(0, screenHeight - 1);
 
     m_warningX = 1;
     m_warningY = 1;
@@ -226,36 +269,36 @@ bool Donut3DScreen::isBelowMinimumScreenSize(int screenWidth, int screenHeight) 
     return screenWidth < MinimumScreenWidth || screenHeight < MinimumScreenHeight;
 }
 
-void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, int height)
+void Donut3DScreen::renderDonut(Surface& surface, const Rect& viewPort)
 {
-    if (width <= 0 || height <= 0)
+    if (viewPort.size.width <= 0 || viewPort.size.height <= 0)
     {
         return;
     }
 
     ScreenBuffer& buffer = surface.buffer();
 
-    ensureBuffers(width, height);
+    ensureBuffers(viewPort.size.width, viewPort.size.height);
 
     buffer.fillRect(
-        Rect{ Point{ left, top }, Size{ width, height } },
+        viewPort,
         U' ',
         style::Bg(Color::FromBasic(Color::Basic::Black)));
 
-    std::vector<float> luminanceBuffer(static_cast<std::size_t>(width * height), 0.0f);
-    std::vector<float> shadowBuffer(static_cast<std::size_t>(width * height), 0.0f);
+    std::vector<float> luminanceBuffer(static_cast<std::size_t>(viewPort.size.width * viewPort.size.height), 0.0f);
+    std::vector<float> shadowBuffer(static_cast<std::size_t>(viewPort.size.width * viewPort.size.height), 0.0f);
 
     const float cosA = std::cos(m_rotationA);
     const float sinA = std::sin(m_rotationA);
     const float cosB = std::cos(m_rotationB);
     const float sinB = std::sin(m_rotationB);
 
-    const float k1 = SizeScale * static_cast<float>(width) * K2 * 3.0f / (8.0f * (R1 + R2));
+    const float k1 = SizeScale * static_cast<float>(viewPort.size.width) * K2 * 3.0f / (8.0f * (R1 + R2));
 
     float minDepth = 1000000.0f;
     float maxDepth = -1000000.0f;
 
-    const float floorY = (static_cast<float>(height) * 0.9f);
+    const float floorY = (static_cast<float>(viewPort.size.height) * 0.9f);
     const float shadowShiftX = 6.0f;
 
     for (float theta = 0.0f; theta < (Pi * 2.0f); theta += ThetaSpacing)
@@ -284,10 +327,10 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
 
             const float ooz = 1.0f / z;
 
-            const int xp = static_cast<int>((static_cast<float>(width) * 0.5f) + (k1 * ooz * x));
-            const int yp = static_cast<int>((static_cast<float>(height) * 0.5f) - (k1 * ooz * y * 0.5f));
+            const int xp = static_cast<int>((static_cast<float>(viewPort.size.width) * 0.5f) + (k1 * ooz * x));
+            const int yp = static_cast<int>((static_cast<float>(viewPort.size.height) * 0.5f) - (k1 * ooz * y * 0.5f));
 
-            if (xp < 0 || xp >= width || yp < 0 || yp >= height)
+            if (xp < 0 || xp >= viewPort.size.width || yp < 0 || yp >= viewPort.size.height)
             {
                 continue;
             }
@@ -303,7 +346,7 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
                 continue;
             }
 
-            const int bufferIndex = index(xp, yp, width);
+            const int bufferIndex = index(xp, yp, viewPort.size.width);
             const std::size_t cellIndex = static_cast<std::size_t>(bufferIndex);
 
             if (ooz <= m_depthBuffer[cellIndex])
@@ -330,26 +373,26 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
 
             const float closeness = std::clamp((ooz - 0.10f) / 0.18f, 0.0f, 1.0f);
             const int shadowX = static_cast<int>(std::round(static_cast<float>(xp) + shadowShiftX + (closeness * 2.0f)));
-            const int shadowY = static_cast<int>(std::round(floorY + ((static_cast<float>(yp) - (static_cast<float>(height) * 0.5f)) * 0.18f)));
+            const int shadowY = static_cast<int>(std::round(floorY + ((static_cast<float>(yp) - (static_cast<float>(viewPort.size.height) * 0.5f)) * 0.18f)));
 
-            if (shadowX >= 0 && shadowX < width && shadowY >= 0 && shadowY < height)
+            if (shadowX >= 0 && shadowX < viewPort.size.width && shadowY >= 0 && shadowY < viewPort.size.height)
             {
-                const std::size_t shadowIndex = static_cast<std::size_t>(index(shadowX, shadowY, width));
+                const std::size_t shadowIndex = static_cast<std::size_t>(index(shadowX, shadowY, viewPort.size.width));
                 shadowBuffer[shadowIndex] = std::max(shadowBuffer[shadowIndex], 0.35f + (luminance * 0.45f));
             }
 
             const int softShadowX1 = shadowX - 1;
             const int softShadowX2 = shadowX + 1;
 
-            if (softShadowX1 >= 0 && softShadowX1 < width && shadowY >= 0 && shadowY < height)
+            if (softShadowX1 >= 0 && softShadowX1 < viewPort.size.width && shadowY >= 0 && shadowY < viewPort.size.height)
             {
-                const std::size_t shadowIndex = static_cast<std::size_t>(index(softShadowX1, shadowY, width));
+                const std::size_t shadowIndex = static_cast<std::size_t>(index(softShadowX1, shadowY, viewPort.size.width));
                 shadowBuffer[shadowIndex] = std::max(shadowBuffer[shadowIndex], 0.18f + (luminance * 0.18f));
             }
 
-            if (softShadowX2 >= 0 && softShadowX2 < width && shadowY >= 0 && shadowY < height)
+            if (softShadowX2 >= 0 && softShadowX2 < viewPort.size.width && shadowY >= 0 && shadowY < viewPort.size.height)
             {
-                const std::size_t shadowIndex = static_cast<std::size_t>(index(softShadowX2, shadowY, width));
+                const std::size_t shadowIndex = static_cast<std::size_t>(index(softShadowX2, shadowY, viewPort.size.width));
                 shadowBuffer[shadowIndex] = std::max(shadowBuffer[shadowIndex], 0.18f + (luminance * 0.18f));
             }
         }
@@ -360,11 +403,11 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
         maxDepth = minDepth + 0.0001f;
     }
 
-    for (int y = 0; y < height; ++y)
+    for (int y = 0; y < viewPort.size.height; ++y)
     {
-        for (int x = 0; x < width; ++x)
+        for (int x = 0; x < viewPort.size.width; ++x)
         {
-            const std::size_t cellIndex = static_cast<std::size_t>(index(x, y, width));
+            const std::size_t cellIndex = static_cast<std::size_t>(index(x, y, viewPort.size.width));
             const float shadowIntensity = shadowBuffer[cellIndex];
 
             if (shadowIntensity <= 0.0f)
@@ -389,15 +432,15 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
                     + style::Bg(Color::FromBasic(Color::Basic::Black));
             }
 
-            buffer.writeCodePoint(left + x, top + y, shadowGlyph, shadowStyle);
+            buffer.writeCodePoint(viewPort.position.x + x, viewPort.position.y + y, shadowGlyph, shadowStyle);
         }
     }
 
-    for (int y = 0; y < height; ++y)
+    for (int y = 0; y < viewPort.size.height; ++y)
     {
-        for (int x = 0; x < width; ++x)
+        for (int x = 0; x < viewPort.size.width; ++x)
         {
-            const int bufferIndex = index(x, y, width);
+            const int bufferIndex = index(x, y, viewPort.size.width);
             const std::size_t cellIndex = static_cast<std::size_t>(bufferIndex);
 
             const char32_t glyph = m_glyphBuffer[cellIndex];
@@ -410,7 +453,7 @@ void Donut3DScreen::renderDonut(Surface& surface, int left, int top, int width, 
             }
 
             const float normalizedDepth = (depth - minDepth) / (maxDepth - minDepth);
-            buffer.writeCodePoint(left + x, top + y, glyph, buildShadedStyle(normalizedDepth, luminance));
+            buffer.writeCodePoint(viewPort.position.x + x, viewPort.position.y + y, glyph, buildShadedStyle(normalizedDepth, luminance));
         }
     }
 }
