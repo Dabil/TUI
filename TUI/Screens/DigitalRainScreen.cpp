@@ -9,11 +9,13 @@
 #include "Rendering/Composition/WritePresets.h"
 #include "Rendering/Objects/TextObjectComposer.h"
 #include "Rendering/Objects/TextObjectFactory.h"
+#include "Rendering/Objects/TextObjectExporter.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Surface.h"
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
+#include "Utilities/Unicode/UnicodeConversion.h"
 
 
 // TODO:
@@ -241,7 +243,7 @@ DigitalRainScreen::DigitalRainScreen(TerminalHostKind hostKind)
 
     m_titleStyle =
         style::Bold
-        + style::Fg(Color::FromBasic(Color::Basic::BrightGreen))
+        + style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(black);
 
     m_labelStyle =
@@ -511,9 +513,13 @@ TextObject DigitalRainScreen::buildUnicodeContractPanelTextObject() const
         10,
         "contractPanelFrame");
 
+    std::u32string H1 = U"UNICODE CONTRACT CHECKS";
+    std::u32string H2 = U"UTF-8 OUTPUT CHECKS";
+    std::u32string H3 = U"STRESS ROUND-TRIP CHECK";
+
     for (std::size_t rowIndex = 0; rowIndex < rows.size(); ++rowIndex)
     {
-        const Style& rowStyle = (rowIndex == 0) ? m_labelStyle : m_previewStyle;
+        const Style& rowStyle = (rows[rowIndex] == H1 || rows[rowIndex] == H2 || rows[rowIndex] == H3) ? m_labelStyle : m_previewStyle;
         composer.addText(rows[rowIndex], 1, static_cast<int>(rowIndex) + 1, rowStyle, 20, "contractPanelRow");
     }
 
@@ -527,6 +533,11 @@ std::vector<std::u32string> DigitalRainScreen::buildUnicodeContractPanelRows() c
     const auto statusPrefix = [](bool passed) -> std::u32string
         {
             return passed ? U"[PASS] " : U"[FAIL] ";
+        };
+
+    const auto byteCountText = [](const std::string& text) -> std::u32string
+        {
+            return UnicodeConversion::utf8ToU32(std::to_string(text.size()));
         };
 
     const TextObject combiningObject = TextObject::fromU32(U"a\u0301");
@@ -572,6 +583,87 @@ std::vector<std::u32string> DigitalRainScreen::buildUnicodeContractPanelRows() c
         mixedObject.getCell(1, 0).cluster == U"界" &&
         mixedObject.getCell(2, 0).isWideTrailing();
 
+    const std::u32string snapshotText = U"e\u0301 表 ✅ √";
+    const std::string expectedSnapshotUtf8 = UnicodeConversion::u32ToUtf8(snapshotText);
+
+    const TextObject snapshotObject = TextObject::fromU32(snapshotText);
+
+    ScreenBuffer snapshotBuffer(
+        snapshotObject.getWidth(),
+        snapshotObject.getHeight());
+
+    snapshotObject.draw(
+        snapshotBuffer,
+        0,
+        0,
+        Composition::WritePresets::solidObject());
+
+    const std::string actualSnapshotUtf8 = snapshotBuffer.renderToUtf8String();
+
+    const bool screenBufferSnapshotPassed =
+        actualSnapshotUtf8 == expectedSnapshotUtf8;
+
+    TextObjectExporter::SaveOptions exportOptions;
+    exportOptions.fileType = TextObjectExporter::FileType::Txt;
+    exportOptions.encoding = TextObjectExporter::Encoding::Utf8;
+    exportOptions.lineEnding = TextObjectExporter::LineEnding::Lf;
+    exportOptions.includeUtf8Bom = false;
+    exportOptions.preserveTrailingSpaces = true;
+
+    const TextObjectExporter::SaveResult exportResult =
+        TextObjectExporter::exportToBytes(snapshotObject, exportOptions);
+
+    const bool textObjectExportPassed =
+        exportResult.success &&
+        exportResult.bytes == expectedSnapshotUtf8;
+
+    const bool snapshotMatchesExport =
+        exportResult.success &&
+        actualSnapshotUtf8 == exportResult.bytes;
+
+    const std::u32string stressText =
+        U"A"
+        U"e\u0301"
+        U" "
+        U"界"
+        U" "
+        U"✅"
+        U" "
+        U"√"
+        U" "
+        U"👍🏽"
+        U" "
+        U"👨‍👩‍👧‍👦"
+        U" "
+        U"🇺🇸";
+
+    const std::string expectedStressUtf8 =
+        UnicodeConversion::u32ToUtf8(stressText);
+
+    const TextObject stressObject = TextObject::fromU32(stressText);
+
+    ScreenBuffer stressBuffer(
+        stressObject.getWidth(),
+        stressObject.getHeight());
+
+    stressObject.draw(
+        stressBuffer,
+        0,
+        0,
+        Composition::WritePresets::solidObject());
+
+    const std::string actualStressUtf8 =
+        stressBuffer.renderToUtf8String();
+
+    const TextObjectExporter::SaveResult stressExportResult =
+        TextObjectExporter::exportToBytes(stressObject, exportOptions);
+
+    const bool stressRoundTripPassed =
+        actualStressUtf8 == expectedStressUtf8 &&
+        stressExportResult.success &&
+        stressExportResult.bytes == expectedStressUtf8 &&
+        actualStressUtf8 == stressExportResult.bytes;
+
     std::vector<std::u32string> rows;
     rows.push_back(U"UNICODE CONTRACT CHECKS");
     rows.push_back(statusPrefix(combiningPassed) + U"Combining mark preserved");
@@ -588,6 +680,30 @@ std::vector<std::u32string> DigitalRainScreen::buildUnicodeContractPanelRows() c
     rows.push_back(statusPrefix(mixedPassed) + U"Cluster boundaries preserved");
     rows.push_back(U"       input: a + U+0301 + 界");
     rows.push_back(U"       expected: cluster, wide glyph, trail");
+
+    rows.push_back(U"UTF-8 OUTPUT CHECKS");
+    rows.push_back(statusPrefix(screenBufferSnapshotPassed) + U"ScreenBuffer emits UTF-8");
+    rows.push_back(statusPrefix(textObjectExportPassed) + U"TextObject export emits UTF-8");
+    rows.push_back(statusPrefix(snapshotMatchesExport) + U"Snapshot matches export");
+
+    rows.push_back(U"STRESS ROUND-TRIP CHECK");
+    rows.push_back(statusPrefix(stressRoundTripPassed) + U"Clusters, wide, emoji, spaces");
+
+    if (!stressRoundTripPassed)
+    {
+        rows.push_back(U"       expected bytes: " + byteCountText(expectedStressUtf8));
+        rows.push_back(U"       snapshot bytes: " + byteCountText(actualStressUtf8));
+
+        if (stressExportResult.success)
+        {
+            rows.push_back(U"       export bytes:   " + byteCountText(stressExportResult.bytes));
+        }
+        else
+        {
+            rows.push_back(U"       export failed");
+        }
+    }
+
     return rows;
 }
 
