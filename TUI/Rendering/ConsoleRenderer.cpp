@@ -772,14 +772,11 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
         const int runStart = x;
 
         std::u32string runText;
-        std::vector<CellWidth> runGlyphWidths;
-
-        runText.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
-        runGlyphWidths.reserve(static_cast<std::size_t>(xEnd - runStart + 1));
 
         while (x <= xEnd)
         {
             const ScreenCell& cell = frame.getCell(x, y);
+
             if (cell.style != runStyle)
             {
                 break;
@@ -787,11 +784,11 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
 
             if (!isContinuationCell(cell))
             {
-                const char32_t glyph = cellToPresentedGlyph(cell);
-                if (glyph != U'\0')
+                const std::u32string clusterText = frame.getDisplayCluster(x, y);
+
+                if (!clusterText.empty())
                 {
-                    runText.push_back(glyph);
-                    runGlyphWidths.push_back(UnicodeWidth::measureCodePointWidth(glyph));
+                    runText += clusterText;
                 }
             }
 
@@ -799,30 +796,22 @@ void ConsoleRenderer::writeSpan(const ScreenBuffer& frame, int y, int xStart, in
         }
 
         const ResolvedStyle resolvedRunStyle = m_stylePolicy.resolve(runStyle);
+
         if (!isBlinkVisibleForResolvedStyle(resolvedRunStyle))
         {
             std::u32string maskedText;
-            maskedText.reserve(runText.size() * 2);
+            maskedText.reserve(runText.size());
 
-            for (std::size_t i = 0; i < runText.size(); ++i)
+            for (char32_t ch : runText)
             {
-                const char32_t glyph = runText[i];
-                const CellWidth width = runGlyphWidths[i];
-
-                if (glyph == U' ')
+                if (ch == U'\n')
+                {
+                    maskedText.push_back(ch);
+                }
+                else
                 {
                     maskedText.push_back(U' ');
-                    continue;
                 }
-
-                if (width == CellWidth::Two)
-                {
-                    maskedText.push_back(U' ');
-                    maskedText.push_back(U' ');
-                    continue;
-                }
-
-                maskedText.push_back(U' ');
             }
 
             runText = std::move(maskedText);
