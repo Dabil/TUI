@@ -12,9 +12,9 @@
 #include <utility>
 #include <vector>
 
+#include "Core/Rect.h"
 #include "Assets/Loaders/AsciiBannerFontLoader.h"
 #include "Assets/Models/AsciiBannerFont.h"
-#include "Core/Rect.h"
 #include "Rendering/Composition/Alignment.h"
 #include "Rendering/Composition/PageComposer.h"
 #include "Rendering/Composition/WritePresets.h"
