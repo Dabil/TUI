@@ -249,6 +249,18 @@ namespace
         return bar;
     }
 
+    int measureDisplayWidth(std::u32string_view text)
+    {
+        int width = 0;
+
+        for (const TextCluster& cluster : GraphemeSegmentation::segment(text))
+        {
+            width += std::max(0, static_cast<int>(cluster.displayWidth));
+        }
+
+        return width;
+    }
+
     std::string makeMarquee(std::string_view message, int width, int offset)
     {
         if (width <= 0)
@@ -303,8 +315,7 @@ namespace
             const std::vector<TextCluster> seg =
                 GraphemeSegmentation::segment(cluster);
 
-            const int clusterWidth =
-                seg.empty() ? 1 : std::max(0, static_cast<int>(seg.front().displayWidth));
+            const int clusterWidth = measureDisplayWidth(cluster);
 
             if (usedWidth + clusterWidth > width)
             {
