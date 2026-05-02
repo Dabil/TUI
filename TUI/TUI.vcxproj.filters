@@ -381,6 +381,9 @@
     <ClInclude Include="Utilities\Text\TextClip.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Rendering\LayerInstance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -699,6 +702,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentationTests.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Rendering\LayerInstance.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
