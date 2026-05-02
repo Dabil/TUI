@@ -17,26 +17,6 @@ namespace
     constexpr int MinimumWidth = 120;
     constexpr int MinimumHeight = 36;
 
-    std::string clipText(const std::string& text, const int width)
-    {
-        if (width <= 0)
-        {
-            return {};
-        }
-
-        if (static_cast<int>(text.size()) <= width)
-        {
-            return text;
-        }
-
-        if (width <= 3)
-        {
-            return text.substr(0, static_cast<std::size_t>(width));
-        }
-
-        return text.substr(0, static_cast<std::size_t>(width - 3)) + "...";
-    }
-
     void writeClipped(
         ScreenBuffer& buffer,
         const int x,

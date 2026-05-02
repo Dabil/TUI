@@ -46,26 +46,6 @@ namespace
             || support == RendererFeatureSupport::Emulated;
     }
 
-    std::string clipText(const std::string& text, int width)
-    {
-        if (width <= 0)
-        {
-            return {};
-        }
-
-        if (static_cast<int>(text.size()) <= width)
-        {
-            return text;
-        }
-
-        if (width <= 3)
-        {
-            return text.substr(0, static_cast<std::size_t>(width));
-        }
-
-        return text.substr(0, static_cast<std::size_t>(width - 3)) + "...";
-    }
-
     void writeClippedLine(
         ScreenBuffer& buffer,
         int x,
@@ -79,7 +59,7 @@ namespace
             return;
         }
 
-        buffer.writeString(x, y, clipText(text, width), style);
+        buffer.writeString(x, y, TextClip::clipUtf8Text(text, width), style);
     }
 
     void fillPanel(ScreenBuffer& buffer, int x, int y, int width, int height, const Style& style)
