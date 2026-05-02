@@ -12,113 +12,6 @@
 
 namespace
 {
-    std::u32string decodeUtf8(std::string_view text)
-    {
-        std::u32string out;
-        out.reserve(text.size());
-
-        std::size_t i = 0;
-        while (i < text.size())
-        {
-            const unsigned char c0 = static_cast<unsigned char>(text[i]);
-
-            if (c0 < 0x80)
-            {
-                out.push_back(static_cast<char32_t>(c0));
-                ++i;
-                continue;
-            }
-
-            if ((c0 & 0xE0) == 0xC0)
-            {
-                if (i + 1 >= text.size())
-                {
-                    out.push_back(U'?');
-                    break;
-                }
-
-                const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
-                if ((c1 & 0xC0) != 0x80)
-                {
-                    out.push_back(U'?');
-                    ++i;
-                    continue;
-                }
-
-                const char32_t cp =
-                    ((static_cast<char32_t>(c0 & 0x1F) << 6) |
-                        (static_cast<char32_t>(c1 & 0x3F)));
-
-                out.push_back(cp);
-                i += 2;
-                continue;
-            }
-
-            if ((c0 & 0xF0) == 0xE0)
-            {
-                if (i + 2 >= text.size())
-                {
-                    out.push_back(U'?');
-                    break;
-                }
-
-                const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
-                const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
-
-                if ((c1 & 0xC0) != 0x80 || (c2 & 0xC0) != 0x80)
-                {
-                    out.push_back(U'?');
-                    ++i;
-                    continue;
-                }
-
-                const char32_t cp =
-                    ((static_cast<char32_t>(c0 & 0x0F) << 12) |
-                        (static_cast<char32_t>(c1 & 0x3F) << 6) |
-                        (static_cast<char32_t>(c2 & 0x3F)));
-
-                out.push_back(cp);
-                i += 3;
-                continue;
-            }
-
-            if ((c0 & 0xF8) == 0xF0)
-            {
-                if (i + 3 >= text.size())
-                {
-                    out.push_back(U'?');
-                    break;
-                }
-
-                const unsigned char c1 = static_cast<unsigned char>(text[i + 1]);
-                const unsigned char c2 = static_cast<unsigned char>(text[i + 2]);
-                const unsigned char c3 = static_cast<unsigned char>(text[i + 3]);
-
-                if ((c1 & 0xC0) != 0x80 || (c2 & 0xC0) != 0x80 || (c3 & 0xC0) != 0x80)
-                {
-                    out.push_back(U'?');
-                    ++i;
-                    continue;
-                }
-
-                const char32_t cp =
-                    ((static_cast<char32_t>(c0 & 0x07) << 18) |
-                        (static_cast<char32_t>(c1 & 0x3F) << 12) |
-                        (static_cast<char32_t>(c2 & 0x3F) << 6) |
-                        (static_cast<char32_t>(c3 & 0x3F)));
-
-                out.push_back(cp);
-                i += 4;
-                continue;
-            }
-
-            out.push_back(U'?');
-            ++i;
-        }
-
-        return out;
-    }
-
     int cellWidthToInt(const CellWidth width)
     {
         switch (width)
@@ -198,7 +91,7 @@ int AsciiBanner::getMinimumLeadingSpaces(const AsciiBannerFont::GlyphRows& glyph
 
     for (const auto& line : glyph)
     {
-        const std::u32string decoded = decodeUtf8(line);
+        const std::u32string decoded = UnicodeConversion::utf8ToU32(line);
 
         int count = 0;
         while (count < static_cast<int>(decoded.size()) &&
@@ -222,7 +115,7 @@ int AsciiBanner::getMinimumTrailingSpaces(const std::vector<std::string>& lines)
 
     for (const auto& line : lines)
     {
-        const std::u32string decoded = decodeUtf8(line);
+        const std::u32string decoded = UnicodeConversion::utf8ToU32(line);
 
         int count = 0;
         for (int i = static_cast<int>(decoded.size()) - 1;
@@ -282,7 +175,7 @@ void AsciiBanner::appendGlyphKern(
 
         while (removed < overlap)
         {
-            const std::u32string decoded = decodeUtf8(outputLines[row]);
+            const std::u32string decoded = UnicodeConversion::utf8ToU32(outputLines[row]);
             if (decoded.empty() || decoded.back() != U' ')
             {
                 break;
@@ -320,7 +213,7 @@ std::vector<std::string> AsciiBanner::renderSingleLine(
 
     std::vector<std::string> outputLines(static_cast<std::size_t>(font.getHeight()), "");
 
-    const std::u32string codePoints = decodeUtf8(text);
+    const std::u32string codePoints = UnicodeConversion::utf8ToU32(text);
 
     for (const char32_t cp : codePoints)
     {
