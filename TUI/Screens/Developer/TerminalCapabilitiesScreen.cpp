@@ -6,6 +6,7 @@
 #include <string>
 
 #include "Core/Rect.h"
+#include "Utilities/Text/TextClip.h"
 #include "Rendering/Capabilities/CapabilityReport.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/IRenderer.h"

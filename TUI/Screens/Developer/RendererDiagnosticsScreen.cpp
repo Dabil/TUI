@@ -6,6 +6,7 @@
 #include <string>
 
 #include "Core/Rect.h"
+#include "Utilities/Text/TextClip.h"
 #include "Rendering/Capabilities/CapabilityReport.h"
 #include "Rendering/Diagnostics/RenderDiagnostics.h"
 #include "Rendering/Diagnostics/RendererSelectionTrace.h"
@@ -42,7 +43,7 @@ namespace
         return text.substr(0, static_cast<std::size_t>(width - 3)) + "...";
     }
 
-    void writeClipped(
+    void writeClippedLine(
         ScreenBuffer& buffer,
         int x,
         int y,
@@ -55,7 +56,7 @@ namespace
             return;
         }
 
-        buffer.writeString(x, y, clipText(text, width), style);
+        buffer.writeString(x, y, TextClip::clipUtf8Text(text, width), style);
     }
 
     void drawPanel(ScreenBuffer& buffer, int x, int y, int width, int height, const std::string& title)

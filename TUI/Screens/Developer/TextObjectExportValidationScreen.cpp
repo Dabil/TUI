@@ -5,6 +5,7 @@
 #include <string>
 
 #include "Core/Rect.h"
+#include "Utilities/Text/TextClip.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Color.h"
 #include "Rendering/Styles/Style.h"
@@ -78,7 +79,7 @@ namespace
             return;
         }
 
-        buffer.writeString(x, y, clipText(text, width), style);
+        buffer.writeString(x, y, TextClip::clipUtf8Text(text, width), style);
     }
 
     void drawPanel(
