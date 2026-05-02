@@ -2798,6 +2798,14 @@ Rules:
 - visible rendering must still end in ScreenCell / ScreenBuffer composition
 - no special bypass around the rendering core
 
+11.5 Window Interaction Layer
+- hit testing system
+- mouse input integration
+- drag support
+- resize support
+- cursor regions (edges/corners)
+- pointer capture model
+
 OUTPUT OF PHASE 10
 A reusable scrolling system for complex text-heavy screens.
 
@@ -2848,6 +2856,13 @@ IMPLEMENT IN THIS PHASE
 12.4 Widget style integration
 - use Style / UITheme roles
 - support focused/disabled/selected states
+
+12.5 Docking & Layout System
+- dock tree
+- split containers
+- panel attachment/detachment
+- snap zones
+- layout persistence
 
 OUTPUT OF PHASE 11
 The first real reusable widget framework.
