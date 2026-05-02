@@ -852,7 +852,7 @@ namespace Composition
 
         refreshFromTarget();
 
-        m_buffer.writeString(x, y, std::string(text), style);
+        m_buffer.writeText(x, y, UnicodeConversion::utf8ToU32(text), style);
 
         synchronizeTarget();
         m_lastSignature = 0;
