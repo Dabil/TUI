@@ -318,10 +318,24 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 
     if (normalized.kind == CellKind::Glyph)
     {
-        const CellWidth measuredWidth =
-            UnicodeWidth::measureCodePointWidth(normalized.glyph);
+        if (normalized.cluster.empty())
+        {
+            normalized.cluster.push_back(normalized.glyph);
+        }
 
-        if (measuredWidth == CellWidth::Zero)
+        const std::vector<TextCluster> clusters =
+            GraphemeSegmentation::segment(normalized.cluster);
+
+        if (!clusters.empty())
+        {
+            normalized.cluster = clusters.front().codePoints;
+            normalized.glyph = UnicodeConversion::sanitizeCodePoint(normalized.cluster.front());
+        }
+
+        const int measuredWidth =
+            clusters.empty() ? 1 : clusters.front().displayWidth;
+
+        if (measuredWidth <= 0)
         {
             ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
             target.glyph = U' ';
@@ -333,7 +347,7 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
             return;
         }
 
-        if (measuredWidth == CellWidth::Two)
+        if (measuredWidth >= 2)
         {
             if (!inBounds(x + 1, y))
             {
@@ -344,7 +358,6 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 
             ScreenCell& leading = m_cells[static_cast<std::size_t>(index(x, y))];
             leading = normalized;
-            leading.cluster.clear();
             leading.kind = CellKind::Glyph;
             leading.width = CellWidth::Two;
 
@@ -360,7 +373,6 @@ void ScreenBuffer::setCell(int x, int y, const ScreenCell& cell)
 
         ScreenCell& target = m_cells[static_cast<std::size_t>(index(x, y))];
         target = normalized;
-        target.cluster.clear();
         target.kind = CellKind::Glyph;
         target.width = CellWidth::One;
         return;
