@@ -462,14 +462,33 @@ namespace
                     scan.discardedStyle = true;
                 }
 
-                ExportCodePoint item;
-                item.source.x = x;
-                item.source.y = row;
-                item.value = (cell.kind == CellKind::Empty)
-                    ? U' '
-                    : UnicodeConversion::sanitizeCodePoint(cell.glyph);
-
-                scan.codePoints.push_back(item);
+                if (cell.kind == CellKind::Empty)
+                {
+                    ExportCodePoint item;
+                    item.source.x = x;
+                    item.source.y = row;
+                    item.value = U' ';
+                    scan.codePoints.push_back(item);
+                }
+                else if (!cell.cluster.empty())
+                {
+                    for (char32_t codePoint : cell.cluster)
+                    {
+                        ExportCodePoint item;
+                        item.source.x = x;
+                        item.source.y = row;
+                        item.value = UnicodeConversion::sanitizeCodePoint(codePoint);
+                        scan.codePoints.push_back(item);
+                    }
+                }
+                else
+                {
+                    ExportCodePoint item;
+                    item.source.x = x;
+                    item.source.y = row;
+                    item.value = UnicodeConversion::sanitizeCodePoint(cell.glyph);
+                    scan.codePoints.push_back(item);
+                }
             }
 
             if (!options.preserveTrailingSpaces)
