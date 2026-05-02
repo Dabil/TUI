@@ -26,6 +26,9 @@
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
 #include "Rendering/Styles/ThemeColor.h"
+#include "Utilities/Unicode/GraphemeSegmentation.h"
+#include "Utilities/Unicode/UnicodeConversion.h"
+#include "Utilities/Text/TextClip.h"
 
 namespace
 {
@@ -250,29 +253,69 @@ namespace
     {
         if (width <= 0)
         {
-            return "";
+            return {};
         }
 
-        std::string padded = "   " + std::string(message) + "   ";
-        while (static_cast<int>(padded.size()) < (width * 3))
+        // Convert to U32 immediately (boundary rule)
+        const std::u32string u32 = UnicodeConversion::utf8ToU32(message);
+
+        // Segment into grapheme clusters
+        const std::vector<TextCluster> clusters =
+            GraphemeSegmentation::segment(u32);
+
+        if (clusters.empty())
         {
-            padded += std::string(message) + "   ";
+            return {};
         }
 
-        offset %= static_cast<int>(padded.size());
-        if (offset < 0)
+        // Build padded cluster sequence
+        std::vector<std::u32string> padded;
+        padded.reserve(clusters.size() * 2);
+
+        for (const auto& c : clusters)
         {
-            offset += static_cast<int>(padded.size());
+            padded.push_back(c.codePoints);
         }
 
-        std::string result;
-        result.reserve(static_cast<std::size_t>(width));
-        for (int i = 0; i < width; ++i)
+        // Optional spacing gap between repeats
+        const std::u32string gap = U"   ";
+        padded.push_back(gap);
+
+        for (const auto& c : clusters)
         {
-            result.push_back(padded[static_cast<std::size_t>((offset + i) % static_cast<int>(padded.size()))]);
+            padded.push_back(c.codePoints);
         }
 
-        return result;
+        const int total = static_cast<int>(padded.size());
+
+        // Normalize offset
+        const int start = total > 0 ? (offset % total + total) % total : 0;
+
+        // Build result using clusters
+        std::u32string resultU32;
+        int usedWidth = 0;
+
+        for (int i = 0; i < total && usedWidth < width; ++i)
+        {
+            const std::u32string& cluster =
+                padded[static_cast<std::size_t>((start + i) % total)];
+
+            const std::vector<TextCluster> seg =
+                GraphemeSegmentation::segment(cluster);
+
+            const int clusterWidth =
+                seg.empty() ? 1 : std::max(0, static_cast<int>(seg.front().displayWidth));
+
+            if (usedWidth + clusterWidth > width)
+            {
+                break;
+            }
+
+            resultU32 += cluster;
+            usedWidth += clusterWidth;
+        }
+
+        return UnicodeConversion::u32ToUtf8(resultU32);
     }
 
     double pulse(double timeSeconds, double speed, double phase = 0.0)
@@ -463,10 +506,7 @@ namespace
 
                 std::string renderedLine = "> " + sourceLine;
 
-                if (static_cast<int>(renderedLine.size()) > monitorRect.size.width)
-                {
-                    renderedLine.resize(static_cast<std::size_t>(monitorRect.size.width));
-                }
+                renderedLine = TextClip::clipUtf8Text(renderedLine, monitorRect.size.width);
 
                 buffer.writeString(
                     monitorRect.position.x,
