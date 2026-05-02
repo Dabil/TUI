@@ -43,7 +43,7 @@ namespace
         return text.substr(0, static_cast<std::size_t>(width - 3)) + "...";
     }
 
-    void writeClippedLine(
+    void writeClipped(
         ScreenBuffer& buffer,
         int x,
         int y,
