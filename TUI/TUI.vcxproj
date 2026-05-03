@@ -178,6 +178,7 @@
     <ClInclude Include="Rendering\Composition\WritePolicyBuilder.h" />
     <ClInclude Include="Rendering\Composition\WritePolicyUtils.h" />
     <ClInclude Include="Rendering\Composition\WritePresets.h" />
+    <ClInclude Include="Rendering\Compositor.h" />
     <ClInclude Include="Rendering\ConsoleRenderer.h" />
     <ClInclude Include="Rendering\Diagnostics\AuthorRenderHints.h" />
     <ClInclude Include="Rendering\Diagnostics\PageCompositionDiagnostics.h" />
@@ -307,6 +308,7 @@
     <ClCompile Include="Rendering\Composition\WritePolicyBuilder.cpp" />
     <ClCompile Include="Rendering\Composition\WritePolicyUtils.cpp" />
     <ClCompile Include="Rendering\Composition\WritePresets.cpp" />
+    <ClCompile Include="Rendering\Compositor.cpp" />
     <ClCompile Include="Rendering\ConsoleRenderer.cpp" />
     <ClCompile Include="Rendering\Diagnostics\AuthorRenderHints.cpp" />
     <ClCompile Include="Rendering\Diagnostics\PageCompositionDiagnostics.cpp" />
