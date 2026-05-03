@@ -270,6 +270,7 @@
     <ClInclude Include="ThirdParty\zlib-1.3.1\zutil.h" />
     <ClInclude Include="UI\Base\UIElement.h" />
     <ClInclude Include="UI\Panels\Panel.h" />
+    <ClInclude Include="UI\Panels\Window.h" />
     <ClInclude Include="Utilities\AssetPaths.h" />
     <ClInclude Include="Utilities\Text\TextClip.h" />
     <ClInclude Include="Utilities\Text\TextWrap.h" />
@@ -404,6 +405,7 @@
     <ClCompile Include="ThirdParty\zlib-1.3.1\zutil.c" />
     <ClCompile Include="UI\Base\UIElement.cpp" />
     <ClCompile Include="UI\Panels\Panel.cpp" />
+    <ClCompile Include="UI\Panels\Window.cpp" />
     <ClCompile Include="Utilities\AssetPaths.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentationTests.cpp" />
