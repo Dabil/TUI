@@ -41,7 +41,7 @@ FireScreen::FireScreen(Assets::AssetLibrary& assetLibrary)
 
 void FireScreen::onEnter()
 {
-    m_content.onEnter();
+    m_fireEffect.onEnter();
 
     m_tuiFireLogoObject.clear();
 
@@ -69,7 +69,7 @@ void FireScreen::onEnter()
 
 void FireScreen::onExit()
 {
-    m_content.onExit();
+    m_fireEffect.onExit();
 
     m_tuiFireLogoObject.clear();
 
@@ -85,7 +85,7 @@ void FireScreen::onExit()
 
 void FireScreen::update(double deltaTime)
 {
-    m_content.update(deltaTime);
+    m_fireEffect.update(deltaTime);
 }
 
 void FireScreen::draw(Surface& surface)
@@ -110,7 +110,7 @@ void FireScreen::draw(Surface& surface)
 
     // Controls dimensions of fire simulation
     Rect contentArea = Rect{ Point{3, 2}, Size{screenWidth - 6, screenHeight - 4} };
-    m_content.draw(surface, contentArea);
+    m_fireEffect.draw(surface, contentArea);
 
     if (!m_fontResult.success || !m_fontResult.hasFont())
     {

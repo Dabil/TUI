@@ -60,5 +60,5 @@ private:
     std::string m_cachedFontFailureText;
     std::string m_cachedMinimumSizeWarningText;
 
-    FireEffect m_content;
+    FireEffect m_fireEffect;
 };
