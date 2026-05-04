@@ -2,7 +2,6 @@
 
 #include <vector>
 
-#include "Screens/Screen.h"
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
 
