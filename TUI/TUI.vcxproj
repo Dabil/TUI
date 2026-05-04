@@ -255,6 +255,7 @@
     <ClInclude Include="Rendering\Styles\Themes.h" />
     <ClInclude Include="Rendering\VtFrameEmitter.h" />
     <ClInclude Include="Rendering\VTRun.h" />
+    <ClInclude Include="Screens\Content\FireEffect.h" />
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
@@ -266,6 +267,7 @@
     <ClInclude Include="Screens\Developer\TextObjectExportValidationScreen.h" />
     <ClInclude Include="Screens\WaterEffectScreen.h" />
     <ClInclude Include="Screens\Developer\XpSequenceDiagnosticsScreen.h" />
+    <ClInclude Include="Screens\WindowDemo.h" />
     <ClInclude Include="ThirdParty\zlib-1.3.1\zconf.h" />
     <ClInclude Include="ThirdParty\zlib-1.3.1\zutil.h" />
     <ClInclude Include="UI\Base\UIElement.h" />
@@ -377,6 +379,7 @@
     </ClCompile>
     <ClCompile Include="Rendering\TerminalSessionOptions.cpp" />
     <ClCompile Include="Rendering\VtFrameEmitter.cpp" />
+    <ClCompile Include="Screens\Content\FireEffect.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
@@ -390,6 +393,7 @@
     <ClCompile Include="Screens\Developer\TextObjectExportValidationScreen.cpp" />
     <ClCompile Include="Screens\WaterEffectScreen.cpp" />
     <ClCompile Include="Screens\Developer\XpSequenceDiagnosticsScreen.cpp" />
+    <ClCompile Include="Screens\WindowDemo.cpp" />
     <ClCompile Include="ThirdParty\zlib-1.3.1\adler32.c" />
     <ClCompile Include="ThirdParty\zlib-1.3.1\compress.c" />
     <ClCompile Include="ThirdParty\zlib-1.3.1\crc32.c" />
