@@ -1,10 +1,10 @@
 #pragma once
 
 #include <string>
-#include <vector>
 
-#include "Rendering/Objects/TextObject.h"
 #include "Screens/Screen.h"
+#include "Screens/Content/Donut3D.h"
+#include "Rendering/Objects/TextObject.h"
 
 class Surface;
 class Style;
@@ -16,32 +16,19 @@ public:
     ~Donut3DScreen();
 
     void onEnter() override;
+    void onExit() override;
     void update(double deltaTime) override;
     void draw(Surface& surface) override;
 
 private:
-    void ensureBuffers(int width, int height);
-    void renderDonut(Surface& surface, const Rect& viewPort);
 
     void invalidateStaticUiCache();
     void ensureStaticUiCache(int screenWidth, int screenHeight);
     void rebuildStaticUiCache(int screenWidth, int screenHeight);
-
     bool isBelowMinimumScreenSize(int screenWidth, int screenHeight) const;
 
-    int index(int x, int y, int width) const;
-    Style buildShadedStyle(float normalizedDepth, float luminance) const;
-
 private:
-    double m_elapsedSeconds = 0.0;
-    float m_rotationA = 0.0f;
-    float m_rotationB = 0.0f;
-
-    std::vector<float> m_depthBuffer;
-    std::vector<char32_t> m_glyphBuffer;
-
     std::string m_titleText = "[ 3D ASCII Render Lab ]";
-    // std::string m_footerText = "[ Hue Cycle + Depth Shading + Floor Shadow ]";
     std::string m_minimumSizeMessage = "3D Donut needs a larger console window.";
 
     TextObject m_outerFrameObject;
@@ -63,4 +50,6 @@ private:
 
     int m_warningX = 1;
     int m_warningY = 1;
+
+    Donut3D m_Donut3D;
 };
