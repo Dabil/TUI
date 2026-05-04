@@ -14,6 +14,7 @@
 #include "Rendering/TerminalRenderer.h"
 
 #include "Screens/ShowcaseScreen.h"
+#include "Screens/WindowDemo.h"
 #include "Screens/DigitalRainScreen.h"
 #include "Screens/WaterEffectScreen.h"
 #include "Screens/Donut3DScreen.h"
@@ -352,6 +353,10 @@ void Application::switchToScreen(ScreenType screenType)
         m_screenManager->pushScreen(std::make_unique<OpsWallScreen>());
         break;
 
+    case ScreenType::WindowDemo:
+        m_screenManager->pushScreen(std::make_unique<WindowDemo>());
+        break;
+
     case ScreenType::DigitalRain:
         m_screenManager->pushScreen(std::make_unique<DigitalRainScreen>(m_startupDiagnostics.actualHost));
         break;
@@ -390,6 +395,10 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::OpsWall:
+        switchToScreen(ScreenType::WindowDemo);
+        break;
+
+    case ScreenType::WindowDemo:
         switchToScreen(ScreenType::DigitalRain);
         break;
 
@@ -440,6 +449,10 @@ void Application::previousScreen()
         break;
 
     case ScreenType::DigitalRain:
+        switchToScreen(ScreenType::WindowDemo);
+        break;
+
+    case ScreenType::WindowDemo:
         switchToScreen(ScreenType::OpsWall);
         break;
 
