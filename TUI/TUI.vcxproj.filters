@@ -411,6 +411,9 @@
     <ClInclude Include="Screens\Content\Donut3D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Screens\Content\DigitalRainEffect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -759,6 +762,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\Content\Donut3D.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\Content\DigitalRainEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

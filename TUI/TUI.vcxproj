@@ -255,6 +255,7 @@
     <ClInclude Include="Rendering\Styles\Themes.h" />
     <ClInclude Include="Rendering\VtFrameEmitter.h" />
     <ClInclude Include="Rendering\VTRun.h" />
+    <ClInclude Include="Screens\Content\DigitalRainEffect.h" />
     <ClInclude Include="Screens\Content\Donut3D.h" />
     <ClInclude Include="Screens\Content\FireEffect.h" />
     <ClInclude Include="Screens\DigitalRainScreen.h" />
@@ -380,6 +381,7 @@
     </ClCompile>
     <ClCompile Include="Rendering\TerminalSessionOptions.cpp" />
     <ClCompile Include="Rendering\VtFrameEmitter.cpp" />
+    <ClCompile Include="Screens\Content\DigitalRainEffect.cpp" />
     <ClCompile Include="Screens\Content\Donut3D.cpp" />
     <ClCompile Include="Screens\Content\FireEffect.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
