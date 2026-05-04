@@ -47,7 +47,7 @@ namespace
 Panel::Panel()
     : UIElement()
     , m_backgroundStyle(AppThemes::Panel)
-    , m_frameStyle(UIThemes::Border)
+    , m_borderStyle(UIThemes::Border)
     , m_titleStyle(UIThemes::PanelTitle)
 {
 }
@@ -55,7 +55,7 @@ Panel::Panel()
 Panel::Panel(const Rect& bounds)
     : UIElement(bounds)
     , m_backgroundStyle(AppThemes::Panel)
-    , m_frameStyle(UIThemes::Border)
+    , m_borderStyle(UIThemes::Border)
     , m_titleStyle(UIThemes::PanelTitle)
 {
 }
@@ -64,7 +64,7 @@ Panel::Panel(const Rect& bounds, std::string title)
     : UIElement(bounds)
     , m_title(std::move(title))
     , m_backgroundStyle(AppThemes::Panel)
-    , m_frameStyle(UIThemes::Border)
+    , m_borderStyle(UIThemes::Border)
     , m_titleStyle(UIThemes::PanelTitle)
 {
 }
@@ -94,14 +94,14 @@ void Panel::setBackgroundStyle(const Style& style)
     m_backgroundStyle = style;
 }
 
-const Style& Panel::frameStyle() const
+const Style& Panel::borderStyle() const
 {
-    return m_frameStyle;
+    return m_borderStyle;
 }
 
-void Panel::setFrameStyle(const Style& style)
+void Panel::setBorderStyle(const Style& style)
 {
-    m_frameStyle = style;
+    m_borderStyle = style;
 }
 
 const Style& Panel::titleStyle() const
@@ -114,14 +114,14 @@ void Panel::setTitleStyle(const Style& style)
     m_titleStyle = style;
 }
 
-const Panel::FrameChars& Panel::frameChars() const
+const ObjectFactory::BorderGlyphs& Panel::borderGlyphs() const
 {
-    return m_frameChars;
+    return m_borderGlyphs;
 }
 
-void Panel::setFrameChars(const FrameChars& chars)
+void Panel::setBorderGlyphs(const ObjectFactory::BorderGlyphs& glyphs)
 {
-    m_frameChars = chars;
+    m_borderGlyphs = glyphs;
 }
 
 Rect Panel::contentBounds() const
@@ -163,18 +163,18 @@ void Panel::draw(Surface& surface)
     if (panelBounds.size.width >= 2 && panelBounds.size.height >= 2)
     {
         const Style& frameRenderStyle = isEnabled()
-            ? m_frameStyle
+            ? m_borderStyle
             : UIThemes::DisabledText;
 
         buffer.drawFrame(
             panelBounds,
             frameRenderStyle,
-            m_frameChars.topLeft,
-            m_frameChars.topRight,
-            m_frameChars.bottomLeft,
-            m_frameChars.bottomRight,
-            m_frameChars.horizontal,
-            m_frameChars.vertical);
+            m_borderGlyphs.topLeft,
+            m_borderGlyphs.topRight,
+            m_borderGlyphs.bottomLeft,
+            m_borderGlyphs.bottomRight,
+            m_borderGlyphs.horizontal,
+            m_borderGlyphs.vertical);
     }
 
     drawTitle(surface);

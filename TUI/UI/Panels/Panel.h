@@ -3,24 +3,14 @@
 #include <string>
 
 #include "Core/Rect.h"
-#include "Rendering/Styles/Style.h"
 #include "UI/Base/UIElement.h"
+#include "Rendering/Styles/Style.h"
+#include "Rendering/Objects/TextObjectFactory.h"
 
 class Surface;
 
 class Panel : public UIElement
 {
-public:
-    struct FrameChars
-    {
-        char32_t topLeft = U'+';
-        char32_t topRight = U'+';
-        char32_t bottomLeft = U'+';
-        char32_t bottomRight = U'+';
-        char32_t horizontal = U'-';
-        char32_t vertical = U'|';
-    };
-
 public:
     Panel();
     explicit Panel(const Rect& bounds);
@@ -33,14 +23,14 @@ public:
     const Style& backgroundStyle() const;
     void setBackgroundStyle(const Style& style);
 
-    const Style& frameStyle() const;
-    void setFrameStyle(const Style& style);
+    const Style& borderStyle() const;
+    void setBorderStyle(const Style& style);
 
     const Style& titleStyle() const;
     void setTitleStyle(const Style& style);
 
-    const FrameChars& frameChars() const;
-    void setFrameChars(const FrameChars& chars);
+    const ObjectFactory::BorderGlyphs& borderGlyphs() const;
+    void setBorderGlyphs(const ObjectFactory::BorderGlyphs& glyphs);
 
     Rect contentBounds() const;
 
@@ -53,8 +43,8 @@ private:
     std::string m_title;
 
     Style m_backgroundStyle;
-    Style m_frameStyle;
+    Style m_borderStyle;
     Style m_titleStyle;
 
-    FrameChars m_frameChars;
+    ObjectFactory::BorderGlyphs m_borderGlyphs;
 };
