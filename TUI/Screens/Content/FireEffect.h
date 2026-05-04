@@ -4,6 +4,7 @@
 
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/ScreenBuffer.h"
 
 class Surface;
 
@@ -23,6 +24,7 @@ private:
     void seedFireSource();
     void updateFire(double deltaTime);
     void coolTopRows();
+    void renderFireEffect(ScreenBuffer& buffer);
 
     int index(int x, int y) const;
     char32_t glyphForIntensity(int intensity) const;

@@ -70,9 +70,12 @@ void FireEffect::draw(Surface& surface, const Rect& viewport)
     ScreenBuffer& buffer = surface.buffer();
 
     setViewport(viewport);
-
     ensureSimulationSize(m_fireWidth, m_fireHeight);
+    renderFireEffect(buffer);
+}
 
+void FireEffect::renderFireEffect(ScreenBuffer& buffer)
+{
     buffer.fillRect(
         Rect{ Point{ m_fireLeft, m_fireTop }, Size{ m_fireWidth, m_fireHeight } },
         U' ',
