@@ -414,6 +414,12 @@
     <ClInclude Include="Screens\Content\DigitalRainEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Screens\Content\WaterWaveEffect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering\Effects\IEffect.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -765,6 +771,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\Content\DigitalRainEffect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\Content\WaterWaveEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

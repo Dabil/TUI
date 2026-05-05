@@ -189,6 +189,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
+    <ClInclude Include="Rendering\Effects\IEffect.h" />
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\LayerInstance.h" />
@@ -258,6 +259,7 @@
     <ClInclude Include="Screens\Content\DigitalRainEffect.h" />
     <ClInclude Include="Screens\Content\Donut3D.h" />
     <ClInclude Include="Screens\Content\FireEffect.h" />
+    <ClInclude Include="Screens\Content\WaterWaveEffect.h" />
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
@@ -384,6 +386,7 @@
     <ClCompile Include="Screens\Content\DigitalRainEffect.cpp" />
     <ClCompile Include="Screens\Content\Donut3D.cpp" />
     <ClCompile Include="Screens\Content\FireEffect.cpp" />
+    <ClCompile Include="Screens\Content\WaterWaveEffect.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
