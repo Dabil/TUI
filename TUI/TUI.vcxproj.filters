@@ -420,6 +420,9 @@
     <ClInclude Include="Rendering\Effects\IEffects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="UI\Panels\EffectWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -774,6 +777,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Effects\WaterWaveEffect.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Panels\EffectWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
