@@ -189,7 +189,7 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</ExcludedFromBuild>
     </ClInclude>
-    <ClInclude Include="Rendering\Effects\IEffect.h" />
+    <ClInclude Include="Rendering\Effects\IEffects.h" />
     <ClInclude Include="Rendering\FrameDiff.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\LayerInstance.h" />

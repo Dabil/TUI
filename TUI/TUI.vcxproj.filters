@@ -417,7 +417,7 @@
     <ClInclude Include="Rendering\Effects\WaterWaveEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Rendering\Effects\IEffect.h">
+    <ClInclude Include="Rendering\Effects\IEffects.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

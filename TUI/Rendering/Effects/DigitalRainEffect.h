@@ -7,19 +7,21 @@
 #include "Rendering/Styles/Style.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
+#include "Rendering/Effects/IEffects.h"
 
 class Surface;
 
-class DigitalRainEffect
+class DigitalRainEffect final : public IEffect
 {
 public:
-	DigitalRainEffect(TerminalHostKind hostKind = TerminalHostKind::Unknown);
-    ~DigitalRainEffect() = default;
+	explicit DigitalRainEffect(TerminalHostKind hostKind = TerminalHostKind::Unknown);
+    ~DigitalRainEffect() override = default;
 
-	void onEnter();
-	void onExit();
-	void update(double deltaTime);
-	void draw(Surface& surface, const Rect& viewport);
+	void onEnter() override;
+    void onExit() override {};
+	void update(double deltaTime) override;
+	void draw(Surface& surface, const Rect& viewport) override;
+ 
     const std::u32string& getGlyphPool() const;
 
 private:

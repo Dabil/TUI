@@ -5,6 +5,7 @@
 
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Effects/IEffects.h"
 
 class Surface;
 
@@ -15,16 +16,17 @@ enum class RainMode
     Pouring
 };
 
-class WaterWaveEffect
+class WaterWaveEffect final : public IEffect
 {
 public:
-	WaterWaveEffect() = default;
-	~WaterWaveEffect() = default;
+    WaterWaveEffect() = default;
+    ~WaterWaveEffect() override = default;
 
-	void onEnter();
-	void onExit();
-	void update(double deltaTime);
-	void draw(Surface& surface, const Rect& viewport);
+    void onEnter() override;
+    void onExit() override;
+    void update(double deltaTime) override;
+    void draw(Surface& surface, const Rect& viewport) override;
+
     RainMode getCurrentRainMode() const;
 
 private:

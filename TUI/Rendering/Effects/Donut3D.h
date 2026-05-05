@@ -4,18 +4,20 @@
 
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
+#include "Rendering/Effects/IEffects.h"
 
 class Surface;
 
-class Donut3D
+class Donut3D final : public IEffect
 {
 public:
 	explicit Donut3D();
+	~Donut3D() override = default;
 
-	void onEnter();
-	void onExit();
-	void update(double deltaTime);
-	void draw(Surface& surface, const Rect& viewPort);
+	void onEnter() override;
+	void onExit() override;
+	void update(double deltaTime) override;
+	void draw(Surface& surface, const Rect& viewPort) override;
 
 private:
 	void ensureBuffers(int width, int height);
