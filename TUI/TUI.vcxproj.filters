@@ -387,7 +387,7 @@
     <ClInclude Include="Rendering\Compositor.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\Content\FireEffect.h">
+    <ClInclude Include="Rendering\Effects\FireEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Screens\WindowDemo.h">
@@ -408,13 +408,13 @@
     <ClInclude Include="UI\Panels\Window.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\Content\Donut3D.h">
+    <ClInclude Include="Rendering\Effects\Donut3D.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\Content\DigitalRainEffect.h">
+    <ClInclude Include="Rendering\Effects\DigitalRainEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\Content\WaterWaveEffect.h">
+    <ClInclude Include="Rendering\Effects\WaterWaveEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Effects\IEffect.h">
@@ -746,7 +746,7 @@
     <ClCompile Include="Rendering\Compositor.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\Content\FireEffect.cpp">
+    <ClCompile Include="Rendering\Effects\FireEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Screens\WindowDemo.cpp">
@@ -767,17 +767,18 @@
     <ClCompile Include="UI\Panels\Window.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\Content\Donut3D.cpp">
+    <ClCompile Include="Rendering\Effects\Donut3D.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\Content\DigitalRainEffect.cpp">
+    <ClCompile Include="Rendering\Effects\DigitalRainEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\Content\WaterWaveEffect.cpp">
+    <ClCompile Include="Rendering\Effects\WaterWaveEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="startup.config" />
+    <None Include="Screens\Content\.gitkeep" />
   </ItemGroup>
 </Project>

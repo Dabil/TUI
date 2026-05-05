@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "Screens/Screen.h"
-#include "Screens/Content/DigitalRainEffect.h"
+#include "Rendering/Effects/DigitalRainEffect.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
 #include "Rendering/Objects/TextObject.h"
 #include "Rendering/Styles/Style.h"

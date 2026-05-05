@@ -3,7 +3,7 @@
 #include <string>
 
 #include "Screens/Screen.h"
-#include "Screens/Content/Donut3D.h"
+#include "Rendering/Effects/Donut3D.h"
 #include "Rendering/Objects/TextObject.h"
 
 class Surface;

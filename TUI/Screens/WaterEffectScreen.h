@@ -8,7 +8,7 @@
 #include "Rendering/Objects/LayeredTextObject.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Objects/TextObject.h"
-#include "Screens/Content/WaterWaveEffect.h"
+#include "Rendering/Effects/WaterWaveEffect.h"
 
 class Surface;
 class ScreenBuffer;

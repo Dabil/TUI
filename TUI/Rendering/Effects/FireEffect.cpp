@@ -1,4 +1,4 @@
-#include "Screens/Content/FireEffect.h"
+#include "Rendering/Effects/FireEffect.h"
 
 #include <algorithm>
 #include <cstdlib>

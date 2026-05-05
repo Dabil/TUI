@@ -1,4 +1,4 @@
-#include "Screens/Content/WaterWaveEffect.h"
+#include "Rendering/Effects/WaterWaveEffect.h"
 
 #include <algorithm>
 #include <cmath>

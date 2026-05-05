@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Screens/Screen.h"
-#include "Screens/Content/FireEffect.h"
+#include "Rendering/Effects/FireEffect.h"
 #include "Assets/AssetLibrary.h"
 
 namespace Assets
