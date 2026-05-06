@@ -280,6 +280,7 @@
     <ClInclude Include="UI\Panels\EffectWindow.h" />
     <ClInclude Include="UI\Panels\Panel.h" />
     <ClInclude Include="UI\Panels\PopupWindow.h" />
+    <ClInclude Include="UI\Panels\StatusBar.h" />
     <ClInclude Include="UI\Panels\Window.h" />
     <ClInclude Include="Utilities\AssetPaths.h" />
     <ClInclude Include="Utilities\Text\TextClip.h" />
@@ -424,6 +425,7 @@
     <ClCompile Include="UI\Panels\EffectWindow.cpp" />
     <ClCompile Include="UI\Panels\Panel.cpp" />
     <ClCompile Include="UI\Panels\PopupWindow.cpp" />
+    <ClCompile Include="UI\Panels\StatusBar.cpp" />
     <ClCompile Include="UI\Panels\Window.cpp" />
     <ClCompile Include="Utilities\AssetPaths.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
