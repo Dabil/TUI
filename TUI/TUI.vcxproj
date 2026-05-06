@@ -279,6 +279,7 @@
     <ClInclude Include="UI\Base\WindowManager.h" />
     <ClInclude Include="UI\Menus\MenuItem.h" />
     <ClInclude Include="UI\Menus\MenuModel.h" />
+    <ClInclude Include="UI\Menus\MenuView.h" />
     <ClInclude Include="UI\Panels\EffectWindow.h" />
     <ClInclude Include="UI\Panels\Panel.h" />
     <ClInclude Include="UI\Panels\PopupWindow.h" />
@@ -426,6 +427,7 @@
     <ClCompile Include="UI\Base\WindowManager.cpp" />
     <ClCompile Include="UI\Menus\MenuItem.cpp" />
     <ClCompile Include="UI\Menus\MenuModel.cpp" />
+    <ClCompile Include="UI\Menus\MenuView.cpp" />
     <ClCompile Include="UI\Panels\EffectWindow.cpp" />
     <ClCompile Include="UI\Panels\Panel.cpp" />
     <ClCompile Include="UI\Panels\PopupWindow.cpp" />
