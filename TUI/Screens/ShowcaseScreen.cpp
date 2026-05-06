@@ -754,8 +754,7 @@ void RetroTerminalScreen::draw(Surface& surface)
     const Rect safe = page.resolveRegion("Safe");
     const auto [header, afterHeader] = page.splitTop(safe, 7);
     const auto [footer, body] = page.splitBottom(afterHeader, 5);
-    const auto [consolePane, telemetryPane] =
-        page.splitLeft(body, std::max(44, (body.size.width * 3) / 5));
+    const auto [consolePane, telemetryPane] = page.splitLeft(body, std::max(44, (body.size.width * 3) / 5));
 
     page.createRegion("Header", header);
     page.createRegion("Footer", footer);
