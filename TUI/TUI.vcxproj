@@ -277,6 +277,8 @@
     <ClInclude Include="UI\Base\FocusManager.h" />
     <ClInclude Include="UI\Base\UIElement.h" />
     <ClInclude Include="UI\Base\WindowManager.h" />
+    <ClInclude Include="UI\Menus\MenuItem.h" />
+    <ClInclude Include="UI\Menus\MenuModel.h" />
     <ClInclude Include="UI\Panels\EffectWindow.h" />
     <ClInclude Include="UI\Panels\Panel.h" />
     <ClInclude Include="UI\Panels\PopupWindow.h" />
@@ -422,6 +424,8 @@
     <ClCompile Include="UI\Base\FocusManager.cpp" />
     <ClCompile Include="UI\Base\UIElement.cpp" />
     <ClCompile Include="UI\Base\WindowManager.cpp" />
+    <ClCompile Include="UI\Menus\MenuItem.cpp" />
+    <ClCompile Include="UI\Menus\MenuModel.cpp" />
     <ClCompile Include="UI\Panels\EffectWindow.cpp" />
     <ClCompile Include="UI\Panels\Panel.cpp" />
     <ClCompile Include="UI\Panels\PopupWindow.cpp" />
