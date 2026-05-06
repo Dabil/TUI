@@ -11,6 +11,15 @@
 
 class Surface;
 
+struct DigitalRainEffectOptions
+{
+    std::u32string glyphPool;
+    int maxStreams = 150;
+    int deadGlyphsSpawnRate = 25;
+    int deadGlyphBlinkRate = 10;
+    double mutationIntervalSeconds = 0.065;
+};
+
 class DigitalRainEffect final : public IEffect
 {
 public:
@@ -21,7 +30,8 @@ public:
     void onExit() override {};
 	void update(double deltaTime) override;
 	void draw(Surface& surface, const Rect& viewport) override;
- 
+    void setOptions(const DigitalRainEffectOptions& options);
+
     const std::u32string& getGlyphPool() const;
 
 private:
@@ -73,13 +83,20 @@ private:
     int m_rainTop = 1;
     int m_rainWidth = 0;
     int m_rainHeight = 0;
+ 
+    // options
+    int m_maxStreams = 150;
+    int m_deadGlyphsSpawnRate = 25;
+    int m_deadGlyphBlinkRate = 10;
+    double m_mutationIntervalSeconds = 0.065;
+    std::u32string m_glyphPool;
 
     double m_elapsedSeconds = 0.0;
 
     TerminalHostKind m_hostKind = TerminalHostKind::Unknown;
-    std::u32string m_glyphPool;
     std::vector<Stream> m_streams;
 
+    // stream colors
     Style m_backgroundStyle;
     Style m_headStyle;
     Style m_secondStyle;

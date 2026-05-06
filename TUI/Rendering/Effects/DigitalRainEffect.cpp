@@ -10,10 +10,6 @@
 
 namespace
 {
-    constexpr int MaximumDigitalDrops = 150;
-    constexpr int DeadGlyphsSpawnRate = 25;
-    constexpr int DeadGlyphBlinkRate = 10;
-    constexpr double MutationIntervalSeconds = 0.065;
     constexpr char32_t RabbitGlyph = U'\U0001F407';
 }
 
@@ -128,6 +124,15 @@ void DigitalRainEffect::draw(Surface& surface, const Rect& viewport)
 
     ensureLayout(viewport);
     drawRain(buffer);
+}
+
+void DigitalRainEffect::setOptions(const DigitalRainEffectOptions& options)
+{
+    m_glyphPool = options.glyphPool;
+    m_maxStreams = options.maxStreams;
+    m_mutationIntervalSeconds = options.mutationIntervalSeconds;
+    m_deadGlyphsSpawnRate = options.deadGlyphsSpawnRate;
+    m_deadGlyphBlinkRate = options.deadGlyphBlinkRate;
 }
 
 const std::u32string& DigitalRainEffect::getGlyphPool() const
@@ -261,7 +266,7 @@ void DigitalRainEffect::updateStreams(double deltaTime)
             if (stream.respawnDelay <= 0.0)
             {
                 // Enforce global active stream cap
-                if (countActiveStreams() < MaximumDigitalDrops)
+                if (countActiveStreams() < m_maxStreams)
                 {
                     configureActiveStream(stream);
                 }
@@ -294,9 +299,9 @@ void DigitalRainEffect::updateStreams(double deltaTime)
 
         stream.mutationTimer += deltaTime;
 
-        while (stream.mutationTimer >= MutationIntervalSeconds)
+        while (stream.mutationTimer >= m_mutationIntervalSeconds)
         {
-            stream.mutationTimer -= MutationIntervalSeconds;
+            stream.mutationTimer -= m_mutationIntervalSeconds;
 
             const int mutationCount = mutationCountDistribution(m_rng);
             if (!stream.glyphs.empty())
@@ -323,7 +328,7 @@ void DigitalRainEffect::spawnDeadGlyphs(double deltaTime)
     m_deadGlyphSpawnAccumulator += deltaTime;
 
     // How many glyphs per second
-    constexpr double spawnRate = static_cast<double>(DeadGlyphsSpawnRate);
+    double spawnRate = (double)m_deadGlyphsSpawnRate;
 
     if (spawnRate <= 0.0)
     {
