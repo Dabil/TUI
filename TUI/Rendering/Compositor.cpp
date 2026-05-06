@@ -205,6 +205,10 @@ void Compositor::composeLayer(
         return;
     }
 
+    const bool isExplicitStyleOnlyPreset =
+        writePolicy.glyphPolicy == Composition::GlyphPolicy::None &&
+        writePolicy.stylePolicy == Composition::StylePolicy::Apply;
+
     for (int sourceY = 0; sourceY < sourceHeight; ++sourceY)
     {
         const int destinationY = layer.y() + sourceY;
@@ -260,7 +264,11 @@ void Compositor::composeLayer(
                     destinationY,
                     writePolicy.glyphOverwriteRule);
 
+            const bool styleSourceCellAllowed =
+                isExplicitStyleOnlyPreset || canWriteGlyph;
+
             const bool canWriteStyle =
+                styleSourceCellAllowed &&
                 writePolicy.stylePolicy == Composition::StylePolicy::Apply &&
                 overwriteRuleAllows(
                     destination,
@@ -275,14 +283,20 @@ void Compositor::composeLayer(
 
             if (canWriteGlyph)
             {
-                const ScreenCell destinationCell =
+                ScreenCell destinationCell =
                     makeGlyphWriteCell(sourceCell, writePolicy.glyphPolicy);
+
+                if (!canWriteStyle)
+                {
+                    destinationCell.style =
+                        destination.getLogicalCell(destinationX, destinationY).style;
+                }
 
                 destination.setCell(destinationX, destinationY, destinationCell);
                 continue;
             }
 
-            if (canWriteStyle && sourceCell.kind != CellKind::Empty)
+            if (isExplicitStyleOnlyPreset && canWriteStyle)
             {
                 destination.setCellStyle(destinationX, destinationY, sourceCell.style);
             }
