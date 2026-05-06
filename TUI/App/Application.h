@@ -42,6 +42,7 @@ private:
         RetroTerminal,
         NeonDialog,
         OpsWall,
+        WindowDemo,
         DigitalRain,
         WaterEffect,
         Donut3D,

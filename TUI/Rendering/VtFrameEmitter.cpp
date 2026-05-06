@@ -14,18 +14,21 @@ void VtFrameEmitter::beginFrame(bool clearScreenFirst)
 
     if (clearScreenFirst)
     {
-        const std::size_t before = m_buffer.size();
+        const std::size_t sgrBefore = m_buffer.size();
+        m_sgrEmitter.appendReset(m_buffer);
+        m_stats.emittedSgrBytes += (m_buffer.size() - sgrBefore);
+
+        const std::size_t controlBefore = m_buffer.size();
         m_buffer += "\x1b[2J\x1b[H";
-        m_stats.emittedControlBytes += (m_buffer.size() - before);
+        m_stats.emittedControlBytes += (m_buffer.size() - controlBefore);
+
         m_cursorX = 0;
         m_cursorY = 0;
         m_cursorKnown = true;
-        m_sgrEmitter.reset();
+        return;
     }
-    else
-    {
-        m_cursorKnown = false;
-    }
+
+    m_cursorKnown = false;
 }
 
 void VtFrameEmitter::appendRun(const VtRun& run)

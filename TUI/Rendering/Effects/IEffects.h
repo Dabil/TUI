@@ -1,0 +1,35 @@
+#pragma once
+
+class Surface;
+class Rect;
+
+/*
+    Concrete Rule:
+
+    IEffect implementations must NOT:
+        - depend on Screen
+        - depend on Window
+        - depend on PageComposer
+        - assume full-screen
+
+    Only: Surface + Rect + internal state
+*/
+
+class IEffect
+{
+public:
+    virtual ~IEffect() = default;
+
+    IEffect() = default;
+    IEffect(const IEffect&) = delete;
+    IEffect& operator=(const IEffect&) = delete;
+
+    virtual void onEnter() {}
+    virtual void onExit() {}
+
+    virtual void update(double deltaTime) = 0;
+    virtual void draw(Surface& surface, const Rect& viewport) = 0;
+
+    // Optional future hook
+    virtual void onResize(const Rect& viewport) {}
+};
