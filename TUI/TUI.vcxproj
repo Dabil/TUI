@@ -263,6 +263,7 @@
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
+    <ClInclude Include="Screens\MenuDemoScreen.h" />
     <ClInclude Include="Screens\PageBuffer.h" />
     <ClInclude Include="Screens\Developer\RendererDiagnosticsScreen.h" />
     <ClInclude Include="Screens\Screen.h" />
@@ -400,6 +401,7 @@
     </ClCompile>
     <ClCompile Include="Screens\Donut3DScreen.cpp" />
     <ClCompile Include="Screens\FireScreen.cpp" />
+    <ClCompile Include="Screens\MenuDemoScreen.cpp" />
     <ClCompile Include="Screens\PageBuffer.cpp" />
     <ClCompile Include="Screens\Developer\RendererDiagnosticsScreen.cpp" />
     <ClCompile Include="Screens\ShowcaseScreen.cpp" />
