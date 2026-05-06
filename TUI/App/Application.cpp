@@ -14,7 +14,7 @@
 #include "Rendering/TerminalRenderer.h"
 
 #include "Screens/ShowcaseScreen.h"
-#include "Screens/WindowDemo.h"
+#include "Screens/WindowDemoScreen.h"
 #include "Screens/DigitalRainScreen.h"
 #include "Screens/WaterEffectScreen.h"
 #include "Screens/Donut3DScreen.h"

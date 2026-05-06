@@ -390,9 +390,6 @@
     <ClInclude Include="Rendering\Effects\FireEffect.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\WindowDemo.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="UI\Base\UIElement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -421,6 +418,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UI\Panels\EffectWindow.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Screens\WindowDemoScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -752,9 +752,6 @@
     <ClCompile Include="Rendering\Effects\FireEffect.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\WindowDemo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="UI\Base\UIElement.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -780,6 +777,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UI\Panels\EffectWindow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\WindowDemoScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
