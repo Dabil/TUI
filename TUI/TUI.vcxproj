@@ -290,6 +290,7 @@
     <ClInclude Include="UI\Panels\ScrollablePanel.h" />
     <ClInclude Include="UI\Panels\StatusBar.h" />
     <ClInclude Include="UI\Panels\Window.h" />
+    <ClInclude Include="UI\Widgets\TextView.h" />
     <ClInclude Include="Utilities\AssetPaths.h" />
     <ClInclude Include="Utilities\Text\TextClip.h" />
     <ClInclude Include="Utilities\Text\TextWrap.h" />
@@ -443,6 +444,7 @@
     <ClCompile Include="UI\Panels\ScrollablePanel.cpp" />
     <ClCompile Include="UI\Panels\StatusBar.cpp" />
     <ClCompile Include="UI\Panels\Window.cpp" />
+    <ClCompile Include="UI\Widgets\TextView.cpp" />
     <ClCompile Include="Utilities\AssetPaths.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentationTests.cpp" />
