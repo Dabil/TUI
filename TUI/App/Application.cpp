@@ -21,6 +21,7 @@
 #include "Screens/FireScreen.h"
 #include "Screens/Developer/RendererDiagnosticsScreen.h"
 #include "Screens/Developer/TerminalCapabilitiesScreen.h"
+#include "Screens/MenuDemoScreen.h"
 
 static Application* g_appInstance = nullptr;
 
@@ -155,6 +156,17 @@ bool Application::initialize()
     m_running = true;
     return true;
 }
+
+/*
+    Application
+        handles global commands
+
+    Screen
+        handles page-level interaction
+
+    Widgets / Menus / Windows
+        handle local interaction
+*/
 
 bool Application::dispatchEvent(const Input::Event& event)
 {
@@ -353,6 +365,10 @@ void Application::switchToScreen(ScreenType screenType)
         m_screenManager->pushScreen(std::make_unique<OpsWallScreen>());
         break;
 
+    case ScreenType::MenuDemoScreen:
+        m_screenManager->pushScreen(std::make_unique<MenuDemoScreen>());
+        break;
+
     case ScreenType::WindowDemo:
         m_screenManager->pushScreen(std::make_unique<WindowDemo>());
         break;
@@ -395,6 +411,10 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::OpsWall:
+        switchToScreen(ScreenType::MenuDemoScreen);
+        break;
+
+    case ScreenType::MenuDemoScreen:
         switchToScreen(ScreenType::WindowDemo);
         break;
 
@@ -448,12 +468,16 @@ void Application::previousScreen()
         switchToScreen(ScreenType::NeonDialog);
         break;
 
-    case ScreenType::DigitalRain:
-        switchToScreen(ScreenType::WindowDemo);
+    case ScreenType::MenuDemoScreen:
+        switchToScreen(ScreenType::OpsWall);
         break;
 
     case ScreenType::WindowDemo:
-        switchToScreen(ScreenType::OpsWall);
+        switchToScreen(ScreenType::MenuDemoScreen);
+        break;
+
+    case ScreenType::DigitalRain:
+        switchToScreen(ScreenType::WindowDemo);
         break;
 
     case ScreenType::WaterEffect:
