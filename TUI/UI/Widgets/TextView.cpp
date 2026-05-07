@@ -5,15 +5,19 @@
 #include <utility>
 
 #include "Core/Rect.h"
+#include "Input/Command.h"
+#include "Input/Event.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Surface.h"
 #include "Utilities/Text/TextClip.h"
+#include "Utilities/Unicode/GraphemeSegmentation.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 TextView::TextView()
     : ScrollablePanel()
     , m_textStyleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::TextViewText))
 {
+    setFocusable(true);
 }
 
 TextView::TextView(std::string title)
@@ -21,6 +25,14 @@ TextView::TextView(std::string title)
     , m_textStyleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::TextViewText))
 {
     setTitle(std::move(title));
+    setFocusable(true);
+}
+
+TextView::TextView(const Rect& bounds, std::string title)
+    : ScrollablePanel(bounds, std::move(title))
+    , m_textStyleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::TextViewText))
+{
+    setFocusable(true);
 }
 
 void TextView::setText(std::string_view text)
@@ -88,13 +100,66 @@ void TextView::setTextStyleSet(const WidgetStyles::StyleSet& styleSet)
     m_textStyleSet = styleSet;
 }
 
+bool TextView::handleEvent(const Input::Event& event)
+{
+    if (!isVisible() || !isEnabled())
+    {
+        return false;
+    }
+
+    const Input::CommandEvent* commandEvent = event.asCommand();
+    if (!commandEvent)
+    {
+        return false;
+    }
+
+    switch (commandEvent->command.code)
+    {
+    case Input::CommandCode::MoveUp:
+        return scrollUp();
+
+    case Input::CommandCode::MoveDown:
+        return scrollDown();
+
+    case Input::CommandCode::MoveLeft:
+        return scrollLeft();
+
+    case Input::CommandCode::MoveRight:
+        return scrollRight();
+
+    case Input::CommandCode::PageUp:
+        return pageUp();
+
+    case Input::CommandCode::PageDown:
+        return pageDown();
+
+    case Input::CommandCode::MoveHome:
+        return home();
+
+    case Input::CommandCode::MoveEnd:
+        return end();
+
+    default:
+        return false;
+    }
+}
+
 void TextView::drawScrollableContent(
     Surface& surface,
     const Rect& visibleContentRect)
 {
     updateContentSizeFromLines();
 
+    if (visibleContentRect.size.width <= 0 || visibleContentRect.size.height <= 0)
+    {
+        return;
+    }
+
     ScreenBuffer& buffer = surface.buffer();
+
+    const Style& renderStyle = WidgetStyles::resolve(
+        m_textStyleSet,
+        WidgetStyles::stateFor(isEnabled(), isFocused()));
 
     for (int viewY = 0; viewY < visibleContentRect.size.height; ++viewY)
     {
@@ -106,24 +171,22 @@ void TextView::drawScrollableContent(
         }
 
         const std::string& sourceLine = m_lines[static_cast<std::size_t>(lineIndex)];
-        const int offsetX = visibleContentRect.position.x;
 
-        if (offsetX >= static_cast<int>(sourceLine.size()))
+        const std::string visibleText = sliceUtf8ByDisplayColumns(
+            sourceLine,
+            visibleContentRect.position.x,
+            visibleContentRect.size.width);
+
+        if (visibleText.empty())
         {
             continue;
         }
-
-        const std::string visibleText = TextClip::clipUtf8Text(
-            sourceLine.substr(static_cast<std::size_t>(offsetX)),
-            visibleContentRect.size.width);
 
         buffer.writeString(
             0,
             viewY,
             visibleText,
-            WidgetStyles::resolve(
-                m_textStyleSet,
-                WidgetStyles::stateFor(isEnabled(), false)));
+            renderStyle);
     }
 }
 
@@ -165,4 +228,54 @@ std::vector<std::string> TextView::splitLines(std::string_view text)
 
     result.push_back(current);
     return result;
+}
+
+std::string TextView::sliceUtf8ByDisplayColumns(
+    std::string_view text,
+    int startColumn,
+    int maxColumns)
+{
+    if (maxColumns <= 0)
+    {
+        return {};
+    }
+
+    const int safeStartColumn = std::max(0, startColumn);
+    const std::u32string text32 = UnicodeConversion::utf8ToU32(text);
+
+    std::u32string sliced;
+    int currentColumn = 0;
+    int usedColumns = 0;
+
+    for (const TextCluster& cluster : GraphemeSegmentation::segment(text32))
+    {
+        const int clusterWidth = std::max(0, static_cast<int>(cluster.displayWidth));
+
+        if (clusterWidth == 0)
+        {
+            if (!sliced.empty())
+            {
+                sliced += cluster.codePoints;
+            }
+
+            continue;
+        }
+
+        if (currentColumn + clusterWidth <= safeStartColumn)
+        {
+            currentColumn += clusterWidth;
+            continue;
+        }
+
+        if (usedColumns + clusterWidth > maxColumns)
+        {
+            break;
+        }
+
+        sliced += cluster.codePoints;
+        usedColumns += clusterWidth;
+        currentColumn += clusterWidth;
+    }
+
+    return UnicodeConversion::u32ToUtf8(sliced);
 }
