@@ -43,6 +43,7 @@ private:
         NeonDialog,
         OpsWall,
         MenuDemoScreen,
+        ScrollableTileGridDemo,
         WindowDemo,
         DigitalRain,
         WaterEffect,
