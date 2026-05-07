@@ -62,8 +62,16 @@ namespace Input
         map.bindKey(KeyCode::Escape, CommandCode::Cancel);
 
         map.bindKey(KeyCode::Tab, CommandCode::NextFocus);
-        map.bindKey(KeyCode::Backtab, CommandCode::PreviousFocus);
+
+        // Different terminals/input paths may report Shift+Tab as either:
+        // - Tab + shift modifier
+        // - Backtab with no modifier
+        // - Backtab + shift modifier
+        //
+        // Bind all supported forms so reverse focus traversal works reliably.
         map.bindKey(KeyCode::Tab, shiftModifier(), CommandCode::PreviousFocus);
+        map.bindKey(KeyCode::Backtab, CommandCode::PreviousFocus);
+        map.bindKey(KeyCode::Backtab, shiftModifier(), CommandCode::PreviousFocus);
 
         map.bindKey(KeyCode::F1, CommandCode::OpenHelp);
         map.bindKey(KeyCode::F5, CommandCode::Refresh);
