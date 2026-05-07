@@ -245,14 +245,17 @@ void Application::run()
 
             std::vector<Input::Event> events;
 
-            for (const Input::KeyEvent& keyEvent : m_inputManager->drainEvents())
+            for (const Input::Event& inputEvent : m_inputManager->drainEvents())
             {
-                events.push_back(Input::Event::key(keyEvent));
+                events.push_back(inputEvent);
 
-                std::optional<Input::Command> command = m_commandMap.map(keyEvent);
-                if (command.has_value())
+                if (const Input::KeyEvent* keyEvent = inputEvent.asKey())
                 {
-                    events.push_back(Input::Event::command(command.value()));
+                    std::optional<Input::Command> command = m_commandMap.map(*keyEvent);
+                    if (command.has_value())
+                    {
+                        events.push_back(Input::Event::command(command.value()));
+                    }
                 }
             }
 
@@ -278,6 +281,7 @@ void Application::run()
         render();
 
         ++m_frameIndex;
+
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
     }
 }
