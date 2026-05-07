@@ -4,6 +4,7 @@
 
 #include "Core/Point.h"
 #include "Core/Rect.h"
+#include "Rendering/Styles/Style.h"
 #include "UI/Interaction/WindowInteraction.h"
 #include "UI/Panels/Panel.h"
 
@@ -34,6 +35,12 @@ public:
     int titleBarHeight() const;
     void setTitleBarHeight(int height);
 
+    const Style& hoveredBorderStyle() const;
+    void setHoveredBorderStyle(const Style& style);
+
+    const Style& hoveredTitleStyle() const;
+    void setHoveredTitleStyle(const Style& style);
+
     UI::CursorRegion hitTest(Point screenPosition) const;
     bool containsScreenPoint(Point screenPosition) const;
 
@@ -50,4 +57,7 @@ private:
     Size m_minimumSize{ 4, 3 };
     int m_resizeBorderThickness = 1;
     int m_titleBarHeight = 1;
+
+    Style m_hoveredBorderStyle;
+    Style m_hoveredTitleStyle;
 };

@@ -44,6 +44,14 @@ namespace DemoColors
         + style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Yellow));
 
+    inline const Style unfocusedWindow =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style unfocusedTitle =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
     inline const Style DigiRainWindow =
           style::Fg(Color::FromBasic(Color::Basic::Green))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
@@ -75,7 +83,6 @@ namespace DemoColors
     inline const Style WaterTitle =
           style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
-
 }
 
 namespace
@@ -235,20 +242,28 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
     m_waterWindow    = std::make_unique<EffectWindow>(windowRectArr[3], "Water Wave Effect", m_water);
 
     m_digiRainWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
-    m_digiRainWindow->setBorderStyle(DemoColors::DigiRainWindow);
-    m_digiRainWindow->setTitleStyle(DemoColors::DigiRainTitle);
+    m_digiRainWindow->setBorderStyle(DemoColors::unfocusedWindow);
+    m_digiRainWindow->setTitleStyle(DemoColors::unfocusedWindow);
+    m_digiRainWindow->setHoveredBorderStyle(DemoColors::DigiRainWindow);
+    m_digiRainWindow->setHoveredTitleStyle(DemoColors::DigiRainTitle);
 
     m_donutWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
-    m_donutWindow->setBorderStyle(DemoColors::DonutWindow);
-    m_donutWindow->setTitleStyle(DemoColors::DonutTitle);
+    m_donutWindow->setBorderStyle(DemoColors::unfocusedWindow);
+    m_donutWindow->setTitleStyle(DemoColors::unfocusedWindow);
+    m_donutWindow->setHoveredBorderStyle(DemoColors::DonutWindow);
+    m_donutWindow->setHoveredTitleStyle(DemoColors::DonutTitle);
 
     m_fireWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
-    m_fireWindow->setBorderStyle(DemoColors::FireWindow);
-    m_fireWindow->setTitleStyle(DemoColors::FireTitle);
+    m_fireWindow->setBorderStyle(DemoColors::unfocusedWindow);
+    m_fireWindow->setTitleStyle(DemoColors::unfocusedWindow);
+    m_fireWindow->setHoveredBorderStyle(DemoColors::FireWindow);
+    m_fireWindow->setHoveredTitleStyle(DemoColors::FireTitle);
 
     m_waterWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
-    m_waterWindow->setBorderStyle(DemoColors::WaterWindow);
-    m_waterWindow->setTitleStyle(DemoColors::WaterTitle);
+    m_waterWindow->setBorderStyle(DemoColors::unfocusedWindow);
+    m_waterWindow->setTitleStyle(DemoColors::unfocusedWindow);
+    m_waterWindow->setHoveredBorderStyle(DemoColors::WaterWindow);
+    m_waterWindow->setHoveredTitleStyle(DemoColors::WaterTitle);
 
     m_windowManager.addWindow(*m_digiRainWindow.get());
     m_windowManager.addWindow(*m_donutWindow.get());

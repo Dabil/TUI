@@ -4,21 +4,28 @@
 #include <utility>
 
 #include "Rendering/Styles/StyleBuilder.h"
+#include "Rendering/Styles/UIThemes.h"
 
 Window::Window()
     : Panel()
+    , m_hoveredBorderStyle(UIThemes::Border + style::Bold)
+    , m_hoveredTitleStyle(UIThemes::PanelTitle + style::Bold)
 {
     setFocusable(true);
 }
 
 Window::Window(const Rect& bounds)
     : Panel(bounds)
+    , m_hoveredBorderStyle(UIThemes::Border + style::Bold)
+    , m_hoveredTitleStyle(UIThemes::PanelTitle + style::Bold)
 {
     setFocusable(true);
 }
 
 Window::Window(const Rect& bounds, std::string title)
     : Panel(bounds, std::move(title))
+    , m_hoveredBorderStyle(UIThemes::Border + style::Bold)
+    , m_hoveredTitleStyle(UIThemes::PanelTitle + style::Bold)
 {
     setFocusable(true);
 }
@@ -26,6 +33,8 @@ Window::Window(const Rect& bounds, std::string title)
 Window::Window(const Rect& bounds, std::string title, bool modal)
     : Panel(bounds, std::move(title))
     , m_modal(modal)
+    , m_hoveredBorderStyle(UIThemes::Border + style::Bold)
+    , m_hoveredTitleStyle(UIThemes::PanelTitle + style::Bold)
 {
     setFocusable(true);
 }
@@ -96,6 +105,26 @@ void Window::setTitleBarHeight(int height)
     m_titleBarHeight = std::max(0, height);
 }
 
+const Style& Window::hoveredBorderStyle() const
+{
+    return m_hoveredBorderStyle;
+}
+
+void Window::setHoveredBorderStyle(const Style& style)
+{
+    m_hoveredBorderStyle = style;
+}
+
+const Style& Window::hoveredTitleStyle() const
+{
+    return m_hoveredTitleStyle;
+}
+
+void Window::setHoveredTitleStyle(const Style& style)
+{
+    m_hoveredTitleStyle = style;
+}
+
 UI::CursorRegion Window::hitTest(Point screenPosition) const
 {
     UI::CursorRegion region = UI::hitTestWindowBounds(
@@ -154,10 +183,16 @@ void Window::draw(Surface& surface)
     const Style originalBorderStyle = borderStyle();
     const Style originalTitleStyle = titleStyle();
 
-    if (isFocused() || isHovered())
+    if (isHovered())
     {
-        setBorderStyle(originalBorderStyle + style::Bold);
-        setTitleStyle(originalTitleStyle + style::Bold);
+        setBorderStyle(m_hoveredBorderStyle);
+        setTitleStyle(m_hoveredTitleStyle);
+    }
+
+    if (isFocused())
+    {
+        setBorderStyle(borderStyle() + style::Bold);
+        setTitleStyle(titleStyle() + style::Bold);
     }
 
     Panel::draw(surface);
