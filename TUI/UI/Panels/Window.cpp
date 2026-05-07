@@ -1,5 +1,6 @@
 #include "UI/Panels/Window.h"
 
+#include <algorithm>
 #include <utility>
 
 Window::Window()
@@ -31,4 +32,81 @@ bool Window::isModal() const
 void Window::setModal(bool modal)
 {
     m_modal = modal;
+}
+
+bool Window::isDraggable() const
+{
+    return m_draggable;
+}
+
+void Window::setDraggable(bool draggable)
+{
+    m_draggable = draggable;
+}
+
+bool Window::isResizable() const
+{
+    return m_resizable;
+}
+
+void Window::setResizable(bool resizable)
+{
+    m_resizable = resizable;
+}
+
+Size Window::minimumSize() const
+{
+    return m_minimumSize;
+}
+
+void Window::setMinimumSize(Size size)
+{
+    m_minimumSize.width = std::max(1, size.width);
+    m_minimumSize.height = std::max(1, size.height);
+}
+
+void Window::setMinimumSize(int width, int height)
+{
+    setMinimumSize(Size{ width, height });
+}
+
+int Window::resizeBorderThickness() const
+{
+    return m_resizeBorderThickness;
+}
+
+void Window::setResizeBorderThickness(int thickness)
+{
+    m_resizeBorderThickness = std::max(0, thickness);
+}
+
+int Window::titleBarHeight() const
+{
+    return m_titleBarHeight;
+}
+
+void Window::setTitleBarHeight(int height)
+{
+    m_titleBarHeight = std::max(0, height);
+}
+
+UI::CursorRegion Window::hitTest(Point screenPosition) const
+{
+    UI::CursorRegion region = UI::hitTestWindowBounds(
+        bounds(),
+        screenPosition,
+        m_resizable ? m_resizeBorderThickness : 0,
+        m_titleBarHeight);
+
+    if (!m_draggable && region == UI::CursorRegion::TitleBar)
+    {
+        return UI::CursorRegion::Client;
+    }
+
+    return region;
+}
+
+bool Window::containsScreenPoint(Point screenPosition) const
+{
+    return hitTest(screenPosition) != UI::CursorRegion::Outside;
 }

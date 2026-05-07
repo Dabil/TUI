@@ -233,6 +233,258 @@ bool WindowManager::canRouteTo(const Window& window) const
     return targetEntry->zOrder >= modalEntry->zOrder;
 }
 
+UI::WindowHitTestResult WindowManager::hitTest(Point screenPosition)
+{
+    const WindowManager* self = this;
+    UI::WindowHitTestResult result = self->hitTest(screenPosition);
+    return result;
+}
+
+UI::WindowHitTestResult WindowManager::hitTest(Point screenPosition) const
+{
+    for (auto it = m_windows.rbegin(); it != m_windows.rend(); ++it)
+    {
+        const ManagedWindow& entry = *it;
+
+        if (entry.window == nullptr)
+        {
+            continue;
+        }
+
+        if (!canRouteTo(*entry.window))
+        {
+            continue;
+        }
+
+        const UI::CursorRegion region = entry.window->hitTest(screenPosition);
+        if (region == UI::CursorRegion::Outside)
+        {
+            continue;
+        }
+
+        return UI::WindowHitTestResult{
+            entry.window,
+            region,
+            screenPosition,
+            Point{
+                screenPosition.x - entry.window->x(),
+                screenPosition.y - entry.window->y()
+            }
+        };
+    }
+
+    return UI::WindowHitTestResult{
+        nullptr,
+        UI::CursorRegion::Outside,
+        screenPosition,
+        Point{}
+    };
+}
+
+void WindowManager::capturePointer(
+    Window& window,
+    UI::PointerButton button,
+    Point screenPosition)
+{
+    if (!canRouteTo(window))
+    {
+        return;
+    }
+
+    m_pointerCapture.window = &window;
+    m_pointerCapture.button = button;
+    m_pointerCapture.origin = screenPosition;
+    m_pointerCapture.current = screenPosition;
+}
+
+void WindowManager::releasePointer(Window& window)
+{
+    if (m_pointerCapture.window == &window)
+    {
+        releasePointer();
+    }
+}
+
+void WindowManager::releasePointer()
+{
+    m_pointerCapture.clear();
+}
+
+bool WindowManager::hasPointerCapture() const
+{
+    return m_pointerCapture.active();
+}
+
+const UI::PointerCaptureState& WindowManager::pointerCapture() const
+{
+    return m_pointerCapture;
+}
+
+Window* WindowManager::capturedWindow()
+{
+    return m_pointerCapture.window;
+}
+
+const Window* WindowManager::capturedWindow() const
+{
+    return m_pointerCapture.window;
+}
+
+bool WindowManager::beginDrag(
+    Window& window,
+    Point screenPosition,
+    UI::PointerButton button)
+{
+    if (!canRouteTo(window) || !window.isDraggable())
+    {
+        return false;
+    }
+
+    m_resizeState.clear();
+    m_dragState.window = &window;
+    m_dragState.pointerOrigin = screenPosition;
+    m_dragState.currentPointer = screenPosition;
+    m_dragState.originalBounds = window.bounds();
+
+    capturePointer(window, button, screenPosition);
+    bringToFront(window);
+    return true;
+}
+
+bool WindowManager::beginDragAt(Point screenPosition, UI::PointerButton button)
+{
+    UI::WindowHitTestResult result = hitTest(screenPosition);
+    if (!result.hit() || result.region != UI::CursorRegion::TitleBar)
+    {
+        return false;
+    }
+
+    return beginDrag(*result.window, screenPosition, button);
+}
+
+bool WindowManager::updateDrag(Point screenPosition)
+{
+    if (!m_dragState.active())
+    {
+        return false;
+    }
+
+    Window* window = m_dragState.window;
+    if (window == nullptr)
+    {
+        m_dragState.clear();
+        releasePointer();
+        return false;
+    }
+
+    m_dragState.currentPointer = screenPosition;
+    m_pointerCapture.current = screenPosition;
+
+    const int deltaX = screenPosition.x - m_dragState.pointerOrigin.x;
+    const int deltaY = screenPosition.y - m_dragState.pointerOrigin.y;
+
+    Rect movedBounds = m_dragState.originalBounds;
+    movedBounds.position.x += deltaX;
+    movedBounds.position.y += deltaY;
+    window->setBounds(movedBounds);
+    return true;
+}
+
+void WindowManager::endDrag()
+{
+    m_dragState.clear();
+    releasePointer();
+}
+
+bool WindowManager::isDragging() const
+{
+    return m_dragState.active();
+}
+
+const UI::WindowDragState& WindowManager::dragState() const
+{
+    return m_dragState;
+}
+
+bool WindowManager::beginResize(
+    Window& window,
+    UI::CursorRegion region,
+    Point screenPosition,
+    UI::PointerButton button)
+{
+    if (!canRouteTo(window) || !window.isResizable() || !UI::isResizeRegion(region))
+    {
+        return false;
+    }
+
+    m_dragState.clear();
+    m_resizeState.window = &window;
+    m_resizeState.region = region;
+    m_resizeState.pointerOrigin = screenPosition;
+    m_resizeState.currentPointer = screenPosition;
+    m_resizeState.originalBounds = window.bounds();
+    m_resizeState.minimumSize = window.minimumSize();
+
+    capturePointer(window, button, screenPosition);
+    bringToFront(window);
+    return true;
+}
+
+bool WindowManager::beginResizeAt(Point screenPosition, UI::PointerButton button)
+{
+    UI::WindowHitTestResult result = hitTest(screenPosition);
+    if (!result.hit() || !UI::isResizeRegion(result.region))
+    {
+        return false;
+    }
+
+    return beginResize(*result.window, result.region, screenPosition, button);
+}
+
+bool WindowManager::updateResize(Point screenPosition)
+{
+    if (!m_resizeState.active())
+    {
+        return false;
+    }
+
+    Window* window = m_resizeState.window;
+    if (window == nullptr)
+    {
+        m_resizeState.clear();
+        releasePointer();
+        return false;
+    }
+
+    m_resizeState.currentPointer = screenPosition;
+    m_pointerCapture.current = screenPosition;
+
+    window->setBounds(UI::resizedBounds(
+        m_resizeState.originalBounds,
+        m_resizeState.region,
+        m_resizeState.pointerOrigin,
+        screenPosition,
+        m_resizeState.minimumSize));
+
+    return true;
+}
+
+void WindowManager::endResize()
+{
+    m_resizeState.clear();
+    releasePointer();
+}
+
+bool WindowManager::isResizing() const
+{
+    return m_resizeState.active();
+}
+
+const UI::WindowResizeState& WindowManager::resizeState() const
+{
+    return m_resizeState;
+}
+
 void WindowManager::update(double deltaTime)
 {
     for (ManagedWindow& entry : m_windows)
