@@ -37,10 +37,16 @@ public:
     UI::CursorRegion hitTest(Point screenPosition) const;
     bool containsScreenPoint(Point screenPosition) const;
 
+    bool isHovered() const;
+    void setHovered(bool hovered);
+
+    void draw(Surface& surface) override;
+
 private:
     bool m_modal = false;
     bool m_draggable = true;
     bool m_resizable = true;
+    bool m_hovered = false;
     Size m_minimumSize{ 4, 3 };
     int m_resizeBorderThickness = 1;
     int m_titleBarHeight = 1;

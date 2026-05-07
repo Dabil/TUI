@@ -19,6 +19,7 @@ public:
     ~WindowDemo() override;
 
     void onEnter() override;
+    bool handleEvent(const Input::Event& event) override;
     void onExit() override;
     void update(double deltaTime) override;
     void draw(Surface& surface) override;

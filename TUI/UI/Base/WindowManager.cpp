@@ -5,6 +5,8 @@
 
 #include "Core/Rect.h"
 #include "UI/Panels/Window.h"
+#include "Input/Event.h"
+#include "Input/MouseEvent.h"
 
 WindowManager::WindowManager() = default;
 
@@ -28,6 +30,21 @@ void WindowManager::addWindow(Window& window)
 
 void WindowManager::removeWindow(Window& window)
 {
+    if (m_hoveredWindow == &window)
+    {
+        setHoveredWindow(nullptr);
+    }
+
+    if (m_focusedWindow == &window)
+    {
+        setFocusedWindow(nullptr);
+    }
+
+    if (m_pointerCapture.window == &window)
+    {
+        releasePointer();
+    }
+
     m_windows.erase(
         std::remove_if(
             m_windows.begin(),
@@ -41,6 +58,11 @@ void WindowManager::removeWindow(Window& window)
 
 void WindowManager::clear()
 {
+    setHoveredWindow(nullptr);
+    setFocusedWindow(nullptr);
+    releasePointer();
+    m_dragState.clear();
+    m_resizeState.clear();
     m_windows.clear();
 }
 
@@ -73,6 +95,16 @@ void WindowManager::hide(Window& window)
 {
     if (ManagedWindow* entry = findEntry(window))
     {
+        if (m_hoveredWindow == &window)
+        {
+            setHoveredWindow(nullptr);
+        }
+
+        if (m_focusedWindow == &window)
+        {
+            setFocusedWindow(nullptr);
+        }
+
         entry->window->hide();
     }
 }
@@ -197,6 +229,26 @@ const Window* WindowManager::topModalWindow() const
     return nullptr;
 }
 
+Window* WindowManager::hoveredWindow()
+{
+    return m_hoveredWindow;
+}
+
+const Window* WindowManager::hoveredWindow() const
+{
+    return m_hoveredWindow;
+}
+
+Window* WindowManager::focusedWindow()
+{
+    return m_focusedWindow;
+}
+
+const Window* WindowManager::focusedWindow() const
+{
+    return m_focusedWindow;
+}
+
 bool WindowManager::hasModalWindow() const
 {
     return topModalWindow() != nullptr;
@@ -231,6 +283,46 @@ bool WindowManager::canRouteTo(const Window& window) const
     }
 
     return targetEntry->zOrder >= modalEntry->zOrder;
+}
+
+bool WindowManager::handleEvent(const Input::Event& event)
+{
+    const Input::MouseEvent* mouseEvent = event.asMouse();
+    if (!mouseEvent)
+    {
+        return false;
+    }
+
+    return handleMouseEvent(*mouseEvent);
+}
+
+bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
+{
+    UI::WindowHitTestResult result = hitTest(mouseEvent.position);
+    Window* target = result.hit() ? result.window : nullptr;
+
+    setHoveredWindow(target);
+
+    if (target == nullptr)
+    {
+        return false;
+    }
+
+    const bool isPrimaryActivation =
+        mouseEvent.button == Input::MouseButton::Left &&
+        (mouseEvent.isPress() || mouseEvent.isClick());
+
+    bool consumedByWindow = target->handleEvent(Input::Event::mouse(mouseEvent));
+
+    if (isPrimaryActivation)
+    {
+        setFocusedWindow(target);
+        bringToFront(*target);
+        setHoveredWindow(target);
+        return true;
+    }
+
+    return consumedByWindow;
 }
 
 UI::WindowHitTestResult WindowManager::hitTest(Point screenPosition)
@@ -635,4 +727,44 @@ int WindowManager::nextBackZOrder() const
         });
 
     return it->zOrder - 1;
+}
+
+void WindowManager::setHoveredWindow(Window* window)
+{
+    if (m_hoveredWindow == window)
+    {
+        return;
+    }
+
+    if (m_hoveredWindow != nullptr)
+    {
+        m_hoveredWindow->setHovered(false);
+    }
+
+    m_hoveredWindow = window;
+
+    if (m_hoveredWindow != nullptr)
+    {
+        m_hoveredWindow->setHovered(true);
+    }
+}
+
+void WindowManager::setFocusedWindow(Window* window)
+{
+    if (m_focusedWindow == window)
+    {
+        return;
+    }
+
+    if (m_focusedWindow != nullptr)
+    {
+        m_focusedWindow->blur();
+    }
+
+    m_focusedWindow = window;
+
+    if (m_focusedWindow != nullptr && m_focusedWindow->canReceiveFocus())
+    {
+        m_focusedWindow->focus();
+    }
 }

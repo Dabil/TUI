@@ -146,6 +146,11 @@ void WindowDemo::onEnter()
     m_modalPopup.open();
 }
 
+bool WindowDemo::handleEvent(const Input::Event& event)
+{
+    return m_windowManager.handleEvent(event);
+}
+
 void WindowDemo::update(double deltaTime)
 {
     m_elapsedSeconds += deltaTime;
