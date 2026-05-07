@@ -8,6 +8,24 @@
 #include "Input/Event.h"
 #include "Input/MouseEvent.h"
 
+namespace
+{
+    UI::PointerButton toPointerButton(Input::MouseButton button)
+    {
+        switch (button)
+        {
+        case Input::MouseButton::Left:
+            return UI::PointerButton::Primary;
+        case Input::MouseButton::Right:
+            return UI::PointerButton::Secondary;
+        case Input::MouseButton::Middle:
+            return UI::PointerButton::Middle;
+        default:
+            return UI::PointerButton::None;
+        }
+    }
+}
+
 WindowManager::WindowManager() = default;
 
 WindowManager::~WindowManager() = default;
@@ -298,6 +316,22 @@ bool WindowManager::handleEvent(const Input::Event& event)
 
 bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
 {
+    if (isDragging())
+    {
+        if (mouseEvent.isRelease())
+        {
+            endDrag();
+            return true;
+        }
+
+        if (mouseEvent.isDrag() || mouseEvent.isMove())
+        {
+            return updateDrag(mouseEvent.position);
+        }
+
+        return true;
+    }
+
     UI::WindowHitTestResult result = hitTest(mouseEvent.position);
     Window* target = result.hit() ? result.window : nullptr;
 
@@ -308,21 +342,35 @@ bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
         return false;
     }
 
+    const bool isPrimaryPress =
+        mouseEvent.button == Input::MouseButton::Left &&
+        mouseEvent.isPress();
+
     const bool isPrimaryActivation =
         mouseEvent.button == Input::MouseButton::Left &&
         (mouseEvent.isPress() || mouseEvent.isClick());
-
-    bool consumedByWindow = target->handleEvent(Input::Event::mouse(mouseEvent));
 
     if (isPrimaryActivation)
     {
         setFocusedWindow(target);
         bringToFront(*target);
         setHoveredWindow(target);
-        return true;
     }
 
-    return consumedByWindow;
+    if (isPrimaryPress &&
+       (result.region == UI::CursorRegion::TitleBar ||
+        result.region == UI::CursorRegion::TopEdge))
+    {
+        if (beginDrag(
+            *target,
+            mouseEvent.position,
+            toPointerButton(mouseEvent.button)))
+        {
+            return true;
+        }
+    }
+
+    return target->handleEvent(Input::Event::mouse(mouseEvent)) || isPrimaryActivation;
 }
 
 UI::WindowHitTestResult WindowManager::hitTest(Point screenPosition)
