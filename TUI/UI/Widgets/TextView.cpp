@@ -2,15 +2,13 @@
 
 #include <algorithm>
 #include <cstddef>
-#include <sstream>
 #include <utility>
-#include < algorithm >
 
 #include "Core/Rect.h"
-#include "Core/Size.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Surface.h"
 #include "Utilities/Text/TextClip.h"
+#include "Utilities/Unicode/UnicodeConversion.h"
 
 TextView::TextView(std::string title)
 {
@@ -72,27 +70,17 @@ const Style& TextView::textStyle() const
     return m_textStyle;
 }
 
-void TextView::draw(Surface& surface)
+void TextView::drawScrollableContent(
+    Surface& surface,
+    const Rect& visibleContentRect)
 {
-    ScrollablePanel::draw(surface);
-
-    ScreenBuffer& buffer = surface.buffer();
-    const Rect textRect = resolveTextRect();
-
-    if (textRect.size.width <= 0 || textRect.size.height <= 0)
-    {
-        return;
-    }
-
-    viewport().setViewSize(textRect.size.width, textRect.size.height);
     updateContentSizeFromLines();
 
-    const int offsetX = viewport().scrollX();
-    const int offsetY = viewport().scrollY();
+    ScreenBuffer& buffer = surface.buffer();
 
-    for (int row = 0; row < textRect.size.height; ++row)
+    for (int viewY = 0; viewY < visibleContentRect.size.height; ++viewY)
     {
-        const int lineIndex = offsetY + row;
+        const int lineIndex = visibleContentRect.position.y + viewY;
 
         if (lineIndex < 0 || lineIndex >= static_cast<int>(m_lines.size()))
         {
@@ -100,20 +88,18 @@ void TextView::draw(Surface& surface)
         }
 
         const std::string& sourceLine = m_lines[static_cast<std::size_t>(lineIndex)];
+        const int offsetX = visibleContentRect.position.x;
 
         if (offsetX >= static_cast<int>(sourceLine.size()))
         {
             continue;
         }
 
-        const std::string visibleText =
-            TextClip::clipUtf8Text(sourceLine.substr(static_cast<std::size_t>(offsetX)), textRect.size.width);
+        const std::string visibleText = TextClip::clipUtf8Text(
+            sourceLine.substr(static_cast<std::size_t>(offsetX)),
+            visibleContentRect.size.width);
 
-        buffer.writeString(
-            textRect.position.x,
-            textRect.position.y + row,
-            visibleText,
-            m_textStyle);
+        buffer.writeString(0, viewY, visibleText, m_textStyle);
     }
 }
 
@@ -123,24 +109,12 @@ void TextView::updateContentSizeFromLines()
 
     for (const std::string& line : m_lines)
     {
-        maxWidth = std::max(maxWidth, TextClip::measureDisplayWidth(
-            UnicodeConversion::utf8ToU32(line)));
+        maxWidth = std::max(
+            maxWidth,
+            TextClip::measureDisplayWidth(UnicodeConversion::utf8ToU32(line)));
     }
 
     viewport().setContentSize(maxWidth, static_cast<int>(m_lines.size()));
-}
-
-Rect TextView::resolveTextRect() const
-{
-    Rect rect = bounds();
-
-    // Inner panel area: leave room for border.
-    rect.position.x += 1;
-    rect.position.y += 1;
-    rect.size.width = std::max(0, rect.size.width - 2);
-    rect.size.height = std::max(0, rect.size.height - 2);
-
-    return rect;
 }
 
 std::vector<std::string> TextView::splitLines(std::string_view text)

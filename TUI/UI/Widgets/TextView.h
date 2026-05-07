@@ -1,9 +1,11 @@
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <vector>
 
+#include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
 #include "UI/Panels/ScrollablePanel.h"
 
@@ -28,11 +30,13 @@ public:
     void setTextStyle(const Style& style);
     const Style& textStyle() const;
 
-    void draw(Surface& surface) override;
+protected:
+    void drawScrollableContent(
+        Surface& surface,
+        const Rect& visibleContentRect) override;
 
 private:
     void updateContentSizeFromLines();
-    Rect resolveTextRect() const;
     static std::vector<std::string> splitLines(std::string_view text);
 
 private:
