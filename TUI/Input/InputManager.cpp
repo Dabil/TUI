@@ -138,13 +138,20 @@ namespace Input
 
         while (true)
         {
-            std::optional<RawKeyEvent> raw = m_keyboardSource->pollRawKey();
+            std::optional<RawInputEvent> raw = m_keyboardSource->pollRawInput();
             if (!raw.has_value())
             {
                 break;
             }
 
-            m_events.push_back(normalizeRawKey(raw.value()));
+            if (const RawKeyEvent* key = std::get_if<RawKeyEvent>(&raw.value()))
+            {
+                m_events.push_back(Event::key(normalizeRawKey(*key)));
+            }
+            else if (const MouseEvent* mouse = std::get_if<MouseEvent>(&raw.value()))
+            {
+                m_events.push_back(Event::mouse(*mouse));
+            }
         }
     }
 
@@ -153,23 +160,62 @@ namespace Input
         return !m_events.empty();
     }
 
-    std::optional<KeyEvent> InputManager::popEvent()
+    std::optional<Event> InputManager::popEvent()
     {
         if (m_events.empty())
         {
             return std::nullopt;
         }
 
-        KeyEvent event = m_events.front();
+        Event event = m_events.front();
         m_events.erase(m_events.begin());
         return event;
     }
 
-    std::vector<KeyEvent> InputManager::drainEvents()
+    std::vector<Event> InputManager::drainEvents()
     {
-        std::vector<KeyEvent> drained;
+        std::vector<Event> drained;
         drained.swap(m_events);
         return drained;
+    }
+
+    std::optional<KeyEvent> InputManager::popKeyEvent()
+    {
+        while (!m_events.empty())
+        {
+            Event event = m_events.front();
+            m_events.erase(m_events.begin());
+
+            if (const KeyEvent* key = event.asKey())
+            {
+                return *key;
+            }
+        }
+
+        return std::nullopt;
+    }
+
+    std::vector<KeyEvent> InputManager::drainKeyEvents()
+    {
+        std::vector<KeyEvent> keys;
+
+        std::vector<Event> remaining;
+        remaining.reserve(m_events.size());
+
+        for (const Event& event : m_events)
+        {
+            if (const KeyEvent* key = event.asKey())
+            {
+                keys.push_back(*key);
+            }
+            else
+            {
+                remaining.push_back(event);
+            }
+        }
+
+        m_events.swap(remaining);
+        return keys;
     }
 
     void InputManager::clear()
@@ -184,10 +230,6 @@ namespace Input
         event.character = event.code == KeyCode::Character ? raw.character : U'\0';
         event.modifiers = raw.modifiers;
 
-        // Windows console reports Ctrl+A through Ctrl+Z as ASCII control
-        // characters 1 through 26. Normalize them back into the project's
-        // normal Character + ctrl modifier form so CommandMap bindings such as
-        // Ctrl+Q can match bindCharacter(U'q', ctrlModifier(), ...).
         if (event.code == KeyCode::Character
             && event.character >= 1
             && event.character <= 26)

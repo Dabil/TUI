@@ -4,6 +4,7 @@
 #include <optional>
 #include <vector>
 
+#include "Input/Event.h"
 #include "Input/KeyEvent.h"
 #include "Input/RawKeyboardSource.h"
 
@@ -22,8 +23,11 @@ namespace Input
         void poll();
 
         bool hasEvents() const;
-        std::optional<KeyEvent> popEvent();
-        std::vector<KeyEvent> drainEvents();
+        std::optional<Event> popEvent();
+        std::vector<Event> drainEvents();
+
+        std::optional<KeyEvent> popKeyEvent();
+        std::vector<KeyEvent> drainKeyEvents();
 
         void clear();
 
@@ -32,7 +36,7 @@ namespace Input
 
     private:
         std::unique_ptr<IRawKeyboardSource> m_keyboardSource;
-        std::vector<KeyEvent> m_events;
+        std::vector<Event> m_events;
         bool m_initialized = false;
     };
 }
