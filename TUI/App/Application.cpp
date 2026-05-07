@@ -23,6 +23,7 @@
 #include "Screens/Developer/TerminalCapabilitiesScreen.h"
 #include "Screens/MenuDemoScreen.h"
 #include "Screens/ScrollableTileGridDemoScreen.h"
+#include "Screens/WidgetDemoScreen.h"
 
 static Application* g_appInstance = nullptr;
 
@@ -370,6 +371,10 @@ void Application::switchToScreen(ScreenType screenType)
         m_screenManager->pushScreen(std::make_unique<MenuDemoScreen>());
         break;
 
+    case ScreenType::WidgetDemoScreen:
+        m_screenManager->pushScreen(std::make_unique<WidgetDemoScreen>());
+        break;
+
     case ScreenType::ScrollableTileGridDemo:
         m_screenManager->pushScreen(std::make_unique<ScrollableTileGridDemoScreen>());
         break;
@@ -420,6 +425,10 @@ void Application::advanceScreen()
         break;
 
     case ScreenType::MenuDemoScreen:
+        switchToScreen(ScreenType::WidgetDemoScreen);
+        break;
+
+    case ScreenType::WidgetDemoScreen:
         switchToScreen(ScreenType::ScrollableTileGridDemo);
         break;
 
@@ -481,8 +490,12 @@ void Application::previousScreen()
         switchToScreen(ScreenType::OpsWall);
         break;
 
-    case ScreenType::ScrollableTileGridDemo:
+    case ScreenType::WidgetDemoScreen:
         switchToScreen(ScreenType::MenuDemoScreen);
+        break;
+
+    case ScreenType::ScrollableTileGridDemo:
+        switchToScreen(ScreenType::WidgetDemoScreen);
         break;
 
     case ScreenType::WindowDemo:
