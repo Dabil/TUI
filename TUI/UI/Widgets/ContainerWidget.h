@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 
+#include "Core/Point.h"
 #include "Core/Rect.h"
 #include "UI/Widgets/Widget.h"
 
@@ -41,6 +42,9 @@ public:
     Widget* focusedChild();
     const Widget* focusedChild() const;
 
+    Widget* hitTest(Point position);
+    const Widget* hitTest(Point position) const;
+
     bool setFocusedChild(Widget& child);
     void clearChildFocus();
 
@@ -60,6 +64,7 @@ private:
     bool canFocusChild(const Widget& child) const;
     bool focusChildAt(std::size_t index);
     bool focusChildByDirection(int direction);
+    bool dispatchMouseEvent(const Input::Event& event);
 
 private:
     std::vector<ChildPtr> m_children;

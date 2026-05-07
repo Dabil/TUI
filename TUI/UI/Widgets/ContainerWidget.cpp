@@ -4,8 +4,9 @@
 #include <stdexcept>
 #include <utility>
 
-#include "Input/Event.h"
 #include "Input/Command.h"
+#include "Input/Event.h"
+#include "Input/MouseEvent.h"
 #include "Rendering/Surface.h"
 
 ContainerWidget::ContainerWidget() = default;
@@ -140,6 +141,56 @@ const Widget* ContainerWidget::focusedChild() const
     return m_focusedChild;
 }
 
+Widget* ContainerWidget::hitTest(Point position)
+{
+    if (!isVisible() || !isEnabled())
+    {
+        return nullptr;
+    }
+
+    for (auto it = m_children.rbegin(); it != m_children.rend(); ++it)
+    {
+        Widget* child = it->get();
+
+        if (!child || !child->isVisible() || !child->isEnabled())
+        {
+            continue;
+        }
+
+        if (child->bounds().contains(position.x, position.y))
+        {
+            return child;
+        }
+    }
+
+    return nullptr;
+}
+
+const Widget* ContainerWidget::hitTest(Point position) const
+{
+    if (!isVisible() || !isEnabled())
+    {
+        return nullptr;
+    }
+
+    for (auto it = m_children.rbegin(); it != m_children.rend(); ++it)
+    {
+        const Widget* child = it->get();
+
+        if (!child || !child->isVisible() || !child->isEnabled())
+        {
+            continue;
+        }
+
+        if (child->bounds().contains(position.x, position.y))
+        {
+            return child;
+        }
+    }
+
+    return nullptr;
+}
+
 bool ContainerWidget::setFocusedChild(Widget& child)
 {
     if (!containsChild(child) || !canFocusChild(child))
@@ -250,6 +301,11 @@ bool ContainerWidget::handleEvent(const Input::Event& event)
         return false;
     }
 
+    if (event.asMouse())
+    {
+        return dispatchMouseEvent(event);
+    }
+
     if (const Input::CommandEvent* commandEvent = event.asCommand())
     {
         switch (commandEvent->command.code)
@@ -343,4 +399,28 @@ bool ContainerWidget::focusChildByDirection(int direction)
     }
 
     return false;
+}
+
+bool ContainerWidget::dispatchMouseEvent(const Input::Event& event)
+{
+    const Input::MouseEvent* mouseEvent = event.asMouse();
+
+    if (!mouseEvent)
+    {
+        return false;
+    }
+
+    Widget* target = hitTest(mouseEvent->position);
+
+    if (!target)
+    {
+        return false;
+    }
+
+    if ((mouseEvent->isPress() || mouseEvent->isClick()) && canFocusChild(*target))
+    {
+        setFocusedChild(*target);
+    }
+
+    return target->handleEvent(event);
 }
