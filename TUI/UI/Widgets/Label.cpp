@@ -3,13 +3,12 @@
 #include <utility>
 
 #include "Rendering/ScreenBuffer.h"
-#include "Rendering/Styles/UIThemes.h"
 #include "Rendering/Surface.h"
 #include "Utilities/Text/TextClip.h"
 
 Label::Label()
     : Widget()
-    , m_textStyle(UIThemes::Label)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::Label))
 {
     setFocusable(false);
 }
@@ -17,7 +16,7 @@ Label::Label()
 Label::Label(std::string text)
     : Widget()
     , m_text(std::move(text))
-    , m_textStyle(UIThemes::Label)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::Label))
 {
     setFocusable(false);
 }
@@ -25,7 +24,7 @@ Label::Label(std::string text)
 Label::Label(const Rect& bounds, std::string text)
     : Widget(bounds)
     , m_text(std::move(text))
-    , m_textStyle(UIThemes::Label)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::Label))
 {
     setFocusable(false);
 }
@@ -52,12 +51,22 @@ bool Label::empty() const
 
 const Style& Label::textStyle() const
 {
-    return m_textStyle;
+    return m_styleSet.normal;
 }
 
 void Label::setTextStyle(const Style& style)
 {
-    m_textStyle = style;
+    m_styleSet.normal = style;
+}
+
+const WidgetStyles::StyleSet& Label::styleSet() const
+{
+    return m_styleSet;
+}
+
+void Label::setStyleSet(const WidgetStyles::StyleSet& styleSet)
+{
+    m_styleSet = styleSet;
 }
 
 void Label::draw(Surface& surface)
@@ -88,9 +97,9 @@ void Label::draw(Surface& surface)
         return;
     }
 
-    const Style& renderStyle = isEnabled()
-        ? m_textStyle
-        : UIThemes::DisabledText;
+    const Style& renderStyle = WidgetStyles::resolve(
+        m_styleSet,
+        WidgetStyles::stateFor(isEnabled(), isFocused()));
 
     surface.buffer().writeString(
         labelBounds.position.x,

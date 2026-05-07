@@ -8,6 +8,7 @@
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
 #include "UI/Widgets/Widget.h"
+#include "UI/Widgets/WidgetStyle.h"
 
 class Surface;
 
@@ -50,6 +51,9 @@ public:
     const Style& disabledStyle() const;
     void setDisabledStyle(const Style& style);
 
+    const WidgetStyles::StyleSet& styleSet() const;
+    void setStyleSet(const WidgetStyles::StyleSet& styleSet);
+
     void setActivationCallback(ActivationCallback callback);
     void clearActivationCallback();
 
@@ -71,9 +75,7 @@ private:
     std::string m_label;
     std::optional<std::string> m_commandId;
 
-    Style m_normalStyle;
-    Style m_focusedStyle;
-    Style m_disabledStyle;
+    WidgetStyles::StyleSet m_styleSet;
 
     ActivationCallback m_activationCallback;
     std::optional<ButtonActivationResult> m_lastActivationResult;

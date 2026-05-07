@@ -6,17 +6,12 @@
 #include "Input/Command.h"
 #include "Input/Event.h"
 #include "Rendering/ScreenBuffer.h"
-#include "Rendering/Styles/UIThemes.h"
 #include "Rendering/Surface.h"
 #include "Utilities/Text/TextClip.h"
 
 ListBox::ListBox()
     : Widget()
-    , m_normalStyle(UIThemes::NormalText)
-    , m_focusedStyle(UIThemes::Focused)
-    , m_selectedStyle(UIThemes::Selection)
-    , m_selectedFocusedStyle(UIThemes::Selection + UIThemes::Focused)
-    , m_disabledStyle(UIThemes::DisabledText)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::ListBoxItem))
 {
     setFocusable(true);
     updateViewport();
@@ -25,11 +20,7 @@ ListBox::ListBox()
 ListBox::ListBox(std::vector<ListBoxItem> items)
     : Widget()
     , m_items(std::move(items))
-    , m_normalStyle(UIThemes::NormalText)
-    , m_focusedStyle(UIThemes::Focused)
-    , m_selectedStyle(UIThemes::Selection)
-    , m_selectedFocusedStyle(UIThemes::Selection + UIThemes::Focused)
-    , m_disabledStyle(UIThemes::DisabledText)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::ListBoxItem))
 {
     setFocusable(true);
     normalizeSelection();
@@ -39,11 +30,7 @@ ListBox::ListBox(std::vector<ListBoxItem> items)
 ListBox::ListBox(const Rect& bounds, std::vector<ListBoxItem> items)
     : Widget(bounds)
     , m_items(std::move(items))
-    , m_normalStyle(UIThemes::NormalText)
-    , m_focusedStyle(UIThemes::Focused)
-    , m_selectedStyle(UIThemes::Selection)
-    , m_selectedFocusedStyle(UIThemes::Selection + UIThemes::Focused)
-    , m_disabledStyle(UIThemes::DisabledText)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::ListBoxItem))
 {
     setFocusable(true);
     normalizeSelection();
@@ -303,52 +290,62 @@ Viewport& ListBox::viewport()
 
 const Style& ListBox::normalStyle() const
 {
-    return m_normalStyle;
+    return m_styleSet.normal;
 }
 
 void ListBox::setNormalStyle(const Style& style)
 {
-    m_normalStyle = style;
+    m_styleSet.normal = style;
 }
 
 const Style& ListBox::focusedStyle() const
 {
-    return m_focusedStyle;
+    return m_styleSet.focused;
 }
 
 void ListBox::setFocusedStyle(const Style& style)
 {
-    m_focusedStyle = style;
+    m_styleSet.focused = style;
 }
 
 const Style& ListBox::selectedStyle() const
 {
-    return m_selectedStyle;
+    return m_styleSet.selected;
 }
 
 void ListBox::setSelectedStyle(const Style& style)
 {
-    m_selectedStyle = style;
+    m_styleSet.selected = style;
 }
 
 const Style& ListBox::selectedFocusedStyle() const
 {
-    return m_selectedFocusedStyle;
+    return m_styleSet.selectedFocused;
 }
 
 void ListBox::setSelectedFocusedStyle(const Style& style)
 {
-    m_selectedFocusedStyle = style;
+    m_styleSet.selectedFocused = style;
 }
 
 const Style& ListBox::disabledStyle() const
 {
-    return m_disabledStyle;
+    return m_styleSet.disabled;
 }
 
 void ListBox::setDisabledStyle(const Style& style)
 {
-    m_disabledStyle = style;
+    m_styleSet.disabled = style;
+}
+
+const WidgetStyles::StyleSet& ListBox::styleSet() const
+{
+    return m_styleSet;
+}
+
+void ListBox::setStyleSet(const WidgetStyles::StyleSet& styleSet)
+{
+    m_styleSet = styleSet;
 }
 
 void ListBox::draw(Surface& surface)
@@ -365,7 +362,7 @@ void ListBox::draw(Surface& surface)
     }
 
     updateViewport();
-    surface.buffer().fillRect(listBounds, U' ', m_normalStyle);
+    surface.buffer().fillRect(listBounds, U' ', m_styleSet.normal);
 
     const int firstVisibleItem = m_viewport.scrollY();
     const int visibleRows = std::min(
@@ -522,20 +519,9 @@ std::optional<std::size_t> ListBox::lastEnabledIndex() const
 
 const Style& ListBox::resolveItemStyle(std::size_t index) const
 {
-    if (!isEnabled() || !m_items[index].enabled)
-    {
-        return m_disabledStyle;
-    }
+    const bool selected = m_selectedIndex.has_value() && *m_selectedIndex == index;
 
-    if (m_selectedIndex == index)
-    {
-        return isFocused() ? m_selectedFocusedStyle : m_selectedStyle;
-    }
-
-    if (isFocused())
-    {
-        return m_focusedStyle;
-    }
-
-    return m_normalStyle;
+    return WidgetStyles::resolve(
+        m_styleSet,
+        WidgetStyles::stateFor(isEnabled() && isItemEnabled(index), isFocused(), selected));
 }

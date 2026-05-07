@@ -6,6 +6,7 @@
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
 #include "UI/Widgets/Widget.h"
+#include "UI/Widgets/WidgetStyle.h"
 
 class Surface;
 
@@ -24,9 +25,12 @@ public:
     const Style& textStyle() const;
     void setTextStyle(const Style& style);
 
+    const WidgetStyles::StyleSet& styleSet() const;
+    void setStyleSet(const WidgetStyles::StyleSet& styleSet);
+
     void draw(Surface& surface) override;
 
 private:
     std::string m_text;
-    Style m_textStyle;
+    WidgetStyles::StyleSet m_styleSet;
 };
