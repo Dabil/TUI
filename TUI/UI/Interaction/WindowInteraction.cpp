@@ -212,6 +212,7 @@ namespace UI
         const int originalBottom = originalBounds.position.y + originalBounds.size.height;
 
         Rect result = originalBounds;
+
         minimumSize.width = std::max(1, minimumSize.width);
         minimumSize.height = std::max(1, minimumSize.height);
 
@@ -220,11 +221,13 @@ namespace UI
         case CursorRegion::LeftEdge:
         case CursorRegion::TopLeftCorner:
         case CursorRegion::BottomLeftCorner:
-            result.position.x = std::min(
-                originalBounds.position.x + deltaX,
-                originalRight - minimumSize.width);
+        {
+            const int maximumLeft = originalRight - minimumSize.width;
+            const int requestedLeft = originalBounds.position.x + deltaX;
+            result.position.x = std::max(0, std::min(requestedLeft, maximumLeft));
             result.size.width = originalRight - result.position.x;
             break;
+        }
 
         case CursorRegion::RightEdge:
         case CursorRegion::TopRightCorner:
@@ -243,11 +246,13 @@ namespace UI
         case CursorRegion::TopEdge:
         case CursorRegion::TopLeftCorner:
         case CursorRegion::TopRightCorner:
-            result.position.y = std::min(
-                originalBounds.position.y + deltaY,
-                originalBottom - minimumSize.height);
+        {
+            const int maximumTop = originalBottom - minimumSize.height;
+            const int requestedTop = originalBounds.position.y + deltaY;
+            result.position.y = std::max(0, std::min(requestedTop, maximumTop));
             result.size.height = originalBottom - result.position.y;
             break;
+        }
 
         case CursorRegion::BottomEdge:
         case CursorRegion::BottomLeftCorner:
