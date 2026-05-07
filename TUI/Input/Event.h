@@ -7,6 +7,7 @@
 #include "Core/Size.h"
 #include "Input/Command.h"
 #include "Input/KeyEvent.h"
+#include "Input/MouseEvent.h"
 
 namespace Input
 {
@@ -44,13 +45,6 @@ namespace Input
     {
         double deltaSeconds = 0.0;
         std::uint64_t frameIndex = 0;
-    };
-
-    struct MouseEvent
-    {
-        // Future extension point.
-        // Intentionally empty for this tier so the event vocabulary can reserve
-        // mouse support without committing to a mouse input contract yet.
     };
 
     using EventPayload = std::variant<
@@ -182,6 +176,11 @@ namespace Input
             event.deltaSeconds = deltaSeconds;
             event.frameIndex = frameIndex;
             return Event(event);
+        }
+
+        static Event mouse(const MouseEvent& mouseEvent)
+        {
+            return Event(mouseEvent);
         }
 
     private:
