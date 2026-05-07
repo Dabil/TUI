@@ -403,6 +403,29 @@ bool ListBox::handleEvent(const Input::Event& event)
         return false;
     }
 
+    if (const Input::MouseEvent* mouseEvent = event.asMouse())
+    {
+        if (mouseEvent->button != Input::MouseButton::Left)
+        {
+            return false;
+        }
+
+        if (!mouseEvent->isPress() && !mouseEvent->isClick())
+        {
+            return false;
+        }
+
+        const std::optional<std::size_t> index =
+            itemIndexFromMousePosition(mouseEvent->position);
+
+        if (!index.has_value())
+        {
+            return false;
+        }
+
+        return selectIndex(*index);
+    }
+
     const Input::CommandEvent* commandEvent = event.asCommand();
     if (!commandEvent)
     {
@@ -472,6 +495,33 @@ void ListBox::ensureSelectedVisible()
     {
         m_viewport.scrollTo(0, selected - std::max(0, m_viewport.viewSize().height) + 1);
     }
+}
+
+std::optional<std::size_t> ListBox::itemIndexFromMousePosition(Point position) const
+{
+    const Rect listBounds = bounds();
+
+    if (!listBounds.contains(position.x, position.y))
+    {
+        return std::nullopt;
+    }
+
+    const int localRow = position.y - listBounds.position.y;
+    const int itemIndex = m_viewport.scrollY() + localRow;
+
+    if (itemIndex < 0 || itemIndex >= static_cast<int>(m_items.size()))
+    {
+        return std::nullopt;
+    }
+
+    const std::size_t index = static_cast<std::size_t>(itemIndex);
+
+    if (!isItemEnabled(index))
+    {
+        return std::nullopt;
+    }
+
+    return index;
 }
 
 std::optional<std::size_t> ListBox::findNextEnabled(std::size_t startIndex) const
