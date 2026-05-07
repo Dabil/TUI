@@ -1,6 +1,7 @@
 #include "UI/Panels/Panel.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/AppThemes.h"
@@ -45,28 +46,31 @@ namespace
 }
 
 Panel::Panel()
-    : UIElement()
+    : Widget()
     , m_backgroundStyle(AppThemes::Panel)
     , m_borderStyle(UIThemes::Border)
     , m_titleStyle(UIThemes::PanelTitle)
 {
+    setFocusable(false);
 }
 
 Panel::Panel(const Rect& bounds)
-    : UIElement(bounds)
+    : Widget(bounds)
     , m_backgroundStyle(AppThemes::Panel)
     , m_borderStyle(UIThemes::Border)
     , m_titleStyle(UIThemes::PanelTitle)
 {
+    setFocusable(false);
 }
 
 Panel::Panel(const Rect& bounds, std::string title)
-    : UIElement(bounds)
+    : Widget(bounds)
     , m_title(std::move(title))
     , m_backgroundStyle(AppThemes::Panel)
     , m_borderStyle(UIThemes::Border)
     , m_titleStyle(UIThemes::PanelTitle)
 {
+    setFocusable(false);
 }
 
 const std::string& Panel::title() const

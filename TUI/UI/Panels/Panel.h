@@ -3,13 +3,13 @@
 #include <string>
 
 #include "Core/Rect.h"
-#include "UI/Base/UIElement.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Objects/TextObjectFactory.h"
+#include "UI/Widgets/Widget.h"
 
 class Surface;
 
-class Panel : public UIElement
+class Panel : public Widget
 {
 public:
     Panel();

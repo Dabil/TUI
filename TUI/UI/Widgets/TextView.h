@@ -12,11 +12,17 @@
 
 class Surface;
 
+namespace Input
+{
+    class Event;
+}
+
 class TextView : public ScrollablePanel
 {
 public:
     TextView();
     explicit TextView(std::string title);
+    TextView(const Rect& bounds, std::string title = {});
 
     void setText(std::string_view text);
     void setLines(const std::vector<std::string>& lines);
@@ -34,6 +40,8 @@ public:
     const WidgetStyles::StyleSet& textStyleSet() const;
     void setTextStyleSet(const WidgetStyles::StyleSet& styleSet);
 
+    bool handleEvent(const Input::Event& event) override;
+
 protected:
     void drawScrollableContent(
         Surface& surface,
@@ -42,6 +50,10 @@ protected:
 private:
     void updateContentSizeFromLines();
     static std::vector<std::string> splitLines(std::string_view text);
+    static std::string sliceUtf8ByDisplayColumns(
+        std::string_view text,
+        int startColumn,
+        int maxColumns);
 
 private:
     std::vector<std::string> m_lines;
