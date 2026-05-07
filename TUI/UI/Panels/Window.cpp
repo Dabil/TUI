@@ -3,25 +3,31 @@
 #include <algorithm>
 #include <utility>
 
+#include "Rendering/Styles/StyleBuilder.h"
+
 Window::Window()
     : Panel()
 {
+    setFocusable(true);
 }
 
 Window::Window(const Rect& bounds)
     : Panel(bounds)
 {
+    setFocusable(true);
 }
 
 Window::Window(const Rect& bounds, std::string title)
     : Panel(bounds, std::move(title))
 {
+    setFocusable(true);
 }
 
 Window::Window(const Rect& bounds, std::string title, bool modal)
     : Panel(bounds, std::move(title))
     , m_modal(modal)
 {
+    setFocusable(true);
 }
 
 bool Window::isModal() const
@@ -109,4 +115,31 @@ UI::CursorRegion Window::hitTest(Point screenPosition) const
 bool Window::containsScreenPoint(Point screenPosition) const
 {
     return hitTest(screenPosition) != UI::CursorRegion::Outside;
+}
+
+bool Window::isHovered() const
+{
+    return m_hovered;
+}
+
+void Window::setHovered(bool hovered)
+{
+    m_hovered = hovered;
+}
+
+void Window::draw(Surface& surface)
+{
+    const Style originalBorderStyle = borderStyle();
+    const Style originalTitleStyle = titleStyle();
+
+    if (isFocused() || isHovered())
+    {
+        setBorderStyle(originalBorderStyle + style::Bold);
+        setTitleStyle(originalTitleStyle + style::Bold);
+    }
+
+    Panel::draw(surface);
+
+    setBorderStyle(originalBorderStyle);
+    setTitleStyle(originalTitleStyle);
 }

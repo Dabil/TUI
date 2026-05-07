@@ -14,6 +14,7 @@ public:
     WindowDemo();
 
     void onEnter() override;
+    bool handleEvent(const Input::Event& event) override;
     void update(double deltaTime) override;
     void draw(Surface& surface) override;
 

@@ -140,6 +140,11 @@ void WindowDemo::onEnter()
     m_digiRain.setOptions(DigiRainOptions);
 }
 
+bool WindowDemo::handleEvent(const Input::Event& event)
+{
+    return m_windowManager.handleEvent(event);
+}
+
 void WindowDemo::onExit()
 {
     m_fire.onExit();
