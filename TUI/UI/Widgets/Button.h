@@ -79,4 +79,6 @@ private:
 
     ActivationCallback m_activationCallback;
     std::optional<ButtonActivationResult> m_lastActivationResult;
+
+    bool m_leftMousePressedInside = false;
 };

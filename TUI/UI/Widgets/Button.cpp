@@ -209,6 +209,41 @@ bool Button::handleEvent(const Input::Event& event)
 {
     if (!isVisible() || !isEnabled())
     {
+        m_leftMousePressedInside = false;
+        return false;
+    }
+
+    if (const Input::MouseEvent* mouseEvent = event.asMouse())
+    {
+        if (mouseEvent->button != Input::MouseButton::Left)
+        {
+            return false;
+        }
+
+        const bool inside = bounds().contains(
+            mouseEvent->position.x,
+            mouseEvent->position.y);
+
+        if (mouseEvent->isPress())
+        {
+            m_leftMousePressedInside = inside;
+            return inside;
+        }
+
+        if (mouseEvent->isRelease())
+        {
+            const bool shouldActivate = m_leftMousePressedInside && inside;
+            m_leftMousePressedInside = false;
+
+            if (!shouldActivate)
+            {
+                return false;
+            }
+
+            const ButtonActivationResult result = activate();
+            return result.activated;
+        }
+
         return false;
     }
 

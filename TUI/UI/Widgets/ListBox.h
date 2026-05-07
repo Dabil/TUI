@@ -89,6 +89,7 @@ private:
     void updateViewport();
     void ensureSelectedVisible();
 
+    std::optional<std::size_t> itemIndexFromMousePosition(Point position) const;
     std::optional<std::size_t> findNextEnabled(std::size_t startIndex) const;
     std::optional<std::size_t> findPreviousEnabled(std::size_t startIndex) const;
     std::optional<std::size_t> firstEnabledIndex() const;

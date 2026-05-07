@@ -107,6 +107,37 @@ bool TextView::handleEvent(const Input::Event& event)
         return false;
     }
 
+    if (const Input::MouseEvent* mouseEvent = event.asMouse())
+    {
+        if (!mouseEvent->isWheel())
+        {
+            return false;
+        }
+
+        const bool hovered = bounds().contains(
+            mouseEvent->position.x,
+            mouseEvent->position.y);
+
+        if (!hovered && !isFocused())
+        {
+            return false;
+        }
+
+        if (mouseEvent->button == Input::MouseButton::WheelUp
+            || mouseEvent->wheelDelta > 0)
+        {
+            return scrollUp();
+        }
+
+        if (mouseEvent->button == Input::MouseButton::WheelDown
+            || mouseEvent->wheelDelta < 0)
+        {
+            return scrollDown();
+        }
+
+        return false;
+    }
+
     const Input::CommandEvent* commandEvent = event.asCommand();
     if (!commandEvent)
     {
