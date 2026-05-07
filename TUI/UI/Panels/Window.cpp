@@ -104,6 +104,28 @@ UI::CursorRegion Window::hitTest(Point screenPosition) const
         m_resizable ? m_resizeBorderThickness : 0,
         m_titleBarHeight);
 
+    const Rect windowBounds = bounds();
+
+    if (region == UI::CursorRegion::TopEdge && m_draggable && hasTitle())
+    {
+        const int titleY = windowBounds.position.y;
+        const int titleX = windowBounds.position.x + 2;
+        const int maxTitleWidth = std::max(0, windowBounds.size.width - 4);
+        const int titleWidth = std::min(
+            maxTitleWidth,
+            static_cast<int>(title().size()));
+
+        const bool overTitleText =
+            screenPosition.y == titleY &&
+            screenPosition.x >= titleX &&
+            screenPosition.x < titleX + titleWidth;
+
+        if (overTitleText)
+        {
+            return UI::CursorRegion::TitleBar;
+        }
+    }
+
     if (!m_draggable && region == UI::CursorRegion::TitleBar)
     {
         return UI::CursorRegion::Client;

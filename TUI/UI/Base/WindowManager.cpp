@@ -316,6 +316,22 @@ bool WindowManager::handleEvent(const Input::Event& event)
 
 bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
 {
+    if (isResizing())
+    {
+        if (mouseEvent.isRelease())
+        {
+            endResize();
+            return true;
+        }
+
+        if (mouseEvent.isDrag() || mouseEvent.isMove())
+        {
+            return updateResize(mouseEvent.position);
+        }
+
+        return true;
+    }
+
     if (isDragging())
     {
         if (mouseEvent.isRelease())
@@ -357,9 +373,19 @@ bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
         setHoveredWindow(target);
     }
 
-    if (isPrimaryPress &&
-       (result.region == UI::CursorRegion::TitleBar ||
-        result.region == UI::CursorRegion::TopEdge))
+    if (isPrimaryPress && UI::isResizeRegion(result.region))
+    {
+        if (beginResize(
+            *target,
+            result.region,
+            mouseEvent.position,
+            toPointerButton(mouseEvent.button)))
+        {
+            return true;
+        }
+    }
+
+    if (isPrimaryPress && result.region == UI::CursorRegion::TitleBar)
     {
         if (beginDrag(
             *target,
