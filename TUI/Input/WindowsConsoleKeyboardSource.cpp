@@ -420,6 +420,21 @@ namespace Input
         // Expected SGR format:
         // ESC [ < b ; x ; y M
         // ESC [ < b ; x ; y m
+        //
+        // Notes:
+        // - 1000 reports button press/release.
+        // - 1002 reports motion while a button is pressed.
+        // - 1003 reports any mouse motion, including passive hover movement.
+        // - 1006 keeps the extended SGR coordinate format.
+        //
+        // Passive any-motion commonly arrives as:
+        // ESC [ < 35 ; x ; y M
+        //
+        // In that case:
+        // - bit 32 is set, meaning motion.
+        // - button bits are 3, meaning no button.
+        // - this should become MouseAction::Moved with MouseButton::None.
+
         if (sequence.size() < 9)
         {
             return std::nullopt;
@@ -506,6 +521,7 @@ namespace Input
             event.action = event.button == MouseButton::None
                 ? MouseAction::Moved
                 : MouseAction::Dragged;
+
             event.buttons = buttonStateFor(event.button, event.button != MouseButton::None);
             return event;
         }
@@ -519,18 +535,21 @@ namespace Input
 
     void WindowsConsoleKeyboardSource::emitMouseReportingEnable() const
     {
-        // 1000: button press/release
-        // 1002: drag reporting
+        // 1000: button press/release reporting
+        // 1002: button-event motion reporting
+        // 1003: any-motion reporting, including passive hover movement
         // 1006: SGR extended mouse format
         std::cout << "\x1b[?1000h"
             << "\x1b[?1002h"
+            << "\x1b[?1003h"
             << "\x1b[?1006h"
             << std::flush;
     }
 
     void WindowsConsoleKeyboardSource::emitMouseReportingDisable() const
     {
-        std::cout << "\x1b[?1002l"
+        std::cout << "\x1b[?1003l"
+            << "\x1b[?1002l"
             << "\x1b[?1000l"
             << "\x1b[?1006l"
             << std::flush;

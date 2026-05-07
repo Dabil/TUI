@@ -1,13 +1,15 @@
-#include "Screens/WidgetDemoScreen.h"
+﻿#include "Screens/WidgetDemoScreen.h"
 
 #include <algorithm>
 #include <memory>
+#include <sstream>
 #include <utility>
 #include <vector>
 
 #include "Core/Rect.h"
 #include "Input/Command.h"
 #include "Input/Event.h"
+#include "Input/MouseEvent.h"
 #include "Rendering/Composition/PageComposer.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/StyleBuilder.h"
@@ -21,6 +23,7 @@ namespace
 
     constexpr int MinimumWidth = 88;
     constexpr int MinimumHeight = 30;
+    constexpr int DiagnosticsPanelHeight = 5;
 
     const Style ScreenStyle =
         style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
@@ -61,6 +64,11 @@ void WidgetDemoScreen::onEnter()
 {
     m_root.focusFirstChild();
     m_lastAction = "Widget demo ready. Use Tab to move focus between controls.";
+    m_lastMouseSummary = "Position: x=- y=- | Button: none | Action: none";
+    m_lastTargetSummary = "Target: <none>";
+    m_lastFocusSummary = "Focus: <none>";
+    m_lastResultSummary = "Result: waiting for mouse input";
+    m_lastMouseAction = "Mouse diagnostics ready. Move, click, or wheel over the demo.";
     syncSelectionMessage();
     updateStatusBar();
 }
@@ -70,6 +78,11 @@ bool WidgetDemoScreen::handleEvent(const Input::Event& event)
     if (const Input::CommandEvent* commandEvent = event.asCommand())
     {
         return handleCommand(commandEvent->command);
+    }
+
+    if (const Input::MouseEvent* mouseEvent = event.asMouse())
+    {
+        return handleMouseEvent(*mouseEvent);
     }
 
     return m_root.handleEvent(event);
@@ -96,6 +109,7 @@ void WidgetDemoScreen::draw(Surface& surface)
     syncSelectionMessage();
 
     m_root.draw(surface);
+    drawMouseDiagnosticsPanel(surface);
     m_statusBar.draw(surface);
 }
 
@@ -168,20 +182,14 @@ void WidgetDemoScreen::buildWidgets()
         "- Button activation is routed through reusable Button callbacks.",
         "- ListBox selection skips disabled items.",
         "- Focused, disabled, and selected styles are visible.",
+        "- Mouse position, target, focus, and result are visible in the diagnostics panel.",
+        "- Mouse diagnostics do not take over the footer/status bar.",
         "",
         "Try focusing this TextView and using Up/Down/PageUp/PageDown.",
-        "The screen does not replace the existing Screen lifecycle.", 
-        "and I need to add a bunch of text lines in here",
-        "So I can test the TextView mouse wheel scroll feature.",
+        "Try moving the mouse over the screen and watching the diagnostics panel.",
+        "Try using the mouse wheel over this TextView.",
         "",
-        "I reall hope it works.",
-        "After all I have put a lot of time into it.",
-        "It's crazy that I can't test it properly until after...",
-        "I add a bunch of text into this textView widget.",
-        "Maybe I should just add a bunch of empty rows.",
-        "That would make it a lot easier than typeing a bunch of random text.",
-        "I'll just put a single line after all the empty rows.",
-        "That way I can tell when I reach the bottom",
+        "Additional scroll content follows so wheel behavior is easy to validate.",
         "",
         "",
         "",
@@ -249,12 +257,14 @@ void WidgetDemoScreen::updateLayout(Surface& surface)
 
     const Rect safe = page.resolveRegion("Safe");
     const auto [header, afterHeader] = page.splitTop(safe, 5);
-    const auto [status, body] = page.splitBottom(afterHeader, 3);
+    const auto [status, aboveStatus] = page.splitBottom(afterHeader, 3);
+    const auto [diagnostics, body] = page.splitBottom(aboveStatus, DiagnosticsPanelHeight);
     const auto [controls, textArea] = page.splitLeft(body, 36);
 
     m_root.setBounds(safe);
     m_headerPanel->setBounds(header);
     m_statusBar.setBounds(status);
+    m_diagnosticsBounds = diagnostics;
 
     const Rect headerContent = m_headerPanel->contentBounds();
     m_titleLabel->setBounds(Rect{
@@ -339,6 +349,64 @@ bool WidgetDemoScreen::handleCommand(const Input::Command& command)
     return handled;
 }
 
+bool WidgetDemoScreen::handleMouseEvent(const Input::MouseEvent& mouseEvent)
+{
+    Widget* targetBeforeDispatch = m_root.hitTest(mouseEvent.position);
+    const std::optional<std::size_t> selectionBefore = m_listBox
+        ? m_listBox->selectedIndex()
+        : std::nullopt;
+    const Widget* focusedBefore = m_root.focusedChild();
+
+    const bool handled = m_root.handleEvent(Input::Event::mouse(mouseEvent));
+
+    const Widget* focusedAfter = m_root.focusedChild();
+    const std::optional<std::size_t> selectionAfter = m_listBox
+        ? m_listBox->selectedIndex()
+        : std::nullopt;
+
+    m_lastMouseSummary = describeMouseEvent(mouseEvent);
+    m_lastTargetSummary = "Target: " + describeWidget(targetBeforeDispatch);
+    m_lastFocusSummary = "Focus: " + describeWidget(focusedAfter);
+    m_lastResultSummary = "Result: " + std::string(handled ? "Handled" : "Not handled");
+
+    if (mouseEvent.isMove())
+    {
+        m_lastMouseAction = targetBeforeDispatch
+            ? "Passive mouse movement tracked over " + describeWidget(targetBeforeDispatch) + "."
+            : "Passive mouse movement tracked outside an enabled widget.";
+    }
+    else if (mouseEvent.isWheel())
+    {
+        m_lastMouseAction = handled
+            ? "Mouse wheel event scrolled or was accepted by " + describeWidget(targetBeforeDispatch) + "."
+            : "Mouse wheel event received, but no widget handled it.";
+    }
+    else if ((mouseEvent.isPress() || mouseEvent.isClick()) && focusedBefore != focusedAfter)
+    {
+        m_lastMouseAction = "Click-to-focus moved focus to " + describeWidget(focusedAfter) + ".";
+    }
+    else if (selectionBefore != selectionAfter)
+    {
+        const std::string* selectedText = m_listBox ? m_listBox->selectedText() : nullptr;
+        m_lastMouseAction = selectedText
+            ? "ListBox mouse selection changed to: " + *selectedText
+            : "ListBox mouse selection changed.";
+    }
+    else if (handled)
+    {
+        m_lastMouseAction = "Mouse event handled by " + describeWidget(targetBeforeDispatch) + ".";
+    }
+    else
+    {
+        m_lastMouseAction = "Mouse event received outside an enabled widget.";
+    }
+
+    syncSelectionMessage();
+    updateSelectionLabel();
+
+    return handled;
+}
+
 void WidgetDemoScreen::activateSelectedListItem()
 {
     const std::string* selectedText = m_listBox->selectedText();
@@ -389,15 +457,234 @@ void WidgetDemoScreen::syncSelectionMessage()
     }
 
     m_lastObservedSelection = selectedIndex;
+    updateSelectionLabel();
+}
 
-    const std::string* selectedText = m_listBox->selectedText();
-    if (selectedText == nullptr)
+void WidgetDemoScreen::updateSelectionLabel()
+{
+    if (!m_stateLabel || !m_listBox)
     {
-        m_stateLabel->setText("Selection: <none>");
         return;
     }
 
-    m_stateLabel->setText("Selection: " + *selectedText);
+    const std::string* selectedText = m_listBox->selectedText();
+    const std::string selectionText = selectedText
+        ? "Selection: " + *selectedText
+        : "Selection: <none>";
+
+    m_stateLabel->setText(selectionText);
+}
+
+void WidgetDemoScreen::drawMouseDiagnosticsPanel(Surface& surface) const
+{
+    ScreenBuffer& buffer = surface.buffer();
+
+    if (m_diagnosticsBounds.size.width <= 0 || m_diagnosticsBounds.size.height <= 0)
+    {
+        return;
+    }
+
+    buffer.fillRect(m_diagnosticsBounds, U' ', PanelStyle);
+    buffer.drawFrame(
+        m_diagnosticsBounds,
+        BorderStyle,
+        U'┌',
+        U'┐',
+        U'└',
+        U'┘',
+        U'─',
+        U'│');
+
+    if (m_diagnosticsBounds.size.width > 4)
+    {
+        buffer.writeString(
+            m_diagnosticsBounds.position.x + 2,
+            m_diagnosticsBounds.position.y,
+            fitToWidth(" Mouse Diagnostics ", m_diagnosticsBounds.size.width - 4),
+            AccentStyle);
+    }
+
+    const int contentX = m_diagnosticsBounds.position.x + 2;
+    const int contentWidth = std::max(0, m_diagnosticsBounds.size.width - 4);
+
+    if (contentWidth <= 0)
+    {
+        return;
+    }
+
+    const std::string line1 = m_lastMouseSummary;
+    const std::string line2 = m_lastTargetSummary + " | " + m_lastFocusSummary + " | " + m_lastResultSummary;
+    const std::string line3 = "Last mouse action: " + m_lastMouseAction;
+
+    writePaddedLine(surface, contentX, m_diagnosticsBounds.position.y + 1, contentWidth, line1, PanelStyle);
+    writePaddedLine(surface, contentX, m_diagnosticsBounds.position.y + 2, contentWidth, line2, PanelStyle);
+    writePaddedLine(surface, contentX, m_diagnosticsBounds.position.y + 3, contentWidth, line3, PanelStyle);
+}
+
+std::string WidgetDemoScreen::fitToWidth(const std::string& text, int width) const
+{
+    if (width <= 0)
+    {
+        return std::string();
+    }
+
+    const std::size_t targetWidth = static_cast<std::size_t>(width);
+    if (text.size() <= targetWidth)
+    {
+        return text;
+    }
+
+    if (targetWidth <= 3)
+    {
+        return text.substr(0, targetWidth);
+    }
+
+    return text.substr(0, targetWidth - 3) + "...";
+}
+
+void WidgetDemoScreen::writePaddedLine(
+    Surface& surface,
+    int x,
+    int y,
+    int width,
+    const std::string& text,
+    const Style& style) const
+{
+    if (width <= 0)
+    {
+        return;
+    }
+
+    std::string line = fitToWidth(text, width);
+    if (line.size() < static_cast<std::size_t>(width))
+    {
+        line.append(static_cast<std::size_t>(width) - line.size(), ' ');
+    }
+
+    surface.buffer().writeString(x, y, line, style);
+}
+
+std::string WidgetDemoScreen::describeMouseEvent(const Input::MouseEvent& mouseEvent) const
+{
+    std::ostringstream stream;
+    stream << "Position: x=" << mouseEvent.position.x
+        << " y=" << mouseEvent.position.y
+        << " | Button: " << describeMouseButton(mouseEvent.button)
+        << " | Action: " << describeMouseAction(mouseEvent.action);
+
+    if (mouseEvent.isWheel())
+    {
+        stream << " delta=" << mouseEvent.wheelDelta;
+    }
+
+    if (mouseEvent.clickCount > 0)
+    {
+        stream << " clicks=" << mouseEvent.clickCount;
+    }
+
+    return stream.str();
+}
+
+std::string WidgetDemoScreen::describeMouseButton(Input::MouseButton button) const
+{
+    switch (button)
+    {
+    case Input::MouseButton::None:
+        return "None";
+    case Input::MouseButton::Left:
+        return "Left";
+    case Input::MouseButton::Right:
+        return "Right";
+    case Input::MouseButton::Middle:
+        return "Middle";
+    case Input::MouseButton::WheelUp:
+        return "WheelUp";
+    case Input::MouseButton::WheelDown:
+        return "WheelDown";
+    default:
+        return "Unknown";
+    }
+}
+
+std::string WidgetDemoScreen::describeMouseAction(Input::MouseAction action) const
+{
+    switch (action)
+    {
+    case Input::MouseAction::Moved:
+        return "Moved";
+    case Input::MouseAction::Pressed:
+        return "Pressed";
+    case Input::MouseAction::Released:
+        return "Released";
+    case Input::MouseAction::Dragged:
+        return "Dragged";
+    case Input::MouseAction::Clicked:
+        return "Clicked";
+    case Input::MouseAction::Wheel:
+        return "Wheel";
+    default:
+        return "Unknown";
+    }
+}
+
+std::string WidgetDemoScreen::describeWidget(const Widget* widget) const
+{
+    if (widget == nullptr)
+    {
+        return "<none>";
+    }
+
+    if (widget == m_listBox)
+    {
+        return "ListBox";
+    }
+
+    if (widget == m_applyButton)
+    {
+        return "Apply Selection Button";
+    }
+
+    if (widget == m_resetButton)
+    {
+        return "Reset List Button";
+    }
+
+    if (widget == m_disabledButton)
+    {
+        return "Disabled Button";
+    }
+
+    if (widget == m_textView)
+    {
+        return "TextView";
+    }
+
+    if (widget == m_titleLabel)
+    {
+        return "Title Label";
+    }
+
+    if (widget == m_stateLabel)
+    {
+        return "Selection Label";
+    }
+
+    if (widget == m_headerPanel)
+    {
+        return "Header Panel";
+    }
+
+    if (widget == m_controlPanel)
+    {
+        return "Controls Panel";
+    }
+
+    if (widget == m_textPanel)
+    {
+        return "Text Panel";
+    }
+
+    return "Widget";
 }
 
 void WidgetDemoScreen::drawTooSmall(Surface& surface) const
