@@ -1,8 +1,10 @@
 #pragma once
 
 #include <cstddef>
+#include <optional>
 #include <string>
 
+#include "Input/MouseEvent.h"
 #include "Screens/Screen.h"
 #include "UI/Panels/Panel.h"
 #include "UI/Panels/StatusBar.h"
@@ -38,9 +40,20 @@ private:
     void updateStatusBar();
 
     bool handleCommand(const Input::Command& command);
+    bool handleMouseEvent(const Input::MouseEvent& mouseEvent);
     void activateSelectedListItem();
     void handleButtonActivation(const ButtonActivationResult& result);
     void syncSelectionMessage();
+    void updateSelectionLabel();
+    void drawMouseDiagnosticsPanel(Surface& surface) const;
+
+    std::string fitToWidth(const std::string& text, int width) const;
+    void writePaddedLine(Surface& surface, int x, int y, int width, const std::string& text, const Style& style) const;
+
+    std::string describeMouseEvent(const Input::MouseEvent& mouseEvent) const;
+    std::string describeMouseButton(Input::MouseButton button) const;
+    std::string describeMouseAction(Input::MouseAction action) const;
+    std::string describeWidget(const Widget* widget) const;
 
     void drawTooSmall(Surface& surface) const;
 
@@ -61,6 +74,13 @@ private:
 
     StatusBar m_statusBar;
 
+    Rect m_diagnosticsBounds;
+
     std::string m_lastAction;
+    std::string m_lastMouseSummary;
+    std::string m_lastTargetSummary;
+    std::string m_lastFocusSummary;
+    std::string m_lastResultSummary;
+    std::string m_lastMouseAction;
     std::optional<std::size_t> m_lastObservedSelection;
 };
