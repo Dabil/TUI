@@ -8,13 +8,14 @@
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
 #include "UI/Panels/ScrollablePanel.h"
+#include "UI/Widgets/WidgetStyle.h"
 
 class Surface;
 
 class TextView : public ScrollablePanel
 {
 public:
-    TextView() = default;
+    TextView();
     explicit TextView(std::string title);
 
     void setText(std::string_view text);
@@ -30,6 +31,9 @@ public:
     void setTextStyle(const Style& style);
     const Style& textStyle() const;
 
+    const WidgetStyles::StyleSet& textStyleSet() const;
+    void setTextStyleSet(const WidgetStyles::StyleSet& styleSet);
+
 protected:
     void drawScrollableContent(
         Surface& surface,
@@ -41,5 +45,5 @@ private:
 
 private:
     std::vector<std::string> m_lines;
-    Style m_textStyle;
+    WidgetStyles::StyleSet m_textStyleSet;
 };

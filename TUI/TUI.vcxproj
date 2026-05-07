@@ -301,6 +301,7 @@
     <ClInclude Include="UI\Widgets\TextView.h" />
     <ClInclude Include="UI\Widgets\TileGridView.h" />
     <ClInclude Include="UI\Widgets\Widget.h" />
+    <ClInclude Include="UI\Widgets\WidgetStyle.h" />
     <ClInclude Include="Utilities\AssetPaths.h" />
     <ClInclude Include="Utilities\Text\TextClip.h" />
     <ClInclude Include="Utilities\Text\TextWrap.h" />
@@ -465,6 +466,7 @@
     <ClCompile Include="UI\Widgets\TextView.cpp" />
     <ClCompile Include="UI\Widgets\TileGridView.cpp" />
     <ClCompile Include="UI\Widgets\Widget.cpp" />
+    <ClCompile Include="UI\Widgets\WidgetStyle.cpp" />
     <ClCompile Include="Utilities\AssetPaths.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentation.cpp" />
     <ClCompile Include="Utilities\Unicode\GraphemeSegmentationTests.cpp" />

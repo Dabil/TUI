@@ -10,7 +10,15 @@
 #include "Utilities/Text/TextClip.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
+TextView::TextView()
+    : ScrollablePanel()
+    , m_textStyleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::TextViewText))
+{
+}
+
 TextView::TextView(std::string title)
+    : ScrollablePanel()
+    , m_textStyleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::TextViewText))
 {
     setTitle(std::move(title));
 }
@@ -62,12 +70,22 @@ std::size_t TextView::lineCount() const
 
 void TextView::setTextStyle(const Style& style)
 {
-    m_textStyle = style;
+    m_textStyleSet.normal = style;
 }
 
 const Style& TextView::textStyle() const
 {
-    return m_textStyle;
+    return m_textStyleSet.normal;
+}
+
+const WidgetStyles::StyleSet& TextView::textStyleSet() const
+{
+    return m_textStyleSet;
+}
+
+void TextView::setTextStyleSet(const WidgetStyles::StyleSet& styleSet)
+{
+    m_textStyleSet = styleSet;
 }
 
 void TextView::drawScrollableContent(
@@ -99,7 +117,13 @@ void TextView::drawScrollableContent(
             sourceLine.substr(static_cast<std::size_t>(offsetX)),
             visibleContentRect.size.width);
 
-        buffer.writeString(0, viewY, visibleText, m_textStyle);
+        buffer.writeString(
+            0,
+            viewY,
+            visibleText,
+            WidgetStyles::resolve(
+                m_textStyleSet,
+                WidgetStyles::stateFor(isEnabled(), false)));
     }
 }
 

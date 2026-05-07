@@ -160,4 +160,32 @@ namespace UIThemes
             Color::FromBasic(Color::Basic::BrightGreen),
             Color::FromIndexed(46),
             Color::FromRgb(0, 255, 95)));
+
+
+    // Reusable widget role/state styles. These aliases keep widget rendering
+    // consistent without introducing a second theme system. Existing roles above
+    // remain valid for older rendering code.
+    inline const Style WidgetLabelNormal = Label;
+    inline const Style WidgetLabelFocused = Label + Focused;
+    inline const Style WidgetLabelDisabled = DisabledText;
+    inline const Style WidgetLabelSelected = Selection;
+    inline const Style WidgetLabelSelectedFocused = Selection + Focused;
+
+    inline const Style WidgetTextNormal = NormalText;
+    inline const Style WidgetTextFocused = NormalText + Focused;
+    inline const Style WidgetTextDisabled = DisabledText;
+    inline const Style WidgetTextSelected = Selection;
+    inline const Style WidgetTextSelectedFocused = Selection + Focused;
+
+    inline const Style WidgetButtonNormal = ButtonNormal;
+    inline const Style WidgetButtonFocused = ButtonHot;
+    inline const Style WidgetButtonDisabled = ButtonDisabled;
+    inline const Style WidgetButtonSelected = ButtonHot;
+    inline const Style WidgetButtonSelectedFocused = ButtonHot + Focused;
+
+    inline const Style WidgetListItemNormal = NormalText;
+    inline const Style WidgetListItemFocused = Focused;
+    inline const Style WidgetListItemDisabled = DisabledText;
+    inline const Style WidgetListItemSelected = Selection;
+    inline const Style WidgetListItemSelectedFocused = Selection + Focused;
 }

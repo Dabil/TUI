@@ -6,16 +6,13 @@
 #include "Input/Command.h"
 #include "Input/Event.h"
 #include "Rendering/ScreenBuffer.h"
-#include "Rendering/Styles/UIThemes.h"
 #include "Rendering/Surface.h"
 #include "Utilities/Text/TextClip.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
 
 Button::Button()
     : Widget()
-    , m_normalStyle(UIThemes::ButtonNormal)
-    , m_focusedStyle(UIThemes::ButtonHot)
-    , m_disabledStyle(UIThemes::ButtonDisabled)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::Button))
 {
     setFocusable(true);
 }
@@ -23,9 +20,7 @@ Button::Button()
 Button::Button(std::string label)
     : Widget()
     , m_label(std::move(label))
-    , m_normalStyle(UIThemes::ButtonNormal)
-    , m_focusedStyle(UIThemes::ButtonHot)
-    , m_disabledStyle(UIThemes::ButtonDisabled)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::Button))
 {
     setFocusable(true);
 }
@@ -33,9 +28,7 @@ Button::Button(std::string label)
 Button::Button(const Rect& bounds, std::string label, std::string commandId)
     : Widget(bounds)
     , m_label(std::move(label))
-    , m_normalStyle(UIThemes::ButtonNormal)
-    , m_focusedStyle(UIThemes::ButtonHot)
-    , m_disabledStyle(UIThemes::ButtonDisabled)
+    , m_styleSet(WidgetStyles::defaultStyleSet(WidgetStyles::Role::Button))
 {
     if (!commandId.empty())
     {
@@ -88,32 +81,42 @@ void Button::clearCommandId()
 
 const Style& Button::normalStyle() const
 {
-    return m_normalStyle;
+    return m_styleSet.normal;
 }
 
 void Button::setNormalStyle(const Style& style)
 {
-    m_normalStyle = style;
+    m_styleSet.normal = style;
 }
 
 const Style& Button::focusedStyle() const
 {
-    return m_focusedStyle;
+    return m_styleSet.focused;
 }
 
 void Button::setFocusedStyle(const Style& style)
 {
-    m_focusedStyle = style;
+    m_styleSet.focused = style;
 }
 
 const Style& Button::disabledStyle() const
 {
-    return m_disabledStyle;
+    return m_styleSet.disabled;
 }
 
 void Button::setDisabledStyle(const Style& style)
 {
-    m_disabledStyle = style;
+    m_styleSet.disabled = style;
+}
+
+const WidgetStyles::StyleSet& Button::styleSet() const
+{
+    return m_styleSet;
+}
+
+void Button::setStyleSet(const WidgetStyles::StyleSet& styleSet)
+{
+    m_styleSet = styleSet;
 }
 
 void Button::setActivationCallback(ActivationCallback callback)
@@ -226,17 +229,9 @@ bool Button::handleEvent(const Input::Event& event)
 
 const Style& Button::resolveRenderStyle() const
 {
-    if (!isEnabled())
-    {
-        return m_disabledStyle;
-    }
-
-    if (isFocused())
-    {
-        return m_focusedStyle;
-    }
-
-    return m_normalStyle;
+    return WidgetStyles::resolve(
+        m_styleSet,
+        WidgetStyles::stateFor(isEnabled(), isFocused()));
 }
 
 std::string Button::buildDisplayText(int availableWidth) const

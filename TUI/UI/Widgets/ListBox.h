@@ -10,6 +10,7 @@
 #include "Rendering/Styles/Style.h"
 #include "UI/Base/Viewport.h"
 #include "UI/Widgets/Widget.h"
+#include "UI/Widgets/WidgetStyle.h"
 
 class Surface;
 
@@ -77,6 +78,9 @@ public:
     const Style& disabledStyle() const;
     void setDisabledStyle(const Style& style);
 
+    const WidgetStyles::StyleSet& styleSet() const;
+    void setStyleSet(const WidgetStyles::StyleSet& styleSet);
+
     void draw(Surface& surface) override;
     bool handleEvent(const Input::Event& event) override;
 
@@ -97,10 +101,5 @@ private:
     std::optional<std::size_t> m_selectedIndex;
     Viewport m_viewport;
 
-    Style m_normalStyle;
-    Style m_focusedStyle;
-    Style m_selectedStyle;
-    Style m_selectedFocusedStyle;
-    Style m_disabledStyle;
+    WidgetStyles::StyleSet m_styleSet;
 };
-
