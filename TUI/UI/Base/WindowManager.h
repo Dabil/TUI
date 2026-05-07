@@ -1,10 +1,13 @@
+// UI/Base/WindowManager.h
 #pragma once
 
 #include <cstddef>
 #include <vector>
 
+#include "Core/Point.h"
 #include "Rendering/LayerInstance.h"
 #include "Rendering/Surface.h"
+#include "UI/Interaction/WindowInteraction.h"
 
 class Window;
 
@@ -40,6 +43,31 @@ public:
     bool hasModalWindow() const;
     bool canRouteTo(const Window& window) const;
 
+    UI::WindowHitTestResult hitTest(Point screenPosition);
+    UI::WindowHitTestResult hitTest(Point screenPosition) const;
+
+    void capturePointer(Window& window, UI::PointerButton button, Point screenPosition);
+    void releasePointer(Window& window);
+    void releasePointer();
+    bool hasPointerCapture() const;
+    const UI::PointerCaptureState& pointerCapture() const;
+    Window* capturedWindow();
+    const Window* capturedWindow() const;
+
+    bool beginDrag(Window& window, Point screenPosition, UI::PointerButton button = UI::PointerButton::Primary);
+    bool beginDragAt(Point screenPosition, UI::PointerButton button = UI::PointerButton::Primary);
+    bool updateDrag(Point screenPosition);
+    void endDrag();
+    bool isDragging() const;
+    const UI::WindowDragState& dragState() const;
+
+    bool beginResize(Window& window, UI::CursorRegion region, Point screenPosition, UI::PointerButton button = UI::PointerButton::Primary);
+    bool beginResizeAt(Point screenPosition, UI::PointerButton button = UI::PointerButton::Primary);
+    bool updateResize(Point screenPosition);
+    void endResize();
+    bool isResizing() const;
+    const UI::WindowResizeState& resizeState() const;
+
     void update(double deltaTime);
     void draw(Surface& surface);
 
@@ -64,4 +92,8 @@ private:
 private:
     std::vector<ManagedWindow> m_windows;
     std::size_t m_nextInsertionOrder = 0;
+
+    UI::PointerCaptureState m_pointerCapture;
+    UI::WindowDragState m_dragState;
+    UI::WindowResizeState m_resizeState;
 };
