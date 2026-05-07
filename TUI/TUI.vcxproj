@@ -284,6 +284,9 @@
     <ClInclude Include="UI\Config\MenuStatusConfig.h" />
     <ClInclude Include="UI\Content\TileGrid.h" />
     <ClInclude Include="UI\Interaction\WindowInteraction.h" />
+    <ClInclude Include="UI\Layout\DockNode.h" />
+    <ClInclude Include="UI\Layout\DockTree.h" />
+    <ClInclude Include="UI\Layout\DockTypes.h" />
     <ClInclude Include="UI\Menus\MenuController.h" />
     <ClInclude Include="UI\Menus\MenuItem.h" />
     <ClInclude Include="UI\Menus\MenuModel.h" />
@@ -449,6 +452,8 @@
     <ClCompile Include="UI\Config\MenuStatusConfig.cpp" />
     <ClCompile Include="UI\Content\TileGrid.cpp" />
     <ClCompile Include="UI\Interaction\WindowInteraction.cpp" />
+    <ClCompile Include="UI\Layout\DockNode.cpp" />
+    <ClCompile Include="UI\Layout\DockTree.cpp" />
     <ClCompile Include="UI\Menus\MenuController.cpp" />
     <ClCompile Include="UI\Menus\MenuItem.cpp" />
     <ClCompile Include="UI\Menus\MenuModel.cpp" />
