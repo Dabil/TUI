@@ -144,7 +144,7 @@ void DigitalRainEffect::ensureLayout(const Rect& viewport)
 {
     const int newRainLeft = viewport.position.x;
     const int newRainTop = viewport.position.y;
-    const int newRainWidth = viewport.size.width;
+    const int newRainWidth = viewport.size.width - 1;
     const int newRainHeight = viewport.size.height;
 
     const bool sizeChanged =
