@@ -1,5 +1,107 @@
 #include "UI/Layout/DockTree.h"
 
+#include <algorithm>
+
+namespace
+{
+    int dockZoneThickness(int length)
+    {
+        if (length <= 0)
+        {
+            return 0;
+        }
+
+        return std::max(1, std::min(6, length / 4));
+    }
+
+    void appendSnapZonesForNode(
+        const UI::DockNode& node,
+        std::vector<UI::DockSnapZone>& zones)
+    {
+        const Rect bounds = node.bounds();
+
+        if (bounds.size.width <= 0 || bounds.size.height <= 0)
+        {
+            return;
+        }
+
+        if (node.isLeaf() || node.isEmpty())
+        {
+            const int horizontalThickness = dockZoneThickness(bounds.size.width);
+            const int verticalThickness = dockZoneThickness(bounds.size.height);
+
+            zones.push_back({ UI::DockSnapZoneType::Left,
+                Rect{ bounds.position, Size{ horizontalThickness, bounds.size.height } },
+                node.id() });
+
+            zones.push_back({ UI::DockSnapZoneType::Right,
+                Rect{ Point{ bounds.position.x + bounds.size.width - horizontalThickness, bounds.position.y },
+                Size{ horizontalThickness, bounds.size.height } },
+                node.id() });
+
+            zones.push_back({ UI::DockSnapZoneType::Top,
+                Rect{ bounds.position, Size{ bounds.size.width, verticalThickness } },
+                node.id() });
+
+            zones.push_back({ UI::DockSnapZoneType::Bottom,
+                Rect{ Point{ bounds.position.x, bounds.position.y + bounds.size.height - verticalThickness },
+                Size{ bounds.size.width, verticalThickness } },
+                node.id() });
+
+            const int centerWidth = std::max(1, bounds.size.width / 3);
+            const int centerHeight = std::max(1, bounds.size.height / 3);
+
+            zones.push_back({ UI::DockSnapZoneType::Center,
+                Rect{
+                    Point{
+                        bounds.position.x + (bounds.size.width - centerWidth) / 2,
+                        bounds.position.y + (bounds.size.height - centerHeight) / 2
+                    },
+                    Size{ centerWidth, centerHeight }
+                },
+                node.id() });
+        }
+
+        if (const UI::DockNode* first = node.firstChild())
+        {
+            appendSnapZonesForNode(*first, zones);
+        }
+
+        if (const UI::DockNode* second = node.secondChild())
+        {
+            appendSnapZonesForNode(*second, zones);
+        }
+    }
+
+}
+
+std::vector<UI::DockSnapZone> UI::DockTree::snapZones() const
+{
+    std::vector<DockSnapZone> zones;
+
+    if (m_root)
+    {
+        appendSnapZonesForNode(*m_root, zones);
+    }
+
+    return zones;
+}
+
+UI::DockSnapZone UI::DockTree::snapZoneAt(Point screenPosition) const
+{
+    const std::vector<DockSnapZone> zones = snapZones();
+
+    for (const DockSnapZone& zone : zones)
+    {
+        if (zone.isValid() && zone.bounds.contains(screenPosition.x, screenPosition.y))
+        {
+            return zone;
+        }
+    }
+
+    return DockSnapZone{};
+}
+
 namespace UI
 {
     DockTree::DockTree()

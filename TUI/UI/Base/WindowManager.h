@@ -1,4 +1,3 @@
-// UI/Base/WindowManager.h
 #pragma once
 
 #include <cstddef>
@@ -8,6 +7,8 @@
 #include "Rendering/LayerInstance.h"
 #include "Rendering/Surface.h"
 #include "UI/Interaction/WindowInteraction.h"
+#include "UI/Layout/DockDragPreview.h"
+#include "UI/Layout/DockTree.h"
 #include "Input/MouseEvent.h"
 
 namespace Input
@@ -88,6 +89,14 @@ public:
 
     std::vector<LayerInstance> buildLayers();
 
+    void setDockTree(UI::DockTree* dockTree);
+    UI::DockTree* dockTree();
+    const UI::DockTree* dockTree() const;
+
+    bool isDockPreviewActive() const;
+    const UI::DockDragPreviewState& dockPreviewState() const;
+    void cancelDockPreview();
+
 private:
     struct ManagedWindow
     {
@@ -107,6 +116,9 @@ private:
     void setHoveredWindow(Window* window);
     void setFocusedWindow(Window* window);
 
+    void updateDockPreview(Point screenPosition);
+    void drawDockPreview(Surface& surface) const;
+
 private:
     std::vector<ManagedWindow> m_windows;
     std::size_t m_nextInsertionOrder = 0;
@@ -114,6 +126,9 @@ private:
     UI::PointerCaptureState m_pointerCapture;
     UI::WindowDragState m_dragState;
     UI::WindowResizeState m_resizeState;
+    UI::DockTree* m_dockTree = nullptr;
+    UI::DockSnapZone m_activeDockPreviewZone{};
+    UI::DockDragPreview m_dockPreview;
 
     Window* m_hoveredWindow = nullptr;
     Window* m_focusedWindow = nullptr;
