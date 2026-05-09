@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Animation\TickClock.h" />
     <ClInclude Include="App\Application.h" />
     <ClInclude Include="App\CommandLineOptions.h" />
     <ClInclude Include="App\ScreenManager.h" />
@@ -317,6 +318,7 @@
     <ClInclude Include="Utilities\Unicode\UnicodeWidth.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Animation\TickClock.cpp" />
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="App\CommandLineOptions.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
