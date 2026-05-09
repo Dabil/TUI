@@ -4,6 +4,7 @@
 
 #include "Screens/Screen.h"
 #include "UI/Base/WindowManager.h"
+#include "UI/Layout/DockTree.h"
 #include "UI/Panels/EffectWindow.h"
 #include "Rendering/Effects/FireEffect.h"
 #include "Rendering/Effects/DigitalRainEffect.h"
@@ -26,6 +27,7 @@ public:
 
 private:
     void ensureLayout(const Rect& viewport, const Rect* windowRectArr);
+    void ensureDockPreviewLayout(const Rect& viewport);
 
 private:
     int m_screenWidth = 0;
@@ -38,6 +40,9 @@ private:
     Donut3D m_donut;
     FireEffect m_fire;
     WaterWaveEffect m_water;
+
+    // Docking preview test layout
+    UI::DockTree m_dockTree;
 
     // Window system
     WindowManager m_windowManager;

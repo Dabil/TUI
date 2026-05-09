@@ -145,6 +145,7 @@ void WindowDemo::onEnter()
         U"♪♫⌘₿äü∄∃ƒ±£µℇ");
 
     m_digiRain.setOptions(DigiRainOptions);
+    m_windowManager.setDockTree(&m_dockTree);
 }
 
 bool WindowDemo::handleEvent(const Input::Event& event)
@@ -217,6 +218,7 @@ void WindowDemo::draw(Surface& surface)
         page.resolveRegion("BottomRightWindow")
     };
 
+    ensureDockPreviewLayout(pageBody);
     ensureLayout(pageBody, windowRectArr);
 
     m_windowManager.draw(surface);
@@ -236,10 +238,10 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
 
     m_windowManager.clear();
 
-    m_digiRainWindow = std::make_unique<EffectWindow>(windowRectArr[0], "Digital Rain Effect", m_digiRain);
-    m_donutWindow    = std::make_unique<EffectWindow>(windowRectArr[1], "3D Donut Effect", m_donut);
-    m_fireWindow     = std::make_unique<EffectWindow>(windowRectArr[2], "Fire Effect", m_fire);
-    m_waterWindow    = std::make_unique<EffectWindow>(windowRectArr[3], "Water Wave Effect", m_water);
+    m_digiRainWindow = std::make_unique<EffectWindow>(windowRectArr[0], "( Digital Rain Effect )", m_digiRain);
+    m_donutWindow    = std::make_unique<EffectWindow>(windowRectArr[1], "( 3D Donut Effect )", m_donut);
+    m_fireWindow     = std::make_unique<EffectWindow>(windowRectArr[2], "( Fire Effect )", m_fire);
+    m_waterWindow    = std::make_unique<EffectWindow>(windowRectArr[3], "( Water Wave Effect )", m_water);
 
     m_digiRainWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
     m_digiRainWindow->setBorderStyle(DemoColors::unfocusedWindow);
@@ -271,4 +273,41 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
     m_windowManager.addWindow(*m_waterWindow.get());
 
     m_layoutInitialized = true;
+}
+
+void WindowDemo::ensureDockPreviewLayout(const Rect& viewport)
+{
+    if (viewport.size.width <= 0 || viewport.size.height <= 0)
+    {
+        return;
+    }
+
+    if (!m_dockTree.empty() &&
+        m_dockTree.bounds().position.x == viewport.position.x &&
+        m_dockTree.bounds().position.y == viewport.position.y &&
+        m_dockTree.bounds().size.width == viewport.size.width &&
+        m_dockTree.bounds().size.height == viewport.size.height)
+    {
+        return;
+    }
+
+    m_dockTree.setBounds(viewport);
+    m_dockTree.clear();
+
+    UI::DockContentDescriptor leftContent;
+    leftContent.contentId = "dock-preview-left";
+    leftContent.title = "Left Preview Region";
+
+    UI::DockContentDescriptor rightContent;
+    rightContent.contentId = "dock-preview-right";
+    rightContent.title = "Right Preview Region";
+
+    const int rootNodeId = m_dockTree.attachRoot(std::move(leftContent));
+
+    m_dockTree.splitNode(
+        rootNodeId,
+        UI::DockSplitOrientation::Horizontal,
+        0.5f,
+        std::move(rightContent),
+        false);
 }

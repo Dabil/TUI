@@ -7,6 +7,8 @@
 #include "UI/Panels/Window.h"
 #include "Input/Event.h"
 #include "Input/MouseEvent.h"
+#include "Rendering/ScreenBuffer.h"
+#include "Rendering/Styles/StyleBuilder.h"
 
 namespace
 {
@@ -81,6 +83,7 @@ void WindowManager::clear()
     releasePointer();
     m_dragState.clear();
     m_resizeState.clear();
+    m_dockPreview.cancel();
     m_windows.clear();
 }
 
@@ -507,6 +510,8 @@ bool WindowManager::beginDrag(
     }
 
     m_resizeState.clear();
+    m_dockPreview.cancel();
+
     m_dragState.window = &window;
     m_dragState.pointerOrigin = screenPosition;
     m_dragState.currentPointer = screenPosition;
@@ -514,8 +519,15 @@ bool WindowManager::beginDrag(
 
     capturePointer(window, button, screenPosition);
     bringToFront(window);
+
+    if (m_dockTree != nullptr && !m_dockTree->empty())
+    {
+        m_dockPreview.begin(*m_dockTree, screenPosition);
+    }
+
     return true;
 }
+
 
 bool WindowManager::beginDragAt(Point screenPosition, UI::PointerButton button)
 {
@@ -540,6 +552,7 @@ bool WindowManager::updateDrag(Point screenPosition)
     {
         m_dragState.clear();
         releasePointer();
+        m_dockPreview.cancel();
         return false;
     }
 
@@ -553,6 +566,12 @@ bool WindowManager::updateDrag(Point screenPosition)
     movedBounds.position.x += deltaX;
     movedBounds.position.y += deltaY;
     window->setBounds(movedBounds);
+
+    if (m_dockTree != nullptr && m_dockPreview.isActive())
+    {
+        m_dockPreview.update(*m_dockTree, screenPosition);
+    }
+
     return true;
 }
 
@@ -560,6 +579,7 @@ void WindowManager::endDrag()
 {
     m_dragState.clear();
     releasePointer();
+    m_dockPreview.end();
 }
 
 bool WindowManager::isDragging() const
@@ -584,6 +604,8 @@ bool WindowManager::beginResize(
     }
 
     m_dragState.clear();
+    m_dockPreview.cancel();
+
     m_resizeState.window = &window;
     m_resizeState.region = region;
     m_resizeState.pointerOrigin = screenPosition;
@@ -639,6 +661,7 @@ void WindowManager::endResize()
 {
     m_resizeState.clear();
     releasePointer();
+    m_dockPreview.cancel();
 }
 
 bool WindowManager::isResizing() const
@@ -682,6 +705,8 @@ void WindowManager::draw(Surface& surface)
 
         entry.window->draw(surface);
     }
+
+    m_dockPreview.draw(surface);
 }
 
 std::vector<LayerInstance> WindowManager::buildLayers()
@@ -841,4 +866,39 @@ void WindowManager::setFocusedWindow(Window* window)
     {
         m_focusedWindow->focus();
     }
+}
+
+void WindowManager::setDockTree(UI::DockTree* dockTree)
+{
+    m_dockTree = dockTree;
+
+    if (m_dockTree == nullptr)
+    {
+        m_dockPreview.cancel();
+    }
+}
+
+UI::DockTree* WindowManager::dockTree()
+{
+    return m_dockTree;
+}
+
+const UI::DockTree* WindowManager::dockTree() const
+{
+    return m_dockTree;
+}
+
+bool WindowManager::isDockPreviewActive() const
+{
+    return m_dockPreview.isActive();
+}
+
+const UI::DockDragPreviewState& WindowManager::dockPreviewState() const
+{
+    return m_dockPreview.state();
+}
+
+void WindowManager::cancelDockPreview()
+{
+    m_dockPreview.cancel();
 }

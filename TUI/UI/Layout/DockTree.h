@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include "Core/Point.h"
 #include "Core/Rect.h"
 #include "UI/Layout/DockNode.h"
 #include "UI/Layout/DockTypes.h"
@@ -42,6 +43,9 @@ namespace UI
         DockContentDescriptor detachContent(const std::string& contentId);
 
         std::vector<DockLayoutRecord> createLayoutRecords() const;
+
+        std::vector<DockSnapZone> snapZones() const;
+        DockSnapZone snapZoneAt(Point screenPosition) const;
 
     private:
         int allocateNodeId();
