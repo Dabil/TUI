@@ -218,7 +218,9 @@ void WindowDemo::draw(Surface& surface)
         page.resolveRegion("BottomRightWindow")
     };
 
-    ensureDockPreviewLayout(pageBody);
+
+    // turns on docking preview
+    // ensureDockPreviewLayout(pageBody);
     ensureLayout(pageBody, windowRectArr);
 
     m_windowManager.draw(surface);
