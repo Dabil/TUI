@@ -131,6 +131,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Animation\AnimatedTextAssetSequence.h" />
     <ClInclude Include="Animation\Animation.h" />
     <ClInclude Include="Animation\Animator.h" />
     <ClInclude Include="Animation\PeriodicTimer.h" />
@@ -323,6 +324,7 @@
     <ClInclude Include="Utilities\Unicode\UnicodeWidth.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Animation\AnimatedTextAssetSequence.cpp" />
     <ClCompile Include="Animation\Animation.cpp" />
     <ClCompile Include="Animation\Animator.cpp" />
     <ClCompile Include="Animation\PeriodicTimer.cpp" />
