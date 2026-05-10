@@ -132,9 +132,9 @@ void TerminalCapabilitiesScreen::onEnter()
     m_elapsedSeconds = 0.0;
 }
 
-void TerminalCapabilitiesScreen::update(double deltaTime)
+void TerminalCapabilitiesScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 }
 
 void TerminalCapabilitiesScreen::draw(Surface& surface)

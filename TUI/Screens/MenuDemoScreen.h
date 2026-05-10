@@ -25,7 +25,7 @@ public:
 
     void onEnter() override;
     bool handleEvent(const Input::Event& event) override;
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface) override;
 
 private:

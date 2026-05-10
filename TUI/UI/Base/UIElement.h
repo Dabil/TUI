@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Animation/TickEvent.h"
 #include "Core/Rect.h"
 
 class Surface;
@@ -37,7 +38,8 @@ public:
     void enable();
     void disable();
 
-    virtual void update(double deltaTime);
+    virtual void update(const Animation::TickEvent& event);
+
     virtual void draw(Surface& surface) = 0;
 
 private:

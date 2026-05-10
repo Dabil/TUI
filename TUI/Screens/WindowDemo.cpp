@@ -151,9 +151,9 @@ bool WindowDemo::handleEvent(const Input::Event& event)
     return m_windowManager.handleEvent(event);
 }
 
-void WindowDemo::update(double deltaTime)
+void WindowDemo::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 
     const int stage = static_cast<int>(std::floor(m_elapsedSeconds / 4.0)) % 4;
 
@@ -194,7 +194,7 @@ void WindowDemo::update(double deltaTime)
         break;
     }
 
-    m_windowManager.update(deltaTime);
+    m_windowManager.update(event.deltaSeconds);
 }
 
 void WindowDemo::draw(Surface& surface)

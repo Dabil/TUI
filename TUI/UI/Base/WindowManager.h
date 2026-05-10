@@ -10,6 +10,7 @@
 #include "UI/Layout/DockDragPreview.h"
 #include "UI/Layout/DockTree.h"
 #include "Input/MouseEvent.h"
+#include "Animation/TickEvent.h"
 
 namespace Input
 {
@@ -84,7 +85,7 @@ public:
     bool isResizing() const;
     const UI::WindowResizeState& resizeState() const;
 
-    void update(double deltaTime);
+    void update(const Animation::TickEvent& event);
     void draw(Surface& surface);
 
     std::vector<LayerInstance> buildLayers();

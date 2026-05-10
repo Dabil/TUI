@@ -131,7 +131,9 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="Animation\PeriodicTimer.h" />
     <ClInclude Include="Animation\TickClock.h" />
+    <ClInclude Include="Animation\TickEvent.h" />
     <ClInclude Include="App\Application.h" />
     <ClInclude Include="App\CommandLineOptions.h" />
     <ClInclude Include="App\ScreenManager.h" />
@@ -318,6 +320,7 @@
     <ClInclude Include="Utilities\Unicode\UnicodeWidth.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Animation\PeriodicTimer.cpp" />
     <ClCompile Include="Animation\TickClock.cpp" />
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="App\CommandLineOptions.cpp" />

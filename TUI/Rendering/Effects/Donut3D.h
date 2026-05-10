@@ -16,7 +16,7 @@ public:
 
 	void onEnter() override;
 	void onExit() override;
-	void update(double deltaTime) override;
+	void update(const Animation::TickEvent& event) override;
 	void draw(Surface& surface, const Rect& viewPort) override;
 
 private:

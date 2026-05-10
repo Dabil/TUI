@@ -35,7 +35,6 @@ namespace Animation
         }
 
         m_deltaSeconds = toSeconds(now - m_lastTickTime);
-        m_elapsedSeconds = toSeconds(now - m_startTime);
         m_lastTickTime = now;
 
         if (m_deltaSeconds < 0.0)
@@ -43,6 +42,7 @@ namespace Animation
             m_deltaSeconds = 0.0;
         }
 
+        m_elapsedSeconds += m_deltaSeconds;
         m_fixedAccumulatorSeconds += m_deltaSeconds;
     }
 

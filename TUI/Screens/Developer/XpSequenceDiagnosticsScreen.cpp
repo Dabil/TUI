@@ -72,9 +72,9 @@ void XpSequenceDiagnosticsScreen::onEnter()
     m_elapsedSeconds = 0.0;
 }
 
-void XpSequenceDiagnosticsScreen::update(const double deltaTime)
+void XpSequenceDiagnosticsScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 }
 
 void XpSequenceDiagnosticsScreen::draw(Surface& surface)

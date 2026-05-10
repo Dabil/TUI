@@ -260,9 +260,9 @@ bool ContainerWidget::focusPreviousChild()
     return focusChildByDirection(-1);
 }
 
-void ContainerWidget::update(double deltaTime)
+void ContainerWidget::update(const Animation::TickEvent& event)
 {
-    Widget::update(deltaTime);
+    Widget::update(event);
 
     if (!isVisible())
     {
@@ -273,7 +273,7 @@ void ContainerWidget::update(double deltaTime)
     {
         if (child && child->isVisible())
         {
-            child->update(deltaTime);
+            child->update(event);
         }
     }
 }

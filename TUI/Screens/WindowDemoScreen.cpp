@@ -161,9 +161,9 @@ void WindowDemo::onExit()
     m_water.onExit();
 }
 
-void WindowDemo::update(double deltaTime)
+void WindowDemo::update(const Animation::TickEvent& event)
 {
-    m_windowManager.update(deltaTime);
+    m_windowManager.update(event);
 }
 
 void WindowDemo::draw(Surface& surface)

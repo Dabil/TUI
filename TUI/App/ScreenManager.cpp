@@ -56,13 +56,13 @@ bool ScreenManager::dispatchEvent(const Input::Event& event)
     return screen->handleEvent(event);
 }
 
-void ScreenManager::update(double deltaTime)
+void ScreenManager::update(const Animation::TickEvent& event)
 {
     Screen* screen = currentScreen();
 
     if (screen)
     {
-        screen->update(deltaTime);
+        screen->update(event);
     }
 }
 

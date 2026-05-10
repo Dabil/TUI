@@ -7,6 +7,8 @@
 #include "Assets/AssetLibrary.h"
 #include "Input/CommandMap.h"
 #include "Rendering/Diagnostics/StartupDiagnosticsContext.h"
+#include "Animation/TickClock.h"
+#include "Animation/TickEvent.h"
 
 class ScreenManager;
 class IRenderer;
@@ -54,7 +56,7 @@ private:
 
 private:
     void handleResize();
-    void update(double deltaTime);
+    void update(const Animation::TickEvent& event);
     void render();
 
     bool dispatchEvent(const Input::Event& event);
@@ -64,7 +66,7 @@ private:
     void switchToScreen(ScreenType screenType);
     void advanceScreen();
     void previousScreen();
-    void updateScreenCycle(double deltaTime);
+    void updateScreenCycle(const Animation::TickEvent& event);
 
     void configureAssetLibrary();
 
@@ -80,6 +82,8 @@ private:
 
     Input::CommandMap m_commandMap;
     Assets::AssetLibrary m_assetLibrary;
+
+    Animation::TickClock m_tickClock;
 
     bool m_running = false;
 

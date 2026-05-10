@@ -674,7 +674,7 @@ const UI::WindowResizeState& WindowManager::resizeState() const
     return m_resizeState;
 }
 
-void WindowManager::update(double deltaTime)
+void WindowManager::update(const Animation::TickEvent& event)
 {
     for (ManagedWindow& entry : m_windows)
     {
@@ -688,7 +688,7 @@ void WindowManager::update(double deltaTime)
             continue;
         }
 
-        entry.window->update(deltaTime);
+        entry.window->update(event);
     }
 }
 

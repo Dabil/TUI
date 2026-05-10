@@ -3,6 +3,8 @@
 #include <memory>
 #include <vector>
 
+#include "Animation/TickEvent.h"
+
 class Screen;
 class Surface;
 
@@ -27,7 +29,8 @@ public:
 
     bool dispatchEvent(const Input::Event& event);
 
-    void update(double deltaTime);
+    void update(const Animation::TickEvent& event);
+
     void drawCurrentScreen(Surface& surface);
 
 private:

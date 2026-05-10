@@ -227,15 +227,14 @@ bool Application::handleApplicationCommand(const Input::CommandEvent& commandEve
 
 void Application::run()
 {
-    using clock = std::chrono::high_resolution_clock;
-
-    auto previousTime = clock::now();
+    m_tickClock.reset();
 
     while (m_running)
     {
-        auto currentTime = clock::now();
-        std::chrono::duration<double> delta = currentTime - previousTime;
-        previousTime = currentTime;
+        m_tickClock.tick();
+
+        Animation::TickEvent tickEvent =
+            Animation::TickEvent::fromClock(m_tickClock, m_frameIndex);
 
         handleResize();
 
@@ -259,7 +258,7 @@ void Application::run()
                 }
             }
 
-            events.push_back(Input::Event::tick(delta.count(), m_frameIndex));
+            events.push_back(Input::Event::tick(tickEvent));
 
             for (const Input::Event& event : events)
             {
@@ -277,7 +276,7 @@ void Application::run()
             break;
         }
 
-        update(delta.count());
+        update(tickEvent);
         render();
 
         ++m_frameIndex;
@@ -327,10 +326,10 @@ void Application::handleResize()
     }
 }
 
-void Application::update(double deltaTime)
+void Application::update(const Animation::TickEvent& event)
 {
-    updateScreenCycle(deltaTime);
-    m_screenManager->update(deltaTime);
+    updateScreenCycle(event);
+    m_screenManager->update(event);
 }
 
 void Application::render()
@@ -532,9 +531,9 @@ void Application::previousScreen()
     }
 }
 
-void Application::updateScreenCycle(double deltaTime)
+void Application::updateScreenCycle(const Animation::TickEvent& event)
 {
-    m_screenCycleElapsedSeconds += deltaTime;
+    m_screenCycleElapsedSeconds += event.deltaSeconds;
 
     while (m_screenCycleElapsedSeconds >= m_screenCycleIntervalSeconds)
     {

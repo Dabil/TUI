@@ -554,9 +554,9 @@ void TimedShowcaseScreen::onEnter()
     m_elapsedSeconds = 0.0;
 }
 
-void TimedShowcaseScreen::update(double deltaTime)
+void TimedShowcaseScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 }
 
 double TimedShowcaseScreen::elapsedSeconds() const

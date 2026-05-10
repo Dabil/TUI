@@ -100,9 +100,9 @@ bool MenuDemoScreen::handleEvent(const Input::Event& event)
     return false;
 }
 
-void MenuDemoScreen::update(double deltaTime)
+void MenuDemoScreen::update(const Animation::TickEvent& event)
 {
-    m_windowManager.update(deltaTime);
+    m_windowManager.update(event);
 }
 
 void MenuDemoScreen::draw(Surface& surface)
