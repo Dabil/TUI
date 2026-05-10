@@ -109,7 +109,7 @@ void UIElement::disable()
     m_enabled = false;
 }
 
-void UIElement::update(double deltaTime)
+void UIElement::update(const Animation::TickEvent& event)
 {
-    (void)deltaTime;
+    (void)event;
 }

@@ -20,7 +20,7 @@ public:
    ~rainXRay();
 
     void draw(ScreenBuffer& buffer);
-    void move(int screenWidth, int screenHeight, double deltaTime);
+    void move(int screenWidth, int screenHeight, const Animation::TickEvent& event);
     void reset(int screenWidth, int screenHeight);
     void invalidateXray();
     bool initialized();
@@ -55,7 +55,7 @@ public:
     explicit DigitalRainScreen(TerminalHostKind hostKind = TerminalHostKind::Unknown);
 
     void onEnter() override;
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface) override;
 
 private:
@@ -65,7 +65,7 @@ private:
     void invalidateStaticUiCache();
     void invalidateMinimumScreenUiCache();
 
-    void updatePreview(double deltaTime);
+    void updatePreview(const Animation::TickEvent& event);
     void drawPreviewLine(ScreenBuffer& buffer, int x, int y, int availableWidth, int startIndex) const;
 
     TextObject buildStaticUiTextObject() const;

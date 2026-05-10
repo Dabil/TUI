@@ -11,14 +11,14 @@ EffectWindow::EffectWindow(Rect bounds, std::string title, IEffect& effect)
 {
 }
 
-void EffectWindow::update(double deltaTime)
+void EffectWindow::update(const Animation::TickEvent& event)
 {
     if (!isVisible() || !isEnabled())
     {
         return;
     }
 
-    m_effect.update(deltaTime);
+    m_effect.update(event);
 }
 
 void EffectWindow::draw(Surface& surface)

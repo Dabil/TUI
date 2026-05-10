@@ -88,9 +88,9 @@ bool WidgetDemoScreen::handleEvent(const Input::Event& event)
     return m_root.handleEvent(event);
 }
 
-void WidgetDemoScreen::update(double deltaTime)
+void WidgetDemoScreen::update(const Animation::TickEvent& event)
 {
-    m_root.update(deltaTime);
+    m_root.update(event);
 }
 
 void WidgetDemoScreen::draw(Surface& surface)

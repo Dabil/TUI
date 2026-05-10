@@ -17,14 +17,14 @@ public:
 
     void onEnter() override;
     void onExit() override;
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface, const Rect& viewport) override;
 
 private:
     void setViewport(const Rect& viewport);
     void ensureSimulationSize(int width, int height);
     void seedFireSource();
-    void updateFire(double deltaTime);
+    void updateFire(const Animation::TickEvent& event);
     void coolTopRows();
     void renderFireEffect(ScreenBuffer& buffer);
 

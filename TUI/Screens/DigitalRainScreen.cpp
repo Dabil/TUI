@@ -84,7 +84,7 @@ void rainXRay::draw(ScreenBuffer& buffer)
         Composition::WritePresets::styleBlock());
 }
 
-void rainXRay::move(int screenWidth, int screenHeight, double deltaTime)
+void rainXRay::move(int screenWidth, int screenHeight, const Animation::TickEvent& event)
 {
     if (!m_xRay_initialized || screenWidth <= 0 || screenHeight <= 0)
     {
@@ -101,8 +101,8 @@ void rainXRay::move(int screenWidth, int screenHeight, double deltaTime)
         return;
     }
 
-    m_xRayX += m_xRayDx * static_cast<float>(deltaTime);
-    m_xRayY += m_xRayDy * static_cast<float>(deltaTime);
+    m_xRayX += m_xRayDx * static_cast<float>(event.deltaSeconds);
+    m_xRayY += m_xRayDy * static_cast<float>(event.deltaSeconds);
 
     if (m_xRayX <= minX || m_xRayX >= maxX)
     {
@@ -202,12 +202,12 @@ void DigitalRainScreen::onEnter()
     m_DigitalRain.onEnter();
 }
 
-void DigitalRainScreen::update(double deltaTime)
+void DigitalRainScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
-    updatePreview(deltaTime);
-    m_xRayMachine.move(m_screenWidth, m_screenHeight, deltaTime);
-    m_DigitalRain.update(deltaTime);
+    m_elapsedSeconds += event.deltaSeconds;
+    updatePreview(event);
+    m_xRayMachine.move(m_screenWidth, m_screenHeight, event);
+    m_DigitalRain.update(event);
 }
 
 void DigitalRainScreen::draw(Surface& surface)
@@ -672,7 +672,7 @@ bool DigitalRainScreen::usesConsoleFooter() const
 
 
 
-void DigitalRainScreen::updatePreview(double deltaTime)
+void DigitalRainScreen::updatePreview(const Animation::TickEvent& event)
 {
     std::u32string glyphPool = m_DigitalRain.getGlyphPool();
 
@@ -681,7 +681,7 @@ void DigitalRainScreen::updatePreview(double deltaTime)
         return;
     }
 
-    m_previewAdvanceTimer += deltaTime;
+    m_previewAdvanceTimer += event.deltaSeconds;
 
     while (m_previewAdvanceTimer >= PreviewAdvanceIntervalSeconds)
     {

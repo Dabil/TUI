@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Animation/TickEvent.h"
+
 class Surface;
 
 namespace Input
@@ -7,38 +9,24 @@ namespace Input
     class Event;
 }
 
-/*
-    Base interface for all screens in the TUI.
-
-    Screens represent high-level application states such as:
-    - Title Screen
-    - Main Menu
-    - Game Screen
-    - Pause Screen
-*/
-
 class Screen
 {
 public:
     virtual ~Screen() = default;
 
-    // Called once when the screen becomes active
     virtual void onEnter() {}
-
-    // Called once when the screen is removed
     virtual void onExit() {}
 
-    // Called when the active screen receives an input/lifecycle event.
-    // Return true when the screen consumes the event.
     virtual bool handleEvent(const Input::Event& event)
     {
         (void)event;
         return false;
     }
 
-    // Called every frame
-    virtual void update(double deltaTime) {}
+    virtual void update(const Animation::TickEvent& event)
+    {
+        (void)event;
+    }
 
-    // Called every frame to render the screen
     virtual void draw(Surface& surface) = 0;
 };

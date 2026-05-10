@@ -7,6 +7,7 @@
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/Style.h"
 #include "Rendering/Styles/StyleBuilder.h"
+#include "Animation/TickEvent.h"
 
 namespace
 {
@@ -52,17 +53,17 @@ void FireEffect::setViewport(const Rect& viewport)
     m_fireHeight = viewport.size.height;
 }
 
-void FireEffect::update(double deltaTime)
+void FireEffect::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
-    m_sourceFlickerTimer += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
+    m_sourceFlickerTimer += event.deltaSeconds;
 
     if (m_fireWidth <= 0 || m_fireHeight <= 0)
     {
         return;
     }
 
-    updateFire(deltaTime);
+    updateFire(event);
 }
 
 void FireEffect::draw(Surface& surface, const Rect& viewport)
@@ -148,10 +149,8 @@ void FireEffect::seedFireSource()
     }
 }
 
-void FireEffect::updateFire(double deltaTime)
+void FireEffect::updateFire(const Animation::TickEvent& event)
 {
-    (void)deltaTime;
-
     if (m_fireWidth <= 0 || m_fireHeight <= 0)
     {
         return;

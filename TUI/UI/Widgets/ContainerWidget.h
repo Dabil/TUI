@@ -53,7 +53,7 @@ public:
     bool focusNextChild();
     bool focusPreviousChild();
 
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface) override;
     bool handleEvent(const Input::Event& event) override;
 

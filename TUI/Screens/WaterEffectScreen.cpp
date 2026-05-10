@@ -106,9 +106,9 @@ void WaterEffectScreen::onExit()
     m_waveEffect.onExit();
 }
 
-void WaterEffectScreen::update(double deltaTime)
+void WaterEffectScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
     updateWaterTitleAnimation();
 
     if (m_screenWidth <= 2 || m_screenHeight <= 2)
@@ -116,7 +116,7 @@ void WaterEffectScreen::update(double deltaTime)
         return;
     }
 
-    m_waveEffect.update(deltaTime);
+    m_waveEffect.update(event);
 }
 
 void WaterEffectScreen::draw(Surface& surface)

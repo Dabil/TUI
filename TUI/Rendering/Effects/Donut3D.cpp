@@ -7,6 +7,7 @@
 #include "Rendering/Surface.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/StyleBuilder.h"
+#include "Animation/TickEvent.h"
 
 namespace
 {
@@ -64,12 +65,12 @@ void Donut3D::onExit()
 {
 }
 
-void Donut3D::update(double deltaTime)
+void Donut3D::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 
-    m_rotationA += static_cast<float>(deltaTime) * RotationASpeed;
-    m_rotationB += static_cast<float>(deltaTime) * RotationBSpeed;
+    m_rotationA += static_cast<float>(event.deltaSeconds) * RotationASpeed;
+    m_rotationB += static_cast<float>(event.deltaSeconds) * RotationBSpeed;
 
     if (m_rotationA > (Pi * 2.0f))
     {

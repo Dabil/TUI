@@ -15,7 +15,7 @@ public:
     ~TimedShowcaseScreen() override = default;
 
     void onEnter() override;
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
 
 protected:
     double elapsedSeconds() const;

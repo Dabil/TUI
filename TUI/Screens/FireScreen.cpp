@@ -9,7 +9,6 @@
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Rendering/Styles/Themes.h"
 
-
 namespace
 {
     constexpr int MinimumScreenWidth = 30;
@@ -83,9 +82,9 @@ void FireScreen::onExit()
     invalidateStaticUiCache();
 }
 
-void FireScreen::update(double deltaTime)
+void FireScreen::update(const Animation::TickEvent& event)
 {
-    m_fireEffect.update(deltaTime);
+    m_fireEffect.update(event);
 }
 
 void FireScreen::draw(Surface& surface)

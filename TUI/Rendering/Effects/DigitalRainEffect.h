@@ -28,8 +28,8 @@ public:
 
 	void onEnter() override;
     void onExit() override {};
-	void update(double deltaTime) override;
-	void draw(Surface& surface, const Rect& viewport) override;
+    void update(const Animation::TickEvent& event) override;
+    void draw(Surface& surface, const Rect& viewport) override;
     void setOptions(const DigitalRainEffectOptions& options);
 
     const std::u32string& getGlyphPool() const;
@@ -71,8 +71,8 @@ private:
     void rebuildStreams();
     void resetStream(Stream& stream, bool staggerStart);
     void configureActiveStream(Stream& stream);
-    void updateStreams(double deltaTime);
-    void spawnDeadGlyphs(double deltaTime);
+    void updateStreams(const Animation::TickEvent& event);
+    void spawnDeadGlyphs(const Animation::TickEvent& event);
     void drawRain(ScreenBuffer& buffer) const;
     int countActiveStreams() const;
     char32_t randomGlyph();

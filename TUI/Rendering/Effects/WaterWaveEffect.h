@@ -24,7 +24,7 @@ public:
 
     void onEnter() override;
     void onExit() override;
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface, const Rect& viewport) override;
 
     RainMode getCurrentRainMode() const;
@@ -47,7 +47,7 @@ private:
     void ensureSimulationSize(int width, int height);
     void rebuildTextMask();
     void spawnRandomDroplet();
-    void updateDroplets(double deltaTime);
+    void updateDroplets(const Animation::TickEvent& event);
     void updateRainTiming();
     void chooseNextRainMode();
     void renderWaveField(Surface& surface);

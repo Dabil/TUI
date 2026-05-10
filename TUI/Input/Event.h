@@ -1,9 +1,9 @@
 #pragma once
 
-#include <chrono>
 #include <cstdint>
 #include <variant>
 
+#include "Animation/TickEvent.h"
 #include "Core/Size.h"
 #include "Input/Command.h"
 #include "Input/KeyEvent.h"
@@ -11,16 +11,15 @@
 
 namespace Input
 {
+    using TickEvent = Animation::TickEvent;
+
     enum class EventType
     {
         None,
-
         Key,
         Command,
         Resize,
         Tick,
-
-        // Reserved for a later tier. Do not emit this yet.
         Mouse
     };
 
@@ -39,12 +38,6 @@ namespace Input
             return previousSize.width != currentSize.width
                 || previousSize.height != currentSize.height;
         }
-    };
-
-    struct TickEvent
-    {
-        double deltaSeconds = 0.0;
-        std::uint64_t frameIndex = 0;
     };
 
     using EventPayload = std::variant<
@@ -87,68 +80,20 @@ namespace Input
 
         EventType type() const
         {
-            if (std::holds_alternative<KeyEvent>(m_payload))
-            {
-                return EventType::Key;
-            }
-
-            if (std::holds_alternative<CommandEvent>(m_payload))
-            {
-                return EventType::Command;
-            }
-
-            if (std::holds_alternative<ResizeEvent>(m_payload))
-            {
-                return EventType::Resize;
-            }
-
-            if (std::holds_alternative<TickEvent>(m_payload))
-            {
-                return EventType::Tick;
-            }
-
-            if (std::holds_alternative<MouseEvent>(m_payload))
-            {
-                return EventType::Mouse;
-            }
+            if (std::holds_alternative<KeyEvent>(m_payload)) return EventType::Key;
+            if (std::holds_alternative<CommandEvent>(m_payload)) return EventType::Command;
+            if (std::holds_alternative<ResizeEvent>(m_payload)) return EventType::Resize;
+            if (std::holds_alternative<TickEvent>(m_payload)) return EventType::Tick;
+            if (std::holds_alternative<MouseEvent>(m_payload)) return EventType::Mouse;
 
             return EventType::None;
         }
 
-        const EventPayload& payload() const
-        {
-            return m_payload;
-        }
-
-        EventPayload& payload()
-        {
-            return m_payload;
-        }
-
-        const KeyEvent* asKey() const
-        {
-            return std::get_if<KeyEvent>(&m_payload);
-        }
-
-        const CommandEvent* asCommand() const
-        {
-            return std::get_if<CommandEvent>(&m_payload);
-        }
-
-        const ResizeEvent* asResize() const
-        {
-            return std::get_if<ResizeEvent>(&m_payload);
-        }
-
-        const TickEvent* asTick() const
-        {
-            return std::get_if<TickEvent>(&m_payload);
-        }
-
-        const MouseEvent* asMouse() const
-        {
-            return std::get_if<MouseEvent>(&m_payload);
-        }
+        const KeyEvent* asKey() const { return std::get_if<KeyEvent>(&m_payload); }
+        const CommandEvent* asCommand() const { return std::get_if<CommandEvent>(&m_payload); }
+        const ResizeEvent* asResize() const { return std::get_if<ResizeEvent>(&m_payload); }
+        const TickEvent* asTick() const { return std::get_if<TickEvent>(&m_payload); }
+        const MouseEvent* asMouse() const { return std::get_if<MouseEvent>(&m_payload); }
 
         static Event key(const KeyEvent& keyEvent)
         {
@@ -168,6 +113,11 @@ namespace Input
             event.previousSize = previousSize;
             event.currentSize = currentSize;
             return Event(event);
+        }
+
+        static Event tick(const TickEvent& tickEvent)
+        {
+            return Event(tickEvent);
         }
 
         static Event tick(double deltaSeconds, std::uint64_t frameIndex)

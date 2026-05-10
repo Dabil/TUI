@@ -7,6 +7,7 @@
 #include "Rendering/Surface.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/StyleBuilder.h"
+#include "Animation/TickEvent.h"
 
 namespace
 {
@@ -70,11 +71,11 @@ void WaterWaveEffect::onExit()
 {
 }
 
-void WaterWaveEffect::update(double deltaTime)
+void WaterWaveEffect::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
     updateRainTiming();
-    updateDroplets(deltaTime);
+    updateDroplets(event);
 }
 
 void WaterWaveEffect::draw(Surface& surface, const Rect& viewport)
@@ -206,9 +207,9 @@ void WaterWaveEffect::spawnRandomDroplet()
     m_droplets.push_back(secondaryDroplet);
 }
 
-void WaterWaveEffect::updateDroplets(double deltaTime)
+void WaterWaveEffect::updateDroplets(const Animation::TickEvent& event)
 {
-    const float dt = static_cast<float>(deltaTime);
+    const float dt = static_cast<float>(event.deltaSeconds);
 
     for (Droplet& droplet : m_droplets)
     {

@@ -83,9 +83,9 @@ void RendererDiagnosticsScreen::onEnter()
     m_elapsedSeconds = 0.0;
 }
 
-void RendererDiagnosticsScreen::update(double deltaTime)
+void RendererDiagnosticsScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 }
 
 void RendererDiagnosticsScreen::draw(Surface& surface)

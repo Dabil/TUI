@@ -3,6 +3,11 @@
 class Surface;
 class Rect;
 
+namespace Animation
+{
+    struct TickEvent;
+}
+
 /*
     Concrete Rule:
 
@@ -26,10 +31,8 @@ public:
 
     virtual void onEnter() {}
     virtual void onExit() {}
-
-    virtual void update(double deltaTime) = 0;
+    virtual void update(const Animation::TickEvent& event) = 0;
     virtual void draw(Surface& surface, const Rect& viewport) = 0;
 
-    // Optional future hook
     virtual void onResize(const Rect& viewport) {}
 };

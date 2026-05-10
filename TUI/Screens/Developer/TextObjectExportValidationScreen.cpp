@@ -137,9 +137,9 @@ void TextObjectExportValidationScreen::onEnter()
     revalidate();
 }
 
-void TextObjectExportValidationScreen::update(double deltaTime)
+void TextObjectExportValidationScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 }
 
 void TextObjectExportValidationScreen::draw(Surface& surface)

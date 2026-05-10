@@ -10,7 +10,7 @@ class EffectWindow : public Window
 public:
     EffectWindow(Rect bounds, std::string title, IEffect& effect);
 
-    void update(double deltaTime) override;
+    void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface) override;
 
 private:

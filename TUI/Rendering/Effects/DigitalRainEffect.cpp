@@ -7,6 +7,7 @@
 #include "Rendering/Styles/StyleBuilder.h"
 #include "Utilities/Unicode/UnicodeWidth.h"
 #include "Utilities/Unicode/UnicodeConversion.h"
+#include "Animation/TickEvent.h"
 
 namespace
 {
@@ -105,17 +106,17 @@ void DigitalRainEffect::onEnter()
     m_deadGlyphSpawnAccumulator = 0.0;
 }
 
-void DigitalRainEffect::update(double deltaTime)
+void DigitalRainEffect::update(const Animation::TickEvent& event)
 {
     if (m_rainWidth <= 0 || m_rainHeight <= 0 || m_streams.empty())
     {
         return;
     }
 
-    m_elapsedSeconds += deltaTime;
+    m_elapsedSeconds += event.deltaSeconds;
 
-    updateStreams(deltaTime);
-    spawnDeadGlyphs(deltaTime);
+    updateStreams(event);
+    spawnDeadGlyphs(event);
 }
 
 void DigitalRainEffect::draw(Surface& surface, const Rect& viewport)
@@ -253,7 +254,7 @@ int DigitalRainEffect::countActiveStreams() const
     return count;
 }
 
-void DigitalRainEffect::updateStreams(double deltaTime)
+void DigitalRainEffect::updateStreams(const Animation::TickEvent& event)
 {
     std::uniform_int_distribution<int> mutationCountDistribution(1, 3);
 
@@ -261,7 +262,7 @@ void DigitalRainEffect::updateStreams(double deltaTime)
     {
         if (!stream.active)
         {
-            stream.respawnDelay -= deltaTime;
+            stream.respawnDelay -= event.deltaSeconds;
 
             if (stream.respawnDelay <= 0.0)
             {
@@ -281,7 +282,7 @@ void DigitalRainEffect::updateStreams(double deltaTime)
         }
 
         const int previousHeadRow = static_cast<int>(std::floor(stream.headY));
-        stream.headY += stream.speed * static_cast<float>(deltaTime);
+        stream.headY += stream.speed * static_cast<float>(event.deltaSeconds);
         const int currentHeadRow = static_cast<int>(std::floor(stream.headY));
 
         for (int row = previousHeadRow; row < currentHeadRow; ++row)
@@ -297,7 +298,7 @@ void DigitalRainEffect::updateStreams(double deltaTime)
             }
         }
 
-        stream.mutationTimer += deltaTime;
+        stream.mutationTimer += event.deltaSeconds;
 
         while (stream.mutationTimer >= m_mutationIntervalSeconds)
         {
@@ -322,10 +323,10 @@ void DigitalRainEffect::updateStreams(double deltaTime)
     }
 }
 
-void DigitalRainEffect::spawnDeadGlyphs(double deltaTime)
+void DigitalRainEffect::spawnDeadGlyphs(const Animation::TickEvent& event)
 {
     // Accumulate time
-    m_deadGlyphSpawnAccumulator += deltaTime;
+    m_deadGlyphSpawnAccumulator += event.deltaSeconds;
 
     // How many glyphs per second
     double spawnRate = (double)m_deadGlyphsSpawnRate;

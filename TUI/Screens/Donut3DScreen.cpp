@@ -61,9 +61,9 @@ void Donut3DScreen::onExit()
     m_Donut3D.onExit();
 }
 
-void Donut3DScreen::update(double deltaTime)
+void Donut3DScreen::update(const Animation::TickEvent& event)
 {
-    m_Donut3D.update(deltaTime);
+    m_Donut3D.update(event);
 }
 
 void Donut3DScreen::draw(Surface& surface)
