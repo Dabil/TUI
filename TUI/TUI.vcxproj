@@ -198,6 +198,7 @@
     </ClInclude>
     <ClInclude Include="Rendering\Effects\IEffects.h" />
     <ClInclude Include="Rendering\FrameDiff.h" />
+    <ClInclude Include="Rendering\InvalidationRegion.h" />
     <ClInclude Include="Rendering\IRenderer.h" />
     <ClInclude Include="Rendering\LayerInstance.h" />
     <ClInclude Include="Rendering\Objects\AnsiLoader.h" />
@@ -366,6 +367,7 @@
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp" />
     <ClCompile Include="Rendering\Diagnostics\RendererSelectionTrace.cpp" />
     <ClCompile Include="Rendering\FrameDiff.cpp" />
+    <ClCompile Include="Rendering\InvalidationRegion.cpp" />
     <ClCompile Include="Rendering\LayerInstance.cpp" />
     <ClCompile Include="Rendering\Objects\AnsiLoader.cpp" />
     <ClCompile Include="Rendering\Objects\AsciiBanner.cpp" />
