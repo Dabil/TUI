@@ -780,15 +780,18 @@ bool WindowManager::completeTabDetachDrag()
     }
 
     Window* rawDetachedWindow = detachedWindow.get();
-    const bool removeSourceWindow = sourceWindow->empty();
 
     m_ownedWindows.push_back(std::move(detachedWindow));
     addWindow(*rawDetachedWindow);
     show(*rawDetachedWindow);
 
-    if (removeSourceWindow)
+    if (sourceWindow->empty())
     {
         removeWindow(*sourceWindow);
+    }
+    else if (sourceWindow->tabCount() == 1)
+    {
+        collapseOneTabTabbedWindowToStandalone(*sourceWindow);
     }
 
     bringToFront(*rawDetachedWindow);
@@ -1793,6 +1796,57 @@ std::unique_ptr<Window> WindowManager::makeStandaloneWindowFromTabPage(
     window->setBounds(bounds);
 
     return window;
+}
+
+Window* WindowManager::collapseOneTabTabbedWindowToStandalone(
+    UI::TabbedWindow& sourceWindow)
+{
+    if (!contains(sourceWindow) || sourceWindow.tabCount() != 1)
+    {
+        return nullptr;
+    }
+
+    const Rect replacementBounds = sourceWindow.bounds();
+    const int sourceZOrder = zOrderOf(sourceWindow);
+    const bool sourceWasFocused = focusedWindow() == &sourceWindow;
+    const bool sourceWasHovered = hoveredWindow() == &sourceWindow;
+
+    UI::TabbedWindowPage remainingPage = sourceWindow.removePageAt(0);
+
+    if (!remainingPage.isValid())
+    {
+        return nullptr;
+    }
+
+    std::unique_ptr<Window> replacementWindow = makeStandaloneWindowFromTabPage(
+        std::move(remainingPage),
+        replacementBounds);
+
+    if (replacementWindow == nullptr)
+    {
+        return nullptr;
+    }
+
+    Window* rawReplacementWindow = replacementWindow.get();
+
+    m_ownedWindows.push_back(std::move(replacementWindow));
+    addWindow(*rawReplacementWindow);
+    setZOrder(*rawReplacementWindow, sourceZOrder);
+    show(*rawReplacementWindow);
+
+    removeWindow(sourceWindow);
+
+    if (sourceWasFocused)
+    {
+        setFocusedWindow(rawReplacementWindow);
+    }
+
+    if (sourceWasHovered)
+    {
+        setHoveredWindow(rawReplacementWindow);
+    }
+
+    return rawReplacementWindow;
 }
 
 void WindowManager::applyMetadataToWindow(

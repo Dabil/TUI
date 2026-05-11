@@ -203,6 +203,7 @@ private:
     std::unique_ptr<Window> makeStandaloneWindowFromTabPage(
         UI::TabbedWindowPage page,
         const Rect& bounds);
+    Window* collapseOneTabTabbedWindowToStandalone(UI::TabbedWindow& sourceWindow);
     void applyMetadataToWindow(
         Window& window,
         const UI::TabbedWindowPageMetadata& metadata);
