@@ -15,15 +15,15 @@
 namespace DemoColors
 {
     inline const Style HeaderSurface =
-          style::Fg(Color::FromBasic(Color::Basic::Black))
+        style::Fg(Color::FromBasic(Color::Basic::Black))
         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 
     inline const Style FooterSurface =
-          style::Fg(Color::FromBasic(Color::Basic::Blue))
+        style::Fg(Color::FromBasic(Color::Basic::Blue))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style Subtitle =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style Background =
@@ -37,11 +37,11 @@ namespace DemoColors
             Color::FromRgb(12, 12, 12)));
 
     inline const Style BorderColor =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style Warning =
-          style::SlowBlink
+        style::SlowBlink
         + style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Yellow));
 
@@ -54,11 +54,11 @@ namespace DemoColors
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style DigiRainWindow =
-          style::Fg(Color::FromBasic(Color::Basic::Green))
+        style::Fg(Color::FromBasic(Color::Basic::Green))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style DigiRainTitle =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style DonutWindow =
@@ -70,19 +70,19 @@ namespace DemoColors
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style FireWindow =
-          style::Fg(Color::FromBasic(Color::Basic::Red))
+        style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style FireTitle =
-          style::Fg(Color::FromBasic(Color::Basic::Yellow))
+        style::Fg(Color::FromBasic(Color::Basic::Yellow))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style WaterWindow =
-          style::Fg(Color::FromBasic(Color::Basic::Blue))
+        style::Fg(Color::FromBasic(Color::Basic::Blue))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style WaterTitle =
-          style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
+        style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 }
 
@@ -139,16 +139,16 @@ void WindowDemo::onEnter()
     DigiRainOptions.maxStreams = 60;
     DigiRainOptions.deadGlyphsSpawnRate = 8;
     DigiRainOptions.deadGlyphBlinkRate = 60;
-    DigiRainOptions.glyphPool = 
+    DigiRainOptions.glyphPool =
         std::u32string(
-        U"アァカサタナハマヤャラワガザダバパ"
-        U"イィキシチニヒミリヰギジヂビピ"
-        U"ウゥクスツヌフムユュルグズブヅプ"
-        U"エェケセテネヘメレヱゲゼデベペ"
-        U"オォコソトノホモヨョロヲゴゾドボポヴッン"
-        U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
-        U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           // greek alphabet
-        U"♪♫⌘₿äü∄∃ƒ±£µℇ");
+            U"アァカサタナハマヤャラワガザダバパ"
+            U"イィキシチニヒミリヰギジヂビピ"
+            U"ウゥクスツヌフムユュルグズブヅプ"
+            U"エェケセテネヘメレヱゲゼデベペ"
+            U"オォコソトノホモヨョロヲゴゾドボポヴッン"
+            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
+            U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           // greek alphabet
+            U"♪♫⌘₿äü∄∃ƒ±£µℇ");
 
     m_digiRain.setOptions(DigiRainOptions);
     m_windowManager.setDockTree(&m_dockTree);
@@ -193,7 +193,7 @@ void WindowDemo::draw(Surface& surface)
     const auto [topPane, bottomPane]     = page.splitTop(pageBody, pageBody.size.height / 2);
     const auto [topLeft, topRight]       = page.splitLeft(topPane, topPane.size.width / 2);
     const auto [bottomLeft, bottomRight] = page.splitLeft(bottomPane, bottomPane.size.width / 2);
-    
+
     page.createRegion("Header", header);
     page.createRegion("Footer", footer);
     page.createRegion("TopLeft", topLeft);
@@ -290,53 +290,12 @@ void WindowDemo::ensureDockContentModel(const Rect& viewport)
         return;
     }
 
-    m_dockTree.setBounds(viewport);
+    // DockTree represents actual docked relationships only.
+    // The demo windows begin as independent floating windows, so do not
+    // preload them into the tree here. Side-dock transactions build the
+    // tree on mouse release from the real target and dragged windows.
     m_dockTree.clear();
-
-    UI::DockContentDescriptor digiRainContent;
-    digiRainContent.contentId = DigitalRainTitle;
-    digiRainContent.title = DigitalRainTitle;
-
-    UI::DockContentDescriptor donutContent;
-    donutContent.contentId = DonutTitle;
-    donutContent.title = DonutTitle;
-
-    UI::DockContentDescriptor fireContent;
-    fireContent.contentId = FireTitle;
-    fireContent.title = FireTitle;
-
-    UI::DockContentDescriptor waterContent;
-    waterContent.contentId = WaterTitle;
-    waterContent.title = WaterTitle;
-
-    const int rootNodeId = m_dockTree.attachRoot(std::move(digiRainContent));
-
-    m_dockTree.splitNode(
-        rootNodeId,
-        UI::DockSplitOrientation::Horizontal,
-        0.5f,
-        std::move(donutContent),
-        false);
-
-    if (UI::DockNode* digiRainNode = m_dockTree.findContent(DigitalRainTitle))
-    {
-        m_dockTree.splitNode(
-            digiRainNode->id(),
-            UI::DockSplitOrientation::Vertical,
-            0.5f,
-            std::move(fireContent),
-            false);
-    }
-
-    if (UI::DockNode* donutNode = m_dockTree.findContent(DonutTitle))
-    {
-        m_dockTree.splitNode(
-            donutNode->id(),
-            UI::DockSplitOrientation::Vertical,
-            0.5f,
-            std::move(waterContent),
-            false);
-    }
+    m_dockTree.setBounds(viewport);
 }
 
 void WindowDemo::drawInstructions(Surface& surface, const Rect& footer)

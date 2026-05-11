@@ -1204,18 +1204,15 @@ bool WindowManager::tryApplyDockPreviewDrop()
         return false;
     }
 
-    if (!m_dockTree->dockContentBeside(
-        zone.targetContentId,
-        draggedContentId,
+    if (!buildSideDockTreeForWindows(
+        *draggedWindow,
+        *targetWindow,
         zone.type))
     {
         return false;
     }
 
-    applySideDockWindowBounds(
-        *draggedWindow,
-        *targetWindow,
-        zone.type);
+    applyDockTreeLayoutToWindows();
 
     bringToFront(*draggedWindow);
 
@@ -1524,6 +1521,103 @@ const Window* WindowManager::findDockWindowByContentId(
     }
 
     return nullptr;
+}
+
+bool WindowManager::buildSideDockTreeForWindows(
+    const Window& draggedWindow,
+    const Window& targetWindow,
+    UI::DockSnapZoneType type)
+{
+    if (m_dockTree == nullptr)
+    {
+        return false;
+    }
+
+    if (&draggedWindow == &targetWindow)
+    {
+        return false;
+    }
+
+    if (!isSideDockZone(type))
+    {
+        return false;
+    }
+
+    const std::string draggedContentId = dockContentIdForWindow(draggedWindow);
+    const std::string targetContentId = dockContentIdForWindow(targetWindow);
+
+    if (draggedContentId.empty() ||
+        targetContentId.empty() ||
+        draggedContentId == targetContentId)
+    {
+        return false;
+    }
+
+    const Rect targetBounds = targetWindow.bounds();
+    if (targetBounds.size.width <= 0 || targetBounds.size.height <= 0)
+    {
+        return false;
+    }
+
+    UI::DockContentDescriptor targetContent;
+    targetContent.contentId = targetContentId;
+    targetContent.title = tabTitleForWindow(targetWindow);
+
+    UI::DockContentDescriptor draggedContent;
+    draggedContent.contentId = draggedContentId;
+    draggedContent.title = tabTitleForWindow(draggedWindow);
+
+    const UI::DockSplitOrientation orientation =
+        (type == UI::DockSnapZoneType::Left ||
+            type == UI::DockSnapZoneType::Right)
+        ? UI::DockSplitOrientation::Horizontal
+        : UI::DockSplitOrientation::Vertical;
+
+    const bool draggedContentInFirstChild =
+        type == UI::DockSnapZoneType::Left ||
+        type == UI::DockSnapZoneType::Top;
+
+    m_dockTree->clear();
+    m_dockTree->setBounds(targetBounds);
+
+    const int rootNodeId = m_dockTree->attachRoot(std::move(targetContent));
+
+    return m_dockTree->splitNode(
+        rootNodeId,
+        orientation,
+        0.5f,
+        std::move(draggedContent),
+        draggedContentInFirstChild);
+}
+
+void WindowManager::applyDockTreeLayoutToWindows()
+{
+    if (m_dockTree == nullptr)
+    {
+        return;
+    }
+
+    const std::vector<UI::DockLayoutRecord> records =
+        m_dockTree->createLayoutRecords();
+
+    for (const UI::DockLayoutRecord& record : records)
+    {
+        if (record.kind != UI::DockNodeKind::Leaf ||
+            record.contentId.empty() ||
+            record.bounds.size.width <= 0 ||
+            record.bounds.size.height <= 0)
+        {
+            continue;
+        }
+
+        Window* window = findDockWindowByContentId(record.contentId);
+        if (window == nullptr)
+        {
+            continue;
+        }
+
+        window->setBounds(record.bounds);
+    }
 }
 
 void WindowManager::applySideDockWindowBounds(

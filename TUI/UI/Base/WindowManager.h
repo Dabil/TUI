@@ -158,6 +158,11 @@ private:
     bool isSideDockZone(UI::DockSnapZoneType type) const;
     Window* findDockWindowByContentId(const std::string& contentId);
     const Window* findDockWindowByContentId(const std::string& contentId) const;
+    bool buildSideDockTreeForWindows(
+        const Window& draggedWindow,
+        const Window& targetWindow,
+        UI::DockSnapZoneType type);
+    void applyDockTreeLayoutToWindows();
     void applySideDockWindowBounds(
         Window& draggedWindow,
         Window& targetWindow,
