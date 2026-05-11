@@ -13,6 +13,14 @@ namespace UI
         update(dockTree, pointerPosition);
     }
 
+    void DockDragPreview::begin(
+        const std::vector<DockSnapZone>& zones,
+        Point pointerPosition)
+    {
+        m_state.active = true;
+        update(zones, pointerPosition);
+    }
+
     void DockDragPreview::update(const DockTree& dockTree, Point pointerPosition)
     {
         if (!m_state.active)
@@ -25,6 +33,20 @@ namespace UI
         m_state.activeZone = findActiveZone(m_state.candidateZones, pointerPosition);
     }
 
+    void DockDragPreview::update(
+        const std::vector<DockSnapZone>& zones,
+        Point pointerPosition)
+    {
+        if (!m_state.active)
+        {
+            return;
+        }
+
+        m_state.pointerPosition = pointerPosition;
+        m_state.candidateZones = zones;
+        m_state.activeZone = findActiveZone(m_state.candidateZones, pointerPosition);
+    } 
+    
     void DockDragPreview::end()
     {
         m_state.clear();

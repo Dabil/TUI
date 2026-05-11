@@ -125,6 +125,16 @@ void Window::setHoveredTitleStyle(const Style& style)
     m_hoveredTitleStyle = style;
 }
 
+bool Window::hasTransferableContent() const
+{
+    return false;
+}
+
+std::unique_ptr<UI::IWindowContent> Window::releaseContent()
+{
+    return nullptr;
+}
+
 UI::CursorRegion Window::hitTest(Point screenPosition) const
 {
     UI::CursorRegion region = UI::hitTestWindowBounds(

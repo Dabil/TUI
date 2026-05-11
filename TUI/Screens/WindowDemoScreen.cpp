@@ -1,6 +1,7 @@
 ﻿#include "Screens/WindowDemoScreen.h"
 
 #include <memory>
+#include <utility>
 
 #include "Core/Rect.h"
 #include "Rendering/Surface.h"
@@ -14,15 +15,15 @@
 namespace DemoColors
 {
     inline const Style HeaderSurface =
-          style::Fg(Color::FromBasic(Color::Basic::Black))
+        style::Fg(Color::FromBasic(Color::Basic::Black))
         + style::Bg(Color::FromBasic(Color::Basic::Blue));
 
     inline const Style FooterSurface =
-          style::Fg(Color::FromBasic(Color::Basic::Blue))
+        style::Fg(Color::FromBasic(Color::Basic::Blue))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style Subtitle =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style Background =
@@ -36,11 +37,11 @@ namespace DemoColors
             Color::FromRgb(12, 12, 12)));
 
     inline const Style BorderColor =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style Warning =
-          style::SlowBlink
+        style::SlowBlink
         + style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Yellow));
 
@@ -53,11 +54,11 @@ namespace DemoColors
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style DigiRainWindow =
-          style::Fg(Color::FromBasic(Color::Basic::Green))
+        style::Fg(Color::FromBasic(Color::Basic::Green))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style DigiRainTitle =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style DonutWindow =
@@ -69,24 +70,29 @@ namespace DemoColors
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style FireWindow =
-          style::Fg(Color::FromBasic(Color::Basic::Red))
+        style::Fg(Color::FromBasic(Color::Basic::Red))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style FireTitle =
-          style::Fg(Color::FromBasic(Color::Basic::Yellow))
+        style::Fg(Color::FromBasic(Color::Basic::Yellow))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style WaterWindow =
-          style::Fg(Color::FromBasic(Color::Basic::Blue))
+        style::Fg(Color::FromBasic(Color::Basic::Blue))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style WaterTitle =
-          style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
+        style::Fg(Color::FromBasic(Color::Basic::BrightCyan))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 }
 
 namespace
 {
+    constexpr const char* DigitalRainTitle = "( Digital Rain Effect )";
+    constexpr const char* DonutTitle = "( 3D Donut Effect )";
+    constexpr const char* FireTitle = "( Fire Effect )";
+    constexpr const char* WaterTitle = "( Water Wave Effect )";
+
     using Composition::Alignment;
     using Composition::PageComposer;
 
@@ -133,16 +139,16 @@ void WindowDemo::onEnter()
     DigiRainOptions.maxStreams = 60;
     DigiRainOptions.deadGlyphsSpawnRate = 8;
     DigiRainOptions.deadGlyphBlinkRate = 60;
-    DigiRainOptions.glyphPool = 
+    DigiRainOptions.glyphPool =
         std::u32string(
-        U"アァカサタナハマヤャラワガザダバパ"
-        U"イィキシチニヒミリヰギジヂビピ"
-        U"ウゥクスツヌフムユュルグズブヅプ"
-        U"エェケセテネヘメレヱゲゼデベペ"
-        U"オォコソトノホモヨョロヲゴゾドボポヴッン"
-        U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
-        U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           // greek alphabet
-        U"♪♫⌘₿äü∄∃ƒ±£µℇ");
+            U"アァカサタナハマヤャラワガザダバパ"
+            U"イィキシチニヒミリヰギジヂビピ"
+            U"ウゥクスツヌフムユュルグズブヅプ"
+            U"エェケセテネヘメレヱゲゼデベペ"
+            U"オォコソトノホモヨョロヲゴゾドボポヴッン"
+            U"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ" // standard numbers and letters
+            U"ΑβϲδεφϑհιյΚλʍƞɸπθʀστυƔѡϰψȥ"           // greek alphabet
+            U"♪♫⌘₿äü∄∃ƒ±£µℇ");
 
     m_digiRain.setOptions(DigiRainOptions);
     m_windowManager.setDockTree(&m_dockTree);
@@ -187,7 +193,7 @@ void WindowDemo::draw(Surface& surface)
     const auto [topPane, bottomPane]     = page.splitTop(pageBody, pageBody.size.height / 2);
     const auto [topLeft, topRight]       = page.splitLeft(topPane, topPane.size.width / 2);
     const auto [bottomLeft, bottomRight] = page.splitLeft(bottomPane, bottomPane.size.width / 2);
-    
+
     page.createRegion("Header", header);
     page.createRegion("Footer", footer);
     page.createRegion("TopLeft", topLeft);
@@ -219,9 +225,8 @@ void WindowDemo::draw(Surface& surface)
     };
 
 
-    // turns on docking preview
-    // ensureDockPreviewLayout(pageBody);
     ensureLayout(pageBody, windowRectArr);
+    drawInstructions(surface, footer);
 
     m_windowManager.draw(surface);
 }
@@ -240,10 +245,10 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
 
     m_windowManager.clear();
 
-    m_digiRainWindow = std::make_unique<EffectWindow>(windowRectArr[0], "( Digital Rain Effect )", m_digiRain);
-    m_donutWindow    = std::make_unique<EffectWindow>(windowRectArr[1], "( 3D Donut Effect )", m_donut);
-    m_fireWindow     = std::make_unique<EffectWindow>(windowRectArr[2], "( Fire Effect )", m_fire);
-    m_waterWindow    = std::make_unique<EffectWindow>(windowRectArr[3], "( Water Wave Effect )", m_water);
+    m_digiRainWindow = std::make_unique<EffectWindow>(windowRectArr[0], DigitalRainTitle, m_digiRain);
+    m_donutWindow = std::make_unique<EffectWindow>(windowRectArr[1], DonutTitle, m_donut);
+    m_fireWindow = std::make_unique<EffectWindow>(windowRectArr[2], FireTitle, m_fire);
+    m_waterWindow = std::make_unique<EffectWindow>(windowRectArr[3], WaterTitle, m_water);
 
     m_digiRainWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
     m_digiRainWindow->setBorderStyle(DemoColors::unfocusedWindow);
@@ -274,42 +279,35 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
     m_windowManager.addWindow(*m_fireWindow.get());
     m_windowManager.addWindow(*m_waterWindow.get());
 
+    ensureDockContentModel(viewport);
     m_layoutInitialized = true;
 }
 
-void WindowDemo::ensureDockPreviewLayout(const Rect& viewport)
+void WindowDemo::ensureDockContentModel(const Rect& viewport)
 {
     if (viewport.size.width <= 0 || viewport.size.height <= 0)
     {
         return;
     }
 
-    if (!m_dockTree.empty() &&
-        m_dockTree.bounds().position.x == viewport.position.x &&
-        m_dockTree.bounds().position.y == viewport.position.y &&
-        m_dockTree.bounds().size.width == viewport.size.width &&
-        m_dockTree.bounds().size.height == viewport.size.height)
-    {
-        return;
-    }
-
-    m_dockTree.setBounds(viewport);
+    // DockTree represents actual docked relationships only.
+    // The demo windows begin as independent floating windows, so do not
+    // preload them into the tree here. Side-dock transactions build the
+    // tree on mouse release from the real target and dragged windows.
     m_dockTree.clear();
+    m_dockTree.setBounds(viewport);
+}
 
-    UI::DockContentDescriptor leftContent;
-    leftContent.contentId = "dock-preview-left";
-    leftContent.title = "Left Preview Region";
+void WindowDemo::drawInstructions(Surface& surface, const Rect& footer)
+{
+    ScreenBuffer& buffer = surface.buffer();
 
-    UI::DockContentDescriptor rightContent;
-    rightContent.contentId = "dock-preview-right";
-    rightContent.title = "Right Preview Region";
+    const int x = footer.position.x + 2;
+    const int y = footer.position.y + 1;
 
-    const int rootNodeId = m_dockTree.attachRoot(std::move(leftContent));
-
-    m_dockTree.splitNode(
-        rootNodeId,
-        UI::DockSplitOrientation::Horizontal,
-        0.5f,
-        std::move(rightContent),
-        false);
+    buffer.writeString(
+        x,
+        y,
+        "Drag windows normally. Hold Ctrl while dragging over another window to preview docking. Release over top/bottom/left/right/center.",
+        DemoColors::Subtitle);
 }

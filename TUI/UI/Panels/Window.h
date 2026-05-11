@@ -1,10 +1,12 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "Core/Point.h"
 #include "Core/Rect.h"
 #include "Rendering/Styles/Style.h"
+#include "UI/Content/IWindowContent.h"
 #include "UI/Interaction/WindowInteraction.h"
 #include "UI/Panels/Panel.h"
 
@@ -40,6 +42,9 @@ public:
 
     const Style& hoveredTitleStyle() const;
     void setHoveredTitleStyle(const Style& style);
+
+    virtual bool hasTransferableContent() const;
+    virtual std::unique_ptr<UI::IWindowContent> releaseContent();
 
     UI::CursorRegion hitTest(Point screenPosition) const;
     bool containsScreenPoint(Point screenPosition) const;

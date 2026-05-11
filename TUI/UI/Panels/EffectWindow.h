@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "UI/Panels/Window.h"
@@ -9,6 +10,9 @@ class EffectWindow : public Window
 {
 public:
     EffectWindow(Rect bounds, std::string title, IEffect& effect);
+
+    bool hasTransferableContent() const override;
+    std::unique_ptr<UI::IWindowContent> releaseContent() override;
 
     void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface) override;

@@ -66,10 +66,12 @@ namespace UI
         DockSnapZoneType type = DockSnapZoneType::None;
         Rect bounds{};
         int targetNodeId = 0;
+        std::string targetContentId;
 
         bool isValid() const
         {
-            return type != DockSnapZoneType::None && targetNodeId != 0;
+            return type != DockSnapZoneType::None
+                && (targetNodeId != 0 || !targetContentId.empty());
         }
     };
 }

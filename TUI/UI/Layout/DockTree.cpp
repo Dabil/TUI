@@ -1,6 +1,7 @@
 #include "UI/Layout/DockTree.h"
 
 #include <algorithm>
+#include <utility>
 
 namespace
 {
@@ -244,5 +245,60 @@ namespace UI
     std::unique_ptr<DockNode> DockTree::makeNode()
     {
         return std::make_unique<DockNode>(allocateNodeId());
+    }
+
+    bool DockTree::dockContentBeside(
+        const std::string& targetContentId,
+        const std::string& draggedContentId,
+        DockSnapZoneType side)
+    {
+        if (targetContentId.empty() || draggedContentId.empty())
+        {
+            return false;
+        }
+
+        if (targetContentId == draggedContentId)
+        {
+            return false;
+        }
+
+        if (side != DockSnapZoneType::Top &&
+            side != DockSnapZoneType::Bottom &&
+            side != DockSnapZoneType::Left &&
+            side != DockSnapZoneType::Right)
+        {
+            return false;
+        }
+
+        DockNode* targetNode = findContent(targetContentId);
+        if (targetNode == nullptr || !targetNode->isLeaf())
+        {
+            return false;
+        }
+
+        if (findContent(draggedContentId) != nullptr)
+        {
+            return false;
+        }
+
+        const DockSplitOrientation orientation =
+            (side == DockSnapZoneType::Left || side == DockSnapZoneType::Right)
+            ? DockSplitOrientation::Horizontal
+            : DockSplitOrientation::Vertical;
+
+        const bool draggedContentInFirstChild =
+            side == DockSnapZoneType::Top ||
+            side == DockSnapZoneType::Left;
+
+        DockContentDescriptor draggedContent{};
+        draggedContent.contentId = draggedContentId;
+        draggedContent.title = draggedContentId;
+
+        return splitNode(
+            targetNode->id(),
+            orientation,
+            0.5f,
+            std::move(draggedContent),
+            draggedContentInFirstChild);
     }
 }

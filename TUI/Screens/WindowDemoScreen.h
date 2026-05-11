@@ -27,7 +27,8 @@ public:
 
 private:
     void ensureLayout(const Rect& viewport, const Rect* windowRectArr);
-    void ensureDockPreviewLayout(const Rect& viewport);
+    void ensureDockContentModel(const Rect& viewport);
+    void drawInstructions(Surface& surface, const Rect& footer);
 
 private:
     int m_screenWidth = 0;
@@ -35,16 +36,13 @@ private:
 
     bool m_layoutInitialized = false;
 
-    // Effects
     DigitalRainEffect m_digiRain;
     Donut3D m_donut;
     FireEffect m_fire;
     WaterWaveEffect m_water;
 
-    // Docking preview test layout
     UI::DockTree m_dockTree;
 
-    // Window system
     WindowManager m_windowManager;
     std::unique_ptr<EffectWindow> m_digiRainWindow;
     std::unique_ptr<EffectWindow> m_donutWindow;
