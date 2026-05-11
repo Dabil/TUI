@@ -68,6 +68,11 @@ void WindowManager::removeWindow(Window& window)
         releasePointer();
     }
 
+    if (m_tabDetachDragState.sourceWindow == &window)
+    {
+        m_tabDetachDragState.clear();
+    }
+
     m_windows.erase(
         std::remove_if(
             m_windows.begin(),
@@ -95,6 +100,7 @@ void WindowManager::clear()
     setFocusedWindow(nullptr);
     releasePointer();
     m_dragState.clear();
+    m_tabDetachDragState.clear();
     m_resizeState.clear();
     m_dockPreview.cancel();
     m_windows.clear();
@@ -349,6 +355,22 @@ bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
         return true;
     }
 
+    if (isTabDetachDragging())
+    {
+        if (mouseEvent.isRelease())
+        {
+            endTabDetachDrag();
+            return true;
+        }
+
+        if (mouseEvent.isDrag() || mouseEvent.isMove())
+        {
+            return updateTabDetachDrag(mouseEvent.position, mouseEvent.modifiers);
+        }
+
+        return true;
+    }
+
     if (isDragging())
     {
         if (mouseEvent.isRelease())
@@ -406,8 +428,24 @@ bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
     {
         if (UI::TabbedWindow* tabbedTarget = dynamic_cast<UI::TabbedWindow*>(target))
         {
-            if (tabbedTarget->isPointInTabTitle(mouseEvent.position))
+            const int tabIndex = tabbedTarget->tabIndexAt(mouseEvent.position);
+
+            if (tabIndex >= 0)
             {
+                if (isDockingModifierHeld(mouseEvent.modifiers))
+                {
+                    tabbedTarget->selectTab(static_cast<std::size_t>(tabIndex));
+
+                    if (beginTabDetachDrag(
+                        *tabbedTarget,
+                        static_cast<std::size_t>(tabIndex),
+                        mouseEvent.position,
+                        toPointerButton(mouseEvent.button)))
+                    {
+                        return true;
+                    }
+                }
+
                 tabbedTarget->handleEvent(Input::Event::mouse(mouseEvent));
             }
         }
@@ -591,6 +629,148 @@ bool WindowManager::updateDrag(
     return true;
 }
 
+
+bool WindowManager::beginTabDetachDrag(
+    UI::TabbedWindow& sourceWindow,
+    std::size_t tabIndex,
+    Point screenPosition,
+    UI::PointerButton button)
+{
+    if (!canRouteTo(sourceWindow) || tabIndex >= sourceWindow.tabCount())
+    {
+        return false;
+    }
+
+    const UI::TabbedWindowPage& page = sourceWindow.model().pages()[tabIndex];
+
+    if (!page.isValid() || page.contentId().empty())
+    {
+        return false;
+    }
+
+    m_dragState.clear();
+    m_resizeState.clear();
+    m_dockPreview.cancel();
+
+    m_tabDetachDragState.sourceWindow = &sourceWindow;
+    m_tabDetachDragState.tabIndex = tabIndex;
+    m_tabDetachDragState.contentId = page.contentId();
+    m_tabDetachDragState.pointerOrigin = screenPosition;
+    m_tabDetachDragState.currentPointer = screenPosition;
+    m_tabDetachDragState.sourceBounds = sourceWindow.bounds();
+    m_tabDetachDragState.previewBounds = makeTabDetachPreviewBounds(
+        sourceWindow,
+        screenPosition);
+    m_tabDetachDragState.active = true;
+
+    capturePointer(sourceWindow, button, screenPosition);
+    bringToFront(sourceWindow);
+
+    return true;
+}
+
+bool WindowManager::updateTabDetachDrag(
+    Point screenPosition,
+    const Input::KeyModifiers& modifiers)
+{
+    if (!m_tabDetachDragState.active)
+    {
+        return false;
+    }
+
+    UI::TabbedWindow* sourceWindow = m_tabDetachDragState.sourceWindow;
+
+    if (sourceWindow == nullptr || !isDockingModifierHeld(modifiers))
+    {
+        cancelTabDetachPreview();
+        return true;
+    }
+
+    m_tabDetachDragState.currentPointer = screenPosition;
+    m_pointerCapture.current = screenPosition;
+    m_tabDetachDragState.previewBounds = makeTabDetachPreviewBounds(
+        *sourceWindow,
+        screenPosition);
+
+    return true;
+}
+
+void WindowManager::endTabDetachDrag()
+{
+    m_tabDetachDragState.clear();
+    releasePointer();
+    m_dockPreview.cancel();
+}
+
+bool WindowManager::isTabDetachDragging() const
+{
+    return m_tabDetachDragState.active;
+}
+
+Rect WindowManager::makeTabDetachPreviewBounds(
+    const UI::TabbedWindow& sourceWindow,
+    Point screenPosition) const
+{
+    const Rect sourceBounds = sourceWindow.bounds();
+
+    const int previewWidth = std::max(8, sourceBounds.size.width);
+    const int previewHeight = std::max(4, sourceBounds.size.height);
+
+    return Rect{
+        Point{ screenPosition.x + 1, screenPosition.y + 1 },
+        Size{ previewWidth, previewHeight }
+    };
+}
+
+void WindowManager::drawTabDetachPreview(Surface& surface) const
+{
+    if (!m_tabDetachDragState.active)
+    {
+        return;
+    }
+
+    const Rect previewBounds = m_tabDetachDragState.previewBounds;
+
+    if (previewBounds.size.width <= 0 || previewBounds.size.height <= 0)
+    {
+        return;
+    }
+
+    ScreenBuffer& buffer = surface.buffer();
+
+    const Style previewStyle =
+        style::Fg(Color::FromBasic(Color::Basic::BrightMagenta))
+        + style::Bg(Color::FromBasic(Color::Basic::Blue));
+
+    buffer.fillRect(previewBounds, U'.', previewStyle);
+    buffer.drawFrame(
+        previewBounds,
+        previewStyle,
+        U'+',
+        U'+',
+        U'+',
+        U'+',
+        U'=',
+        U'|');
+
+    if (!m_tabDetachDragState.contentId.empty() && previewBounds.size.width > 4)
+    {
+        const int maxTitleWidth = previewBounds.size.width - 4;
+        std::string title = m_tabDetachDragState.contentId;
+
+        if (static_cast<int>(title.size()) > maxTitleWidth)
+        {
+            title = title.substr(0, static_cast<std::size_t>(maxTitleWidth - 1)) + "~";
+        }
+
+        buffer.writeString(
+            previewBounds.position.x + 2,
+            previewBounds.position.y,
+            title,
+            previewStyle.withReverse(true));
+    }
+}
+
 void WindowManager::endDrag()
 {
     tryApplyDockPreviewDrop();
@@ -725,6 +905,7 @@ void WindowManager::draw(Surface& surface)
     }
 
     m_dockPreview.draw(surface);
+    drawTabDetachPreview(surface);
 }
 
 std::vector<LayerInstance> WindowManager::buildLayers()
@@ -962,6 +1143,22 @@ const UI::DockDragPreviewState& WindowManager::dockPreviewState() const
 void WindowManager::cancelDockPreview()
 {
     m_dockPreview.cancel();
+}
+
+bool WindowManager::isTabDetachPreviewActive() const
+{
+    return m_tabDetachDragState.active;
+}
+
+Rect WindowManager::tabDetachPreviewBounds() const
+{
+    return m_tabDetachDragState.previewBounds;
+}
+
+void WindowManager::cancelTabDetachPreview()
+{
+    m_tabDetachDragState.clear();
+    releasePointer();
 }
 
 std::vector<UI::DockTarget> WindowManager::dockTargets() const

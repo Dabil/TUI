@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "Core/Point.h"
+#include "Core/Rect.h"
 #include "Rendering/LayerInstance.h"
 #include "Rendering/Surface.h"
 #include "UI/Layout/DockTarget.h"
@@ -107,6 +108,10 @@ public:
     const UI::DockDragPreviewState& dockPreviewState() const;
     void cancelDockPreview();
 
+    bool isTabDetachPreviewActive() const;
+    Rect tabDetachPreviewBounds() const;
+    void cancelTabDetachPreview();
+
     std::vector<UI::DockTarget> dockTargets() const;
     UI::DockTarget dockTargetAt(Point screenPosition) const;
     std::vector<UI::DockSnapZone> dockSnapZonesForTargets() const;
@@ -117,6 +122,30 @@ private:
         Window* window = nullptr;
         int zOrder = 0;
         std::size_t insertionOrder = 0;
+    };
+
+    struct TabDetachDragState
+    {
+        UI::TabbedWindow* sourceWindow = nullptr;
+        std::size_t tabIndex = 0;
+        std::string contentId;
+        Point pointerOrigin{};
+        Point currentPointer{};
+        Rect sourceBounds{};
+        Rect previewBounds{};
+        bool active = false;
+
+        void clear()
+        {
+            sourceWindow = nullptr;
+            tabIndex = 0;
+            contentId.clear();
+            pointerOrigin = Point{};
+            currentPointer = Point{};
+            sourceBounds = Rect{};
+            previewBounds = Rect{};
+            active = false;
+        }
     };
 
 private:
@@ -131,6 +160,22 @@ private:
     void setFocusedWindow(Window* window);
 
     bool updateDrag(Point screenPosition, const Input::KeyModifiers& modifiers = Input::KeyModifiers{});
+
+    bool beginTabDetachDrag(
+        UI::TabbedWindow& sourceWindow,
+        std::size_t tabIndex,
+        Point screenPosition,
+        UI::PointerButton button = UI::PointerButton::Primary);
+    bool updateTabDetachDrag(
+        Point screenPosition,
+        const Input::KeyModifiers& modifiers = Input::KeyModifiers{});
+    void endTabDetachDrag();
+    bool isTabDetachDragging() const;
+    Rect makeTabDetachPreviewBounds(
+        const UI::TabbedWindow& sourceWindow,
+        Point screenPosition) const;
+    void drawTabDetachPreview(Surface& surface) const;
+
     bool isDockingModifierHeld(const Input::KeyModifiers& modifiers) const;
     void updateDockPreview(Point screenPosition, const Input::KeyModifiers& modifiers);
 
@@ -175,6 +220,7 @@ private:
 
     UI::PointerCaptureState m_pointerCapture;
     UI::WindowDragState m_dragState;
+    TabDetachDragState m_tabDetachDragState;
     UI::WindowResizeState m_resizeState;
     UI::DockTree* m_dockTree = nullptr;
     UI::DockDragPreview m_dockPreview;
