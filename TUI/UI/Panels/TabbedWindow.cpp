@@ -96,6 +96,14 @@ namespace UI
     {
         TabbedWindowPage removed = m_model.removePageAt(index);
 
+        if (m_model.empty())
+        {
+            clearHoveredTabIndex();
+            setTitle("Tabbed Window");
+            m_lastContentBounds = Rect{};
+            return removed;
+        }
+
         if (m_hoveredTabIndex >= static_cast<int>(m_model.count()))
         {
             clearHoveredTabIndex();
@@ -111,6 +119,14 @@ namespace UI
         const std::string& contentId)
     {
         TabbedWindowPage removed = m_model.removePageByContentId(contentId);
+
+        if (m_model.empty())
+        {
+            clearHoveredTabIndex();
+            setTitle("Tabbed Window");
+            m_lastContentBounds = Rect{};
+            return removed;
+        }
 
         if (m_hoveredTabIndex >= static_cast<int>(m_model.count()))
         {
@@ -350,6 +366,12 @@ namespace UI
     {
         if (!isVisible())
         {
+            return;
+        }
+
+        if (m_model.empty())
+        {
+            Window::draw(surface);
             return;
         }
 

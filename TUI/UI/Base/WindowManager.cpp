@@ -729,9 +729,28 @@ bool WindowManager::completeTabDetachDrag()
         return false;
     }
 
-    const std::size_t tabIndex = m_tabDetachDragState.tabIndex;
+    const std::string detachedContentId = m_tabDetachDragState.contentId;
 
-    if (tabIndex >= sourceWindow->tabCount())
+    if (detachedContentId.empty())
+    {
+        return false;
+    }
+
+    int tabIndex = sourceWindow->model().indexOfContentId(detachedContentId);
+
+    if (tabIndex < 0 &&
+        m_tabDetachDragState.tabIndex < sourceWindow->tabCount())
+    {
+        const UI::TabbedWindowPage& fallbackPage =
+            sourceWindow->model().pages()[m_tabDetachDragState.tabIndex];
+
+        if (fallbackPage.contentId() == detachedContentId)
+        {
+            tabIndex = static_cast<int>(m_tabDetachDragState.tabIndex);
+        }
+    }
+
+    if (tabIndex < 0)
     {
         return false;
     }
@@ -743,7 +762,8 @@ bool WindowManager::completeTabDetachDrag()
         return false;
     }
 
-    UI::TabbedWindowPage page = sourceWindow->removePageAt(tabIndex);
+    UI::TabbedWindowPage page =
+        sourceWindow->removePageAt(static_cast<std::size_t>(tabIndex));
 
     if (!page.isValid())
     {
@@ -760,10 +780,17 @@ bool WindowManager::completeTabDetachDrag()
     }
 
     Window* rawDetachedWindow = detachedWindow.get();
+    const bool removeSourceWindow = sourceWindow->empty();
 
     m_ownedWindows.push_back(std::move(detachedWindow));
     addWindow(*rawDetachedWindow);
     show(*rawDetachedWindow);
+
+    if (removeSourceWindow)
+    {
+        removeWindow(*sourceWindow);
+    }
+
     bringToFront(*rawDetachedWindow);
     setFocusedWindow(rawDetachedWindow);
     setHoveredWindow(rawDetachedWindow);

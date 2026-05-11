@@ -43,22 +43,16 @@ namespace UI
 
     void EffectReferenceWindowContent::onAttached()
     {
-        if (m_effect == nullptr)
-        {
-            return;
-        }
-
-        m_effect->onEnter();
+        // This content adapter borrows an effect owned elsewhere.
+        // The owning screen/window controls the effect lifecycle.
+        // Do not call onEnter() here, because attaching/detaching tabs
+        // should not reset or reinitialize borrowed effect state.
     }
 
     void EffectReferenceWindowContent::onDetached()
     {
-        if (m_effect == nullptr)
-        {
-            return;
-        }
-
-        m_effect->onExit();
+        // This content adapter borrows an effect owned elsewhere.
+        // Do not call onExit() here; ownership is not ending.
     }
 
     void EffectReferenceWindowContent::onBoundsChanged(const Rect& bounds)
