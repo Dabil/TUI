@@ -1,6 +1,7 @@
 ﻿#include "Screens/WindowDemoScreen.h"
 
 #include <memory>
+#include <utility>
 
 #include "Core/Rect.h"
 #include "Rendering/Surface.h"
@@ -87,6 +88,11 @@ namespace DemoColors
 
 namespace
 {
+    constexpr const char* DigitalRainTitle = "( Digital Rain Effect )";
+    constexpr const char* DonutTitle = "( 3D Donut Effect )";
+    constexpr const char* FireTitle = "( Fire Effect )";
+    constexpr const char* WaterTitle = "( Water Wave Effect )";
+
     using Composition::Alignment;
     using Composition::PageComposer;
 
@@ -219,9 +225,8 @@ void WindowDemo::draw(Surface& surface)
     };
 
 
-    // turns on docking preview
-    // ensureDockPreviewLayout(pageBody);
     ensureLayout(pageBody, windowRectArr);
+    drawInstructions(surface, footer);
 
     m_windowManager.draw(surface);
 }
@@ -240,10 +245,10 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
 
     m_windowManager.clear();
 
-    m_digiRainWindow = std::make_unique<EffectWindow>(windowRectArr[0], "( Digital Rain Effect )", m_digiRain);
-    m_donutWindow    = std::make_unique<EffectWindow>(windowRectArr[1], "( 3D Donut Effect )", m_donut);
-    m_fireWindow     = std::make_unique<EffectWindow>(windowRectArr[2], "( Fire Effect )", m_fire);
-    m_waterWindow    = std::make_unique<EffectWindow>(windowRectArr[3], "( Water Wave Effect )", m_water);
+    m_digiRainWindow = std::make_unique<EffectWindow>(windowRectArr[0], DigitalRainTitle, m_digiRain);
+    m_donutWindow = std::make_unique<EffectWindow>(windowRectArr[1], DonutTitle, m_donut);
+    m_fireWindow = std::make_unique<EffectWindow>(windowRectArr[2], FireTitle, m_fire);
+    m_waterWindow = std::make_unique<EffectWindow>(windowRectArr[3], WaterTitle, m_water);
 
     m_digiRainWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
     m_digiRainWindow->setBorderStyle(DemoColors::unfocusedWindow);
@@ -274,21 +279,13 @@ void WindowDemo::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
     m_windowManager.addWindow(*m_fireWindow.get());
     m_windowManager.addWindow(*m_waterWindow.get());
 
+    ensureDockContentModel(viewport);
     m_layoutInitialized = true;
 }
 
-void WindowDemo::ensureDockPreviewLayout(const Rect& viewport)
+void WindowDemo::ensureDockContentModel(const Rect& viewport)
 {
     if (viewport.size.width <= 0 || viewport.size.height <= 0)
-    {
-        return;
-    }
-
-    if (!m_dockTree.empty() &&
-        m_dockTree.bounds().position.x == viewport.position.x &&
-        m_dockTree.bounds().position.y == viewport.position.y &&
-        m_dockTree.bounds().size.width == viewport.size.width &&
-        m_dockTree.bounds().size.height == viewport.size.height)
     {
         return;
     }
@@ -296,20 +293,62 @@ void WindowDemo::ensureDockPreviewLayout(const Rect& viewport)
     m_dockTree.setBounds(viewport);
     m_dockTree.clear();
 
-    UI::DockContentDescriptor leftContent;
-    leftContent.contentId = "dock-preview-left";
-    leftContent.title = "Left Preview Region";
+    UI::DockContentDescriptor digiRainContent;
+    digiRainContent.contentId = DigitalRainTitle;
+    digiRainContent.title = DigitalRainTitle;
 
-    UI::DockContentDescriptor rightContent;
-    rightContent.contentId = "dock-preview-right";
-    rightContent.title = "Right Preview Region";
+    UI::DockContentDescriptor donutContent;
+    donutContent.contentId = DonutTitle;
+    donutContent.title = DonutTitle;
 
-    const int rootNodeId = m_dockTree.attachRoot(std::move(leftContent));
+    UI::DockContentDescriptor fireContent;
+    fireContent.contentId = FireTitle;
+    fireContent.title = FireTitle;
+
+    UI::DockContentDescriptor waterContent;
+    waterContent.contentId = WaterTitle;
+    waterContent.title = WaterTitle;
+
+    const int rootNodeId = m_dockTree.attachRoot(std::move(digiRainContent));
 
     m_dockTree.splitNode(
         rootNodeId,
         UI::DockSplitOrientation::Horizontal,
         0.5f,
-        std::move(rightContent),
+        std::move(donutContent),
         false);
+
+    if (UI::DockNode* digiRainNode = m_dockTree.findContent(DigitalRainTitle))
+    {
+        m_dockTree.splitNode(
+            digiRainNode->id(),
+            UI::DockSplitOrientation::Vertical,
+            0.5f,
+            std::move(fireContent),
+            false);
+    }
+
+    if (UI::DockNode* donutNode = m_dockTree.findContent(DonutTitle))
+    {
+        m_dockTree.splitNode(
+            donutNode->id(),
+            UI::DockSplitOrientation::Vertical,
+            0.5f,
+            std::move(waterContent),
+            false);
+    }
+}
+
+void WindowDemo::drawInstructions(Surface& surface, const Rect& footer)
+{
+    ScreenBuffer& buffer = surface.buffer();
+
+    const int x = footer.position.x + 2;
+    const int y = footer.position.y + 1;
+
+    buffer.writeString(
+        x,
+        y,
+        "Drag windows normally. Hold Ctrl while dragging over another window to preview docking. Release over top/bottom/left/right/center.",
+        DemoColors::Subtitle);
 }

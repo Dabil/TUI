@@ -31,7 +31,9 @@ namespace UI
     {
     public:
         void begin(const DockTree& dockTree, Point pointerPosition);
+        void begin(const std::vector<DockSnapZone>& zones, Point pointerPosition);
         void update(const DockTree& dockTree, Point pointerPosition);
+        void update(const std::vector<DockSnapZone>& zones, Point pointerPosition);
         void end();
         void cancel();
 

@@ -1,10 +1,13 @@
 #include "UI/Base/WindowManager.h"
 
 #include <algorithm>
+#include <memory>
 #include <utility>
+#include <sstream>
 
 #include "Core/Rect.h"
 #include "UI/Panels/Window.h"
+#include "UI/Panels/TabbedWindow.h"
 #include "Input/Event.h"
 #include "Input/MouseEvent.h"
 #include "Rendering/ScreenBuffer.h"
@@ -74,6 +77,16 @@ void WindowManager::removeWindow(Window& window)
                 return entry.window == &window;
             }),
         m_windows.end());
+
+    m_ownedTabbedWindows.erase(
+        std::remove_if(
+            m_ownedTabbedWindows.begin(),
+            m_ownedTabbedWindows.end(),
+            [&window](const std::unique_ptr<UI::TabbedWindow>& ownedWindow)
+            {
+                return ownedWindow.get() == &window;
+            }),
+        m_ownedTabbedWindows.end());
 }
 
 void WindowManager::clear()
@@ -85,6 +98,7 @@ void WindowManager::clear()
     m_resizeState.clear();
     m_dockPreview.cancel();
     m_windows.clear();
+    m_ownedTabbedWindows.clear();
 }
 
 bool WindowManager::contains(const Window& window) const
@@ -345,7 +359,7 @@ bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
 
         if (mouseEvent.isDrag() || mouseEvent.isMove())
         {
-            return updateDrag(mouseEvent.position);
+            return updateDrag(mouseEvent.position, mouseEvent.modifiers);
         }
 
         return true;
@@ -390,6 +404,14 @@ bool WindowManager::handleMouseEvent(const Input::MouseEvent& mouseEvent)
 
     if (isPrimaryPress && result.region == UI::CursorRegion::TitleBar)
     {
+        if (UI::TabbedWindow* tabbedTarget = dynamic_cast<UI::TabbedWindow*>(target))
+        {
+            if (tabbedTarget->isPointInTabTitle(mouseEvent.position))
+            {
+                tabbedTarget->handleEvent(Input::Event::mouse(mouseEvent));
+            }
+        }
+
         if (beginDrag(
             *target,
             mouseEvent.position,
@@ -520,11 +542,6 @@ bool WindowManager::beginDrag(
     capturePointer(window, button, screenPosition);
     bringToFront(window);
 
-    if (m_dockTree != nullptr && !m_dockTree->empty())
-    {
-        m_dockPreview.begin(*m_dockTree, screenPosition);
-    }
-
     return true;
 }
 
@@ -540,7 +557,9 @@ bool WindowManager::beginDragAt(Point screenPosition, UI::PointerButton button)
     return beginDrag(*result.window, screenPosition, button);
 }
 
-bool WindowManager::updateDrag(Point screenPosition)
+bool WindowManager::updateDrag(
+    Point screenPosition,
+    const Input::KeyModifiers& modifiers)
 {
     if (!m_dragState.active())
     {
@@ -567,16 +586,15 @@ bool WindowManager::updateDrag(Point screenPosition)
     movedBounds.position.y += deltaY;
     window->setBounds(movedBounds);
 
-    if (m_dockTree != nullptr && m_dockPreview.isActive())
-    {
-        m_dockPreview.update(*m_dockTree, screenPosition);
-    }
+    updateDockPreview(screenPosition, modifiers);
 
     return true;
 }
 
 void WindowManager::endDrag()
 {
+    tryApplyDockPreviewDrop();
+
     m_dragState.clear();
     releasePointer();
     m_dockPreview.end();
@@ -868,6 +886,49 @@ void WindowManager::setFocusedWindow(Window* window)
     }
 }
 
+bool WindowManager::isDockingModifierHeld(
+    const Input::KeyModifiers& modifiers) const
+{
+    return modifiers.ctrl;
+}
+
+void WindowManager::updateDockPreview(
+    Point screenPosition,
+    const Input::KeyModifiers& modifiers)
+{
+    if (!m_dragState.active() || !isDockingModifierHeld(modifiers))
+    {
+        m_dockPreview.cancel();
+        return;
+    }
+
+    const UI::DockTarget target = dockTargetAt(screenPosition);
+
+    if (!target.isValid())
+    {
+        m_dockPreview.cancel();
+        return;
+    }
+
+    const std::vector<UI::DockSnapZone> zones =
+        createDockSnapZonesForTarget(target);
+
+    if (zones.empty())
+    {
+        m_dockPreview.cancel();
+        return;
+    }
+
+    if (!m_dockPreview.isActive())
+    {
+        m_dockPreview.begin(zones, screenPosition);
+    }
+    else
+    {
+        m_dockPreview.update(zones, screenPosition);
+    }
+}
+
 void WindowManager::setDockTree(UI::DockTree* dockTree)
 {
     m_dockTree = dockTree;
@@ -901,4 +962,675 @@ const UI::DockDragPreviewState& WindowManager::dockPreviewState() const
 void WindowManager::cancelDockPreview()
 {
     m_dockPreview.cancel();
+}
+
+std::vector<UI::DockTarget> WindowManager::dockTargets() const
+{
+    std::vector<ManagedWindow> entries = m_windows;
+
+    std::stable_sort(
+        entries.begin(),
+        entries.end(),
+        [](const ManagedWindow& lhs, const ManagedWindow& rhs)
+        {
+            if (lhs.zOrder != rhs.zOrder)
+            {
+                return lhs.zOrder < rhs.zOrder;
+            }
+
+            return lhs.insertionOrder < rhs.insertionOrder;
+        });
+
+    std::vector<UI::DockTarget> targets;
+
+    for (const ManagedWindow& entry : entries)
+    {
+        if (entry.window == nullptr || !isDockTargetEligible(*entry.window))
+        {
+            continue;
+        }
+
+        targets.push_back(UI::DockTarget{
+            entry.window,
+            dockContentIdForWindow(*entry.window),
+            entry.window->bounds(),
+            entry.zOrder
+            });
+    }
+
+    return targets;
+}
+
+UI::DockTarget WindowManager::dockTargetAt(Point screenPosition) const
+{
+    std::vector<UI::DockTarget> targets = dockTargets();
+
+    for (auto it = targets.rbegin(); it != targets.rend(); ++it)
+    {
+        if (it->isValid() &&
+            it->bounds.contains(screenPosition.x, screenPosition.y))
+        {
+            return *it;
+        }
+    }
+
+    return UI::DockTarget{};
+}
+
+std::vector<UI::DockSnapZone> WindowManager::dockSnapZonesForTargets() const
+{
+    std::vector<UI::DockSnapZone> zones;
+
+    for (const UI::DockTarget& target : dockTargets())
+    {
+        std::vector<UI::DockSnapZone> targetZones =
+            createDockSnapZonesForTarget(target);
+
+        zones.insert(
+            zones.end(),
+            targetZones.begin(),
+            targetZones.end());
+    }
+
+    return zones;
+}
+
+bool WindowManager::isDockTargetEligible(const Window& window) const
+{
+    if (&window == m_dragState.window)
+    {
+        return false;
+    }
+
+    if (!window.isVisible() || !window.isEnabled())
+    {
+        return false;
+    }
+
+    const Rect bounds = window.bounds();
+
+    return bounds.size.width > 0 && bounds.size.height > 0;
+}
+
+std::string WindowManager::dockContentIdForWindow(const Window& window) const
+{
+    if (window.hasTitle())
+    {
+        return window.title();
+    }
+
+    std::ostringstream stream;
+    stream << "window@" << &window;
+    return stream.str();
+}
+
+std::vector<UI::DockSnapZone> WindowManager::createDockSnapZonesForTarget(
+    const UI::DockTarget& target) const
+{
+    std::vector<UI::DockSnapZone> zones;
+
+    if (!target.isValid())
+    {
+        return zones;
+    }
+
+    const Rect bounds = target.bounds;
+
+    if (bounds.size.width <= 0 || bounds.size.height <= 0)
+    {
+        return zones;
+    }
+
+    const int leftWidth = std::max(1, bounds.size.width / 3);
+    const int rightWidth = std::max(1, bounds.size.width / 3);
+    const int topHeight = std::max(1, bounds.size.height / 3);
+    const int bottomHeight = std::max(1, bounds.size.height / 3);
+
+    const int centerX = bounds.position.x + leftWidth;
+    const int centerY = bounds.position.y + topHeight;
+    const int centerWidth = std::max(1, bounds.size.width - leftWidth - rightWidth);
+    const int centerHeight = std::max(1, bounds.size.height - topHeight - bottomHeight);
+
+    zones.push_back(UI::DockSnapZone{
+        UI::DockSnapZoneType::Top,
+        Rect{
+            bounds.position,
+            Size{ bounds.size.width, topHeight }
+        },
+        0,
+        target.contentId
+        });
+
+    zones.push_back(UI::DockSnapZone{
+        UI::DockSnapZoneType::Bottom,
+        Rect{
+            Point{
+                bounds.position.x,
+                bounds.position.y + bounds.size.height - bottomHeight
+            },
+            Size{ bounds.size.width, bottomHeight }
+        },
+        0,
+        target.contentId
+        });
+
+    zones.push_back(UI::DockSnapZone{
+        UI::DockSnapZoneType::Left,
+        Rect{
+            bounds.position,
+            Size{ leftWidth, bounds.size.height }
+        },
+        0,
+        target.contentId
+        });
+
+    zones.push_back(UI::DockSnapZone{
+        UI::DockSnapZoneType::Right,
+        Rect{
+            Point{
+                bounds.position.x + bounds.size.width - rightWidth,
+                bounds.position.y
+            },
+            Size{ rightWidth, bounds.size.height }
+        },
+        0,
+        target.contentId
+        });
+
+    zones.push_back(UI::DockSnapZone{
+        UI::DockSnapZoneType::Center,
+        Rect{
+            Point{ centerX, centerY },
+            Size{ centerWidth, centerHeight }
+        },
+        0,
+        target.contentId
+        });
+
+    return zones;
+}
+
+bool WindowManager::tryApplyDockPreviewDrop()
+{
+    if (!m_dragState.active())
+    {
+        return false;
+    }
+
+    Window* draggedWindow = m_dragState.window;
+    if (draggedWindow == nullptr)
+    {
+        return false;
+    }
+
+    const UI::DockDragPreviewState& previewState = m_dockPreview.state();
+    const UI::DockSnapZone& zone = previewState.activeZone;
+
+    if (!previewState.active || !zone.isValid())
+    {
+        return false;
+    }
+
+    if (zone.targetContentId.empty())
+    {
+        return false;
+    }
+
+    const std::string draggedContentId = dockContentIdForWindow(*draggedWindow);
+
+    if (draggedContentId.empty() || draggedContentId == zone.targetContentId)
+    {
+        return false;
+    }
+
+    Window* targetWindow = findDockWindowByContentId(zone.targetContentId);
+    if (targetWindow == nullptr || targetWindow == draggedWindow)
+    {
+        return false;
+    }
+
+    if (zone.type == UI::DockSnapZoneType::Center)
+    {
+        return tryApplyCenterDockWindowTabs(*draggedWindow, *targetWindow);
+    }
+
+    if (!isSideDockZone(zone.type))
+    {
+        return false;
+    }
+
+    if (m_dockTree == nullptr)
+    {
+        return false;
+    }
+
+    if (!m_dockTree->dockContentBeside(
+        zone.targetContentId,
+        draggedContentId,
+        zone.type))
+    {
+        return false;
+    }
+
+    applySideDockWindowBounds(
+        *draggedWindow,
+        *targetWindow,
+        zone.type);
+
+    bringToFront(*draggedWindow);
+
+    return true;
+}
+
+bool WindowManager::tryApplyCenterDockWindowTabs(
+    Window& draggedWindow,
+    Window& targetWindow)
+{
+    if (&draggedWindow == &targetWindow)
+    {
+        return false;
+    }
+
+    UI::TabbedWindow* draggedTabbedWindow =
+        dynamic_cast<UI::TabbedWindow*>(&draggedWindow);
+    UI::TabbedWindow* targetTabbedWindow =
+        dynamic_cast<UI::TabbedWindow*>(&targetWindow);
+
+    if (draggedTabbedWindow == nullptr && !draggedWindow.hasTransferableContent())
+    {
+        return false;
+    }
+
+    if (targetTabbedWindow == nullptr && !targetWindow.hasTransferableContent())
+    {
+        return false;
+    }
+
+    const Rect targetBounds = targetWindow.bounds();
+
+    if (targetTabbedWindow != nullptr)
+    {
+        bool transferred = false;
+
+        if (draggedTabbedWindow != nullptr)
+        {
+            transferred = transferPagesFromTabbedWindow(
+                *draggedTabbedWindow,
+                *targetTabbedWindow,
+                true);
+        }
+        else
+        {
+            transferred = transferStandaloneWindowToTabbedWindow(
+                draggedWindow,
+                *targetTabbedWindow,
+                true);
+        }
+
+        if (!transferred)
+        {
+            return false;
+        }
+
+        targetTabbedWindow->setBounds(targetBounds);
+        removeWindow(draggedWindow);
+        bringToFront(*targetTabbedWindow);
+        setFocusedWindow(targetTabbedWindow);
+        setHoveredWindow(targetTabbedWindow);
+        return true;
+    }
+
+    if (draggedTabbedWindow != nullptr)
+    {
+        if (!transferStandaloneWindowToTabbedWindow(
+            targetWindow,
+            *draggedTabbedWindow,
+            false))
+        {
+            return false;
+        }
+
+        draggedTabbedWindow->setBounds(targetBounds);
+        removeWindow(targetWindow);
+        bringToFront(*draggedTabbedWindow);
+        setFocusedWindow(draggedTabbedWindow);
+        setHoveredWindow(draggedTabbedWindow);
+        return true;
+    }
+
+    UI::TabbedWindow* newTabbedWindow = createOwnedTabbedWindow(
+        targetBounds,
+        tabTitleForWindow(targetWindow));
+
+    if (newTabbedWindow == nullptr)
+    {
+        return false;
+    }
+
+    if (!transferStandaloneWindowToTabbedWindow(
+        targetWindow,
+        *newTabbedWindow,
+        false))
+    {
+        removeWindow(*newTabbedWindow);
+        return false;
+    }
+
+    if (!transferStandaloneWindowToTabbedWindow(
+        draggedWindow,
+        *newTabbedWindow,
+        true))
+    {
+        removeWindow(*newTabbedWindow);
+        return false;
+    }
+
+    removeWindow(targetWindow);
+    removeWindow(draggedWindow);
+    addWindow(*newTabbedWindow);
+    bringToFront(*newTabbedWindow);
+    setFocusedWindow(newTabbedWindow);
+    setHoveredWindow(newTabbedWindow);
+    return true;
+}
+
+bool WindowManager::transferStandaloneWindowToTabbedWindow(
+    Window& sourceWindow,
+    UI::TabbedWindow& tabbedWindow,
+    bool selectNewPage)
+{
+    const std::string contentId = dockContentIdForWindow(sourceWindow);
+
+    if (contentId.empty() || tabbedWindow.model().containsContentId(contentId))
+    {
+        return false;
+    }
+
+    UI::TabbedWindowPage page = makeTabPageFromWindow(sourceWindow);
+
+    if (!page.isValid())
+    {
+        return false;
+    }
+
+    return tabbedWindow.addPage(std::move(page), selectNewPage);
+}
+
+bool WindowManager::transferPagesFromTabbedWindow(
+    UI::TabbedWindow& sourceWindow,
+    UI::TabbedWindow& targetWindow,
+    bool selectTransferredPages)
+{
+    if (&sourceWindow == &targetWindow || sourceWindow.empty())
+    {
+        return false;
+    }
+
+    for (const UI::TabbedWindowPage& page : sourceWindow.model().pages())
+    {
+        if (targetWindow.model().containsContentId(page.contentId()))
+        {
+            return false;
+        }
+    }
+
+    bool transferredAny = false;
+
+    while (!sourceWindow.empty())
+    {
+        UI::TabbedWindowPage page = sourceWindow.removePageAt(0);
+
+        if (!page.isValid())
+        {
+            continue;
+        }
+
+        const bool added = targetWindow.addPage(
+            std::move(page),
+            selectTransferredPages);
+
+        if (!added)
+        {
+            return transferredAny;
+        }
+
+        transferredAny = true;
+    }
+
+    return transferredAny;
+}
+
+UI::TabbedWindow* WindowManager::createOwnedTabbedWindow(
+    const Rect& bounds,
+    const std::string& title)
+{
+    auto tabbedWindow = std::make_unique<UI::TabbedWindow>(bounds, title);
+    UI::TabbedWindow* rawWindow = tabbedWindow.get();
+
+    rawWindow->setMinimumSize(8, 4);
+    m_ownedTabbedWindows.push_back(std::move(tabbedWindow));
+
+    return rawWindow;
+}
+
+UI::TabbedWindowPage WindowManager::makeTabPageFromWindow(Window& window)
+{
+    if (!window.hasTransferableContent())
+    {
+        return UI::TabbedWindowPage{};
+    }
+
+    const std::string contentId = dockContentIdForWindow(window);
+    const std::string title = tabTitleForWindow(window);
+    UI::TabbedWindowPageMetadata metadata = makeTabPageMetadataFromWindow(window);
+    std::unique_ptr<UI::IWindowContent> content = window.releaseContent();
+
+    if (content == nullptr)
+    {
+        return UI::TabbedWindowPage{};
+    }
+
+    return UI::TabbedWindowPage(
+        contentId,
+        title,
+        std::move(content),
+        metadata);
+}
+
+UI::TabbedWindowPageMetadata WindowManager::makeTabPageMetadataFromWindow(
+    const Window& window) const
+{
+    UI::TabbedWindowPageMetadata metadata{};
+
+    metadata.lastStandaloneBounds = window.bounds();
+    metadata.hasStandaloneBounds = true;
+    metadata.modal = window.isModal();
+    metadata.draggable = window.isDraggable();
+    metadata.resizable = window.isResizable();
+    metadata.enabled = window.isEnabled();
+    metadata.visible = window.isVisible();
+    metadata.minimumSize = window.minimumSize();
+    metadata.resizeBorderThickness = window.resizeBorderThickness();
+    metadata.titleBarHeight = window.titleBarHeight();
+    metadata.backgroundStyle = window.backgroundStyle();
+    metadata.borderStyle = window.borderStyle();
+    metadata.titleStyle = window.titleStyle();
+    metadata.hoveredBorderStyle = window.hoveredBorderStyle();
+    metadata.hoveredTitleStyle = window.hoveredTitleStyle();
+    metadata.borderGlyphs = window.borderGlyphs();
+
+    if (dynamic_cast<const UI::TabbedWindow*>(&window) != nullptr)
+    {
+        metadata.sourceWindowType = "TabbedWindow";
+    }
+    else
+    {
+        metadata.sourceWindowType = "Window";
+    }
+
+    return metadata;
+}
+
+std::string WindowManager::tabTitleForWindow(const Window& window) const
+{
+    if (window.hasTitle())
+    {
+        return window.title();
+    }
+
+    return dockContentIdForWindow(window);
+}
+
+bool WindowManager::isSideDockZone(UI::DockSnapZoneType type) const
+{
+    return type == UI::DockSnapZoneType::Top
+        || type == UI::DockSnapZoneType::Bottom
+        || type == UI::DockSnapZoneType::Left
+        || type == UI::DockSnapZoneType::Right;
+}
+
+Window* WindowManager::findDockWindowByContentId(const std::string& contentId)
+{
+    for (ManagedWindow& entry : m_windows)
+    {
+        if (entry.window == nullptr)
+        {
+            continue;
+        }
+
+        if (dockContentIdForWindow(*entry.window) == contentId)
+        {
+            return entry.window;
+        }
+    }
+
+    return nullptr;
+}
+
+const Window* WindowManager::findDockWindowByContentId(
+    const std::string& contentId) const
+{
+    for (const ManagedWindow& entry : m_windows)
+    {
+        if (entry.window == nullptr)
+        {
+            continue;
+        }
+
+        if (dockContentIdForWindow(*entry.window) == contentId)
+        {
+            return entry.window;
+        }
+    }
+
+    return nullptr;
+}
+
+void WindowManager::applySideDockWindowBounds(
+    Window& draggedWindow,
+    Window& targetWindow,
+    UI::DockSnapZoneType type)
+{
+    const Rect targetBounds = targetWindow.bounds();
+
+    if (targetBounds.size.width <= 0 || targetBounds.size.height <= 0)
+    {
+        return;
+    }
+
+    Rect draggedBounds = targetBounds;
+    Rect remainingBounds = targetBounds;
+
+    switch (type)
+    {
+    case UI::DockSnapZoneType::Top:
+    {
+        const int draggedHeight = std::max(1, targetBounds.size.height / 2);
+        const int remainingHeight = std::max(1, targetBounds.size.height - draggedHeight);
+
+        draggedBounds = Rect{
+            targetBounds.position,
+            Size{ targetBounds.size.width, draggedHeight }
+        };
+
+        remainingBounds = Rect{
+            Point{
+                targetBounds.position.x,
+                targetBounds.position.y + draggedHeight
+            },
+            Size{ targetBounds.size.width, remainingHeight }
+        };
+
+        break;
+    }
+
+    case UI::DockSnapZoneType::Bottom:
+    {
+        const int targetHeight = std::max(1, targetBounds.size.height / 2);
+        const int draggedHeight = std::max(1, targetBounds.size.height - targetHeight);
+
+        remainingBounds = Rect{
+            targetBounds.position,
+            Size{ targetBounds.size.width, targetHeight }
+        };
+
+        draggedBounds = Rect{
+            Point{
+                targetBounds.position.x,
+                targetBounds.position.y + targetHeight
+            },
+            Size{ targetBounds.size.width, draggedHeight }
+        };
+
+        break;
+    }
+
+    case UI::DockSnapZoneType::Left:
+    {
+        const int draggedWidth = std::max(1, targetBounds.size.width / 2);
+        const int remainingWidth = std::max(1, targetBounds.size.width - draggedWidth);
+
+        draggedBounds = Rect{
+            targetBounds.position,
+            Size{ draggedWidth, targetBounds.size.height }
+        };
+
+        remainingBounds = Rect{
+            Point{
+                targetBounds.position.x + draggedWidth,
+                targetBounds.position.y
+            },
+            Size{ remainingWidth, targetBounds.size.height }
+        };
+
+        break;
+    }
+
+    case UI::DockSnapZoneType::Right:
+    {
+        const int targetWidth = std::max(1, targetBounds.size.width / 2);
+        const int draggedWidth = std::max(1, targetBounds.size.width - targetWidth);
+
+        remainingBounds = Rect{
+            targetBounds.position,
+            Size{ targetWidth, targetBounds.size.height }
+        };
+
+        draggedBounds = Rect{
+            Point{
+                targetBounds.position.x + targetWidth,
+                targetBounds.position.y
+            },
+            Size{ draggedWidth, targetBounds.size.height }
+        };
+
+        break;
+    }
+
+    default:
+        return;
+    }
+
+    targetWindow.setBounds(remainingBounds);
+    draggedWindow.setBounds(draggedBounds);
 }

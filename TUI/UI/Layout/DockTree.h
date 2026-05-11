@@ -47,6 +47,11 @@ namespace UI
         std::vector<DockSnapZone> snapZones() const;
         DockSnapZone snapZoneAt(Point screenPosition) const;
 
+        bool dockContentBeside(
+            const std::string& targetContentId,
+            const std::string& draggedContentId,
+            DockSnapZoneType side);
+
     private:
         int allocateNodeId();
         std::unique_ptr<DockNode> makeNode();

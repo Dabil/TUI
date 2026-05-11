@@ -291,10 +291,15 @@
     <ClInclude Include="UI\Base\Viewport.h" />
     <ClInclude Include="UI\Base\WindowManager.h" />
     <ClInclude Include="UI\Config\MenuStatusConfig.h" />
+    <ClInclude Include="UI\Content\EffectReferenceWindowContent.h" />
+    <ClInclude Include="UI\Content\EffectWindowContent.h" />
+    <ClInclude Include="UI\Content\IWindowContent.h" />
     <ClInclude Include="UI\Content\TileGrid.h" />
+    <ClInclude Include="UI\Content\WidgetWindowContent.h" />
     <ClInclude Include="UI\Interaction\WindowInteraction.h" />
     <ClInclude Include="UI\Layout\DockDragPreview.h" />
     <ClInclude Include="UI\Layout\DockNode.h" />
+    <ClInclude Include="UI\Layout\DockTarget.h" />
     <ClInclude Include="UI\Layout\DockTree.h" />
     <ClInclude Include="UI\Layout\DockTypes.h" />
     <ClInclude Include="UI\Menus\MenuController.h" />
@@ -306,6 +311,9 @@
     <ClInclude Include="UI\Panels\PopupWindow.h" />
     <ClInclude Include="UI\Panels\ScrollablePanel.h" />
     <ClInclude Include="UI\Panels\StatusBar.h" />
+    <ClInclude Include="UI\Panels\TabbedWindow.h" />
+    <ClInclude Include="UI\Panels\TabbedWindowPage.h" />
+    <ClInclude Include="UI\Panels\TabbedWindowModel.h" />
     <ClInclude Include="UI\Panels\Window.h" />
     <ClInclude Include="UI\Widgets\Button.h" />
     <ClInclude Include="UI\Widgets\ContainerWidget.h" />
@@ -467,7 +475,10 @@
     <ClCompile Include="UI\Base\Viewport.cpp" />
     <ClCompile Include="UI\Base\WindowManager.cpp" />
     <ClCompile Include="UI\Config\MenuStatusConfig.cpp" />
+    <ClCompile Include="UI\Content\EffectReferenceWindowContent.cpp" />
+    <ClCompile Include="UI\Content\EffectWindowContent.cpp" />
     <ClCompile Include="UI\Content\TileGrid.cpp" />
+    <ClCompile Include="UI\Content\WidgetWindowContent.cpp" />
     <ClCompile Include="UI\Interaction\WindowInteraction.cpp" />
     <ClCompile Include="UI\Layout\DockDragPreview.cpp" />
     <ClCompile Include="UI\Layout\DockNode.cpp" />
@@ -481,6 +492,9 @@
     <ClCompile Include="UI\Panels\PopupWindow.cpp" />
     <ClCompile Include="UI\Panels\ScrollablePanel.cpp" />
     <ClCompile Include="UI\Panels\StatusBar.cpp" />
+    <ClCompile Include="UI\Panels\TabbedWindow.cpp" />
+    <ClCompile Include="UI\Panels\TabbedWindowModel.cpp" />
+    <ClCompile Include="UI\Panels\TabbedWindowPage.cpp" />
     <ClCompile Include="UI\Panels\Window.cpp" />
     <ClCompile Include="UI\Widgets\Button.cpp" />
     <ClCompile Include="UI\Widgets\ContainerWidget.cpp" />
