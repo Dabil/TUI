@@ -170,6 +170,7 @@ private:
         Point screenPosition,
         const Input::KeyModifiers& modifiers = Input::KeyModifiers{});
     void endTabDetachDrag();
+    bool completeTabDetachDrag();
     bool isTabDetachDragging() const;
     Rect makeTabDetachPreviewBounds(
         const UI::TabbedWindow& sourceWindow,
@@ -199,6 +200,12 @@ private:
         const std::string& title);
     UI::TabbedWindowPage makeTabPageFromWindow(Window& window);
     UI::TabbedWindowPageMetadata makeTabPageMetadataFromWindow(const Window& window) const;
+    std::unique_ptr<Window> makeStandaloneWindowFromTabPage(
+        UI::TabbedWindowPage page,
+        const Rect& bounds);
+    void applyMetadataToWindow(
+        Window& window,
+        const UI::TabbedWindowPageMetadata& metadata);
     std::string tabTitleForWindow(const Window& window) const;
     bool isSideDockZone(UI::DockSnapZoneType type) const;
     Window* findDockWindowByContentId(const std::string& contentId);
@@ -215,6 +222,7 @@ private:
 
 private:
     std::vector<ManagedWindow> m_windows;
+    std::vector<std::unique_ptr<Window>> m_ownedWindows;
     std::vector<std::unique_ptr<UI::TabbedWindow>> m_ownedTabbedWindows;
     std::size_t m_nextInsertionOrder = 0;
 

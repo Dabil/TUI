@@ -7,6 +7,7 @@
 
 #include "Core/Rect.h"
 #include "UI/Panels/Window.h"
+#include "UI/Panels/ContentWindow.h"
 #include "UI/Panels/TabbedWindow.h"
 #include "Input/Event.h"
 #include "Input/MouseEvent.h"
@@ -83,6 +84,16 @@ void WindowManager::removeWindow(Window& window)
             }),
         m_windows.end());
 
+    m_ownedWindows.erase(
+        std::remove_if(
+            m_ownedWindows.begin(),
+            m_ownedWindows.end(),
+            [&window](const std::unique_ptr<Window>& ownedWindow)
+            {
+                return ownedWindow.get() == &window;
+            }),
+        m_ownedWindows.end());
+
     m_ownedTabbedWindows.erase(
         std::remove_if(
             m_ownedTabbedWindows.begin(),
@@ -104,6 +115,7 @@ void WindowManager::clear()
     m_resizeState.clear();
     m_dockPreview.cancel();
     m_windows.clear();
+    m_ownedWindows.clear();
     m_ownedTabbedWindows.clear();
 }
 
@@ -697,9 +709,66 @@ bool WindowManager::updateTabDetachDrag(
 
 void WindowManager::endTabDetachDrag()
 {
+    completeTabDetachDrag();
     m_tabDetachDragState.clear();
     releasePointer();
     m_dockPreview.cancel();
+}
+
+bool WindowManager::completeTabDetachDrag()
+{
+    if (!m_tabDetachDragState.active || m_tabDetachDragState.sourceWindow == nullptr)
+    {
+        return false;
+    }
+
+    UI::TabbedWindow* sourceWindow = m_tabDetachDragState.sourceWindow;
+
+    if (!contains(*sourceWindow))
+    {
+        return false;
+    }
+
+    const std::size_t tabIndex = m_tabDetachDragState.tabIndex;
+
+    if (tabIndex >= sourceWindow->tabCount())
+    {
+        return false;
+    }
+
+    const Rect previewBounds = m_tabDetachDragState.previewBounds;
+
+    if (previewBounds.size.width <= 0 || previewBounds.size.height <= 0)
+    {
+        return false;
+    }
+
+    UI::TabbedWindowPage page = sourceWindow->removePageAt(tabIndex);
+
+    if (!page.isValid())
+    {
+        return false;
+    }
+
+    std::unique_ptr<Window> detachedWindow = makeStandaloneWindowFromTabPage(
+        std::move(page),
+        previewBounds);
+
+    if (detachedWindow == nullptr)
+    {
+        return false;
+    }
+
+    Window* rawDetachedWindow = detachedWindow.get();
+
+    m_ownedWindows.push_back(std::move(detachedWindow));
+    addWindow(*rawDetachedWindow);
+    show(*rawDetachedWindow);
+    bringToFront(*rawDetachedWindow);
+    setFocusedWindow(rawDetachedWindow);
+    setHoveredWindow(rawDetachedWindow);
+
+    return true;
 }
 
 bool WindowManager::isTabDetachDragging() const
@@ -1663,6 +1732,70 @@ UI::TabbedWindowPageMetadata WindowManager::makeTabPageMetadataFromWindow(
     }
 
     return metadata;
+}
+
+std::unique_ptr<Window> WindowManager::makeStandaloneWindowFromTabPage(
+    UI::TabbedWindowPage page,
+    const Rect& bounds)
+{
+    if (!page.isValid())
+    {
+        return nullptr;
+    }
+
+    const UI::TabbedWindowPageMetadata metadata = page.metadata();
+    std::unique_ptr<UI::IWindowContent> content = page.releaseContent();
+
+    if (content == nullptr)
+    {
+        return nullptr;
+    }
+
+    std::string title = page.title();
+    if (title.empty())
+    {
+        title = page.contentId();
+    }
+
+    std::unique_ptr<Window> window = std::make_unique<UI::ContentWindow>(
+        bounds,
+        std::move(title),
+        std::move(content));
+
+    applyMetadataToWindow(*window, metadata);
+    window->setBounds(bounds);
+
+    return window;
+}
+
+void WindowManager::applyMetadataToWindow(
+    Window& window,
+    const UI::TabbedWindowPageMetadata& metadata)
+{
+    window.setModal(metadata.modal);
+    window.setDraggable(metadata.draggable);
+    window.setResizable(metadata.resizable);
+    window.setEnabled(metadata.enabled);
+
+    if (metadata.visible)
+    {
+        window.show();
+    }
+    else
+    {
+        window.hide();
+    }
+
+    window.setMinimumSize(metadata.minimumSize);
+    window.setResizeBorderThickness(metadata.resizeBorderThickness);
+    window.setTitleBarHeight(metadata.titleBarHeight);
+
+    window.setBackgroundStyle(metadata.backgroundStyle);
+    window.setBorderStyle(metadata.borderStyle);
+    window.setTitleStyle(metadata.titleStyle);
+    window.setHoveredBorderStyle(metadata.hoveredBorderStyle);
+    window.setHoveredTitleStyle(metadata.hoveredTitleStyle);
+    window.setBorderGlyphs(metadata.borderGlyphs);
 }
 
 std::string WindowManager::tabTitleForWindow(const Window& window) const
