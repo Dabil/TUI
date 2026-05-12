@@ -558,6 +558,12 @@
     <ClInclude Include="Animation\AnimationBindingResolver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Animation\AnimationDrivenRecompositionLoop.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation\XpSequencePlayback.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -1035,6 +1041,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Animation\AnimationBindingResolver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationDrivenRecompositionLoop.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\XpSequencePlayback.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

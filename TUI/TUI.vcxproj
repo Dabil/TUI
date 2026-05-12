@@ -139,6 +139,7 @@
     <ClInclude Include="Animation\PeriodicTimer.h" />
     <ClInclude Include="Animation\TickClock.h" />
     <ClInclude Include="Animation\TickEvent.h" />
+    <ClInclude Include="Animation\XpSequencePlayback.h" />
     <ClInclude Include="App\Application.h" />
     <ClInclude Include="App\CommandLineOptions.h" />
     <ClInclude Include="App\ScreenManager.h" />
@@ -342,6 +343,7 @@
     <ClCompile Include="Animation\Animator.cpp" />
     <ClCompile Include="Animation\PeriodicTimer.cpp" />
     <ClCompile Include="Animation\TickClock.cpp" />
+    <ClCompile Include="Animation\XpSequencePlayback.cpp" />
     <ClCompile Include="App\Application.cpp" />
     <ClCompile Include="App\CommandLineOptions.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
