@@ -10,6 +10,7 @@
 #include "Animation/AnimatedTextAssetSequence.h"
 #include "Animation/Animator.h"
 #include "Animation/TickEvent.h"
+#include "Animation/AnimationDiagnostics.h"
 #include "Rendering/Composition/ObjectSource.h"
 #include "Rendering/Composition/PageComposer.h"
 #include "Rendering/Composition/WritePolicy.h"
@@ -145,6 +146,8 @@ namespace Animation
         void updateBoundControllers(const TickEvent& event);
 
         std::vector<AnimationBindingFrameState> captureFrameState() const;
+
+        AnimationDiagnosticsReport diagnosticsReport() const;
 
     private:
         static bool isValidFrameIndex(
