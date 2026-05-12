@@ -307,6 +307,7 @@ namespace Animation
             return result;
 
         case AnimationBindingTargetKind::FramePlaceholder:
+        {
             if (target.registeredFrames == nullptr)
             {
                 result.message = "Frame placeholder has no registered frame list.";
@@ -319,6 +320,12 @@ namespace Animation
                 return result;
             }
 
+            const TextObject& frame = (*target.registeredFrames)[frameIndex];
+
+            result.placementBounds = composer.resolvePlacementBounds(
+                target.placement,
+                Size{ frame.getWidth(), frame.getHeight() });
+
             composer.placeSource(
                 Composition::ObjectSource::fromRegisteredFrame(
                     *target.registeredFrames,
@@ -329,8 +336,10 @@ namespace Animation
             result.placed = true;
             result.message = "Placed registered frame placeholder.";
             return result;
+        }
 
         case AnimationBindingTargetKind::RegisteredFrameSequence:
+        {
             if (target.textAssetSequence == nullptr)
             {
                 result.message = "Animated text sequence target has no sequence.";
@@ -342,28 +351,31 @@ namespace Animation
                 result.message = "Animated text sequence frame is out of range.";
                 return result;
             }
-            else
+
+            const AnimatedTextAssetFrameBuildResult frameResult =
+                target.textAssetSequence->buildTextObjectForFrame(frameIndex);
+
+            if (!frameResult.success || !frameResult.hasObject())
             {
-                const AnimatedTextAssetFrameBuildResult frameResult =
-                    target.textAssetSequence->buildTextObjectForFrame(frameIndex);
-
-                if (!frameResult.success || !frameResult.hasObject())
-                {
-                    result.message = frameResult.errorMessage.empty()
-                        ? "Animated text sequence did not produce a loaded frame."
-                        : frameResult.errorMessage;
-                    return result;
-                }
-
-                composer.placeSource(
-                    Composition::ObjectSource::fromTextObject(frameResult.object),
-                    target.placement,
-                    target.policy);
-
-                result.placed = true;
-                result.message = "Placed animated text sequence frame.";
+                result.message = frameResult.errorMessage.empty()
+                    ? "Animated text sequence did not produce a loaded frame."
+                    : frameResult.errorMessage;
                 return result;
             }
+
+            result.placementBounds = composer.resolvePlacementBounds(
+                target.placement,
+                Size{ frameResult.object.getWidth(), frameResult.object.getHeight() });
+
+            composer.placeSource(
+                Composition::ObjectSource::fromTextObject(frameResult.object),
+                target.placement,
+                target.policy);
+
+            result.placed = true;
+            result.message = "Placed animated text sequence frame.";
+            return result;
+        }
 
         case AnimationBindingTargetKind::XpSequencePlacement:
             if (target.xpSequence == nullptr || !target.xpSequence->isValid())

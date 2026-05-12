@@ -591,6 +591,18 @@ namespace Composition
         return makeRectValue(x, base.position.y, nextX - x, base.size.height);
     }
 
+    Rect PageComposer::resolvePlacementBounds(
+        const PlacementSpec& placement,
+        const Size& contentSize) const
+    {
+        const PlacementResult result = resolvePlacementResult(placement, contentSize);
+        return makeRectValue(
+            result.origin.x,
+            result.origin.y,
+            std::max(0, result.contentSize.width),
+            std::max(0, result.contentSize.height));
+    }
+
     void PageComposer::placeSource(
         const ObjectSource& source,
         const PlacementSpec& placement,

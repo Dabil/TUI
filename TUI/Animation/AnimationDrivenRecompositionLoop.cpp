@@ -1,5 +1,6 @@
 #include "Animation/AnimationDrivenRecompositionLoop.h"
 
+#include <algorithm>
 #include <utility>
 
 namespace Animation
@@ -57,6 +58,7 @@ namespace Animation
     void AnimationDrivenRecompositionLoop::resetFrameTracking()
     {
         m_lastFrameState.clear();
+        m_lastKnownBindingBounds.clear();
     }
 
     AnimationDrivenRecompositionLoop::Result
@@ -85,12 +87,14 @@ namespace Animation
             return result;
         }
 
-        m_lastFrameState = currentFrameState;
-
-        return composeIntoBuffer(
+        Result result = composeIntoBuffer(
             buffer,
             m_forceRecompose,
             frameStateChanged);
+
+        applyInvalidation(result, currentFrameState);
+        m_lastFrameState = currentFrameState;
+        return result;
     }
 
     AnimationDrivenRecompositionLoop::Result
@@ -101,12 +105,14 @@ namespace Animation
             ? m_bindingResolver->captureFrameState()
             : std::vector<AnimationBindingFrameState>{};
 
-        m_lastFrameState = currentFrameState;
-
-        return composeIntoBuffer(
+        Result result = composeIntoBuffer(
             buffer,
             true,
             true);
+
+        applyInvalidation(result, currentFrameState);
+        m_lastFrameState = currentFrameState;
+        return result;
     }
 
     AnimationDrivenRecompositionLoop::Result
@@ -136,13 +142,107 @@ namespace Animation
         result.deterministicSignature =
             composer.computeDeterministicSignature();
 
-        if (m_invalidation != nullptr)
-        {
-            m_invalidation->invalidateAll();
-        }
-
         m_forceRecompose = false;
         return result;
+    }
+
+    void AnimationDrivenRecompositionLoop::applyInvalidation(
+        Result& result,
+        const std::vector<AnimationBindingFrameState>& currentFrameState)
+    {
+        if (m_invalidation == nullptr || !result.recomposed)
+        {
+            return;
+        }
+
+        if (result.forced)
+        {
+            m_invalidation->invalidateAll();
+            result.invalidated = true;
+            result.wholePageInvalidated = true;
+            result.dirtyRegionCount = 0;
+
+            m_lastKnownBindingBounds.clear();
+            for (const AnimationBindingResolutionResult& bindingResult : result.bindingResults)
+            {
+                if (bindingResult.placementBounds.has_value())
+                {
+                    m_lastKnownBindingBounds[makeBindingKey(
+                        bindingResult.targetName,
+                        bindingResult.controllerName)] = *bindingResult.placementBounds;
+                }
+            }
+            return;
+        }
+
+        if (!result.frameStateChanged)
+        {
+            return;
+        }
+
+        std::unordered_map<std::string, Rect> nextKnownBounds;
+        nextKnownBounds.reserve(result.bindingResults.size());
+
+        for (const AnimationBindingResolutionResult& bindingResult : result.bindingResults)
+        {
+            const std::string key = makeBindingKey(
+                bindingResult.targetName,
+                bindingResult.controllerName);
+
+            const auto oldBounds = m_lastKnownBindingBounds.find(key);
+            const bool hadOldBounds = oldBounds != m_lastKnownBindingBounds.end();
+
+            if (bindingResult.placementBounds.has_value())
+            {
+                m_invalidation->invalidateRect(*bindingResult.placementBounds);
+                nextKnownBounds[key] = *bindingResult.placementBounds;
+            }
+
+            if (hadOldBounds)
+            {
+                m_invalidation->invalidateRect(oldBounds->second);
+            }
+
+            if (!bindingResult.placementBounds.has_value() && !hadOldBounds)
+            {
+                m_invalidation->invalidateAll();
+                result.invalidated = true;
+                result.wholePageInvalidated = true;
+                result.dirtyRegionCount = 0;
+                m_lastKnownBindingBounds = std::move(nextKnownBounds);
+                return;
+            }
+        }
+
+        for (const auto& oldEntry : m_lastKnownBindingBounds)
+        {
+            const bool stillPresent = std::any_of(
+                currentFrameState.begin(),
+                currentFrameState.end(),
+                [&oldEntry](const AnimationBindingFrameState& state)
+                {
+                    return makeBindingKey(
+                        state.targetName,
+                        state.controllerName) == oldEntry.first;
+                });
+
+            if (!stillPresent)
+            {
+                m_invalidation->invalidateRect(oldEntry.second);
+            }
+        }
+
+        result.invalidated = !m_invalidation->isEmpty();
+        result.wholePageInvalidated = m_invalidation->isWholePageInvalidated();
+        result.dirtyRegionCount = m_invalidation->dirtyRegions().size();
+        m_lastKnownBindingBounds = std::move(nextKnownBounds);
+    }
+
+    std::string AnimationDrivenRecompositionLoop::makeBindingKey(
+        const std::string& targetName,
+        const std::string& controllerName)
+    {
+        return targetName + "\x1f" + controllerName;
     }
 
     bool AnimationDrivenRecompositionLoop::shouldRecompose(
