@@ -67,6 +67,11 @@ ContainerWidget::ChildPtr ContainerWidget::removeChildAt(std::size_t index)
         m_focusedChild = nullptr;
     }
 
+    if (m_mouseCaptureChild == removedChild.get())
+    {
+        m_mouseCaptureChild = nullptr;
+    }
+
     m_children.erase(m_children.begin() + static_cast<std::ptrdiff_t>(index));
 
     if (!m_focusedChild)
@@ -79,6 +84,7 @@ ContainerWidget::ChildPtr ContainerWidget::removeChildAt(std::size_t index)
 
 void ContainerWidget::clearChildren()
 {
+    m_mouseCaptureChild = nullptr;
     clearChildFocus();
     m_children.clear();
 }
@@ -349,6 +355,7 @@ bool ContainerWidget::handleEvent(const Input::Event& event)
 
 void ContainerWidget::onFocusLost()
 {
+    m_mouseCaptureChild = nullptr;
     clearChildFocus();
 }
 
@@ -412,15 +419,35 @@ bool ContainerWidget::dispatchMouseEvent(const Input::Event& event)
 
     Widget* target = hitTest(mouseEvent->position);
 
-    if (!target)
+    if (mouseEvent->isPress())
     {
-        return false;
+        m_mouseCaptureChild = target;
+
+        if (target && canFocusChild(*target))
+        {
+            setFocusedChild(*target);
+        }
+
+        return target ? target->handleEvent(event) : false;
     }
 
-    if ((mouseEvent->isPress() || mouseEvent->isClick()) && canFocusChild(*target))
+    if (mouseEvent->isRelease())
+    {
+        Widget* captured = m_mouseCaptureChild;
+        m_mouseCaptureChild = nullptr;
+
+        if (captured && containsChild(*captured) && captured->isVisible() && captured->isEnabled())
+        {
+            return captured->handleEvent(event);
+        }
+
+        return target ? target->handleEvent(event) : false;
+    }
+
+    if (mouseEvent->isClick() && target && canFocusChild(*target))
     {
         setFocusedChild(*target);
     }
 
-    return target->handleEvent(event);
+    return target ? target->handleEvent(event) : false;
 }
