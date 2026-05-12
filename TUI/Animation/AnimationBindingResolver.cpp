@@ -4,6 +4,8 @@
 #include <limits>
 #include <utility>
 
+#include "Rendering/Objects/XpSequenceAnimationAdapter.h"
+
 namespace Animation
 {
     AnimationBindingTarget AnimationBindingTarget::sequenceAssetPlacement(
@@ -145,19 +147,165 @@ namespace Animation
         return m_targets;
     }
 
-    std::vector<AnimationBindingResolutionResult>
-        AnimationBindingResolver::resolveAll(
-            Composition::PageComposer& composer) const
+    AnimationBindingResolutionResult
+        AnimationBindingResolver::placeResolvedFrame(
+            Composition::PageComposer& composer,
+            const AnimationBindingTarget& target,
+            const Animator& animator) const
     {
-        std::vector<AnimationBindingResolutionResult> results;
-        results.reserve(m_targets.size());
+        AnimationBindingResolutionResult result;
+        result.targetName = target.targetName;
+        result.controllerName = target.controllerName;
+        result.resolved = true;
 
-        for (const AnimationBindingTarget& target : m_targets)
+        const std::size_t frameIndex = animator.currentFrameIndex();
+        result.frameIndex = frameIndex;
+
+        switch (target.kind)
         {
-            results.push_back(resolveTarget(composer, target));
+        case AnimationBindingTargetKind::SequenceAssetPlacement:
+        {
+            if (target.assetName.empty())
+            {
+                result.message = "Sequence asset placement has no asset name.";
+                return result;
+            }
+
+            composer.placeSource(
+                Composition::ObjectSource::fromAssetFrame(
+                    target.assetName,
+                    toPlacementFrameIndex(frameIndex)),
+                target.placement,
+                target.policy);
+
+            result.placed = true;
+            result.message = "Placed sequence asset frame.";
+            return result;
         }
 
-        return results;
+        case AnimationBindingTargetKind::FramePlaceholder:
+        {
+            if (target.registeredFrames == nullptr)
+            {
+                result.message = "Frame placeholder has no registered frame list.";
+                return result;
+            }
+
+            if (!isValidFrameIndex(frameIndex, target.registeredFrames->size()))
+            {
+                result.message = "Frame placeholder resolved frame is out of range.";
+                return result;
+            }
+
+            const TextObject& frame = (*target.registeredFrames)[frameIndex];
+
+            result.placementBounds = composer.resolvePlacementBounds(
+                target.placement,
+                Size{ frame.getWidth(), frame.getHeight() });
+
+            composer.placeSource(
+                Composition::ObjectSource::fromRegisteredFrame(
+                    *target.registeredFrames,
+                    toPlacementFrameIndex(frameIndex)),
+                target.placement,
+                target.policy);
+
+            result.placed = true;
+            result.message = "Placed registered frame placeholder.";
+            return result;
+        }
+
+        case AnimationBindingTargetKind::RegisteredFrameSequence:
+        {
+            if (target.textAssetSequence == nullptr)
+            {
+                result.message = "Animated text sequence target has no sequence.";
+                return result;
+            }
+
+            if (!isValidFrameIndex(frameIndex, target.textAssetSequence->frameCount()))
+            {
+                result.message = "Animated text sequence frame is out of range.";
+                return result;
+            }
+
+            const AnimatedTextAssetFrameBuildResult frameResult =
+                target.textAssetSequence->buildTextObjectForFrame(frameIndex);
+
+            if (!frameResult.success || !frameResult.hasObject())
+            {
+                result.message = frameResult.errorMessage.empty()
+                    ? "Animated text sequence did not produce a loaded frame."
+                    : frameResult.errorMessage;
+                return result;
+            }
+
+            result.placementBounds = composer.resolvePlacementBounds(
+                target.placement,
+                Size{ frameResult.object.getWidth(), frameResult.object.getHeight() });
+
+            composer.placeSource(
+                Composition::ObjectSource::fromTextObject(frameResult.object),
+                target.placement,
+                target.policy);
+
+            result.placed = true;
+            result.message = "Placed animated text sequence frame.";
+            return result;
+        }
+
+        case AnimationBindingTargetKind::XpSequencePlacement:
+        {
+            if (target.xpSequence == nullptr || !target.xpSequence->isValid())
+            {
+                result.message = "XP sequence placement has no valid XP sequence.";
+                return result;
+            }
+
+            if (!isValidFrameIndex(frameIndex, static_cast<std::size_t>(target.xpSequence->getFrameCount())))
+            {
+                result.message = "XP sequence resolved frame ordinal is out of range.";
+                return result;
+            }
+
+            const XpSequenceAnimationAdapter::TextObjectFrameResult frameResult =
+                XpSequenceAnimationAdapter::buildTextObjectForFrame(
+                    *target.xpSequence,
+                    toPlacementFrameIndex(frameIndex),
+                    target.xpFrameOptions);
+
+            if (!frameResult.success || !frameResult.buildResult.object.isLoaded())
+            {
+                result.message = frameResult.errorMessage.empty()
+                    ? "XP sequence frame conversion failed."
+                    : frameResult.errorMessage;
+                return result;
+            }
+
+            result.placementBounds = composer.resolvePlacementBounds(
+                target.placement,
+                Size{
+                    frameResult.buildResult.object.getWidth(),
+                    frameResult.buildResult.object.getHeight()
+                });
+
+            composer.placeSource(
+                Composition::ObjectSource::fromXpSequence(
+                    *target.xpSequence,
+                    toPlacementFrameIndex(frameIndex),
+                    target.xpFrameOptions),
+                target.placement,
+                target.policy);
+
+            result.placed = true;
+            result.message = "Placed XP sequence frame.";
+            return result;
+        }
+
+        default:
+            result.message = "Unknown animation binding target kind.";
+            return result;
+        }
     }
 
     AnimationBindingResolutionResult AnimationBindingResolver::resolveTarget(

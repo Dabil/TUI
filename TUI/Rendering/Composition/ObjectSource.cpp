@@ -3,6 +3,7 @@
 #include <utility>
 
 #include "Assets/AssetLibrary.h"
+#include "Rendering/Objects/XpSequenceAnimationAdapter.h"
 
 namespace
 {
@@ -255,30 +256,31 @@ namespace Composition
             }
             else
             {
-                const XpArtLoader::LoadResult buildResult =
+                const XpSequenceAnimationAdapter::TextObjectFrameResult frameResult =
                     source.frameIndex >= 0
-                    ? XpSequenceAccess::buildTextObjectFromFrameByIndex(
+                    ? XpSequenceAnimationAdapter::buildTextObjectForFrame(
                         *source.xpSequence,
                         source.frameIndex,
                         source.xpFrameOptions)
-                    : XpSequenceAccess::buildTextObjectFromDefaultFrame(
+                    : XpSequenceAnimationAdapter::buildTextObjectForFrame(
                         *source.xpSequence,
+                        0,
                         source.xpFrameOptions);
 
-                if (!buildResult.success || !buildResult.object.isLoaded())
+                if (!frameResult.success || !frameResult.buildResult.object.isLoaded())
                 {
                     return makeFailure(
-                        buildResult.errorMessage.empty()
+                        frameResult.errorMessage.empty()
                         ? "XP sequence frame conversion failed."
-                        : buildResult.errorMessage);
+                        : frameResult.errorMessage);
                 }
 
                 return makeSuccess(
-                    buildResult.object,
+                    frameResult.buildResult.object,
                     true,
                     false,
                     AssetPaths::AssetType::XpSequence,
-                    source.frameIndex);
+                    frameResult.frameRequest.reference.frameIndex);
             }
 
         case ObjectSource::Kind::AssetReference:
