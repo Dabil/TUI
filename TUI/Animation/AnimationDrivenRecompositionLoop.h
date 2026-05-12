@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <functional>
+#include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "Animation/AnimationBindingResolver.h"
@@ -25,6 +27,9 @@ namespace Animation
             bool frameStateChanged = false;
             bool forced = false;
             std::uint64_t deterministicSignature = 0;
+            bool invalidated = false;
+            bool wholePageInvalidated = false;
+            std::size_t dirtyRegionCount = 0;
             std::vector<AnimationBindingResolutionResult> bindingResults;
         };
 
@@ -56,6 +61,14 @@ namespace Animation
         bool shouldRecompose(
             const std::vector<AnimationBindingFrameState>& currentFrameState) const;
 
+        void applyInvalidation(
+            Result& result,
+            const std::vector<AnimationBindingFrameState>& currentFrameState);
+
+        static std::string makeBindingKey(
+            const std::string& targetName,
+            const std::string& controllerName);
+
     private:
         ComposePageCallback m_composePage;
         AnimationBindingResolver* m_bindingResolver = nullptr;
@@ -65,5 +78,6 @@ namespace Animation
         bool m_forceRecompose = true;
 
         std::vector<AnimationBindingFrameState> m_lastFrameState;
+        std::unordered_map<std::string, Rect> m_lastKnownBindingBounds;
     };
 }

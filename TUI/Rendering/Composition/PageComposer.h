@@ -182,6 +182,10 @@ namespace Composition
         Rect gridRow(const Rect& base, int rows, int row) const;
         Rect gridColumn(const Rect& base, int cols, int col) const;
 
+        Rect resolvePlacementBounds(
+            const PlacementSpec& placement,
+            const Size& contentSize) const;
+
         // ---------------------------------------------------------------------
         // Core composition API
         // ---------------------------------------------------------------------

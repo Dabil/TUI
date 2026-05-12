@@ -92,6 +92,7 @@ namespace Animation
         bool placed = false;
 
         std::optional<std::size_t> frameIndex;
+        std::optional<Rect> placementBounds;
         std::string message;
     };
 
