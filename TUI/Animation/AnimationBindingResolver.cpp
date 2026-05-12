@@ -6,6 +6,28 @@
 
 #include "Rendering/Objects/XpSequenceAnimationAdapter.h"
 
+namespace
+{
+    const char* toBindingTargetKindString(Animation::AnimationBindingTargetKind kind)
+    {
+        using Kind = Animation::AnimationBindingTargetKind;
+
+        switch (kind)
+        {
+        case Kind::SequenceAssetPlacement:
+            return "SequenceAssetPlacement";
+        case Kind::FramePlaceholder:
+            return "FramePlaceholder";
+        case Kind::RegisteredFrameSequence:
+            return "RegisteredFrameSequence";
+        case Kind::XpSequencePlacement:
+            return "XpSequencePlacement";
+        default:
+            return "Unknown";
+        }
+    }
+}
+
 namespace Animation
 {
     AnimationBindingTarget AnimationBindingTarget::sequenceAssetPlacement(
@@ -145,6 +167,36 @@ namespace Animation
         AnimationBindingResolver::targets() const
     {
         return m_targets;
+    }
+
+    std::vector<AnimationBindingResolutionResult>
+        AnimationBindingResolver::resolveAll(
+            Composition::PageComposer& composer) const
+    {
+        std::vector<AnimationBindingResolutionResult> results;
+        results.reserve(m_targets.size());
+
+        for (const AnimationBindingTarget& target : m_targets)
+        {
+            const Animator* animator = tryGetController(target.controllerName);
+
+            if (animator == nullptr)
+            {
+                AnimationBindingResolutionResult result;
+                result.targetName = target.targetName;
+                result.controllerName = target.controllerName;
+                result.resolved = false;
+                result.placed = false;
+                result.message = "Animation controller reference could not be resolved.";
+
+                results.push_back(result);
+                continue;
+            }
+
+            results.push_back(placeResolvedFrame(composer, target, *animator));
+        }
+
+        return results;
     }
 
     AnimationBindingResolutionResult
@@ -420,133 +472,126 @@ namespace Animation
         return result;
     }
 
-    AnimationBindingResolutionResult
-        AnimationBindingResolver::placeResolvedFrame(
-            Composition::PageComposer& composer,
-            const AnimationBindingTarget& target,
-            const Animator& animator) const
+    AnimationDiagnosticsReport AnimationBindingResolver::diagnosticsReport() const
     {
-        AnimationBindingResolutionResult result;
-        result.targetName = target.targetName;
-        result.controllerName = target.controllerName;
-        result.resolved = true;
+        AnimationDiagnosticsReport report;
+        report.enabled = true;
 
-        const std::size_t frameIndex = animator.currentFrameIndex();
-        result.frameIndex = frameIndex;
-
-        switch (target.kind)
+        report.controllers.reserve(m_controllers.size());
+        for (const auto& entry : m_controllers)
         {
-        case AnimationBindingTargetKind::SequenceAssetPlacement:
-            if (target.assetName.empty())
+            const std::string& controllerName = entry.first;
+            const Animator* animator = entry.second;
+
+            if (animator == nullptr)
             {
-                result.message = "Sequence asset placement has no asset name.";
-                return result;
+                continue;
             }
 
-            composer.placeSource(
-                Composition::ObjectSource::fromAssetFrame(
-                    target.assetName,
-                    toPlacementFrameIndex(frameIndex)),
-                target.placement,
-                target.policy);
+            AnimatorDiagnostics controller;
+            controller.controllerName = controllerName;
+            controller.frameCount = animator->frameCount();
+            controller.currentFrameIndex = animator->currentFrameIndex();
+            controller.framesPerSecond = animator->framesPerSecond();
+            controller.playbackRate = animator->playbackRate();
+            controller.elapsedSeconds = animator->elapsedSeconds();
+            controller.durationSeconds = animator->durationSeconds();
+            controller.progress = animator->progress();
+            controller.playbackState = animator->playbackState();
+            controller.playbackMode = animator->playbackMode();
+            controller.hasExplicitFrameIndex = animator->hasExplicitFrameIndex();
+            controller.explicitFrameIndex = animator->explicitFrameIndex();
 
-            result.placed = true;
-            result.message = "Placed sequence asset frame.";
-            return result;
-
-        case AnimationBindingTargetKind::FramePlaceholder:
-        {
-            if (target.registeredFrames == nullptr)
-            {
-                result.message = "Frame placeholder has no registered frame list.";
-                return result;
-            }
-
-            if (!isValidFrameIndex(frameIndex, target.registeredFrames->size()))
-            {
-                result.message = "Frame placeholder resolved frame is out of range.";
-                return result;
-            }
-
-            const TextObject& frame = (*target.registeredFrames)[frameIndex];
-
-            result.placementBounds = composer.resolvePlacementBounds(
-                target.placement,
-                Size{ frame.getWidth(), frame.getHeight() });
-
-            composer.placeSource(
-                Composition::ObjectSource::fromRegisteredFrame(
-                    *target.registeredFrames,
-                    toPlacementFrameIndex(frameIndex)),
-                target.placement,
-                target.policy);
-
-            result.placed = true;
-            result.message = "Placed registered frame placeholder.";
-            return result;
+            report.controllers.push_back(controller);
         }
 
-        case AnimationBindingTargetKind::RegisteredFrameSequence:
+        report.bindings.reserve(m_targets.size());
+        for (const AnimationBindingTarget& target : m_targets)
         {
-            if (target.textAssetSequence == nullptr)
+            AnimationBindingDiagnostics binding;
+            binding.targetName = target.targetName;
+            binding.controllerName = target.controllerName;
+            binding.targetKind = toBindingTargetKindString(target.kind);
+
+            const Animator* animator = tryGetController(target.controllerName);
+            binding.controllerResolved = animator != nullptr;
+
+            if (animator != nullptr)
             {
-                result.message = "Animated text sequence target has no sequence.";
-                return result;
+                binding.currentFrameIndex = animator->currentFrameIndex();
             }
 
-            if (!isValidFrameIndex(frameIndex, target.textAssetSequence->frameCount()))
+            switch (target.kind)
             {
-                result.message = "Animated text sequence frame is out of range.";
-                return result;
+            case AnimationBindingTargetKind::SequenceAssetPlacement:
+                binding.targetReferenceValid = !target.assetName.empty();
+                binding.frameReferenceValid = binding.targetReferenceValid;
+                binding.message = binding.targetReferenceValid
+                    ? "Sequence asset reference is present."
+                    : "Sequence asset placement has no asset name.";
+                break;
+
+            case AnimationBindingTargetKind::FramePlaceholder:
+                binding.targetReferenceValid = target.registeredFrames != nullptr;
+                binding.availableFrameCount = target.registeredFrames != nullptr
+                    ? std::optional<std::size_t>(target.registeredFrames->size())
+                    : std::nullopt;
+                binding.frameReferenceValid =
+                    animator != nullptr &&
+                    target.registeredFrames != nullptr &&
+                    animator->currentFrameIndex() < target.registeredFrames->size();
+                binding.message = binding.frameReferenceValid
+                    ? "Registered frame binding is valid."
+                    : "Registered frame binding is missing frames or resolved outside range.";
+                break;
+
+            case AnimationBindingTargetKind::RegisteredFrameSequence:
+                binding.targetReferenceValid = target.textAssetSequence != nullptr;
+                binding.availableFrameCount = target.textAssetSequence != nullptr
+                    ? std::optional<std::size_t>(target.textAssetSequence->frameCount())
+                    : std::nullopt;
+                binding.frameReferenceValid =
+                    animator != nullptr &&
+                    target.textAssetSequence != nullptr &&
+                    animator->currentFrameIndex() < target.textAssetSequence->frameCount();
+                binding.message = binding.frameReferenceValid
+                    ? "Animated text sequence binding is valid."
+                    : "Animated text sequence binding is missing a sequence or resolved outside range.";
+                break;
+
+            case AnimationBindingTargetKind::XpSequencePlacement:
+                binding.targetReferenceValid =
+                    target.xpSequence != nullptr &&
+                    target.xpSequence->isValid();
+                binding.availableFrameCount =
+                    target.xpSequence != nullptr
+                    ? std::optional<std::size_t>(
+                        static_cast<std::size_t>(target.xpSequence->getFrameCount()))
+                    : std::nullopt;
+                binding.frameReferenceValid =
+                    animator != nullptr &&
+                    target.xpSequence != nullptr &&
+                    target.xpSequence->isValid() &&
+                    animator->currentFrameIndex() <
+                    static_cast<std::size_t>(target.xpSequence->getFrameCount());
+                binding.message = binding.frameReferenceValid
+                    ? "XP sequence binding is valid."
+                    : "XP sequence binding is invalid, missing, or resolved outside range.";
+                break;
+
+            default:
+                binding.message = "Unknown animation binding target kind.";
+                break;
             }
 
-            const AnimatedTextAssetFrameBuildResult frameResult =
-                target.textAssetSequence->buildTextObjectForFrame(frameIndex);
-
-            if (!frameResult.success || !frameResult.hasObject())
+            if (!binding.controllerResolved)
             {
-                result.message = frameResult.errorMessage.empty()
-                    ? "Animated text sequence did not produce a loaded frame."
-                    : frameResult.errorMessage;
-                return result;
+                binding.message = "Animation controller reference could not be resolved.";
             }
 
-            result.placementBounds = composer.resolvePlacementBounds(
-                target.placement,
-                Size{ frameResult.object.getWidth(), frameResult.object.getHeight() });
-
-            composer.placeSource(
-                Composition::ObjectSource::fromTextObject(frameResult.object),
-                target.placement,
-                target.policy);
-
-            result.placed = true;
-            result.message = "Placed animated text sequence frame.";
-            return result;
+            report.bindings.push_back(binding);
         }
 
-        case AnimationBindingTargetKind::XpSequencePlacement:
-            if (target.xpSequence == nullptr || !target.xpSequence->isValid())
-            {
-                result.message = "XP sequence placement has no valid XP sequence.";
-                return result;
-            }
-
-            composer.placeSource(
-                Composition::ObjectSource::fromXpSequence(
-                    *target.xpSequence,
-                    toPlacementFrameIndex(frameIndex),
-                    target.xpFrameOptions),
-                target.placement,
-                target.policy);
-
-            result.placed = true;
-            result.message = "Placed XP sequence frame.";
-            return result;
-
-        default:
-            result.message = "Unknown animation binding target kind.";
-            return result;
-        }
+        return report;
     }
 }

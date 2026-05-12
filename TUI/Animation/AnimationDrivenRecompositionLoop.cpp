@@ -84,6 +84,8 @@ namespace Animation
             result.frameStateChanged = false;
             result.forced = false;
             result.recomposed = false;
+
+            captureDiagnostics(result);
             return result;
         }
 
@@ -94,6 +96,8 @@ namespace Animation
 
         applyInvalidation(result, currentFrameState);
         m_lastFrameState = currentFrameState;
+
+        captureDiagnostics(result);
         return result;
     }
 
@@ -112,6 +116,8 @@ namespace Animation
 
         applyInvalidation(result, currentFrameState);
         m_lastFrameState = currentFrameState;
+
+        captureDiagnostics(result);
         return result;
     }
 
@@ -238,6 +244,36 @@ namespace Animation
         m_lastKnownBindingBounds = std::move(nextKnownBounds);
     }
 
+    void AnimationDrivenRecompositionLoop::captureDiagnostics(
+        const Result& result)
+    {
+        if (m_diagnostics == nullptr || !m_diagnostics->enabled)
+        {
+            return;
+        }
+
+        m_diagnostics->clearRuntimeData();
+
+        if (m_bindingResolver != nullptr)
+        {
+            AnimationDiagnosticsReport bindingReport =
+                m_bindingResolver->diagnosticsReport();
+
+            m_diagnostics->controllers = std::move(bindingReport.controllers);
+            m_diagnostics->bindings = std::move(bindingReport.bindings);
+        }
+
+        m_diagnostics->lastRecomposition.recomposed = result.recomposed;
+        m_diagnostics->lastRecomposition.frameStateChanged = result.frameStateChanged;
+        m_diagnostics->lastRecomposition.forced = result.forced;
+        m_diagnostics->lastRecomposition.invalidated = result.invalidated;
+        m_diagnostics->lastRecomposition.wholePageInvalidated = result.wholePageInvalidated;
+        m_diagnostics->lastRecomposition.dirtyRegionCount = result.dirtyRegionCount;
+        m_diagnostics->lastRecomposition.bindingResultCount = result.bindingResults.size();
+        m_diagnostics->lastRecomposition.deterministicSignature =
+            result.deterministicSignature;
+    }
+
     std::string AnimationDrivenRecompositionLoop::makeBindingKey(
         const std::string& targetName,
         const std::string& controllerName)
@@ -254,5 +290,16 @@ namespace Animation
         }
 
         return currentFrameState != m_lastFrameState;
+    }
+
+    void AnimationDrivenRecompositionLoop::setDiagnosticsReport(
+        AnimationDiagnosticsReport* diagnostics)
+    {
+        m_diagnostics = diagnostics;
+    }
+
+    void AnimationDrivenRecompositionLoop::clearDiagnosticsReport()
+    {
+        m_diagnostics = nullptr;
     }
 }

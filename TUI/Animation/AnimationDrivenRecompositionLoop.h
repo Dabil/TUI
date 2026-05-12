@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "Animation/AnimationBindingResolver.h"
+#include "Animation/AnimationDiagnostics.h"
 #include "Animation/TickEvent.h"
 #include "Rendering/Composition/PageComposer.h"
 #include "Rendering/InvalidationRegion.h"
@@ -52,6 +53,9 @@ namespace Animation
 
         Result recomposeNow(ScreenBuffer& buffer);
 
+        void setDiagnosticsReport(AnimationDiagnosticsReport* diagnostics);
+        void clearDiagnosticsReport();
+
     private:
         Result composeIntoBuffer(
             ScreenBuffer& buffer,
@@ -64,6 +68,8 @@ namespace Animation
         void applyInvalidation(
             Result& result,
             const std::vector<AnimationBindingFrameState>& currentFrameState);
+
+        void captureDiagnostics(const Result& result);
 
         static std::string makeBindingKey(
             const std::string& targetName,
@@ -79,5 +85,7 @@ namespace Animation
 
         std::vector<AnimationBindingFrameState> m_lastFrameState;
         std::unordered_map<std::string, Rect> m_lastKnownBindingBounds;
+
+        AnimationDiagnosticsReport* m_diagnostics = nullptr;
     };
 }
