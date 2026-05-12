@@ -555,6 +555,9 @@
     <ClInclude Include="UI\Panels\ContentWindow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Animation\AnimationBindingResolver.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -1029,6 +1032,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UI\Panels\ContentWindow.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationBindingResolver.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
