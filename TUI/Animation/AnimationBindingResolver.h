@@ -9,6 +9,7 @@
 
 #include "Animation/AnimatedTextAssetSequence.h"
 #include "Animation/Animator.h"
+#include "Animation/TickEvent.h"
 #include "Rendering/Composition/ObjectSource.h"
 #include "Rendering/Composition/PageComposer.h"
 #include "Rendering/Composition/WritePolicy.h"
@@ -94,6 +95,27 @@ namespace Animation
         std::string message;
     };
 
+    struct AnimationBindingFrameState
+    {
+        std::string targetName;
+        std::string controllerName;
+        bool resolved = false;
+        std::optional<std::size_t> frameIndex;
+
+        bool operator==(const AnimationBindingFrameState& other) const
+        {
+            return targetName == other.targetName
+                && controllerName == other.controllerName
+                && resolved == other.resolved
+                && frameIndex == other.frameIndex;
+        }
+
+        bool operator!=(const AnimationBindingFrameState& other) const
+        {
+            return !(*this == other);
+        }
+    };
+
     class AnimationBindingResolver
     {
     public:
@@ -118,6 +140,10 @@ namespace Animation
         AnimationBindingResolutionResult resolveTarget(
             Composition::PageComposer& composer,
             const AnimationBindingTarget& target) const;
+
+        void updateBoundControllers(const TickEvent& event);
+
+        std::vector<AnimationBindingFrameState> captureFrameState() const;
 
     private:
         static bool isValidFrameIndex(

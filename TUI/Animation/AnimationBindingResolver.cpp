@@ -187,6 +187,60 @@ namespace Animation
         return placeResolvedFrame(composer, target, *animator);
     }
 
+    void AnimationBindingResolver::updateBoundControllers(const TickEvent& event)
+    {
+        std::vector<Animator*> updatedControllers;
+        updatedControllers.reserve(m_controllers.size());
+
+        for (const auto& entry : m_controllers)
+        {
+            Animator* animator = entry.second;
+            if (animator == nullptr)
+            {
+                continue;
+            }
+
+            const bool alreadyUpdated =
+                std::find(
+                    updatedControllers.begin(),
+                    updatedControllers.end(),
+                    animator) != updatedControllers.end();
+
+            if (alreadyUpdated)
+            {
+                continue;
+            }
+
+            animator->update(event);
+            updatedControllers.push_back(animator);
+        }
+    }
+
+    std::vector<AnimationBindingFrameState>
+        AnimationBindingResolver::captureFrameState() const
+    {
+        std::vector<AnimationBindingFrameState> states;
+        states.reserve(m_targets.size());
+
+        for (const AnimationBindingTarget& target : m_targets)
+        {
+            AnimationBindingFrameState state;
+            state.targetName = target.targetName;
+            state.controllerName = target.controllerName;
+
+            const Animator* animator = tryGetController(target.controllerName);
+            if (animator != nullptr)
+            {
+                state.resolved = true;
+                state.frameIndex = animator->currentFrameIndex();
+            }
+
+            states.push_back(state);
+        }
+
+        return states;
+    }
+
     bool AnimationBindingResolver::isValidFrameIndex(
         std::size_t frameIndex,
         std::size_t frameCount)
