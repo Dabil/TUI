@@ -1,0 +1,69 @@
+#pragma once
+
+#include <cstdint>
+#include <functional>
+#include <vector>
+
+#include "Animation/AnimationBindingResolver.h"
+#include "Animation/TickEvent.h"
+#include "Rendering/Composition/PageComposer.h"
+#include "Rendering/InvalidationRegion.h"
+#include "Rendering/ScreenBuffer.h"
+#include "Rendering/Styles/Style.h"
+
+namespace Animation
+{
+    class AnimationDrivenRecompositionLoop
+    {
+    public:
+        using ComposePageCallback =
+            std::function<void(Composition::PageComposer& composer)>;
+
+        struct Result
+        {
+            bool recomposed = false;
+            bool frameStateChanged = false;
+            bool forced = false;
+            std::uint64_t deterministicSignature = 0;
+            std::vector<AnimationBindingResolutionResult> bindingResults;
+        };
+
+        void setComposePageCallback(ComposePageCallback callback);
+        void clearComposePageCallback();
+
+        void setBindingResolver(AnimationBindingResolver* resolver);
+        void clearBindingResolver();
+
+        void setInvalidationRegion(Rendering::InvalidationRegion* invalidation);
+        void clearInvalidationRegion();
+
+        void setClearStyle(const Style& style);
+        void requestRecompose();
+        void resetFrameTracking();
+
+        Result updateAndRecomposeIfNeeded(
+            ScreenBuffer& buffer,
+            const TickEvent& event);
+
+        Result recomposeNow(ScreenBuffer& buffer);
+
+    private:
+        Result composeIntoBuffer(
+            ScreenBuffer& buffer,
+            bool forced,
+            bool frameStateChanged);
+
+        bool shouldRecompose(
+            const std::vector<AnimationBindingFrameState>& currentFrameState) const;
+
+    private:
+        ComposePageCallback m_composePage;
+        AnimationBindingResolver* m_bindingResolver = nullptr;
+        Rendering::InvalidationRegion* m_invalidation = nullptr;
+
+        Style m_clearStyle;
+        bool m_forceRecompose = true;
+
+        std::vector<AnimationBindingFrameState> m_lastFrameState;
+    };
+}

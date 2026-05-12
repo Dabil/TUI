@@ -134,6 +134,7 @@
     <ClInclude Include="Animation\AnimatedTextAssetSequence.h" />
     <ClInclude Include="Animation\Animation.h" />
     <ClInclude Include="Animation\AnimationBindingResolver.h" />
+    <ClInclude Include="Animation\AnimationDrivenRecompositionLoop.h" />
     <ClInclude Include="Animation\Animator.h" />
     <ClInclude Include="Animation\PeriodicTimer.h" />
     <ClInclude Include="Animation\TickClock.h" />
@@ -337,6 +338,7 @@
     <ClCompile Include="Animation\AnimatedTextAssetSequence.cpp" />
     <ClCompile Include="Animation\Animation.cpp" />
     <ClCompile Include="Animation\AnimationBindingResolver.cpp" />
+    <ClCompile Include="Animation\AnimationDrivenRecompositionLoop.cpp" />
     <ClCompile Include="Animation\Animator.cpp" />
     <ClCompile Include="Animation\PeriodicTimer.cpp" />
     <ClCompile Include="Animation\TickClock.cpp" />
