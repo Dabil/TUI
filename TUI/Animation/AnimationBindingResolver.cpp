@@ -169,6 +169,36 @@ namespace Animation
         return m_targets;
     }
 
+    std::vector<AnimationBindingResolutionResult>
+        AnimationBindingResolver::resolveAll(
+            Composition::PageComposer& composer) const
+    {
+        std::vector<AnimationBindingResolutionResult> results;
+        results.reserve(m_targets.size());
+
+        for (const AnimationBindingTarget& target : m_targets)
+        {
+            const Animator* animator = tryGetController(target.controllerName);
+
+            if (animator == nullptr)
+            {
+                AnimationBindingResolutionResult result;
+                result.targetName = target.targetName;
+                result.controllerName = target.controllerName;
+                result.resolved = false;
+                result.placed = false;
+                result.message = "Animation controller reference could not be resolved.";
+
+                results.push_back(result);
+                continue;
+            }
+
+            results.push_back(placeResolvedFrame(composer, target, *animator));
+        }
+
+        return results;
+    }
+
     AnimationBindingResolutionResult
         AnimationBindingResolver::placeResolvedFrame(
             Composition::PageComposer& composer,
