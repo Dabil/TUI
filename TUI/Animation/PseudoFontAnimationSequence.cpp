@@ -54,47 +54,26 @@ namespace
         return builder.build();
     }
 
-    bool addHiddenFrameFromSource(
-        Animation::AnimatedTextAssetSequence& sequence,
+    bool canUseLayerObjectDirectly(
         const Rendering::LayeredTextObject& source,
-        const Animation::PseudoFontAnimationFrame& frame,
-        const int sourceFrameIndex)
+        const Rendering::TextObjectLayer& layer)
     {
-        TextObject object = makeHiddenTextObject(source);
-        if (!object.isLoaded())
+        return layer.offsetX == 0 &&
+            layer.offsetY == 0 &&
+            layer.object.isLoaded() &&
+            layer.object.getWidth() == source.getWidth() &&
+            layer.object.getHeight() == source.getHeight();
+    }
+
+    TextObject composeLayersIntoFrame(
+        const Rendering::LayeredTextObject& source,
+        const std::vector<const Rendering::TextObjectLayer*>& layers)
+    {
+        if (!source.isLoaded() || source.getWidth() <= 0 || source.getHeight() <= 0)
         {
-            return false;
+            return TextObject{};
         }
 
-        sequence.addFrame(Animation::AnimatedTextAssetFrame::fromTextObject(
-            std::move(object),
-            makeTiming(frame.durationSeconds),
-            makeFrameInfo(frame, sourceFrameIndex)));
-
-        return true;
-    }
-
-    bool addSingleLayerFrame(
-        Animation::AnimatedTextAssetSequence& sequence,
-        const Rendering::TextObjectLayer& layer,
-        const Animation::PseudoFontAnimationFrame& frame,
-        const int sourceFrameIndex)
-    {
-        sequence.addFrame(Animation::AnimatedTextAssetFrame::fromTextObject(
-            layer.object,
-            makeTiming(frame.durationSeconds),
-            makeFrameInfo(frame, sourceFrameIndex)));
-
-        return true;
-    }
-
-    bool addCompositedFrame(
-        Animation::AnimatedTextAssetSequence& sequence,
-        const Rendering::LayeredTextObject& source,
-        const std::vector<const Rendering::TextObjectLayer*>& layers,
-        const Animation::PseudoFontAnimationFrame& frame,
-        const int sourceFrameIndex)
-    {
         Rendering::LayeredTextObject composed(source.getWidth(), source.getHeight());
 
         for (const Rendering::TextObjectLayer* sourceLayer : layers)
@@ -109,7 +88,15 @@ namespace
             composed.addLayer(std::move(layer));
         }
 
-        TextObject object = composed.flattenVisibleOnly();
+        return composed.flattenVisibleOnly();
+    }
+
+    bool addTextObjectFrame(
+        Animation::AnimatedTextAssetSequence& sequence,
+        TextObject object,
+        const Animation::PseudoFontAnimationFrame& frame,
+        const int sourceFrameIndex)
+    {
         if (!object.isLoaded())
         {
             return false;
@@ -121,6 +108,64 @@ namespace
             makeFrameInfo(frame, sourceFrameIndex)));
 
         return true;
+    }
+
+    bool addHiddenFrameFromSource(
+        Animation::AnimatedTextAssetSequence& sequence,
+        const Rendering::LayeredTextObject& source,
+        const Animation::PseudoFontAnimationFrame& frame,
+        const int sourceFrameIndex)
+    {
+        return addTextObjectFrame(
+            sequence,
+            makeHiddenTextObject(source),
+            frame,
+            sourceFrameIndex);
+    }
+
+    bool addSingleLayerFrame(
+        Animation::AnimatedTextAssetSequence& sequence,
+        const Rendering::LayeredTextObject& source,
+        const Rendering::TextObjectLayer& layer,
+        const Animation::PseudoFontAnimationFrame& frame,
+        const int sourceFrameIndex)
+    {
+        if (!layer.object.isLoaded())
+        {
+            return false;
+        }
+
+        if (canUseLayerObjectDirectly(source, layer))
+        {
+            return addTextObjectFrame(
+                sequence,
+                layer.object,
+                frame,
+                sourceFrameIndex);
+        }
+
+        std::vector<const Rendering::TextObjectLayer*> layers;
+        layers.push_back(&layer);
+
+        return addTextObjectFrame(
+            sequence,
+            composeLayersIntoFrame(source, layers),
+            frame,
+            sourceFrameIndex);
+    }
+
+    bool addCompositedFrame(
+        Animation::AnimatedTextAssetSequence& sequence,
+        const Rendering::LayeredTextObject& source,
+        const std::vector<const Rendering::TextObjectLayer*>& layers,
+        const Animation::PseudoFontAnimationFrame& frame,
+        const int sourceFrameIndex)
+    {
+        return addTextObjectFrame(
+            sequence,
+            composeLayersIntoFrame(source, layers),
+            frame,
+            sourceFrameIndex);
     }
 
     std::string makeMissingLayerMessage(
@@ -136,6 +181,24 @@ namespace
         }
 
         stream << " references missing layer '" << layerName << "'.";
+        return stream.str();
+    }
+
+    std::string makeSingleLayerMessage(
+        const Rendering::LayeredTextObject& source,
+        const Rendering::TextObjectLayer& layer)
+    {
+        std::ostringstream stream;
+
+        if (canUseLayerObjectDirectly(source, layer))
+        {
+            stream << "Added direct single-layer pFont animation frame.";
+        }
+        else
+        {
+            stream << "Added positioned single-layer pFont animation frame using composition.";
+        }
+
         return stream.str();
     }
 }
@@ -223,18 +286,22 @@ namespace Animation
 
             if (resolvedLayers.size() == 1)
             {
-                const bool added = addSingleLayerFrame(
-                    result.sequence,
-                    *resolvedLayers.front(),
-                    frame,
-                    sourceFrameIndex);
+                const Rendering::TextObjectLayer* layer = resolvedLayers.front();
+
+                const bool added = layer != nullptr &&
+                    addSingleLayerFrame(
+                        result.sequence,
+                        source,
+                        *layer,
+                        frame,
+                        sourceFrameIndex);
 
                 result.diagnostics.push_back(makeDiagnostic(
                     frame.frameName,
                     PseudoFontAnimationFrameBuildKind::SingleLayer,
                     added,
-                    added
-                    ? "Added single-layer pFont animation frame."
+                    added && layer != nullptr
+                    ? makeSingleLayerMessage(source, *layer)
                     : "Failed to add single-layer pFont animation frame."));
 
                 continue;
