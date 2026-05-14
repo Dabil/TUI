@@ -210,8 +210,8 @@ namespace Animation
         result.controllerName = target.controllerName;
         result.resolved = true;
 
-        const std::size_t frameIndex = animator.currentFrameIndex();
-        result.frameIndex = frameIndex;
+        const std::size_t animatorFrameIndex = animator.currentFrameIndex();
+        result.frameIndex = animatorFrameIndex;
 
         switch (target.kind)
         {
@@ -226,7 +226,7 @@ namespace Animation
             composer.placeSource(
                 Composition::ObjectSource::fromAssetFrame(
                     target.assetName,
-                    toPlacementFrameIndex(frameIndex)),
+                    toPlacementFrameIndex(animatorFrameIndex)),
                 target.placement,
                 target.policy);
 
@@ -243,13 +243,13 @@ namespace Animation
                 return result;
             }
 
-            if (!isValidFrameIndex(frameIndex, target.registeredFrames->size()))
+            if (!isValidFrameIndex(animatorFrameIndex, target.registeredFrames->size()))
             {
                 result.message = "Frame placeholder resolved frame is out of range.";
                 return result;
             }
 
-            const TextObject& frame = (*target.registeredFrames)[frameIndex];
+            const TextObject& frame = (*target.registeredFrames)[animatorFrameIndex];
 
             result.placementBounds = composer.resolvePlacementBounds(
                 target.placement,
@@ -258,7 +258,7 @@ namespace Animation
             composer.placeSource(
                 Composition::ObjectSource::fromRegisteredFrame(
                     *target.registeredFrames,
-                    toPlacementFrameIndex(frameIndex)),
+                    toPlacementFrameIndex(animatorFrameIndex)),
                 target.placement,
                 target.policy);
 
@@ -272,37 +272,46 @@ namespace Animation
             if (target.textAssetSequence == nullptr)
             {
                 result.message = "Animated text sequence target has no sequence.";
+                result.frameIndex.reset();
                 return result;
             }
 
-            if (!isValidFrameIndex(frameIndex, target.textAssetSequence->frameCount()))
+            const AnimatedTextAssetSequencePlaybackResult playbackResult =
+                buildTextObjectForAnimatorWithResult(
+                    *target.textAssetSequence,
+                    animator);
+
+            if (playbackResult.hasFrameIndex)
             {
-                result.message = "Animated text sequence frame is out of range.";
-                return result;
+                result.frameIndex = playbackResult.frameIndex;
+            }
+            else
+            {
+                result.frameIndex.reset();
             }
 
-            const AnimatedTextAssetFrameBuildResult frameResult =
-                target.textAssetSequence->buildTextObjectForFrame(frameIndex);
-
-            if (!frameResult.success || !frameResult.hasObject())
+            if (!playbackResult.success() || !playbackResult.hasObject())
             {
-                result.message = frameResult.errorMessage.empty()
+                result.message = playbackResult.buildResult.errorMessage.empty()
                     ? "Animated text sequence did not produce a loaded frame."
-                    : frameResult.errorMessage;
+                    : playbackResult.buildResult.errorMessage;
                 return result;
             }
 
             result.placementBounds = composer.resolvePlacementBounds(
                 target.placement,
-                Size{ frameResult.object.getWidth(), frameResult.object.getHeight() });
+                Size{
+                    playbackResult.buildResult.object.getWidth(),
+                    playbackResult.buildResult.object.getHeight()
+                });
 
             composer.placeSource(
-                Composition::ObjectSource::fromTextObject(frameResult.object),
+                Composition::ObjectSource::fromTextObject(playbackResult.buildResult.object),
                 target.placement,
                 target.policy);
 
             result.placed = true;
-            result.message = "Placed animated text sequence frame.";
+            result.message = "Placed duration-aware animated text sequence frame.";
             return result;
         }
 
@@ -314,7 +323,9 @@ namespace Animation
                 return result;
             }
 
-            if (!isValidFrameIndex(frameIndex, static_cast<std::size_t>(target.xpSequence->getFrameCount())))
+            if (!isValidFrameIndex(
+                animatorFrameIndex,
+                static_cast<std::size_t>(target.xpSequence->getFrameCount())))
             {
                 result.message = "XP sequence resolved frame ordinal is out of range.";
                 return result;
@@ -323,7 +334,7 @@ namespace Animation
             const XpSequenceAnimationAdapter::TextObjectFrameResult frameResult =
                 XpSequenceAnimationAdapter::buildTextObjectForFrame(
                     *target.xpSequence,
-                    toPlacementFrameIndex(frameIndex),
+                    toPlacementFrameIndex(animatorFrameIndex),
                     target.xpFrameOptions);
 
             if (!frameResult.success || !frameResult.buildResult.object.isLoaded())
@@ -344,7 +355,7 @@ namespace Animation
             composer.placeSource(
                 Composition::ObjectSource::fromXpSequence(
                     *target.xpSequence,
-                    toPlacementFrameIndex(frameIndex),
+                    toPlacementFrameIndex(animatorFrameIndex),
                     target.xpFrameOptions),
                 target.placement,
                 target.policy);
