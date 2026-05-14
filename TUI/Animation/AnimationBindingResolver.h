@@ -165,6 +165,10 @@ namespace Animation
             const AnimationBindingTarget& target,
             const Animator& animator) const;
 
+        static std::optional<std::size_t> resolveFrameIndexForTarget(
+            const AnimationBindingTarget& target,
+            const Animator& animator);
+
     private:
         std::unordered_map<std::string, Animator*> m_controllers;
         std::vector<AnimationBindingTarget> m_targets;

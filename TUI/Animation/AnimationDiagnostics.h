@@ -33,7 +33,11 @@ namespace Animation
         bool controllerResolved = false;
         bool targetReferenceValid = false;
         bool frameReferenceValid = false;
+
         std::optional<std::size_t> currentFrameIndex;
+        std::optional<std::size_t> animatorFrameIndex;
+        bool usesDurationAwareSequenceTiming = false;
+
         std::optional<std::size_t> availableFrameCount;
         std::string message;
     };
