@@ -113,6 +113,12 @@ namespace Rendering
         return (it != m_layers.end()) ? &(*it) : nullptr;
     }
 
+    const TextObject* LayeredTextObject::findLayerTextObjectByName(std::string_view name) const
+    {
+        const TextObjectLayer* layer = findLayer(name);
+        return (layer != nullptr) ? &layer->object : nullptr;
+    }
+
     bool LayeredTextObject::hasLayer(std::string_view name) const
     {
         return findLayer(name) != nullptr;

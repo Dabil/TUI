@@ -76,6 +76,8 @@ namespace Rendering
         const TextObjectLayer* findLayer(std::string_view name) const;
         TextObjectLayer* findLayer(std::string_view name);
 
+        const TextObject* findLayerTextObjectByName(std::string_view name) const;
+
         bool hasLayer(std::string_view name) const;
         bool addLayer(const TextObjectLayer& layer);
         bool addLayer(TextObjectLayer&& layer);
