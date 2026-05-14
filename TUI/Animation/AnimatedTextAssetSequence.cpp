@@ -4,6 +4,7 @@
 #include <sstream>
 #include <utility>
 
+#include "Animation/Animator.h"
 #include "Rendering/Objects/XpSequenceAnimationAdapter.h"
 
 namespace
@@ -50,6 +51,18 @@ namespace
 
         return fallbackDurationSeconds;
     }
+
+    std::size_t clampSequenceFrameIndex(
+        const std::size_t frameIndex,
+        const std::size_t frameCount)
+    {
+        if (frameCount == 0)
+        {
+            return 0;
+        }
+
+        return std::min(frameIndex, frameCount - 1);
+    }
 }
 
 namespace Animation
@@ -89,6 +102,16 @@ namespace Animation
     bool AnimatedTextAssetFrameBuildResult::hasObject() const
     {
         return success && object.isLoaded();
+    }
+
+    bool AnimatedTextAssetSequencePlaybackResult::success() const
+    {
+        return buildResult.success;
+    }
+
+    bool AnimatedTextAssetSequencePlaybackResult::hasObject() const
+    {
+        return buildResult.hasObject();
     }
 
     AnimatedTextAssetFrame AnimatedTextAssetFrame::fromTextObject(
@@ -631,6 +654,56 @@ namespace Animation
     double AnimatedTextAssetSequence::sanitizeDefaultDuration(const double seconds)
     {
         return seconds > 0.0 ? seconds : 0.0;
+    }
+
+    std::size_t frameIndexForAnimator(
+        const AnimatedTextAssetSequence& sequence,
+        const Animator& animator)
+    {
+        if (sequence.isEmpty())
+        {
+            return 0;
+        }
+
+        if (animator.hasExplicitFrameIndex())
+        {
+            return clampSequenceFrameIndex(
+                animator.explicitFrameIndex().value(),
+                sequence.frameCount());
+        }
+
+        return sequence.frameIndexForElapsedSeconds(animator.elapsedSeconds());
+    }
+
+    AnimatedTextAssetSequencePlaybackResult buildTextObjectForAnimatorWithResult(
+        const AnimatedTextAssetSequence& sequence,
+        const Animator& animator)
+    {
+        AnimatedTextAssetSequencePlaybackResult result;
+        result.elapsedSeconds = animator.elapsedSeconds();
+        result.usedExplicitFrameIndex = animator.hasExplicitFrameIndex();
+
+        if (sequence.isEmpty())
+        {
+            result.buildResult = makeFailure(
+                AnimatedTextAssetFrameResultCode::FrameIndexOutOfRange,
+                "Cannot build a TextObject from an empty animated text asset sequence.");
+
+            return result;
+        }
+
+        result.frameIndex = frameIndexForAnimator(sequence, animator);
+        result.hasFrameIndex = true;
+        result.buildResult = sequence.buildTextObjectForFrame(result.frameIndex);
+
+        return result;
+    }
+
+    AnimatedTextAssetFrameBuildResult buildTextObjectForAnimator(
+        const AnimatedTextAssetSequence& sequence,
+        const Animator& animator)
+    {
+        return buildTextObjectForAnimatorWithResult(sequence, animator).buildResult;
     }
 
     const char* toString(const AnimatedTextAssetFrameSourceKind kind)

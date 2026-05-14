@@ -12,6 +12,9 @@
 
 namespace Animation
 {
+    class Animator;
+    class AnimatedTextAssetSequence;
+
     enum class AnimatedTextAssetFrameSourceKind
     {
         Empty,
@@ -61,6 +64,19 @@ namespace Animation
         AnimatedTextAssetFrameResultCode code = AnimatedTextAssetFrameResultCode::None;
         std::string errorMessage;
 
+        bool hasObject() const;
+    };
+
+    struct AnimatedTextAssetSequencePlaybackResult
+    {
+        AnimatedTextAssetFrameBuildResult buildResult;
+
+        std::size_t frameIndex = 0;
+        bool hasFrameIndex = false;
+        bool usedExplicitFrameIndex = false;
+        double elapsedSeconds = 0.0;
+
+        bool success() const;
         bool hasObject() const;
     };
 
@@ -191,6 +207,18 @@ namespace Animation
         bool m_looping = false;
         std::vector<AnimatedTextAssetFrame> m_frames;
     };
+
+    std::size_t frameIndexForAnimator(
+        const AnimatedTextAssetSequence& sequence,
+        const Animator& animator);
+
+    AnimatedTextAssetSequencePlaybackResult buildTextObjectForAnimatorWithResult(
+        const AnimatedTextAssetSequence& sequence,
+        const Animator& animator);
+
+    AnimatedTextAssetFrameBuildResult buildTextObjectForAnimator(
+        const AnimatedTextAssetSequence& sequence,
+        const Animator& animator);
 
     const char* toString(AnimatedTextAssetFrameSourceKind kind);
     const char* toString(AnimatedTextAssetFrameResultCode code);
