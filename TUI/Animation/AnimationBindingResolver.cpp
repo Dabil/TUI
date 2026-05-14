@@ -443,7 +443,7 @@ namespace Animation
             if (animator != nullptr)
             {
                 state.resolved = true;
-                state.frameIndex = animator->currentFrameIndex();
+                state.frameIndex = resolveFrameIndexForTarget(target, *animator);
             }
 
             states.push_back(state);
@@ -529,14 +529,16 @@ namespace Animation
 
             if (animator != nullptr)
             {
-                binding.currentFrameIndex = animator->currentFrameIndex();
+                binding.animatorFrameIndex = animator->currentFrameIndex();
+                binding.currentFrameIndex = resolveFrameIndexForTarget(target, *animator);
             }
 
             switch (target.kind)
             {
             case AnimationBindingTargetKind::SequenceAssetPlacement:
                 binding.targetReferenceValid = !target.assetName.empty();
-                binding.frameReferenceValid = binding.targetReferenceValid;
+                binding.frameReferenceValid = binding.targetReferenceValid &&
+                    binding.currentFrameIndex.has_value();
                 binding.message = binding.targetReferenceValid
                     ? "Sequence asset reference is present."
                     : "Sequence asset placement has no asset name.";
@@ -548,25 +550,26 @@ namespace Animation
                     ? std::optional<std::size_t>(target.registeredFrames->size())
                     : std::nullopt;
                 binding.frameReferenceValid =
-                    animator != nullptr &&
                     target.registeredFrames != nullptr &&
-                    animator->currentFrameIndex() < target.registeredFrames->size();
+                    binding.currentFrameIndex.has_value() &&
+                    binding.currentFrameIndex.value() < target.registeredFrames->size();
                 binding.message = binding.frameReferenceValid
                     ? "Registered frame binding is valid."
                     : "Registered frame binding is missing frames or resolved outside range.";
                 break;
 
             case AnimationBindingTargetKind::RegisteredFrameSequence:
+                binding.usesDurationAwareSequenceTiming = true;
                 binding.targetReferenceValid = target.textAssetSequence != nullptr;
                 binding.availableFrameCount = target.textAssetSequence != nullptr
                     ? std::optional<std::size_t>(target.textAssetSequence->frameCount())
                     : std::nullopt;
                 binding.frameReferenceValid =
-                    animator != nullptr &&
                     target.textAssetSequence != nullptr &&
-                    animator->currentFrameIndex() < target.textAssetSequence->frameCount();
+                    binding.currentFrameIndex.has_value() &&
+                    binding.currentFrameIndex.value() < target.textAssetSequence->frameCount();
                 binding.message = binding.frameReferenceValid
-                    ? "Animated text sequence binding is valid."
+                    ? "Animated text sequence binding is valid using duration-aware sequence timing."
                     : "Animated text sequence binding is missing a sequence or resolved outside range.";
                 break;
 
@@ -580,10 +583,10 @@ namespace Animation
                         static_cast<std::size_t>(target.xpSequence->getFrameCount()))
                     : std::nullopt;
                 binding.frameReferenceValid =
-                    animator != nullptr &&
                     target.xpSequence != nullptr &&
                     target.xpSequence->isValid() &&
-                    animator->currentFrameIndex() <
+                    binding.currentFrameIndex.has_value() &&
+                    binding.currentFrameIndex.value() <
                     static_cast<std::size_t>(target.xpSequence->getFrameCount());
                 binding.message = binding.frameReferenceValid
                     ? "XP sequence binding is valid."
@@ -604,5 +607,31 @@ namespace Animation
         }
 
         return report;
+    }
+
+    std::optional<std::size_t>
+        AnimationBindingResolver::resolveFrameIndexForTarget(
+            const AnimationBindingTarget& target,
+            const Animator& animator)
+    {
+        switch (target.kind)
+        {
+        case AnimationBindingTargetKind::RegisteredFrameSequence:
+            if (target.textAssetSequence == nullptr ||
+                target.textAssetSequence->isEmpty())
+            {
+                return std::nullopt;
+            }
+
+            return frameIndexForAnimator(*target.textAssetSequence, animator);
+
+        case AnimationBindingTargetKind::SequenceAssetPlacement:
+        case AnimationBindingTargetKind::FramePlaceholder:
+        case AnimationBindingTargetKind::XpSequencePlacement:
+            return animator.currentFrameIndex();
+
+        default:
+            return std::nullopt;
+        }
     }
 }
