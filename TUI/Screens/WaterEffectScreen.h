@@ -3,12 +3,16 @@
 #include <string>
 #include <vector>
 
-#include "Screens/Screen.h"
+#include "Animation/AnimatedTextAssetSequence.h"
+#include "Animation/AnimationBindingResolver.h"
+#include "Animation/Animator.h"
+#include "Animation/PseudoFontAnimationSequence.h"
 #include "Assets/AssetLibrary.h"
-#include "Rendering/Objects/LayeredTextObject.h"
-#include "Rendering/Styles/Style.h"
-#include "Rendering/Objects/TextObject.h"
 #include "Rendering/Effects/WaterWaveEffect.h"
+#include "Rendering/Objects/pFontLoader.h"
+#include "Rendering/Objects/TextObject.h"
+#include "Rendering/Styles/Style.h"
+#include "Screens/Screen.h"
 
 class Surface;
 class ScreenBuffer;
@@ -25,13 +29,11 @@ public:
     void draw(Surface& surface) override;
 
 private:
-    // Title Related
+    // Title related
     void ensureWaterTitleLoaded();
-    void rebuildWaterTitle();
-    void updateWaterTitleAnimation();
-    void setWaterTitleLayerVisibility(bool stage1Visible, bool stage2Visible, bool stage3Visible, bool finalVisible);
-    void hideWaterTitleLayers();
-    void drawWaterTitle(ScreenBuffer& buffer) const;
+    void rebuildWaterTitleAnimation();
+    std::vector<Animation::PseudoFontAnimationFrame> buildWaterTitleAnimationFrames() const;
+    void drawWaterTitle(ScreenBuffer& buffer);
 
     // Static UI cache / layout related
     void ensureLayout(int screenWidth, int screenHeight);
@@ -58,12 +60,16 @@ private:
     // Title related
     Assets::AssetLibrary& m_assetLibrary;
     PseudoFont::FontDefinition m_waterTitleFont;
-    Rendering::LayeredTextObject m_waterTitleObject;
+
+    Animation::AnimatedTextAssetSequence m_waterTitleSequence;
+    Animation::Animator m_waterTitleAnimator;
+    Animation::AnimationBindingResolver m_waterTitleBindingResolver;
+
     std::string m_waterTitlePseudoFontKey = "pfont.assemble_box";
     std::string m_waterTitleLoadError;
     bool m_waterTitleLoadAttempted = false;
     bool m_waterTitleLoaded = false;
-    double m_elapsedSeconds = 0.0;
+    bool m_waterTitleAnimationReady = false;
 
     // Retained static UI cache
     int m_screenWidth = 0;

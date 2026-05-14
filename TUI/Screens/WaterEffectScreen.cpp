@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <sstream>
 
 #include "Core/Rect.h"
 #include "Rendering/Composition/WritePresets.h"
@@ -23,15 +24,33 @@ namespace
     using Composition::Alignment;
     using Composition::PageComposer;
 
+    constexpr const char* WaterTitleControllerName = "water.title.controller";
+    constexpr const char* WaterTitleTargetName = "water.title";
+    constexpr const char* WaterTitleRegionName = "WaterTitleRegion";
+
     constexpr double WaterTitleAssembleDurationSeconds = 1.5;
     constexpr double WaterTitleHoldDurationSeconds = 5.0;
     constexpr double WaterTitleReverseDurationSeconds = 1.5;
     constexpr double WaterTitleRepeatDelaySeconds = 10.0;
-    constexpr double WaterTitleCycleDurationSeconds =
-        WaterTitleAssembleDurationSeconds +
-        WaterTitleHoldDurationSeconds +
-        WaterTitleReverseDurationSeconds +
-        WaterTitleRepeatDelaySeconds;
+
+    std::string buildPseudoFontAnimationErrorMessage(
+        const Animation::PseudoFontAnimationSequenceBuildResult& result)
+    {
+        std::ostringstream stream;
+        stream << "Failed to build WATER pFont animation sequence.";
+
+        for (const Animation::PseudoFontAnimationFrameDiagnostic& diagnostic : result.diagnostics)
+        {
+            if (diagnostic.success)
+            {
+                continue;
+            }
+
+            stream << " " << diagnostic.message;
+        }
+
+        return stream.str();
+    }
 }
 
 namespace WaterColors
@@ -86,30 +105,34 @@ WaterEffectScreen::WaterEffectScreen(Assets::AssetLibrary& assetLibrary)
 
 void WaterEffectScreen::onEnter()
 {
-    m_elapsedSeconds = 0.0;
     invalidateStaticUiCache();
     invalidateModeBarCache();
     invalidateMinimumScreenUiCache();
     invalidateWaterTitleFallbackCache();
 
     ensureWaterTitleLoaded();
-    rebuildWaterTitle();
-    updateWaterTitleAnimation();
+    rebuildWaterTitleAnimation();
 
     m_waveEffect.onEnter();
 }
 
 void WaterEffectScreen::onExit()
 {
-    m_waterTitleObject.clear();
+    m_waterTitleBindingResolver.clear();
+    m_waterTitleSequence.clear();
+    m_waterTitleAnimator.stop();
+    m_waterTitleAnimationReady = false;
+
     invalidateWaterTitleFallbackCache();
     m_waveEffect.onExit();
 }
 
 void WaterEffectScreen::update(const Animation::TickEvent& event)
 {
-    m_elapsedSeconds += event.deltaSeconds;
-    updateWaterTitleAnimation();
+    if (m_waterTitleAnimationReady)
+    {
+        m_waterTitleBindingResolver.updateBoundControllers(event);
+    }
 
     if (m_screenWidth <= 2 || m_screenHeight <= 2)
     {
@@ -422,11 +445,15 @@ void WaterEffectScreen::ensureWaterTitleLoaded()
     invalidateWaterTitleFallbackCache();
 }
 
-void WaterEffectScreen::rebuildWaterTitle()
+void WaterEffectScreen::rebuildWaterTitleAnimation()
 {
+    m_waterTitleBindingResolver.clear();
+    m_waterTitleSequence.clear();
+    m_waterTitleAnimator.stop();
+    m_waterTitleAnimationReady = false;
+
     if (!m_waterTitleLoaded)
     {
-        m_waterTitleObject.clear();
         return;
     }
 
@@ -434,107 +461,86 @@ void WaterEffectScreen::rebuildWaterTitle()
     options.initialVisibilityMode =
         PseudoFont::LayeredRenderOptions::InitialVisibilityMode::AllHidden;
 
-    m_waterTitleObject =
+    const Rendering::LayeredTextObject waterTitleObject =
         BannerFactory::makeLayeredBannerObject(
             m_waterTitleFont,
             "WATER TUI",
             options);
 
-    hideWaterTitleLayers();
-}
+    const Animation::PseudoFontAnimationSequenceBuildResult buildResult =
+        Animation::buildPseudoFontAnimationSequenceWithDiagnostics(
+            waterTitleObject,
+            buildWaterTitleAnimationFrames(),
+            "WaterEffectScreen.WATER.title");
 
-void WaterEffectScreen::updateWaterTitleAnimation()
-{
-    if (!m_waterTitleLoaded || m_waterTitleObject.isEmpty())
+    if (!buildResult.success || buildResult.builtFrameCount == 0)
     {
+        m_waterTitleLoaded = false;
+        m_waterTitleLoadError = buildPseudoFontAnimationErrorMessage(buildResult);
+        invalidateWaterTitleFallbackCache();
         return;
     }
 
-    hideWaterTitleLayers();
+    m_waterTitleSequence = buildResult.sequence;
+    m_waterTitleSequence.setLooping(true);
 
-    const double cycleTime = std::fmod(m_elapsedSeconds, WaterTitleCycleDurationSeconds);
-
-    if (cycleTime < WaterTitleAssembleDurationSeconds)
+    const double totalDurationSeconds = m_waterTitleSequence.totalDurationSeconds();
+    if (totalDurationSeconds <= 0.0 || m_waterTitleSequence.frameCount() == 0)
     {
-        const double stepDuration = WaterTitleAssembleDurationSeconds / 4.0;
-
-        if (cycleTime < stepDuration)
-        {
-            setWaterTitleLayerVisibility(true, false, false, false);
-        }
-        else if (cycleTime < (stepDuration * 2.0))
-        {
-            setWaterTitleLayerVisibility(false, true, false, false);
-        }
-        else if (cycleTime < (stepDuration * 3.0))
-        {
-            setWaterTitleLayerVisibility(false, false, true, false);
-        }
-        else
-        {
-            setWaterTitleLayerVisibility(false, false, false, true);
-        }
-
+        m_waterTitleLoaded = false;
+        m_waterTitleLoadError = "WATER pFont animation sequence has no playable duration.";
+        invalidateWaterTitleFallbackCache();
         return;
     }
 
-    if (cycleTime < (WaterTitleAssembleDurationSeconds + WaterTitleHoldDurationSeconds))
-    {
-        setWaterTitleLayerVisibility(false, false, false, true);
-        return;
-    }
+    const double framesPerSecond =
+        static_cast<double>(m_waterTitleSequence.frameCount()) / totalDurationSeconds;
 
-    if (cycleTime < (WaterTitleAssembleDurationSeconds + WaterTitleHoldDurationSeconds + WaterTitleReverseDurationSeconds))
-    {
-        const double reverseTime =
-            cycleTime - (WaterTitleAssembleDurationSeconds + WaterTitleHoldDurationSeconds);
-        const double stepDuration = WaterTitleReverseDurationSeconds / 4.0;
+    m_waterTitleAnimator.configure(
+        m_waterTitleSequence.frameCount(),
+        framesPerSecond);
 
-        if (reverseTime < stepDuration)
-        {
-            setWaterTitleLayerVisibility(false, false, false, true);
-        }
-        else if (reverseTime < (stepDuration * 2.0))
-        {
-            setWaterTitleLayerVisibility(false, false, true, false);
-        }
-        else if (reverseTime < (stepDuration * 3.0))
-        {
-            setWaterTitleLayerVisibility(false, true, false, false);
-        }
-        else
-        {
-            setWaterTitleLayerVisibility(true, false, false, false);
-        }
+    m_waterTitleAnimator.setPlaybackMode(Animation::PlaybackMode::Loop);
+    m_waterTitleAnimator.play();
 
-        return;
-    }
+    m_waterTitleBindingResolver.bindController(
+        WaterTitleControllerName,
+        m_waterTitleAnimator);
 
-    hideWaterTitleLayers();
+    m_waterTitleAnimationReady = true;
+    invalidateWaterTitleFallbackCache();
 }
 
-void WaterEffectScreen::setWaterTitleLayerVisibility(
-    bool stage1Visible,
-    bool stage2Visible,
-    bool stage3Visible,
-    bool finalVisible)
+std::vector<Animation::PseudoFontAnimationFrame>
+WaterEffectScreen::buildWaterTitleAnimationFrames() const
 {
-    m_waterTitleObject.setLayerVisibility("stage_1", stage1Visible);
-    m_waterTitleObject.setLayerVisibility("stage_2", stage2Visible);
-    m_waterTitleObject.setLayerVisibility("stage_3", stage3Visible);
-    m_waterTitleObject.setLayerVisibility("final", finalVisible);
+    const double assembleStepSeconds = WaterTitleAssembleDurationSeconds / 4.0;
+    const double reverseStepSeconds = WaterTitleReverseDurationSeconds / 4.0;
+
+    std::vector<Animation::PseudoFontAnimationFrame> frames;
+
+    frames.push_back({ "stage_1", { "stage_1" }, assembleStepSeconds });
+    frames.push_back({ "stage_2", { "stage_2" }, assembleStepSeconds });
+    frames.push_back({ "stage_3", { "stage_3" }, assembleStepSeconds });
+    frames.push_back({ "final", { "final" }, assembleStepSeconds });
+
+    frames.push_back({ "final_hold", { "final" }, WaterTitleHoldDurationSeconds });
+
+    frames.push_back({ "reverse_final", { "final" }, reverseStepSeconds });
+    frames.push_back({ "reverse_stage_3", { "stage_3" }, reverseStepSeconds });
+    frames.push_back({ "reverse_stage_2", { "stage_2" }, reverseStepSeconds });
+    frames.push_back({ "reverse_stage_1", { "stage_1" }, reverseStepSeconds });
+
+    frames.push_back({ "hidden_pause", {}, WaterTitleRepeatDelaySeconds });
+
+    return frames;
 }
 
-void WaterEffectScreen::hideWaterTitleLayers()
+void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer)
 {
-    setWaterTitleLayerVisibility(false, false, false, false);
-}
-
-void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer) const
-{
-    if (!m_waterTitleLoaded)
+    if (!m_waterTitleLoaded || !m_waterTitleAnimationReady)
     {
-        const_cast<WaterEffectScreen*>(this)->ensureWaterTitleFallbackCache();
+        ensureWaterTitleFallbackCache();
 
         if (!m_waterTitleFallbackObject.isEmpty())
         {
@@ -546,14 +552,38 @@ void WaterEffectScreen::drawWaterTitle(ScreenBuffer& buffer) const
         return;
     }
 
-    const TextObject waterTitle = m_waterTitleObject.flattenVisibleOnly();
-    if (waterTitle.isEmpty())
+    PageComposer page(buffer);
+    page.clearRegions();
+
+    const int titleRegionHeight = std::max(1, std::min(16, buffer.getHeight() - 2));
+    const int titleCenterY = std::max(2, buffer.getHeight() / 3);
+
+    int titleRegionTop = titleCenterY - (titleRegionHeight / 2);
+    titleRegionTop = std::max(0, titleRegionTop);
+
+    if (titleRegionTop + titleRegionHeight > buffer.getHeight())
     {
-        return;
+        titleRegionTop = std::max(0, buffer.getHeight() - titleRegionHeight);
     }
 
-    const int x = std::max(0, (buffer.getWidth() - waterTitle.getWidth()) / 2);
-    const int y = std::max(2, (buffer.getHeight() / 3) - (waterTitle.getHeight() / 2));
+    page.createRegion(
+        WaterTitleRegionName,
+        Rect{
+            Point{ 0, titleRegionTop },
+            Size{ buffer.getWidth(), titleRegionHeight }
+        });
 
-    waterTitle.draw(buffer, x, y, Composition::WritePresets::visibleObject());
+    const Animation::AnimationBindingTarget target =
+        Animation::AnimationBindingTarget::animatedTextSequence(
+            WaterTitleTargetName,
+            WaterTitleControllerName,
+            m_waterTitleSequence,
+            PageComposer::PlacementSpec::inNamedRegion(
+                WaterTitleRegionName,
+                Composition::Align::center(),
+                true),
+            Composition::WritePresets::visibleObject());
+
+    m_waterTitleBindingResolver.setTargets({ target });
+    m_waterTitleBindingResolver.resolveAll(page);
 }
