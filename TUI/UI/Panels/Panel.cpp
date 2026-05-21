@@ -88,6 +88,16 @@ bool Panel::hasTitle() const
     return !m_title.empty();
 }
 
+bool Panel::isBorderVisible() const
+{
+    return m_borderVisible;
+}
+
+void Panel::setBorderVisible(bool visible)
+{
+    m_borderVisible = visible;
+}
+
 const Style& Panel::backgroundStyle() const
 {
     return m_backgroundStyle;
@@ -132,6 +142,11 @@ Rect Panel::contentBounds() const
 {
     const Rect panelBounds = bounds();
 
+    if (!m_borderVisible)
+    {
+        return panelBounds;
+    }
+
     if (panelBounds.size.width <= 2 || panelBounds.size.height <= 2)
     {
         return Rect{
@@ -164,7 +179,7 @@ void Panel::draw(Surface& surface)
 
     buffer.fillRect(panelBounds, U' ', m_backgroundStyle);
 
-    if (panelBounds.size.width >= 2 && panelBounds.size.height >= 2)
+    if (m_borderVisible && panelBounds.size.width >= 2 && panelBounds.size.height >= 2)
     {
         const Style& frameRenderStyle = isEnabled()
             ? m_borderStyle
@@ -181,7 +196,10 @@ void Panel::draw(Surface& surface)
             m_borderGlyphs.vertical);
     }
 
-    drawTitle(surface);
+    if (m_borderVisible)
+    {
+        drawTitle(surface);
+    }
 }
 
 void Panel::drawTitle(Surface& surface) const
