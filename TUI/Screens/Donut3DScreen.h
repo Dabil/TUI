@@ -2,9 +2,15 @@
 
 #include <string>
 
+#include "Core/Rect.h"
 #include "Screens/Screen.h"
+#include "UI/Panels/Window.h"
+#include "UI/Panels/EffectWindow.h"
+#include "UI/Panels/ContentWindow.h"
 #include "Rendering/Effects/Donut3D.h"
 #include "Rendering/Objects/TextObject.h"
+#include "UI/Base/WindowManager.h"
+#include "UI/Layout/DockTree.h"
 
 class Surface;
 class Style;
@@ -22,6 +28,8 @@ public:
 
 private:
 
+    void ensureLayout(const Rect& viewport, const Rect* windowRectArr);
+    void ensureDockContentModel(const Rect& viewport);
     void invalidateStaticUiCache();
     void ensureStaticUiCache(int screenWidth, int screenHeight);
     void rebuildStaticUiCache(int screenWidth, int screenHeight);
@@ -30,6 +38,9 @@ private:
 private:
     std::string m_titleText = "[ 3D ASCII Render Lab ]";
     std::string m_minimumSizeMessage = "3D Donut needs a larger console window.";
+    bool m_layoutInitialized = false;
+    int m_screenWidth = 0;
+    int m_screenHeight = 0;
 
     TextObject m_outerFrameObject;
     TextObject m_previewPaneObject;
@@ -37,6 +48,9 @@ private:
     TextObject m_footerPaneObject;
     TextObject m_titleObject;
     TextObject m_minimumSizeWarningObject;
+
+    UI::DockTree m_dockTree;
+    WindowManager m_windowManager;
 
     int m_cachedScreenWidth = -1;
     int m_cachedScreenHeight = -1;
@@ -52,4 +66,9 @@ private:
     int m_warningY = 1;
 
     Donut3D m_Donut3D;
+    std::unique_ptr<EffectWindow> m_previewWindow;
+    std::unique_ptr<UI::ContentWindow> m_renderInfoWindow;
+
+    const char* m_previewWindowTitle = "( Preview )";
+    const char* m_renderInfoWindowTitle = "( Render Info )";
 };

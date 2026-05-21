@@ -5,6 +5,17 @@
 #include "Input/Event.h"
 #include "Rendering/Surface.h"
 
+namespace
+{
+    bool areSameBounds(const Rect& lhs, const Rect& rhs)
+    {
+        return lhs.position.x == rhs.position.x &&
+            lhs.position.y == rhs.position.y &&
+            lhs.size.width == rhs.size.width &&
+            lhs.size.height == rhs.size.height;
+    }
+}
+
 namespace UI
 {
     ContentWindow::ContentWindow(
@@ -21,6 +32,11 @@ namespace UI
         }
     }
 
+    ContentWindow::~ContentWindow()
+    {
+        detachContent();
+    }
+
     bool ContentWindow::hasTransferableContent() const
     {
         return m_content != nullptr;
@@ -28,11 +44,9 @@ namespace UI
 
     std::unique_ptr<IWindowContent> ContentWindow::releaseContent()
     {
-        if (m_content != nullptr)
-        {
-            m_content->onDetached();
-        }
+        detachContent();
 
+        m_hasLastContentBounds = false;
         return std::move(m_content);
     }
 
@@ -69,11 +83,20 @@ namespace UI
         }
 
         notifyContentBoundsChanged();
+
         Window::draw(surface);
 
         if (m_content != nullptr)
         {
             m_content->draw(surface, contentBounds());
+        }
+    }
+
+    void ContentWindow::detachContent()
+    {
+        if (m_content != nullptr)
+        {
+            m_content->onDetached();
         }
     }
 
@@ -86,16 +109,14 @@ namespace UI
 
         const Rect currentBounds = contentBounds();
 
-        if (currentBounds.position.x == m_lastContentBounds.position.x &&
-            currentBounds.position.y == m_lastContentBounds.position.y &&
-            currentBounds.size.width == m_lastContentBounds.size.width &&
-            currentBounds.size.height == m_lastContentBounds.size.height)
+        if (m_hasLastContentBounds && areSameBounds(currentBounds, m_lastContentBounds))
         {
             return;
         }
 
         m_lastContentBounds = currentBounds;
+        m_hasLastContentBounds = true;
+
         m_content->onBoundsChanged(currentBounds);
     }
 }
-

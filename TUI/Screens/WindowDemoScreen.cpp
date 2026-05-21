@@ -224,7 +224,6 @@ void WindowDemo::draw(Surface& surface)
         page.resolveRegion("BottomRightWindow")
     };
 
-
     ensureLayout(pageBody, windowRectArr);
     drawInstructions(surface, footer);
 
