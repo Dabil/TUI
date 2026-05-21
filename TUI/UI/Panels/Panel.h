@@ -20,6 +20,9 @@ public:
     void setTitle(std::string title);
     bool hasTitle() const;
 
+    bool isBorderVisible() const;
+    void setBorderVisible(bool visible);
+
     const Style& backgroundStyle() const;
     void setBackgroundStyle(const Style& style);
 
@@ -41,6 +44,8 @@ private:
 
 private:
     std::string m_title;
+
+    bool m_borderVisible = true;
 
     Style m_backgroundStyle;
     Style m_borderStyle;
