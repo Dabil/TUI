@@ -23,6 +23,7 @@ public:
 
     void onEnter() override;
     void onExit() override;
+    bool handleEvent(const Input::Event& event) override;
     void update(const Animation::TickEvent& event) override;
     void draw(Surface& surface) override;
 

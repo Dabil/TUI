@@ -74,6 +74,7 @@ void Donut3DScreen::onEnter()
 {
     invalidateStaticUiCache();
     m_Donut3D.onEnter();
+    m_windowManager.setDockTree(&m_dockTree);
 }
 
 void Donut3DScreen::onExit()
@@ -81,9 +82,15 @@ void Donut3DScreen::onExit()
     m_Donut3D.onExit();
 }
 
+bool Donut3DScreen::handleEvent(const Input::Event& event)
+{
+    return m_windowManager.handleEvent(event);
+}
+
 void Donut3DScreen::update(const Animation::TickEvent& event)
 {
     m_Donut3D.update(event);
+    m_windowManager.update(event);
 }
 
 void Donut3DScreen::draw(Surface& surface)
