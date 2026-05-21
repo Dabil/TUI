@@ -159,6 +159,7 @@ void Donut3DScreen::ensureLayout(const Rect& viewport, const Rect* windowRectArr
    
     auto renderInfoWidget = std::make_unique<TextView>(m_renderInfoWindowTitle);
 
+    renderInfoWidget->setBorderVisible(false);
     renderInfoWidget->setLines({
         "3D ASCII Render Lab",
         "",
