@@ -570,6 +570,9 @@
     <ClInclude Include="Animation\PseudoFontAnimationSequence.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="UI\Content\ComposedWindowContent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -1059,6 +1062,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Animation\PseudoFontAnimationSequence.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Content\ComposedWindowContent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
