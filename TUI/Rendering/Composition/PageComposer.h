@@ -26,6 +26,14 @@ namespace Assets
 
 namespace Composition
 {
+    // KeyHint: small convenience struct for drawing footer-style shortcut hints like:
+    // [F1] Help   [D] Dock   [Esc] Back
+    struct KeyHint
+    {
+        std::string key;
+        std::string label;
+    };
+
     class PageComposer
     {
     public:
@@ -303,6 +311,128 @@ namespace Composition
             const Style& style,
             int insetX = 2,
             int insetY = 1);
+
+        // Window Interior Composition Tasks
+
+        void writeLine(
+            const Rect& region,
+            int y,
+            std::string_view text,
+            const Style& style);
+
+        void writeLine(
+            std::string_view regionName,
+            int y,
+            std::string_view text,
+            const Style& style);
+
+        void writeLines(
+            const Rect& region,
+            int startY,
+            const std::vector<std::string>& lines,
+            const Style& style);
+        
+        void writeLines(
+            std::string_view regionName,
+            int startY,
+            const std::vector<std::string>& lines,
+            const Style& style);
+
+        void writeRight(
+            const Rect& region,
+            int y,
+            std::string_view text,
+            const Style& style);
+
+        void writeRight(
+            std::string_view regionName,
+            int y,
+            std::string_view text,
+            const Style& style);
+
+        void drawNameValue(
+            const Rect& region,
+            int y,
+            std::string_view name,
+            std::string_view value,
+            const Style& nameStyle,
+            const Style& valueStyle,
+            int gap);
+
+        void drawNameValue(
+            std::string_view regionName,
+            int y,
+            std::string_view name,
+            std::string_view value,
+            const Style& nameStyle,
+            const Style& valueStyle,
+            int gap);
+
+        void drawHorizontalRule(
+            const Rect& region,
+            int y,
+            const Style& style,
+            char32_t glyph);
+
+        void drawHorizontalRule(
+            std::string_view regionName,
+            int y,
+            const Style& style,
+            char32_t glyph);
+
+        void drawSectionHeader(
+            const Rect& region,
+            int y,
+            std::string_view text,
+            const Style& textStyle,
+            const Style& ruleStyle,
+            char32_t ruleGlyph);
+
+        void drawSectionHeader(
+            std::string_view regionName,
+            int y,
+            std::string_view text,
+            const Style& textStyle,
+            const Style& ruleStyle,
+            char32_t ruleGlyph);
+
+        void drawMeter(
+            const Rect& region,
+            int y,
+            std::string_view label,
+            int value,
+            int maxValue,
+            const Style& labelStyle,
+            const Style& filledStyle,
+            const Style& emptyStyle,
+            int meterWidth);
+
+        void drawMeter(
+            std::string_view regionName,
+            int y,
+            std::string_view label,
+            int value,
+            int maxValue,
+            const Style& labelStyle,
+            const Style& filledStyle,
+            const Style& emptyStyle,
+            int meterWidth);
+
+        void drawKeyHints(
+            const Rect& region,
+            int y,
+            const std::vector<KeyHint>& hints,
+            const Style& keyStyle,
+            const Style& labelStyle,
+            int gap);
+
+        void drawKeyHints(
+            std::string_view regionName,
+            int y,
+            const std::vector<KeyHint>& hints,
+            const Style& keyStyle,
+            const Style& labelStyle,
+            int gap);
 
         // ---------------------------------------------------------------------
         // Asset / template hooks

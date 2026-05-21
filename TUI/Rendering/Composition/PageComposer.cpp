@@ -870,6 +870,464 @@ namespace Composition
         m_lastSignature = 0;
     }
 
+    /*
+        writeLine(...): write one line of text at a specific row inside a region
+
+        so it's easier than writing: 
+
+        region.position.x
+        region.position.y + y
+        etc...
+    */
+
+    void PageComposer::writeLine(
+        const Rect& region,
+        int y,
+        std::string_view text,
+        const Style& style)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        refreshFromTarget();
+
+        m_buffer.writeText(
+            region.position.x,
+            region.position.y + y,
+            UnicodeConversion::utf8ToU32(text),
+            style);
+
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::writeLine(
+        std::string_view regionName,
+        int y,
+        std::string_view text,
+        const Style& style)
+    {
+        writeLine(resolveRegion(regionName), y, text, style);
+    }
+
+    /*
+        writeLines(...): multi-line version of writeLine
+
+        example:
+
+        composer.writeLines(
+            region,
+            1,
+            {
+                "FPS: 60",
+                "Mode: ASCII",
+                "Triangles: 842"
+            },
+            style);
+    */
+
+    void PageComposer::writeLines(
+        const Rect& region,
+        int startY,
+        const std::vector<std::string>& lines,
+        const Style& style)
+    {
+        for (std::size_t index = 0; index < lines.size(); ++index)
+        {
+            writeLine(region, startY + static_cast<int>(index), lines[index], style);
+        }
+    }
+
+    void PageComposer::writeLines(
+        std::string_view regionName,
+        int startY,
+        const std::vector<std::string>& lines,
+        const Style& style)
+    {
+        writeLines(resolveRegion(regionName), startY, lines, style);
+    }
+
+    /*
+        writeRight(...): right-align one line of text inside a region row
+    */
+
+    void PageComposer::writeRight(
+        const Rect& region,
+        int y,
+        std::string_view text,
+        const Style& style)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        const int textWidth = measureDisplayWidth(UnicodeConversion::utf8ToU32(text));
+        const int x = std::max(region.position.x, region.position.x + region.size.width - textWidth);
+
+        refreshFromTarget();
+
+        m_buffer.writeText(
+            x,
+            region.position.y + y,
+            UnicodeConversion::utf8ToU32(text),
+            style);
+
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::writeRight(
+        std::string_view regionName,
+        int y,
+        std::string_view text,
+        const Style& style)
+    {
+        writeRight(resolveRegion(regionName), y, text, style);
+    }
+
+    /*
+        drawNameValue: This method automates:
+            1. left-side label placement
+            2. right-side value placement
+            3. spacing/gap logic
+            4. alignment consistency
+
+        pattern:
+            Name          Value
+
+        examples:
+            FPS           60
+            Triangles     842
+            Renderer      ASCII
+            CPU Usage     73%
+            Resolution    80x25
+    */
+
+    void PageComposer::drawNameValue(
+        const Rect& region,
+        int y,
+        std::string_view name,
+        std::string_view value,
+        const Style& nameStyle,
+        const Style& valueStyle,
+        int gap)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        const std::u32string nameText = UnicodeConversion::utf8ToU32(name);
+        const std::u32string valueText = UnicodeConversion::utf8ToU32(value);
+        const int nameWidth = measureDisplayWidth(nameText);
+        const int safeGap = std::max(0, gap);
+
+        refreshFromTarget();
+
+        const int rowY = region.position.y + y;
+        m_buffer.writeText(region.position.x, rowY, nameText, nameStyle);
+
+        const int valueX = region.position.x + nameWidth + safeGap;
+        if (valueX < region.position.x + region.size.width)
+        {
+            m_buffer.writeText(valueX, rowY, valueText, valueStyle);
+        }
+
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::drawNameValue(
+        std::string_view regionName,
+        int y,
+        std::string_view name,
+        std::string_view value,
+        const Style& nameStyle,
+        const Style& valueStyle,
+        int gap)
+    {
+        drawNameValue(resolveRegion(regionName), y, name, value, nameStyle, valueStyle, gap);
+    }
+
+    /*
+        drawHorizontalRule: draw a horizontal line across a region row
+    */
+
+    void PageComposer::drawHorizontalRule(
+        const Rect& region,
+        int y,
+        const Style& style,
+        char32_t glyph)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        refreshFromTarget();
+
+        m_buffer.writeText(
+            region.position.x,
+            region.position.y + y,
+            std::u32string(static_cast<std::size_t>(region.size.width), glyph),
+            style);
+
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::drawHorizontalRule(
+        std::string_view regionName,
+        int y,
+        const Style& style,
+        char32_t glyph)
+    {
+        drawHorizontalRule(resolveRegion(regionName), y, style, glyph);
+    }
+
+    /*
+        drawSectionHeader(...): draws a section title in the style of:
+            - ──────── Render Stats ────────
+            - === Diagnostics ===
+            - Performance ------------------
+
+        So it:
+        1. writes the section title
+        2. draws a horizontal rule around/after it
+        3. has spacing/alignment math
+    */
+
+    void PageComposer::drawSectionHeader(
+        const Rect& region,
+        int y,
+        std::string_view text,
+        const Style& textStyle,
+        const Style& ruleStyle,
+        char32_t ruleGlyph)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        drawHorizontalRule(region, y, ruleStyle, ruleGlyph);
+        writeLine(region, y, text, textStyle);
+    }
+
+    void PageComposer::drawSectionHeader(
+        std::string_view regionName,
+        int y,
+        std::string_view text,
+        const Style& textStyle,
+        const Style& ruleStyle,
+        char32_t ruleGlyph)
+    {
+        drawSectionHeader(resolveRegion(regionName), y, text, textStyle, ruleStyle, ruleGlyph);
+    }
+
+    /*
+        drawMeter(...) convenience helper for drawing ASCII/Unicode 
+        progress bars inside a composed region.
+
+        default is: 
+        filledGlyph = U'█'
+        emptyGlyph  = U'░'
+    */
+
+    void PageComposer::drawMeter(
+        const Rect& region,
+        int y,
+        std::string_view label,
+        int value,
+        int maxValue,
+        const Style& labelStyle,
+        const Style& filledStyle,
+        const Style& emptyStyle,
+        int meterWidth)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        const std::u32string labelText = UnicodeConversion::utf8ToU32(label);
+        const int labelWidth = measureDisplayWidth(labelText);
+        const int meterX = region.position.x + labelWidth + (labelText.empty() ? 0 : 1);
+        const int availableWidth = region.position.x + region.size.width - meterX;
+
+        if (availableWidth <= 0)
+        {
+            writeLine(region, y, label, labelStyle);
+            return;
+        }
+
+        const int resolvedMeterWidth =
+            meterWidth > 0 ? std::min(meterWidth, availableWidth) : availableWidth;
+
+        const int safeMax = std::max(1, maxValue);
+        const int clampedValue = std::max(0, std::min(value, safeMax));
+        const int filledWidth = (resolvedMeterWidth * clampedValue) / safeMax;
+        const int emptyWidth = resolvedMeterWidth - filledWidth;
+
+        refreshFromTarget();
+
+        const int rowY = region.position.y + y;
+
+        if (!labelText.empty())
+        {
+            m_buffer.writeText(region.position.x, rowY, labelText, labelStyle);
+        }
+
+        if (filledWidth > 0)
+        {
+            m_buffer.writeText(
+                meterX,
+                rowY,
+                std::u32string(static_cast<std::size_t>(filledWidth), U'█'),
+                filledStyle);
+        }
+
+        if (emptyWidth > 0)
+        {
+            m_buffer.writeText(
+                meterX + filledWidth,
+                rowY,
+                std::u32string(static_cast<std::size_t>(emptyWidth), U'░'),
+                emptyStyle);
+        }
+
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::drawMeter(
+        std::string_view regionName,
+        int y,
+        std::string_view label,
+        int value,
+        int maxValue,
+        const Style& labelStyle,
+        const Style& filledStyle,
+        const Style& emptyStyle,
+        int meterWidth)
+    {
+        drawMeter(
+            resolveRegion(regionName),
+            y,
+            label,
+            value,
+            maxValue,
+            labelStyle,
+            filledStyle,
+            emptyStyle,
+            meterWidth);
+    }
+
+    /*
+        drawKeyHints(...): small convenience method for drawing footer-style shortcut hints like:
+        [F1] Help   [D] Dock   [Esc] Back
+    */
+
+    void PageComposer::drawKeyHints(
+        const Rect& region,
+        int y,
+        const std::vector<KeyHint>& hints,
+        const Style& keyStyle,
+        const Style& labelStyle,
+        int gap)
+    {
+        if (region.size.width <= 0 || region.size.height <= 0)
+        {
+            return;
+        }
+
+        if (y < 0 || y >= region.size.height)
+        {
+            return;
+        }
+
+        const int safeGap = std::max(0, gap);
+        int x = region.position.x;
+        const int rowY = region.position.y + y;
+        const int maxX = region.position.x + region.size.width;
+
+        refreshFromTarget();
+
+        for (const KeyHint& hint : hints)
+        {
+            const std::u32string keyText = UnicodeConversion::utf8ToU32(hint.key);
+            const std::u32string labelText = UnicodeConversion::utf8ToU32(hint.label);
+            const int keyWidth = measureDisplayWidth(keyText);
+            const int labelWidth = measureDisplayWidth(labelText);
+            const int pairWidth = keyWidth + (labelText.empty() ? 0 : 1 + labelWidth);
+
+            if (x + pairWidth > maxX)
+            {
+                break;
+            }
+
+            m_buffer.writeText(x, rowY, keyText, keyStyle);
+            x += keyWidth;
+
+            if (!labelText.empty())
+            {
+                m_buffer.writeText(x, rowY, U" ", labelStyle);
+                ++x;
+                m_buffer.writeText(x, rowY, labelText, labelStyle);
+                x += labelWidth;
+            }
+
+            x += safeGap;
+        }
+
+        synchronizeTarget();
+        m_lastSignature = 0;
+    }
+
+    void PageComposer::drawKeyHints(
+        std::string_view regionName,
+        int y,
+        const std::vector<KeyHint>& hints,
+        const Style& keyStyle,
+        const Style& labelStyle,
+        int gap)
+    {
+        drawKeyHints(resolveRegion(regionName), y, hints, keyStyle, labelStyle, gap);
+    }
+
     void PageComposer::setAssetLibrary(Assets::AssetLibrary* library)
     {
         m_assetLibrary = library;
