@@ -296,6 +296,7 @@
     <ClInclude Include="UI\Base\Viewport.h" />
     <ClInclude Include="UI\Base\WindowManager.h" />
     <ClInclude Include="UI\Config\MenuStatusConfig.h" />
+    <ClInclude Include="UI\Content\ComposedWindowContent.h" />
     <ClInclude Include="UI\Content\EffectReferenceWindowContent.h" />
     <ClInclude Include="UI\Content\EffectWindowContent.h" />
     <ClInclude Include="UI\Content\IWindowContent.h" />
@@ -486,6 +487,7 @@
     <ClCompile Include="UI\Base\Viewport.cpp" />
     <ClCompile Include="UI\Base\WindowManager.cpp" />
     <ClCompile Include="UI\Config\MenuStatusConfig.cpp" />
+    <ClCompile Include="UI\Content\ComposedWindowContent.cpp" />
     <ClCompile Include="UI\Content\EffectReferenceWindowContent.cpp" />
     <ClCompile Include="UI\Content\EffectWindowContent.cpp" />
     <ClCompile Include="UI\Content\TileGrid.cpp" />
