@@ -10,9 +10,9 @@ namespace
     bool areSameBounds(const Rect& lhs, const Rect& rhs)
     {
         return lhs.position.x == rhs.position.x &&
-            lhs.position.y == rhs.position.y &&
-            lhs.size.width == rhs.size.width &&
-            lhs.size.height == rhs.size.height;
+               lhs.position.y == rhs.position.y &&
+               lhs.size.width == rhs.size.width &&
+               lhs.size.height == rhs.size.height;
     }
 }
 
