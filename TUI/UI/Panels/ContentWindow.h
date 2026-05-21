@@ -11,10 +11,8 @@ namespace UI
     class ContentWindow final : public Window
     {
     public:
-        ContentWindow(
-            const Rect& bounds,
-            std::string title,
-            std::unique_ptr<IWindowContent> content);
+        ContentWindow(const Rect& bounds, std::string title, std::unique_ptr<IWindowContent> content);
+        ~ContentWindow() override;
 
         bool hasTransferableContent() const override;
         std::unique_ptr<IWindowContent> releaseContent() override;
@@ -24,11 +22,12 @@ namespace UI
         void draw(Surface& surface) override;
 
     private:
+        void detachContent();
         void notifyContentBoundsChanged();
 
     private:
         std::unique_ptr<IWindowContent> m_content;
         Rect m_lastContentBounds{};
+        bool m_hasLastContentBounds = false;
     };
 }
-
