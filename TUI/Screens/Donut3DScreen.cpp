@@ -14,6 +14,10 @@
 #include "Rendering/Objects/TextObjectFactory.h"
 #include "Rendering/Composition/Alignment.h"
 #include "Rendering/Composition/PageComposer.h"
+#include "UI/Content/WidgetWindowContent.h"
+#include "UI/Widgets/TextView.h"
+
+using namespace UI;
 
 namespace
 {
@@ -35,6 +39,22 @@ namespace DonutColors
 
     inline const Style BorderColor =
           style::Fg(Color::FromBasic(Color::Basic::White))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style unfocusedWindow =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style unfocusedTitle =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style DonutWindow =
+        style::Fg(Color::FromBasic(Color::Basic::Magenta))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style DonutTitle =
+        style::Fg(Color::FromBasic(Color::Basic::BrightRed))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 }
 
@@ -100,13 +120,85 @@ void Donut3DScreen::draw(Surface& surface)
 
     page.writeObjectInRegion(m_outerFrameObject, "Screen", Composition::Align::center());
 
-    page.drawPanel("LeftPane", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
-    page.drawPanel("RightPane", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
+    const Rect windowRectArr[2] =
+    {
+        page.resolveRegion("LeftPane"),
+        page.resolveRegion("RightPane")
+    };
+
+    ensureLayout(safe, windowRectArr);
+
+    // page.drawPanel("RightPane", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
     page.drawPanel("Footer", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
 
     m_titleObject.draw(buffer, m_titleX, m_titleY);
         
-    m_Donut3D.draw(surface, viewPort);
+    m_windowManager.draw(surface);
+}
+
+void Donut3DScreen::ensureLayout(const Rect& viewport, const Rect* windowRectArr)
+{
+    if (m_layoutInitialized &&
+        viewport.size.width == m_screenWidth &&
+        viewport.size.height == m_screenHeight)
+    {
+        return;
+    }
+
+    m_screenWidth = viewport.size.width;
+    m_screenHeight = viewport.size.height;
+
+    m_windowManager.clear();
+   
+    auto renderInfoWidget = std::make_unique<TextView>(m_renderInfoWindowTitle);
+
+    renderInfoWidget->setLines({
+        "3D ASCII Render Lab",
+        "",
+        "Mode: Classic ASCII",
+        "Palette: Magenta",
+        "Speed: Normal",
+        "",
+        "Live render telemetry can go here."
+        });
+
+    auto renderInfoContent = std::make_unique<WidgetWindowContent>(std::move(renderInfoWidget));
+
+    m_previewWindow    = std::make_unique<EffectWindow>(windowRectArr[0], m_previewWindowTitle, m_Donut3D);
+    m_renderInfoWindow = std::make_unique<ContentWindow>(windowRectArr[1], m_renderInfoWindowTitle, std::move(renderInfoContent));
+
+    m_previewWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
+    m_previewWindow->setBorderStyle(DonutColors::unfocusedWindow);
+    m_previewWindow->setTitleStyle(DonutColors::unfocusedWindow);
+    m_previewWindow->setHoveredBorderStyle(DonutColors::DonutWindow);
+    m_previewWindow->setHoveredTitleStyle(DonutColors::DonutTitle);
+
+    m_renderInfoWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
+    m_renderInfoWindow->setBorderStyle(DonutColors::unfocusedWindow);
+    m_renderInfoWindow->setTitleStyle(DonutColors::unfocusedWindow);
+    m_renderInfoWindow->setHoveredBorderStyle(DonutColors::DonutWindow);
+    m_renderInfoWindow->setHoveredTitleStyle(DonutColors::DonutTitle);
+
+    m_windowManager.addWindow(*m_previewWindow.get());
+    m_windowManager.addWindow(*m_renderInfoWindow.get());
+
+    ensureDockContentModel(viewport);
+    m_layoutInitialized = true;
+}
+
+void Donut3DScreen::ensureDockContentModel(const Rect& viewport)
+{
+    if (viewport.size.width <= 0 || viewport.size.height <= 0)
+    {
+        return;
+    }
+
+    // DockTree represents actual docked relationships only.
+    // The demo windows begin as independent floating windows, so do not
+    // preload them into the tree here. Side-dock transactions build the
+    // tree on mouse release from the real target and dragged windows.
+    m_dockTree.clear();
+    m_dockTree.setBounds(viewport);
 }
 
 void Donut3DScreen::invalidateStaticUiCache()
