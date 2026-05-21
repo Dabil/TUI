@@ -1,27 +1,45 @@
 #include "UI/Panels/EffectWindow.h"
 
-#include <memory>
 #include <utility>
 
-#include "Core/Rect.h"
 #include "Rendering/Surface.h"
 #include "UI/Content/EffectReferenceWindowContent.h"
 
-EffectWindow::EffectWindow(Rect bounds, std::string title, IEffect& effect)
-    : Window(bounds, std::move(title))
-    , m_effect(effect)
+namespace
 {
+    bool areSameBounds(const Rect& lhs, const Rect& rhs)
+    {
+        return lhs.position.x == rhs.position.x &&
+            lhs.position.y == rhs.position.y &&
+            lhs.size.width == rhs.size.width &&
+            lhs.size.height == rhs.size.height;
+    }
 }
 
+EffectWindow::EffectWindow(Rect bounds, std::string title, IEffect& effect)
+    : Window(bounds, std::move(title))
+    , m_content(std::make_unique<UI::EffectReferenceWindowContent>(effect))
+{
+    m_content->onAttached();
+    notifyContentBoundsChanged();
+}
+
+EffectWindow::~EffectWindow()
+{
+    detachContent();
+}
 
 bool EffectWindow::hasTransferableContent() const
 {
-    return true;
+    return m_content != nullptr;
 }
 
 std::unique_ptr<UI::IWindowContent> EffectWindow::releaseContent()
 {
-    return std::make_unique<UI::EffectReferenceWindowContent>(m_effect);
+    detachContent();
+
+    m_hasLastContentBounds = false;
+    return std::move(m_content);
 }
 
 void EffectWindow::update(const Animation::TickEvent& event)
@@ -31,7 +49,12 @@ void EffectWindow::update(const Animation::TickEvent& event)
         return;
     }
 
-    m_effect.update(event);
+    notifyContentBoundsChanged();
+
+    if (m_content != nullptr)
+    {
+        m_content->update(event);
+    }
 }
 
 void EffectWindow::draw(Surface& surface)
@@ -41,7 +64,40 @@ void EffectWindow::draw(Surface& surface)
         return;
     }
 
+    notifyContentBoundsChanged();
+
     Window::draw(surface);
 
-    m_effect.draw(surface, contentBounds());
+    if (m_content != nullptr)
+    {
+        m_content->draw(surface, contentBounds());
+    }
+}
+
+void EffectWindow::detachContent()
+{
+    if (m_content != nullptr)
+    {
+        m_content->onDetached();
+    }
+}
+
+void EffectWindow::notifyContentBoundsChanged()
+{
+    if (m_content == nullptr)
+    {
+        return;
+    }
+
+    const Rect currentBounds = contentBounds();
+
+    if (m_hasLastContentBounds && areSameBounds(currentBounds, m_lastContentBounds))
+    {
+        return;
+    }
+
+    m_lastContentBounds = currentBounds;
+    m_hasLastContentBounds = true;
+
+    m_content->onBoundsChanged(currentBounds);
 }
