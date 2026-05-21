@@ -299,6 +299,7 @@
     <ClInclude Include="UI\Content\ComposedWindowContent.h" />
     <ClInclude Include="UI\Content\EffectReferenceWindowContent.h" />
     <ClInclude Include="UI\Content\EffectWindowContent.h" />
+    <ClInclude Include="UI\Content\ImmediateModeWindowContent.h" />
     <ClInclude Include="UI\Content\IWindowContent.h" />
     <ClInclude Include="UI\Content\TileGrid.h" />
     <ClInclude Include="UI\Content\WidgetWindowContent.h" />
@@ -490,6 +491,7 @@
     <ClCompile Include="UI\Content\ComposedWindowContent.cpp" />
     <ClCompile Include="UI\Content\EffectReferenceWindowContent.cpp" />
     <ClCompile Include="UI\Content\EffectWindowContent.cpp" />
+    <ClCompile Include="UI\Content\ImmediateModeWindowContent.cpp" />
     <ClCompile Include="UI\Content\TileGrid.cpp" />
     <ClCompile Include="UI\Content\WidgetWindowContent.cpp" />
     <ClCompile Include="UI\Interaction\WindowInteraction.cpp" />
