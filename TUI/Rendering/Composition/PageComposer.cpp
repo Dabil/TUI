@@ -1170,7 +1170,7 @@ namespace Composition
         int maxValue,
         const Style& labelStyle,
         const Style& filledStyle,
-        const Style& emptyStyle,
+        const Style& emptyStyle, 
         int meterWidth)
     {
         if (region.size.width <= 0 || region.size.height <= 0)
