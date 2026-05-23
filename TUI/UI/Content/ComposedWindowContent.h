@@ -6,6 +6,14 @@
 #include "Rendering/Surface.h"
 #include "UI/Content/IWindowContent.h"
 
+/*
+    Remember that ComposedWindowContent is a cached window type
+    designed for static output, so if you need dynamic data updates
+    use a different window content type such as ImmediateModeWindowContent.
+    it only redraws when the composition changes, ie resize
+    You can force a redraw by calling: requestRecompose()
+*/
+
 namespace Composition
 {
     class PageComposer;
