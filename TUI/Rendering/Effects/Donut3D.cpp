@@ -1,31 +1,17 @@
 #include "Rendering/Effects/Donut3D.h"
 
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
-#include "Rendering/Surface.h"
+#include "Animation/TickEvent.h"
 #include "Rendering/ScreenBuffer.h"
 #include "Rendering/Styles/StyleBuilder.h"
-#include "Animation/TickEvent.h"
+#include "Rendering/Surface.h"
 
 namespace
 {
     constexpr float Pi = 3.1415926535f;
-    constexpr float ThetaSpacing = 0.07f;
-    constexpr float PhiSpacing = 0.02f;
-
-    constexpr float R1 = 1.0f;
-    constexpr float R2 = 2.0f;
-    constexpr float K2 = 5.0f;
-
-    constexpr float RotationASpeed = 1.15f;
-    constexpr float RotationBSpeed = 0.45f;
-
-    constexpr float SizeScale = 0.4f;
-
-    constexpr char32_t LuminanceRamp[] = U".,-~:;=!*#$@";
-    constexpr int LuminanceRampCount = static_cast<int>((sizeof(LuminanceRamp) / sizeof(LuminanceRamp[0])) - 1);
 
     constexpr Color::Basic CyclePalette[] =
     {
@@ -48,6 +34,85 @@ namespace
     };
 
     constexpr int CyclePaletteCount = static_cast<int>(sizeof(CyclePalette) / sizeof(CyclePalette[0]));
+
+    float wrapAngle(float angle)
+    {
+        const float fullTurn = Pi * 2.0f;
+
+        if (angle > fullTurn || angle < -fullTurn)
+        {
+            angle = std::fmod(angle, fullTurn);
+        }
+
+        if (angle < 0.0f)
+        {
+            angle += fullTurn;
+        }
+
+        return angle;
+    }
+
+    struct Vec3
+    {
+        float x = 0.0f;
+        float y = 0.0f;
+        float z = 0.0f;
+    };
+
+    Vec3 rotateX(const Vec3& point, float cosX, float sinX)
+    {
+        return Vec3{
+            point.x,
+            (point.y * cosX) - (point.z * sinX),
+            (point.y * sinX) + (point.z * cosX)
+        };
+    }
+
+    Vec3 rotateY(const Vec3& point, float cosY, float sinY)
+    {
+        return Vec3{
+            (point.x * cosY) + (point.z * sinY),
+            point.y,
+            (-point.x * sinY) + (point.z * cosY)
+        };
+    }
+
+    Vec3 rotateZ(const Vec3& point, float cosZ, float sinZ)
+    {
+        return Vec3{
+            (point.x * cosZ) - (point.y * sinZ),
+            (point.x * sinZ) + (point.y * cosZ),
+            point.z
+        };
+    }
+
+    Vec3 transformPoint(
+        const Vec3& point,
+        float cosX,
+        float sinX,
+        float cosY,
+        float sinY,
+        float cosZ,
+        float sinZ)
+    {
+        return rotateZ(
+            rotateY(
+                rotateX(point, cosX, sinX),
+                cosY,
+                sinY),
+            cosZ,
+            sinZ);
+    }
+
+    float toRadians(float degrees)
+    {
+        return degrees * (Pi / 180.0f);
+    }
+
+    float toDegrees(float radians)
+    {
+        return radians * (180.0f / Pi);
+    }
 }
 
 Donut3D::Donut3D()
@@ -56,9 +121,10 @@ Donut3D::Donut3D()
 
 void Donut3D::onEnter()
 {
-    m_elapsedSeconds = 0.0;
-    m_rotationA = 0.0f;
-    m_rotationB = 0.0f;
+    m_elapsedSeconds   = 0.0;
+    m_rotationXRadians = 0.0f;
+    m_rotationYRadians = 0.0f;
+    m_rotationZRadians = 0.0f;
 }
 
 void Donut3D::onExit()
@@ -69,25 +135,57 @@ void Donut3D::update(const Animation::TickEvent& event)
 {
     m_elapsedSeconds += event.deltaSeconds;
 
-    m_rotationA += static_cast<float>(event.deltaSeconds) * RotationASpeed;
-    m_rotationB += static_cast<float>(event.deltaSeconds) * RotationBSpeed;
-
-    if (m_rotationA > (Pi * 2.0f))
-    {
-        m_rotationA = std::fmod(m_rotationA, Pi * 2.0f);
-    }
-
-    if (m_rotationB > (Pi * 2.0f))
-    {
-        m_rotationB = std::fmod(m_rotationB, Pi * 2.0f);
-    }
+    m_rotationXRadians = wrapAngle(m_rotationXRadians + (static_cast<float>(event.deltaSeconds) * m_rotationXSpeed));
+    m_rotationYRadians = wrapAngle(m_rotationYRadians + (static_cast<float>(event.deltaSeconds) * m_rotationYSpeed));
+    m_rotationZRadians = wrapAngle(m_rotationZRadians + (static_cast<float>(event.deltaSeconds) * m_rotationZSpeed));
 }
 
 void Donut3D::draw(Surface& surface, const Rect& viewPort)
 {
-//    ScreenBuffer& buffer = surface.buffer();
-
     renderDonut(surface, viewPort);
+}
+
+void Donut3D::setOptions(const DonutEffectOptions& options)
+{
+    m_luminanceRamp      = options.luminanceRamp;
+    m_luminanceRampCount = static_cast<int>(m_luminanceRamp.size());
+    m_elapsedSeconds     = options.elapsedSeconds;
+    m_rotationXRadians   = toRadians(options.rotationXDegrees);
+    m_rotationYRadians   = toRadians(options.rotationYDegrees);
+    m_rotationZRadians   = toRadians(options.rotationZDegrees);
+    m_rotationXSpeed     = options.rotationXSpeed;
+    m_rotationYSpeed     = options.rotationYSpeed;
+    m_rotationZSpeed     = options.rotationZSpeed;
+    m_scale              = options.scale;
+    m_thetaSpacing       = options.thetaSpacing;
+    m_phiSpacing         = options.phiSpacing;
+    m_tubeRadius         = options.tubeRadius;
+    m_torusRadius        = options.torusRadius;
+    m_cameraDistance     = options.cameraDistance;
+    m_showBands          = options.showBands;
+}
+
+DonutEffectOptions Donut3D::getOptions() const
+{
+    DonutEffectOptions options;
+
+    options.luminanceRamp    = m_luminanceRamp;
+    options.elapsedSeconds   = m_elapsedSeconds;
+    options.rotationXDegrees = toDegrees(m_rotationXRadians);
+    options.rotationYDegrees = toDegrees(m_rotationYRadians);
+    options.rotationZDegrees = toDegrees(m_rotationZRadians);
+    options.rotationXSpeed   = m_rotationXSpeed;
+    options.rotationYSpeed   = m_rotationYSpeed;
+    options.rotationZSpeed   = m_rotationZSpeed;
+    options.scale            = m_scale;
+    options.thetaSpacing     = m_thetaSpacing;
+    options.phiSpacing       = m_phiSpacing;
+    options.tubeRadius       = m_tubeRadius;
+    options.torusRadius      = m_torusRadius;
+    options.cameraDistance   = m_cameraDistance;
+    options.showBands        = m_showBands;
+
+    return options;
 }
 
 void Donut3D::ensureBuffers(int width, int height)
@@ -120,6 +218,11 @@ void Donut3D::renderDonut(Surface& surface, const Rect& viewPort)
         return;
     }
 
+    if (m_luminanceRamp.empty())
+    {
+        return;
+    }
+
     ScreenBuffer& buffer = surface.buffer();
 
     ensureBuffers(viewPort.size.width, viewPort.size.height);
@@ -132,12 +235,14 @@ void Donut3D::renderDonut(Surface& surface, const Rect& viewPort)
     std::vector<float> luminanceBuffer(static_cast<std::size_t>(viewPort.size.width * viewPort.size.height), 0.0f);
     std::vector<float> shadowBuffer(static_cast<std::size_t>(viewPort.size.width * viewPort.size.height), 0.0f);
 
-    const float cosA = std::cos(m_rotationA);
-    const float sinA = std::sin(m_rotationA);
-    const float cosB = std::cos(m_rotationB);
-    const float sinB = std::sin(m_rotationB);
+    const float cosX = std::cos(m_rotationXRadians);
+    const float sinX = std::sin(m_rotationXRadians);
+    const float cosY = std::cos(m_rotationYRadians);
+    const float sinY = std::sin(m_rotationYRadians);
+    const float cosZ = std::cos(m_rotationZRadians);
+    const float sinZ = std::sin(m_rotationZRadians);
 
-    const float k1 = SizeScale * static_cast<float>(viewPort.size.width) * K2 * 3.0f / (8.0f * (R1 + R2));
+    const float k1 = m_scale * static_cast<float>(viewPort.size.width) * m_cameraDistance * 3.0f / (8.0f * (m_tubeRadius + m_torusRadius));
 
     float minDepth = 1000000.0f;
     float maxDepth = -1000000.0f;
@@ -145,24 +250,38 @@ void Donut3D::renderDonut(Surface& surface, const Rect& viewPort)
     const float floorY = (static_cast<float>(viewPort.size.height) * 0.9f);
     const float shadowShiftX = 6.0f;
 
-    for (float theta = 0.0f; theta < (Pi * 2.0f); theta += ThetaSpacing)
+    for (float theta = 0.0f; theta < (Pi * 2.0f); theta += m_thetaSpacing)
     {
         const float costheta = std::cos(theta);
         const float sintheta = std::sin(theta);
 
-        for (float phi = 0.0f; phi < (Pi * 2.0f); phi += PhiSpacing)
+        for (float phi = 0.0f; phi < (Pi * 2.0f); phi += m_phiSpacing)
         {
+            // define the taurus
             const float cosphi = std::cos(phi);
             const float sinphi = std::sin(phi);
 
-            const float circlex = R2 + (R1 * costheta);
-            const float circley = R1 * sintheta;
+            const float circlex = m_torusRadius + (m_tubeRadius * costheta);
+            const float circley = m_tubeRadius * sintheta;
 
-            const float x = circlex * ((cosB * cosphi) + (sinA * sinB * sinphi))
-                - (circley * cosA * sinB);
-            const float y = circlex * ((sinB * cosphi) - (sinA * cosB * sinphi))
-                + (circley * cosA * cosB);
-            const float z = K2 + (cosA * circlex * sinphi) + (circley * sinA);
+            const Vec3 localPoint{
+                circlex * cosphi,
+                circley,
+                circlex * sinphi
+            };
+
+            const Vec3 transformedPoint = transformPoint(
+                localPoint,
+                cosX,
+                sinX,
+                cosY,
+                sinY,
+                cosZ,
+                sinZ);
+
+            const float x = transformedPoint.x;
+            const float y = transformedPoint.y;
+            const float z = m_cameraDistance + transformedPoint.z;
 
             if (z <= 0.0f)
             {
@@ -179,11 +298,24 @@ void Donut3D::renderDonut(Surface& surface, const Rect& viewPort)
                 continue;
             }
 
+            const Vec3 localNormal{
+                costheta * cosphi,
+                sintheta,
+                costheta * sinphi
+            };
+
+            const Vec3 transformedNormal = transformPoint(
+                localNormal,
+                cosX,
+                sinX,
+                cosY,
+                sinY,
+                cosZ,
+                sinZ);
+
             const float luminance =
-                (cosphi * costheta * sinB)
-                - (cosA * costheta * sinphi)
-                - (sinA * sintheta)
-                + (cosB * ((cosA * sintheta) - (costheta * sinA * sinphi)));
+                transformedNormal.y
+                - transformedNormal.z;
 
             if (luminance <= 0.0f)
             {
@@ -201,9 +333,35 @@ void Donut3D::renderDonut(Surface& surface, const Rect& viewPort)
             m_depthBuffer[cellIndex] = ooz;
             luminanceBuffer[cellIndex] = luminance;
 
-            int luminanceIndex = static_cast<int>(luminance * 8.0f);
-            luminanceIndex = std::clamp(luminanceIndex, 0, LuminanceRampCount - 1);
-            m_glyphBuffer[cellIndex] = LuminanceRamp[luminanceIndex];
+            if (m_showBands)
+            {
+                // cut 4 bands equal distances apart
+                const float bandSpacing = Pi * 0.5f;
+                const float seamWidth = 0.04f;
+
+                const float bandPhase =
+                    std::fmod(phi, bandSpacing);
+
+                const bool isBand = bandPhase < seamWidth
+                    || bandPhase >(bandSpacing - seamWidth);
+
+                if (isBand)
+                {
+                    m_glyphBuffer[cellIndex] = U' ';
+                }
+                else
+                {
+                    int luminanceIndex = static_cast<int>(luminance * 8.0f);
+                    luminanceIndex = std::clamp(luminanceIndex, 0, m_luminanceRampCount - 1);
+                    m_glyphBuffer[cellIndex] = m_luminanceRamp[static_cast<std::size_t>(luminanceIndex)];
+                }
+            }
+            else
+            {
+                int luminanceIndex = static_cast<int>(luminance * 8.0f);
+                luminanceIndex = std::clamp(luminanceIndex, 0, m_luminanceRampCount - 1);
+                m_glyphBuffer[cellIndex] = m_luminanceRamp[static_cast<std::size_t>(luminanceIndex)];
+            }
 
             if (ooz < minDepth)
             {
@@ -343,16 +501,16 @@ Style Donut3D::buildShadedStyle(float normalizedDepth, float luminance) const
     if (luminance < 0.25f)
     {
         return style::Fg(baseColor)
-             + style::Bg(Color::FromBasic(Color::Basic::Black));
+            + style::Bg(Color::FromBasic(Color::Basic::Black));
     }
 
     if (luminance < 0.55f)
     {
         return style::Fg(brightColor)
-             + style::Bg(Color::FromBasic(Color::Basic::Black));
+            + style::Bg(Color::FromBasic(Color::Basic::Black));
     }
 
     return style::Bold
-         + style::Fg(hottestColor)
-         + style::Bg(Color::FromBasic(Color::Basic::Black));
+        + style::Fg(hottestColor)
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
 }
