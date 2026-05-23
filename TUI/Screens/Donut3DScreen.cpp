@@ -1,44 +1,50 @@
-#include "Screens/Donut3DScreen.h"
+﻿#include "Screens/Donut3DScreen.h"
 
-#include <cmath>
-
-#include "Rendering/Surface.h"
-#include "Rendering/ScreenBuffer.h"
+#include <string>
+#include <sstream>
+#include <iomanip>
 
 #include "Core/Rect.h"
-#include "Rendering/Styles/Style.h"
-#include "Rendering/Styles/Themes.h"
-#include "Rendering/Styles/StyleBuilder.h"
-
-#include "Rendering/Objects/TextObject.h"
-#include "Rendering/Objects/TextObjectFactory.h"
 #include "Rendering/Composition/Alignment.h"
 #include "Rendering/Composition/PageComposer.h"
-#include "UI/Content/WidgetWindowContent.h"
-#include "UI/Widgets/TextView.h"
+#include "Rendering/Objects/TextObject.h"
+#include "Rendering/Objects/TextObjectFactory.h"
+#include "Rendering/ScreenBuffer.h"
+#include "Rendering/Styles/Style.h"
+#include "Rendering/Styles/StyleBuilder.h"
+#include "Rendering/Styles/Themes.h"
+#include "Rendering/Surface.h"
+#include "UI/Content/ComposedWindowContent.h"
+#include "UI/Content/ImmediateModeWindowContent.h"
+#include "UI/Content/EffectReferenceWindowContent.h"
 
 using namespace UI;
 
 namespace
 {
-    using Composition::Alignment;
     using Composition::PageComposer;
-    using Composition::WritePresets::solidObject;
-    using Composition::WritePresets::visibleObject;
-    using Composition::WritePresets::authoredObject;
 
     constexpr int MinimumScreenWidth = 30;
     constexpr int MinimumScreenHeight = 12;
+
+    template<typename T>
+    std::string toFixedString(T value, int precision = 2)
+    {
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(precision)
+            << value;
+        return ss.str();
+    }
 }
 
 namespace DonutColors
 {
     inline const Style Background =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style BorderColor =
-          style::Fg(Color::FromBasic(Color::Basic::White))
+        style::Fg(Color::FromBasic(Color::Basic::White))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 
     inline const Style unfocusedWindow =
@@ -55,6 +61,22 @@ namespace DonutColors
 
     inline const Style DonutTitle =
         style::Fg(Color::FromBasic(Color::Basic::BrightRed))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style InfoLabel =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style InfoValue =
+        style::Fg(Color::FromBasic(Color::Basic::BrightWhite))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style InfoAccent =
+        style::Fg(Color::FromBasic(Color::Basic::Magenta))
+        + style::Bg(Color::FromBasic(Color::Basic::Black));
+
+    inline const Style InfoDim =
+        style::Fg(Color::FromBasic(Color::Basic::BrightBlack))
         + style::Bg(Color::FromBasic(Color::Basic::Black));
 }
 
@@ -75,6 +97,18 @@ void Donut3DScreen::onEnter()
     invalidateStaticUiCache();
     m_Donut3D.onEnter();
     m_windowManager.setDockTree(&m_dockTree);
+
+    DonutEffectOptions options = m_Donut3D.getOptions();
+
+    options.rotationXDegrees = 90.00f;
+    options.rotationYDegrees = 0.00f;
+    options.rotationZDegrees = 0.00f;
+
+    options.rotationXSpeed = 0.001f;
+    options.rotationYSpeed = 1.00f;
+    options.rotationZSpeed = 0.50f;
+
+    m_Donut3D.setOptions(options);
 }
 
 void Donut3DScreen::onExit()
@@ -89,7 +123,6 @@ bool Donut3DScreen::handleEvent(const Input::Event& event)
 
 void Donut3DScreen::update(const Animation::TickEvent& event)
 {
-    m_Donut3D.update(event);
     m_windowManager.update(event);
 }
 
@@ -112,7 +145,7 @@ void Donut3DScreen::draw(Surface& surface)
     page.clearRegions();
 
     page.createFullScreenRegion("Screen");
-    page.createInsetRegion("Safe", "Screen", 2, 1, 2, 1);
+    page.createInsetRegion("Safe", "Screen", 2, 2, 2, 1);
 
     const Rect safe = page.resolveRegion("Safe");
     const auto [footer, body] = page.splitBottom(safe, 5);
@@ -123,7 +156,7 @@ void Donut3DScreen::draw(Surface& surface)
     page.createRegion("Footer", footer);
 
     page.createInsetRegion("3dViewPort", "LeftPane", 2, 1, 2, 1);
-    const Rect viewPort = page.resolveRegion("3dViewPort");
+    page.createInsetRegion("FooterContent", "Footer", 2, 1, 2, 1);
 
     page.writeObjectInRegion(m_outerFrameObject, "Screen", Composition::Align::center());
 
@@ -135,11 +168,11 @@ void Donut3DScreen::draw(Surface& surface)
 
     ensureLayout(safe, windowRectArr);
 
-    // page.drawPanel("RightPane", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
     page.drawPanel("Footer", DonutColors::Background, DonutColors::BorderColor, ObjectFactory::roundedBorder());
+    page.drawNameValue("FooterContent", 0, "Palette", "Cyber Neon", DonutColors::InfoLabel, DonutColors::InfoValue, 2);
 
     m_titleObject.draw(buffer, m_titleX, m_titleY);
-        
+
     m_windowManager.draw(surface);
 }
 
@@ -156,24 +189,221 @@ void Donut3DScreen::ensureLayout(const Rect& viewport, const Rect* windowRectArr
     m_screenHeight = viewport.size.height;
 
     m_windowManager.clear();
-   
-    auto renderInfoWidget = std::make_unique<TextView>(m_renderInfoWindowTitle);
 
-    renderInfoWidget->setBorderVisible(false);
-    renderInfoWidget->setLines({
-        "3D ASCII Render Lab",
-        "",
-        "Mode: Classic ASCII",
-        "Palette: Magenta",
-        "Speed: Normal",
-        "",
-        "Live render telemetry can go here."
-        });
+    auto previewContent =
+        std::make_unique<UI::EffectReferenceWindowContent>(m_Donut3D);
 
-    auto renderInfoContent = std::make_unique<WidgetWindowContent>(std::move(renderInfoWidget));
+    auto renderInfoContent =
+        std::make_unique<UI::ImmediateModeWindowContent>(
+            [this](Surface& surface, const Rect& bounds)
+            {
+                DonutEffectOptions options = m_Donut3D.getOptions();
 
-    m_previewWindow    = std::make_unique<EffectWindow>(windowRectArr[0], m_previewWindowTitle, m_Donut3D);
-    m_renderInfoWindow = std::make_unique<ContentWindow>(windowRectArr[1], m_renderInfoWindowTitle, std::move(renderInfoContent));
+                Composition::PageComposer composer(surface.buffer());
+
+                composer.createRegion("Content", bounds);
+
+                composer.drawSectionHeader(
+                    "Content",
+                    1,
+                    "Render Pipeline",
+                    DonutColors::DonutTitle,
+                    DonutColors::InfoDim,
+                    U'─');
+
+                composer.drawNameValue(
+                    "Content",
+                    3,
+                    "Host:   ",
+                    "ContentWindow",
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoValue,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    4,
+                    "Preview:",
+                    "EffectReferenceWindowContent",
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoValue,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    5,
+                    "Info:   ",
+                    "ImmediateModeWindowContent",
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoValue,
+                    2);
+
+                composer.drawHorizontalRule(
+                    "Content",
+                    7,
+                    DonutColors::InfoDim,
+                    U'─');
+
+                composer.drawNameValue(
+                    "Content",
+                    9,
+                    "Effect: ",
+                    "Donut3D",
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoValue,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    10,
+                    "Mode:   ",
+                    "Classic ASCII",
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoValue,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    13,
+                    "Elapsed Seconds:",
+                    toFixedString(options.elapsedSeconds),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    14,
+                    "X Rotation:",
+                    toFixedString(options.rotationXDegrees),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    15,
+                    "Y Rotation:",
+                    toFixedString(options.rotationYDegrees),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    16,
+                    "Z Rotation:",
+                    toFixedString(options.rotationZDegrees),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    17,
+                    "X Rotation Speed:",
+                    toFixedString(options.rotationXSpeed),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    18,
+                    "Y Rotation Speed:",
+                    toFixedString(options.rotationYSpeed),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    19,
+                    "Z Rotation Speed:",
+                    toFixedString(options.rotationZSpeed),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    20,
+                    "Camera Distance:",
+                    toFixedString(options.cameraDistance),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    21,
+                    "Object Scale: ",
+                    toFixedString(options.scale),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    22,
+                    "Theta Spacing:",
+                    toFixedString(options.thetaSpacing),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawNameValue(
+                    "Content",
+                    23,
+                    "Phi Spacing:  ",
+                    toFixedString(options.phiSpacing),
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    2);
+
+                composer.drawMeter(
+                    "Content",
+                    25,
+                    "X Rotation",
+                    options.rotationXDegrees,
+                    360,
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    DonutColors::InfoDim,
+                    14);
+
+                composer.drawMeter(
+                    "Content",
+                    27,
+                    "Y Rotation",
+                    options.rotationYDegrees,
+                    360,
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    DonutColors::InfoDim,
+                    14);
+
+                composer.drawMeter(
+                    "Content",
+                    29,
+                    "Z Rotation",
+                    options.rotationZDegrees,
+                    360,
+                    DonutColors::InfoLabel,
+                    DonutColors::InfoAccent,
+                    DonutColors::InfoDim,
+                    14);
+            });
+
+    m_previewWindow = std::make_unique<UI::ContentWindow>(
+        windowRectArr[0],
+        m_previewWindowTitle,
+        std::move(previewContent));
+
+    m_renderInfoWindow = std::make_unique<UI::ContentWindow>(
+        windowRectArr[1],
+        m_renderInfoWindowTitle,
+        std::move(renderInfoContent));
 
     m_previewWindow->setBorderGlyphs(ObjectFactory::roundedBorder());
     m_previewWindow->setBorderStyle(DonutColors::unfocusedWindow);
@@ -187,8 +417,8 @@ void Donut3DScreen::ensureLayout(const Rect& viewport, const Rect* windowRectArr
     m_renderInfoWindow->setHoveredBorderStyle(DonutColors::DonutWindow);
     m_renderInfoWindow->setHoveredTitleStyle(DonutColors::DonutTitle);
 
-    m_windowManager.addWindow(*m_previewWindow.get());
-    m_windowManager.addWindow(*m_renderInfoWindow.get());
+    m_windowManager.addWindow(*m_previewWindow);
+    m_windowManager.addWindow(*m_renderInfoWindow);
 
     ensureDockContentModel(viewport);
     m_layoutInitialized = true;
@@ -239,7 +469,6 @@ void Donut3DScreen::ensureStaticUiCache(int screenWidth, int screenHeight)
 
     const bool contentChanged =
         (m_titleText != m_cachedTitleText) ||
-        // (m_footerText != m_cachedFooterText) ||
         (m_minimumSizeMessage != m_cachedMinimumSizeMessage);
 
     if (!sizeChanged && !contentChanged)

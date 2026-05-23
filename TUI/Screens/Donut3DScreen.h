@@ -1,16 +1,15 @@
 #pragma once
 
+#include <memory>
 #include <string>
 
 #include "Core/Rect.h"
-#include "Screens/Screen.h"
-#include "UI/Panels/Window.h"
-#include "UI/Panels/EffectWindow.h"
-#include "UI/Panels/ContentWindow.h"
 #include "Rendering/Effects/Donut3D.h"
 #include "Rendering/Objects/TextObject.h"
+#include "Screens/Screen.h"
 #include "UI/Base/WindowManager.h"
 #include "UI/Layout/DockTree.h"
+#include "UI/Panels/ContentWindow.h"
 
 class Surface;
 class Style;
@@ -28,7 +27,6 @@ public:
     void draw(Surface& surface) override;
 
 private:
-
     void ensureLayout(const Rect& viewport, const Rect* windowRectArr);
     void ensureDockContentModel(const Rect& viewport);
     void invalidateStaticUiCache();
@@ -67,7 +65,7 @@ private:
     int m_warningY = 1;
 
     Donut3D m_Donut3D;
-    std::unique_ptr<EffectWindow> m_previewWindow;
+    std::unique_ptr<UI::ContentWindow> m_previewWindow;
     std::unique_ptr<UI::ContentWindow> m_renderInfoWindow;
 
     const char* m_previewWindowTitle = "( Preview )";
