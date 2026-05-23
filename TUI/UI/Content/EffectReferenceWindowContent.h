@@ -19,6 +19,8 @@ namespace UI
 
         ~EffectReferenceWindowContent() override;
 
+        std::string_view contentTypeName() const;
+
         IEffect& effect();
         const IEffect& effect() const;
 

@@ -37,6 +37,23 @@ namespace UI
         detachContent();
     }
 
+    IWindowContent* ContentWindow::content()
+    {
+        return m_content.get();
+    }
+
+    const IWindowContent* ContentWindow::content() const
+    {
+        return m_content.get();
+    }
+
+    std::string_view ContentWindow::contentTypeName() const
+    {
+        return m_content != nullptr
+             ? m_content->contentTypeName()
+             : std::string_view("UI::ContentWindow(empty)");
+    }
+
     bool ContentWindow::hasTransferableContent() const
     {
         return m_content != nullptr;

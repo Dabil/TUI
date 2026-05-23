@@ -21,6 +21,8 @@ namespace UI
 
         ~EffectWindowContent() override;
 
+        std::string_view contentTypeName() const;
+
         bool hasEffect() const;
 
         IEffect* effect();

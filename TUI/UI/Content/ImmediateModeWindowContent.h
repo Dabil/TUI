@@ -39,6 +39,8 @@ namespace UI
 
         ~ImmediateModeWindowContent() override;
 
+        std::string_view contentTypeName() const;
+
         void setDrawCallback(DrawCallback draw);
         void setUpdateCallback(UpdateCallback update);
         void setEventCallback(EventCallback handleEvent);

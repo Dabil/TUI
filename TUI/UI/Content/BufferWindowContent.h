@@ -103,6 +103,8 @@ namespace UI
 
         ~BufferWindowContent() override;
 
+        std::string_view contentTypeName() const override;
+
         bool ownsBuffer() const;
         bool hasBuffer() const;
 
