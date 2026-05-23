@@ -26,7 +26,10 @@ namespace UI
     {
     }
 
-    TabbedWindow::~TabbedWindow() = default;
+    TabbedWindow::~TabbedWindow()
+    {
+        detachAllPageContent();
+    }
 
     TabbedWindowModel& TabbedWindow::model()
     {
@@ -50,11 +53,19 @@ namespace UI
 
     bool TabbedWindow::addPage(TabbedWindowPage page, bool selectNewPage)
     {
+        const std::string contentId = page.contentId();
+
         const bool added = m_model.addPage(std::move(page), selectNewPage);
 
         if (!added)
         {
             return false;
+        }
+
+        const int addedIndex = m_model.indexOfContentId(contentId);
+        if (addedIndex >= 0)
+        {
+            attachPageContent(m_model.pages()[static_cast<std::size_t>(addedIndex)]);
         }
 
         synchronizeTitleWithSelectedPage();
@@ -95,6 +106,7 @@ namespace UI
     TabbedWindowPage TabbedWindow::removePageAt(std::size_t index)
     {
         TabbedWindowPage removed = m_model.removePageAt(index);
+        detachPageContent(removed);
 
         if (m_model.empty())
         {
@@ -119,6 +131,7 @@ namespace UI
         const std::string& contentId)
     {
         TabbedWindowPage removed = m_model.removePageByContentId(contentId);
+        detachPageContent(removed);
 
         if (m_model.empty())
         {
@@ -452,6 +465,39 @@ namespace UI
         }
     }
 
+    void TabbedWindow::attachPageContent(TabbedWindowPage& page)
+    {
+        IWindowContent* content = page.content();
+
+        if (content == nullptr)
+        {
+            return;
+        }
+
+        content->onAttached();
+        content->onBoundsChanged(selectedContentBounds());
+    }
+
+    void TabbedWindow::detachPageContent(TabbedWindowPage& page)
+    {
+        IWindowContent* content = page.content();
+
+        if (content == nullptr)
+        {
+            return;
+        }
+
+        content->onDetached();
+    }
+
+    void TabbedWindow::detachAllPageContent()
+    {
+        for (TabbedWindowPage& page : m_model.pages())
+        {
+            detachPageContent(page);
+        }
+    }
+
     bool TabbedWindow::handleMouseEvent(const Input::MouseEvent& mouseEvent)
     {
         updateHoveredTabFromPoint(mouseEvent.position);
@@ -522,7 +568,6 @@ namespace UI
     void TabbedWindow::updateHoveredTabFromPoint(Point screenPosition)
     {
         const int tabIndex = tabIndexAt(screenPosition);
-
         if (tabIndex >= 0)
         {
             setHoveredTabIndex(tabIndex);

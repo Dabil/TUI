@@ -86,6 +86,10 @@ namespace UI
         void synchronizeTitleWithSelectedPage();
         void notifyContentBoundsChanged();
 
+        void attachPageContent(TabbedWindowPage& page);
+        void detachPageContent(TabbedWindowPage& page);
+        void detachAllPageContent();
+
         bool handleMouseEvent(const Input::MouseEvent& mouseEvent);
         bool handleTabHeaderMouseEvent(const Input::MouseEvent& mouseEvent);
         bool routeContentMouseEvent(const Input::MouseEvent& mouseEvent);
