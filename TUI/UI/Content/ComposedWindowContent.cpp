@@ -72,6 +72,11 @@ namespace UI
 
     ComposedWindowContent::~ComposedWindowContent() = default;
 
+    std::string_view  ComposedWindowContent::contentTypeName() const
+    {
+        return "UI::ComposedWindowContent";
+    }
+
     void ComposedWindowContent::setComposeCallback(ComposeCallback compose)
     {
         m_compose = std::move(compose);

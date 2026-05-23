@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <string>
+#include <string_view>
 
 #include "UI/Content/IWindowContent.h"
 #include "UI/Panels/Window.h"
@@ -13,6 +14,10 @@ namespace UI
     public:
         ContentWindow(const Rect& bounds, std::string title, std::unique_ptr<IWindowContent> content);
         ~ContentWindow() override;
+
+        IWindowContent* content();
+        const IWindowContent* content() const;
+        std::string_view contentTypeName() const;
 
         bool hasTransferableContent() const override;
         std::unique_ptr<IWindowContent> releaseContent() override;

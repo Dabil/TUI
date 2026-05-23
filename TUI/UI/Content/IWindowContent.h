@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "Animation/TickEvent.h"
 #include "Core/Rect.h"
 
@@ -24,6 +26,11 @@ namespace UI
         IWindowContent& operator=(IWindowContent&&) noexcept = default;
 
         virtual ~IWindowContent() = default;
+
+        virtual std::string_view contentTypeName() const
+        {
+            return "UI::IWindowContent";
+        }
 
         virtual void update(const Animation::TickEvent& event) = 0;
 

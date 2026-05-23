@@ -11,6 +11,11 @@ namespace UI
 
     EffectReferenceWindowContent::~EffectReferenceWindowContent() = default;
 
+    std::string_view EffectReferenceWindowContent::contentTypeName() const
+    {
+        return "UI::EffectReferenceWindowContent";
+    }
+
     IEffect& EffectReferenceWindowContent::effect()
     {
         return *m_effect;

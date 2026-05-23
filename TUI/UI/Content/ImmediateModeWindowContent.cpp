@@ -26,6 +26,11 @@ namespace UI
 
     ImmediateModeWindowContent::~ImmediateModeWindowContent() = default;
 
+    std::string_view ImmediateModeWindowContent::contentTypeName() const
+    {
+        return "UI::ImmediateModeWindowContent";
+    }
+
     void ImmediateModeWindowContent::setDrawCallback(DrawCallback draw)
     {
         m_draw = std::move(draw);

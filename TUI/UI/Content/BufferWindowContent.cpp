@@ -107,6 +107,11 @@ namespace UI
 
     BufferWindowContent::~BufferWindowContent() = default;
 
+    std::string_view UI::BufferWindowContent::contentTypeName() const
+    {
+        return "UI::BufferWindowContent";
+    }
+
     bool BufferWindowContent::ownsBuffer() const
     {
         return m_ownedBuffer != nullptr;

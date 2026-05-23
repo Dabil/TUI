@@ -13,6 +13,11 @@ namespace UI
 
     EffectWindowContent::~EffectWindowContent() = default;
 
+    std::string_view EffectWindowContent::contentTypeName() const
+    {
+        return "UI::EffectWindowContent";
+    }
+
     bool EffectWindowContent::hasEffect() const
     {
         return m_effect != nullptr;

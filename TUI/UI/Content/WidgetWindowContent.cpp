@@ -13,6 +13,11 @@ namespace UI
 
     WidgetWindowContent::~WidgetWindowContent() = default;
 
+    std::string_view WidgetWindowContent::contentTypeName() const
+    {
+        return "UI::WidgetWindowContent";
+    }
+
     bool WidgetWindowContent::hasWidget() const
     {
         return m_widget != nullptr;

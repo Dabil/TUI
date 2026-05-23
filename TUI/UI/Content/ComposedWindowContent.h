@@ -37,6 +37,8 @@ namespace UI
 
         ~ComposedWindowContent() override;
 
+        std::string_view contentTypeName() const;
+
         void setComposeCallback(ComposeCallback compose);
         void requestRecompose();
 

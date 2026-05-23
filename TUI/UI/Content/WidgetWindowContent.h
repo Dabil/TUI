@@ -21,6 +21,8 @@ namespace UI
 
         ~WidgetWindowContent() override;
 
+        std::string_view contentTypeName() const;
+
         bool hasWidget() const;
 
         Widget* widget();
