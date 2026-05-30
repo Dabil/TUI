@@ -66,9 +66,6 @@
     <ClInclude Include="Rendering\Text\TextTypes.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\ShowcaseScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Utilities\Unicode\GraphemeSegmentation.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -112,18 +109,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Diagnostics\RenderDiagnosticsWriter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\WaterEffectScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\Donut3DScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\FireScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\DigitalRainScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Backends\TerminalCapabilityDetector.h">
@@ -420,13 +405,7 @@
     <ClInclude Include="UI\Panels\EffectWindow.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\WindowDemoScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Assets\Loaders\TileGridLoader.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\MenuDemoScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UI\Base\FocusManager.h">
@@ -465,13 +444,7 @@
     <ClInclude Include="UI\Widgets\TileGridView.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\ScrollableTileGridDemoScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Input\MouseEvent.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\WidgetDemoScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="UI\Interaction\WindowInteraction.h">
@@ -573,6 +546,12 @@
     <ClInclude Include="UI\Content\ComposedWindowContent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="UI\Content\BufferWindowContent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="UI\Content\ImmediateModeWindowContent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -617,9 +596,6 @@
     <ClCompile Include="Rendering\Styles\StyleMerge.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\ShowcaseScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Rendering\Styles\StylePolicy.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -636,18 +612,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Diagnostics\RenderDiagnosticsWriter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\WaterEffectScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\Donut3DScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\FireScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\DigitalRainScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Backends\TerminalCapabilityDetector.cpp">
@@ -929,13 +893,7 @@
     <ClCompile Include="UI\Panels\EffectWindow.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\WindowDemoScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Assets\Loaders\TileGridLoader.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\MenuDemoScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UI\Base\FocusManager.cpp">
@@ -972,12 +930,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UI\Widgets\TileGridView.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\ScrollableTileGridDemoScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\WidgetDemoScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UI\Interaction\WindowInteraction.cpp">
@@ -1065,6 +1017,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="UI\Content\ComposedWindowContent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Content\BufferWindowContent.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="UI\Content\ImmediateModeWindowContent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

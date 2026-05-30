@@ -1,7 +1,7 @@
 #pragma once
 
 class Surface;
-class Rect;
+struct Rect;
 
 namespace Animation
 {
