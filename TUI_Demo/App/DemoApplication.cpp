@@ -2,6 +2,9 @@
 
 #include "App/ScreenManager.h"
 
+#include "Rendering/IRenderer.h"
+#include "Rendering/Surface.h"
+
 #include "Screens/Developer/RendererDiagnosticsScreen.h"
 #include "Screens/Developer/TerminalCapabilitiesScreen.h"
 #include "Screens/DigitalRainScreen.h"
@@ -13,8 +16,13 @@
 #include "Screens/WaterEffectScreen.h"
 #include "Screens/WidgetDemoScreen.h"
 #include "Screens/WindowDemoScreen.h"
+#include "Rendering/Styles/Themes.h"
+
+#include "UI/Widgets/Button.h"
 
 #include <memory>
+#include <string>
+#include <utility>
 
 DemoApplication::DemoApplication(
     StartupRendererSelection rendererSelection,
@@ -52,6 +60,8 @@ void DemoApplication::configureAssetLibrary()
 
 bool DemoApplication::onInitialize()
 {
+    registerDemoRoutes();
+
     if (m_validationScreenStart == StartupValidationScreenPreference::ValidationStartTrue)
     {
         m_currentScreenType = ScreenType::TerminalCapabilities;
@@ -62,23 +72,31 @@ bool DemoApplication::onInitialize()
     }
 
     m_screenCycleElapsedSeconds = 0.0;
-    switchToScreen(m_currentScreenType);
 
-    return true;
+    rebuildNavigationButtons();
+
+    return replaceWith(routeIdForScreenType(m_currentScreenType));
+}
+
+bool DemoApplication::dispatchEvent(const Input::Event& event)
+{
+    if (m_navigationButtons.handleEvent(event))
+    {
+        return true;
+    }
+
+    return ApplicationHost::dispatchEvent(event);
 }
 
 bool DemoApplication::handleApplicationCommand(const Input::CommandEvent& commandEvent)
 {
     switch (commandEvent.command.code)
     {
-    case Input::CommandCode::Confirm:
     case Input::CommandCode::Forward:
-    case Input::CommandCode::MoveRight:
         advanceScreen();
         return true;
 
     case Input::CommandCode::Back:
-    case Input::CommandCode::MoveLeft:
         previousScreen();
         return true;
 
@@ -92,199 +110,397 @@ void DemoApplication::update(const Animation::TickEvent& event)
     updateScreenCycle(event);
 
     ApplicationHost::update(event);
+
+    m_navigationButtons.update(event);
+}
+
+void DemoApplication::render()
+{
+    surface().clear(Themes::Disabled);
+
+    screenManager().drawCurrentScreen(surface());
+
+    positionNavigationButtons();
+    m_navigationButtons.draw(surface());
+
+    renderer().present(surface().buffer());
+}
+
+void DemoApplication::registerDemoRoutes()
+{
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::TerminalCapabilities),
+        [this]() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<TerminalCapabilitiesScreen>(&renderer());
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::RendererDiagnostics),
+        [this]() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<RendererDiagnosticsScreen>(&renderer());
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::ControlDeck),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<ControlDeckScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::RetroTerminal),
+        [this]() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<RetroTerminalScreen>(assetLibrary());
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::NeonDialog),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<NeonDialogScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::OpsWall),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<OpsWallScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::MenuDemoScreen),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<MenuDemoScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::WidgetDemoScreen),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<WidgetDemoScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::ScrollableTileGridDemo),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<ScrollableTileGridDemoScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::WindowDemo),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<WindowDemo>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::DigitalRain),
+        [this]() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<DigitalRainScreen>(startupDiagnostics().actualHost);
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::WaterEffect),
+        [this]() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<WaterEffectScreen>(assetLibrary());
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::Donut3D),
+        []() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<Donut3DScreen>();
+        });
+
+    registerScreenRoute(
+        routeIdForScreenType(ScreenType::Fire),
+        [this]() -> std::unique_ptr<Screen>
+        {
+            return std::make_unique<FireScreen>(assetLibrary());
+        });
 }
 
 void DemoApplication::switchToScreen(ScreenType screenType)
 {
-    screenManager().clearScreens();
-
-    switch (screenType)
-    {
-    case ScreenType::TerminalCapabilities:
-        screenManager().pushScreen(std::make_unique<TerminalCapabilitiesScreen>(&renderer()));
-        break;
-
-    case ScreenType::RendererDiagnostics:
-        screenManager().pushScreen(std::make_unique<RendererDiagnosticsScreen>(&renderer()));
-        break;
-
-    case ScreenType::ControlDeck:
-        screenManager().pushScreen(std::make_unique<ControlDeckScreen>());
-        break;
-
-    case ScreenType::RetroTerminal:
-        screenManager().pushScreen(std::make_unique<RetroTerminalScreen>(assetLibrary()));
-        break;
-
-    case ScreenType::NeonDialog:
-        screenManager().pushScreen(std::make_unique<NeonDialogScreen>());
-        break;
-
-    case ScreenType::OpsWall:
-        screenManager().pushScreen(std::make_unique<OpsWallScreen>());
-        break;
-
-    case ScreenType::MenuDemoScreen:
-        screenManager().pushScreen(std::make_unique<MenuDemoScreen>());
-        break;
-
-    case ScreenType::WidgetDemoScreen:
-        screenManager().pushScreen(std::make_unique<WidgetDemoScreen>());
-        break;
-
-    case ScreenType::ScrollableTileGridDemo:
-        screenManager().pushScreen(std::make_unique<ScrollableTileGridDemoScreen>());
-        break;
-
-    case ScreenType::WindowDemo:
-        screenManager().pushScreen(std::make_unique<WindowDemo>());
-        break;
-
-    case ScreenType::DigitalRain:
-        screenManager().pushScreen(
-            std::make_unique<DigitalRainScreen>(startupDiagnostics().actualHost));
-        break;
-
-    case ScreenType::WaterEffect:
-        screenManager().pushScreen(std::make_unique<WaterEffectScreen>(assetLibrary()));
-        break;
-
-    case ScreenType::Donut3D:
-        screenManager().pushScreen(std::make_unique<Donut3DScreen>());
-        break;
-
-    case ScreenType::Fire:
-        screenManager().pushScreen(std::make_unique<FireScreen>(assetLibrary()));
-        break;
-    }
-
     m_currentScreenType = screenType;
     m_screenCycleElapsedSeconds = 0.0;
-    requestRender();
+
+    rebuildNavigationButtons();
+
+    replaceWith(routeIdForScreenType(screenType));
 }
 
 void DemoApplication::advanceScreen()
 {
-    switch (m_currentScreenType)
-    {
-    case ScreenType::ControlDeck:
-        switchToScreen(ScreenType::RetroTerminal);
-        break;
-
-    case ScreenType::RetroTerminal:
-        switchToScreen(ScreenType::NeonDialog);
-        break;
-
-    case ScreenType::NeonDialog:
-        switchToScreen(ScreenType::OpsWall);
-        break;
-
-    case ScreenType::OpsWall:
-        switchToScreen(ScreenType::MenuDemoScreen);
-        break;
-
-    case ScreenType::MenuDemoScreen:
-        switchToScreen(ScreenType::WidgetDemoScreen);
-        break;
-
-    case ScreenType::WidgetDemoScreen:
-        switchToScreen(ScreenType::ScrollableTileGridDemo);
-        break;
-
-    case ScreenType::ScrollableTileGridDemo:
-        switchToScreen(ScreenType::WindowDemo);
-        break;
-
-    case ScreenType::WindowDemo:
-        switchToScreen(ScreenType::DigitalRain);
-        break;
-
-    case ScreenType::DigitalRain:
-        switchToScreen(ScreenType::WaterEffect);
-        break;
-
-    case ScreenType::WaterEffect:
-        switchToScreen(ScreenType::Donut3D);
-        break;
-
-    case ScreenType::Donut3D:
-        switchToScreen(ScreenType::Fire);
-        break;
-
-    case ScreenType::Fire:
-        switchToScreen(ScreenType::ControlDeck);
-        break;
-
-    case ScreenType::TerminalCapabilities:
-        switchToScreen(ScreenType::RendererDiagnostics);
-        break;
-
-    case ScreenType::RendererDiagnostics:
-        switchToScreen(ScreenType::TerminalCapabilities);
-        break;
-    }
+    switchToScreen(nextScreenType(m_currentScreenType));
 }
 
 void DemoApplication::previousScreen()
 {
-    switch (m_currentScreenType)
+    switchToScreen(previousScreenType(m_currentScreenType));
+}
+
+DemoApplication::ScreenType DemoApplication::nextScreenType(ScreenType screenType) const
+{
+    switch (screenType)
     {
     case ScreenType::ControlDeck:
-        switchToScreen(ScreenType::Fire);
-        break;
+        return ScreenType::RetroTerminal;
 
     case ScreenType::RetroTerminal:
-        switchToScreen(ScreenType::ControlDeck);
-        break;
+        return ScreenType::NeonDialog;
 
     case ScreenType::NeonDialog:
-        switchToScreen(ScreenType::RetroTerminal);
-        break;
+        return ScreenType::OpsWall;
 
     case ScreenType::OpsWall:
-        switchToScreen(ScreenType::NeonDialog);
-        break;
+        return ScreenType::MenuDemoScreen;
 
     case ScreenType::MenuDemoScreen:
-        switchToScreen(ScreenType::OpsWall);
-        break;
+        return ScreenType::WidgetDemoScreen;
 
     case ScreenType::WidgetDemoScreen:
-        switchToScreen(ScreenType::MenuDemoScreen);
-        break;
+        return ScreenType::ScrollableTileGridDemo;
 
     case ScreenType::ScrollableTileGridDemo:
-        switchToScreen(ScreenType::WidgetDemoScreen);
-        break;
+        return ScreenType::WindowDemo;
 
     case ScreenType::WindowDemo:
-        switchToScreen(ScreenType::ScrollableTileGridDemo);
-        break;
+        return ScreenType::DigitalRain;
 
     case ScreenType::DigitalRain:
-        switchToScreen(ScreenType::WindowDemo);
-        break;
+        return ScreenType::WaterEffect;
 
     case ScreenType::WaterEffect:
-        switchToScreen(ScreenType::DigitalRain);
-        break;
+        return ScreenType::Donut3D;
 
     case ScreenType::Donut3D:
-        switchToScreen(ScreenType::WaterEffect);
-        break;
+        return ScreenType::Fire;
 
     case ScreenType::Fire:
-        switchToScreen(ScreenType::Donut3D);
-        break;
+        return ScreenType::ControlDeck;
 
     case ScreenType::TerminalCapabilities:
-        switchToScreen(ScreenType::RendererDiagnostics);
-        break;
+        return ScreenType::RendererDiagnostics;
 
     case ScreenType::RendererDiagnostics:
-        switchToScreen(ScreenType::TerminalCapabilities);
-        break;
+        return ScreenType::TerminalCapabilities;
     }
+
+    return ScreenType::ControlDeck;
+}
+
+DemoApplication::ScreenType DemoApplication::previousScreenType(ScreenType screenType) const
+{
+    switch (screenType)
+    {
+    case ScreenType::ControlDeck:
+        return ScreenType::Fire;
+
+    case ScreenType::RetroTerminal:
+        return ScreenType::ControlDeck;
+
+    case ScreenType::NeonDialog:
+        return ScreenType::RetroTerminal;
+
+    case ScreenType::OpsWall:
+        return ScreenType::NeonDialog;
+
+    case ScreenType::MenuDemoScreen:
+        return ScreenType::OpsWall;
+
+    case ScreenType::WidgetDemoScreen:
+        return ScreenType::MenuDemoScreen;
+
+    case ScreenType::ScrollableTileGridDemo:
+        return ScreenType::WidgetDemoScreen;
+
+    case ScreenType::WindowDemo:
+        return ScreenType::ScrollableTileGridDemo;
+
+    case ScreenType::DigitalRain:
+        return ScreenType::WindowDemo;
+
+    case ScreenType::WaterEffect:
+        return ScreenType::DigitalRain;
+
+    case ScreenType::Donut3D:
+        return ScreenType::WaterEffect;
+
+    case ScreenType::Fire:
+        return ScreenType::Donut3D;
+
+    case ScreenType::TerminalCapabilities:
+        return ScreenType::RendererDiagnostics;
+
+    case ScreenType::RendererDiagnostics:
+        return ScreenType::TerminalCapabilities;
+    }
+
+    return ScreenType::ControlDeck;
+}
+
+std::string DemoApplication::routeIdForScreenType(ScreenType screenType) const
+{
+    switch (screenType)
+    {
+    case ScreenType::TerminalCapabilities:
+        return "demo:terminal_capabilities";
+
+    case ScreenType::RendererDiagnostics:
+        return "demo:renderer_diagnostics";
+
+    case ScreenType::ControlDeck:
+        return "demo:control_deck";
+
+    case ScreenType::RetroTerminal:
+        return "demo:retro_terminal";
+
+    case ScreenType::NeonDialog:
+        return "demo:neon_dialog";
+
+    case ScreenType::OpsWall:
+        return "demo:ops_wall";
+
+    case ScreenType::MenuDemoScreen:
+        return "demo:menu_demo";
+
+    case ScreenType::WidgetDemoScreen:
+        return "demo:widget_demo";
+
+    case ScreenType::ScrollableTileGridDemo:
+        return "demo:scrollable_tile_grid";
+
+    case ScreenType::WindowDemo:
+        return "demo:window_demo";
+
+    case ScreenType::DigitalRain:
+        return "demo:digital_rain";
+
+    case ScreenType::WaterEffect:
+        return "demo:water_effect";
+
+    case ScreenType::Donut3D:
+        return "demo:donut_3d";
+
+    case ScreenType::Fire:
+        return "demo:fire";
+    }
+
+    return "demo:control_deck";
+}
+
+void DemoApplication::rebuildNavigationButtons()
+{
+    m_navigationButtons.clearChildren();
+
+    auto previousButton = std::make_unique<Button>(
+        Rect{ Point{ 0, 0 }, Size{ 14, 3 } },
+        "Previous",
+        "route:" + routeIdForScreenType(previousScreenType(m_currentScreenType)));
+
+    previousButton->setActivationCallback(
+        [this](const ButtonActivationResult& result)
+        {
+            if (!result.activated)
+            {
+                return;
+            }
+
+            dispatchNavigationCommandId(result.commandId);
+        });
+
+    auto nextButton = std::make_unique<Button>(
+        Rect{ Point{ 0, 0 }, Size{ 10, 3 } },
+        "Next",
+        "route:" + routeIdForScreenType(nextScreenType(m_currentScreenType)));
+
+    nextButton->setActivationCallback(
+        [this](const ButtonActivationResult& result)
+        {
+            if (!result.activated)
+            {
+                return;
+            }
+
+            dispatchNavigationCommandId(result.commandId);
+        });
+
+    m_navigationButtons.addChild(std::move(previousButton));
+    m_navigationButtons.addChild(std::move(nextButton));
+
+    positionNavigationButtons();
+}
+
+void DemoApplication::positionNavigationButtons()
+{
+    const int buttonY = 2;
+    const int nextWidth = 10;
+    const int previousWidth = 14;
+    const int gap = 2;
+    const int rightPadding = 4;
+
+    const int nextX = width() - rightPadding - nextWidth;
+    const int previousX = nextX - gap - previousWidth;
+
+    m_navigationButtons.setBounds(
+        Rect{
+            Point{ previousX, buttonY },
+            Size{ previousWidth + gap + nextWidth, 3 }
+        });
+
+    if (Widget* previousButton = m_navigationButtons.childAt(0))
+    {
+        previousButton->setBounds(
+            Rect{ Point{ previousX, buttonY }, Size{ previousWidth, 3 } });
+    }
+
+    if (Widget* nextButton = m_navigationButtons.childAt(1))
+    {
+        nextButton->setBounds(
+            Rect{ Point{ nextX, buttonY }, Size{ nextWidth, 3 } });
+    }
+}
+
+bool DemoApplication::dispatchNavigationCommandId(const std::string& commandId)
+{
+    if (commandId.empty())
+    {
+        return false;
+    }
+
+    if (commandId == "route:" + routeIdForScreenType(nextScreenType(m_currentScreenType)))
+    {
+        m_currentScreenType = nextScreenType(m_currentScreenType);
+        m_screenCycleElapsedSeconds = 0.0;
+
+        const bool handled = handleCommandId(commandId);
+
+        rebuildNavigationButtons();
+
+        return handled;
+    }
+
+    if (commandId == "route:" + routeIdForScreenType(previousScreenType(m_currentScreenType)))
+    {
+        m_currentScreenType = previousScreenType(m_currentScreenType);
+        m_screenCycleElapsedSeconds = 0.0;
+
+        const bool handled = handleCommandId(commandId);
+
+        rebuildNavigationButtons();
+
+        return handled;
+    }
+
+    return handleCommandId(commandId);
 }
 
 void DemoApplication::updateScreenCycle(const Animation::TickEvent& event)
@@ -297,4 +513,3 @@ void DemoApplication::updateScreenCycle(const Animation::TickEvent& event)
         advanceScreen();
     }
 }
-
