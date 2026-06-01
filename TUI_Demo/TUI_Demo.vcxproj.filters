@@ -45,7 +45,19 @@
     <ClCompile Include="Screens\WindowDemoScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="App\Application.cpp">
+    <ClCompile Include="App\DemoApplication.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\Developer\RendererDiagnosticsScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\Developer\TerminalCapabilitiesScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\Developer\TextObjectExportValidationScreen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Screens\Developer\XpSequenceDiagnosticsScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -77,7 +89,19 @@
     <ClInclude Include="Screens\WindowDemoScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="App\Application.h">
+    <ClInclude Include="App\DemoApplication.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Screens\Developer\RendererDiagnosticsScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Screens\Developer\TerminalCapabilitiesScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Screens\Developer\TextObjectExportValidationScreen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Screens\Developer\XpSequenceDiagnosticsScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

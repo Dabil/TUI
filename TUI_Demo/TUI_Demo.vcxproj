@@ -135,8 +135,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="App\Application.cpp" />
+    <ClCompile Include="App\DemoApplication.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Screens\Developer\RendererDiagnosticsScreen.cpp" />
+    <ClCompile Include="Screens\Developer\TerminalCapabilitiesScreen.cpp" />
+    <ClCompile Include="Screens\Developer\TextObjectExportValidationScreen.cpp" />
+    <ClCompile Include="Screens\Developer\XpSequenceDiagnosticsScreen.cpp" />
     <ClCompile Include="Screens\DigitalRainScreen.cpp" />
     <ClCompile Include="Screens\Donut3DScreen.cpp" />
     <ClCompile Include="Screens\FireScreen.cpp" />
@@ -148,7 +152,11 @@
     <ClCompile Include="Screens\WindowDemoScreen.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="App\Application.h" />
+    <ClInclude Include="App\DemoApplication.h" />
+    <ClInclude Include="Screens\Developer\RendererDiagnosticsScreen.h" />
+    <ClInclude Include="Screens\Developer\TerminalCapabilitiesScreen.h" />
+    <ClInclude Include="Screens\Developer\TextObjectExportValidationScreen.h" />
+    <ClInclude Include="Screens\Developer\XpSequenceDiagnosticsScreen.h" />
     <ClInclude Include="Screens\DigitalRainScreen.h" />
     <ClInclude Include="Screens\Donut3DScreen.h" />
     <ClInclude Include="Screens\FireScreen.h" />
