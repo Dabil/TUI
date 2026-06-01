@@ -1,4 +1,4 @@
-#include "App/Application.h"
+#include "App/DemoApplication.h"
 #include "App/CommandLineOptions.h"
 #include "App/StartupConfig.h"
 #include "App/StartupOptions.h"
@@ -41,7 +41,7 @@ int main()
         return 0;
     }
 
-    Application app(
+    DemoApplication app(
         launchDecision.rendererSelection,
         startupOptions.validationScreenPreference,
         launchDecision.diagnosticsContext);
