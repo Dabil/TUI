@@ -1,8 +1,11 @@
 #pragma once
 
-#include "App/ApplicationHost.h"
+#include <string>
+
 #include "Animation/TickEvent.h"
+#include "App/ApplicationHost.h"
 #include "Input/Event.h"
+#include "UI/Widgets/ContainerWidget.h"
 
 class DemoApplication : public ApplicationHost
 {
@@ -18,8 +21,11 @@ protected:
     void configureAssetLibrary() override;
     bool onInitialize() override;
 
+    bool dispatchEvent(const Input::Event& event) override;
     bool handleApplicationCommand(const Input::CommandEvent& commandEvent) override;
+
     void update(const Animation::TickEvent& event) override;
+    void render() override;
 
 private:
     enum class ScreenType
@@ -41,9 +47,21 @@ private:
     };
 
 private:
+    void registerDemoRoutes();
+
     void switchToScreen(ScreenType screenType);
     void advanceScreen();
     void previousScreen();
+
+    ScreenType nextScreenType(ScreenType screenType) const;
+    ScreenType previousScreenType(ScreenType screenType) const;
+
+    std::string routeIdForScreenType(ScreenType screenType) const;
+
+    void rebuildNavigationButtons();
+    void positionNavigationButtons();
+    bool dispatchNavigationCommandId(const std::string& commandId);
+
     void updateScreenCycle(const Animation::TickEvent& event);
 
 private:
@@ -54,5 +72,6 @@ private:
 
     double m_screenCycleElapsedSeconds = 0.0;
     double m_screenCycleIntervalSeconds = 60.0;
-};
 
+    ContainerWidget m_navigationButtons;
+};
