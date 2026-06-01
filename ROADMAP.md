@@ -3197,7 +3197,111 @@ Rules:
 - no hidden mutation of composed output outside the normal composition path
 
 ============================================================
-15. PHASE 14 — ALTERNATE BACKENDS / BACKEND-NEUTRAL RENDERING
+15. PHASE 14 — Navigation, Scroll Containers, and Workflow Widgets
+============================================================
+
+PURPOSE: Provide application support
+
+IMPLEMENT IN THIS PHASE
+
+14.1 Navigation and Route Layer
+- Add a route layer on top of existing 'ScreenManager'
+
+- Keep
+	- ScreenManager::pushScreen(...)
+	- ScreenManager::popScreen()
+	- ScreenManager::clearScreens()
+
+- Add
+	- ScreenRouteId
+	- ScreenRouteRegistry
+	- ScreenNavigationController
+	- ApplicationHost::navigateTo(routeId)
+	- ApplicationHost::goBack()
+	- ApplicationHost::replaceWith(routeId)
+	
+14.2 Scroll container cleanup
+- Add optional scrollbar rendering to ScrollablePanel
+- Add shared scroll event helper
+- Create ScrollBox as a scrollable ContainerWidget
+- Create ScrollWindow as a ContentWindow/Window wrapper around scrollable content
+
+14.3 Forms
+
+- Build form widgets using existing `Widget` and `ContainerWidget`.
+
+- Add:
+	- Checkbox
+	- RadioButton
+	- RadioButtonGroup
+	- TextInput
+	- NumberInput
+	- SelectBox
+	- ComboBox
+	
+14.4 Data Views
+
+- Keep Existing:
+	- ListBox
+	- TileGrid
+	- TileGridView
+	- Viewport
+
+- Add: 
+	- TableModel
+	- TableColumn
+	- TableView
+	- TableSelectionModel
+	- IDataViewAdapter
+
+14.5 Dialogs
+- Use existing modal-capable systems:
+	- Window
+	- PopupWindow
+	- WindowManager modal routing
+	- Button
+	- TextView
+	- ContainerWidget
+
+- Add: 
+	- Dialog
+	- MessageDialog
+	- ConfirmDialog
+	- DialogResult
+	- ModalDialogHost
+	
+OUTPUT OF PHASE 14
+
+- ScreenManager → route navigation
+- Button.commandId → screen navigation commands
+- Viewport/ScrollablePanel → all scroll containers
+- Window/PopupWindow/WindowManager modal flag → dialogs
+- Widget/ContainerWidget/FocusManager → forms
+- ListBox/TileGridView → data view foundation
+	
+============================================================
+16. PHASE 15 — Sound and Music
+============================================================
+
+PURPOSE
+Implement an independent Sound and Music system
+
+15.1 - Audio Abstraction Foundation
+
+15.2 - Audio Command Queue
+
+15.3 - Audio Asset Integration
+
+15.4 - Miniaudio Backend
+
+15.5 - Application Integration
+
+15.6 - UI Sound Hooks
+
+15.7 - Audio Settings & Diagnostics Screen
+	
+============================================================
+17. PHASE 16 — ALTERNATE BACKENDS / BACKEND-NEUTRAL RENDERING
 ============================================================
 
 PURPOSE
@@ -3205,17 +3309,17 @@ Future-proof the engine for non-console output.
 
 IMPLEMENT IN THIS PHASE
 
-15.1 Strengthen IRenderer seam
+16.1 Strengthen IRenderer seam
 - backend-neutral contract
 - style mapping abstraction if needed
 
-15.2 Optional ANSI terminal backend
+16.2 Optional ANSI terminal backend
 
-15.3 Optional SDL/SFML fake-terminal backend
+16.3 Optional SDL/SFML fake-terminal backend
 
-15.4 Optional image/debug export backend
+16.4 Optional image/debug export backend
 
-OUTPUT OF PHASE 14
+OUTPUT OF PHASE 15
 Renderer flexibility without disturbing page API or interpreter.
 
 FILES / FOLDERS NEEDED
@@ -3231,7 +3335,7 @@ Rendering/Backends/
 
 
 ============================================================
-16. PHASE 15 — TOOLING / TESTING / PAGE AUTHORING QUALITY-OF-LIFE
+18. PHASE 17 — TOOLING / TESTING / PAGE AUTHORING QUALITY-OF-LIFE
 ============================================================
 
 PURPOSE
@@ -3239,17 +3343,17 @@ Make the engine practical to maintain and use.
 
 IMPLEMENT IN THIS PHASE
 
-16.1 Render snapshot tests
+17.1 Render snapshot tests
 - compare renderToString output
 - verify layout regressions
 
-16.2 Theme/style preview tools
+17.2 Theme/style preview tools
 
-16.3 Asset preview tools
+17.3 Asset preview tools
 
-16.4 Page linting / script validation
+17.4 Page linting / script validation
 
-16.5 Optional page editor later
+17.5 Optional page editor later
 
 OUTPUT OF PHASE 15
 A maintainable and author-friendly ecosystem around the engine.
@@ -3270,7 +3374,7 @@ Tests/
 
 
 ============================================================
-17. UPDATED VISUAL STUDIO FOLDER / FILE LAYOUT
+19. UPDATED VISUAL STUDIO FOLDER / FILE LAYOUT
 ============================================================
 
 This updates the earlier architecture/file roadmap to support API 1.0 and interpreter work.
