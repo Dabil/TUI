@@ -145,6 +145,7 @@
     <ClInclude Include="App\ApplicationHost.h" />
     <ClInclude Include="App\CommandLineOptions.h" />
     <ClInclude Include="App\ScreenManager.h" />
+    <ClInclude Include="App\ScreenRouteRegistry.h" />
     <ClInclude Include="App\StartupConfig.h" />
     <ClInclude Include="App\StartupOptions.h" />
     <ClInclude Include="App\TerminalLauncher.h" />
@@ -341,6 +342,7 @@
     <ClCompile Include="App\ApplicationHost.cpp" />
     <ClCompile Include="App\CommandLineOptions.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
+    <ClCompile Include="App\ScreenRouteRegistry.cpp" />
     <ClCompile Include="App\StartupConfig.cpp" />
     <ClCompile Include="App\StartupOptions.cpp" />
     <ClCompile Include="App\TerminalLauncher.cpp" />
