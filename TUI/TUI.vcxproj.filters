@@ -36,9 +36,6 @@
     <ClInclude Include="Rendering\Surface.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="App\Application.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="App\ScreenManager.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -171,12 +168,6 @@
     <ClInclude Include="Rendering\TerminalSessionOptions.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Screens\Developer\RendererDiagnosticsScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\Developer\TerminalCapabilitiesScreen.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Rendering\Styles\StylePolicyFactory.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -196,9 +187,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Objects\TextObjectExporter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\Developer\TextObjectExportValidationScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Objects\AnsiLoader.h">
@@ -244,9 +232,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Objects\XpSequenceValidation.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Screens\Developer\XpSequenceDiagnosticsScreen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Rendering\Objects\XpSequenceAnimationAdapter.h">
@@ -552,6 +537,9 @@
     <ClInclude Include="UI\Content\ImmediateModeWindowContent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="App\ApplicationHost.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Rendering\ScreenBuffer.cpp">
@@ -560,13 +548,7 @@
     <ClCompile Include="Rendering\Surface.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="App\Application.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="App\ScreenManager.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\ConsoleRenderer.cpp">
@@ -665,12 +647,6 @@
     <ClCompile Include="Rendering\TerminalSessionOptions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Screens\Developer\RendererDiagnosticsScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\Developer\TerminalCapabilitiesScreen.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Rendering\Styles\StylePolicyFactory.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -690,9 +666,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\TextObjectExporter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\Developer\TextObjectExportValidationScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\AnsiLoader.cpp">
@@ -747,9 +720,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\XpSequenceValidation.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="Screens\Developer\XpSequenceDiagnosticsScreen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="Rendering\Objects\XpSequenceAnimationAdapter.cpp">
@@ -1025,9 +995,11 @@
     <ClCompile Include="UI\Content\ImmediateModeWindowContent.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="App\ApplicationHost.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <None Include="startup.config" />
     <None Include="Screens\Content\.gitkeep" />
   </ItemGroup>
 </Project>

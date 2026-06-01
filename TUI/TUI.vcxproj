@@ -142,6 +142,7 @@
     <ClInclude Include="Animation\TickClock.h" />
     <ClInclude Include="Animation\TickEvent.h" />
     <ClInclude Include="Animation\XpSequencePlayback.h" />
+    <ClInclude Include="App\ApplicationHost.h" />
     <ClInclude Include="App\CommandLineOptions.h" />
     <ClInclude Include="App\ScreenManager.h" />
     <ClInclude Include="App\StartupConfig.h" />
@@ -274,11 +275,7 @@
     <ClInclude Include="Rendering\Effects\FireEffect.h" />
     <ClInclude Include="Rendering\Effects\WaterWaveEffect.h" />
     <ClInclude Include="Screens\PageBuffer.h" />
-    <ClInclude Include="Screens\Developer\RendererDiagnosticsScreen.h" />
     <ClInclude Include="Screens\Screen.h" />
-    <ClInclude Include="Screens\Developer\TerminalCapabilitiesScreen.h" />
-    <ClInclude Include="Screens\Developer\TextObjectExportValidationScreen.h" />
-    <ClInclude Include="Screens\Developer\XpSequenceDiagnosticsScreen.h" />
     <ClInclude Include="ThirdParty\zlib-1.3.1\zconf.h" />
     <ClInclude Include="ThirdParty\zlib-1.3.1\zutil.h" />
     <ClInclude Include="UI\Base\FocusManager.h" />
@@ -341,6 +338,7 @@
     <ClCompile Include="Animation\PseudoFontAnimationSequence.cpp" />
     <ClCompile Include="Animation\TickClock.cpp" />
     <ClCompile Include="Animation\XpSequencePlayback.cpp" />
+    <ClCompile Include="App\ApplicationHost.cpp" />
     <ClCompile Include="App\CommandLineOptions.cpp" />
     <ClCompile Include="App\ScreenManager.cpp" />
     <ClCompile Include="App\StartupConfig.cpp" />
@@ -441,10 +439,6 @@
     <ClCompile Include="Rendering\Effects\FireEffect.cpp" />
     <ClCompile Include="Rendering\Effects\WaterWaveEffect.cpp" />
     <ClCompile Include="Screens\PageBuffer.cpp" />
-    <ClCompile Include="Screens\Developer\RendererDiagnosticsScreen.cpp" />
-    <ClCompile Include="Screens\Developer\TerminalCapabilitiesScreen.cpp" />
-    <ClCompile Include="Screens\Developer\TextObjectExportValidationScreen.cpp" />
-    <ClCompile Include="Screens\Developer\XpSequenceDiagnosticsScreen.cpp" />
     <ClCompile Include="ThirdParty\zlib-1.3.1\adler32.c" />
     <ClCompile Include="ThirdParty\zlib-1.3.1\compress.c" />
     <ClCompile Include="ThirdParty\zlib-1.3.1\crc32.c" />
@@ -506,7 +500,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Screens\Content\.gitkeep" />
-    <None Include="startup.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
