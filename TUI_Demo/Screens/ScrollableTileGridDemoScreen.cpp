@@ -109,6 +109,20 @@ bool ScrollableTileGridDemoScreen::handleEvent(const Input::Event& event)
         return handleCommand(commandEvent->command);
     }
 
+    const Point before = m_gridView.viewport().scrollOffset();
+
+    if (m_gridView.handleEvent(event))
+    {
+        const Point after = m_gridView.viewport().scrollOffset();
+
+        if (before.x != after.x || before.y != after.y)
+        {
+            m_lastAction = "Mouse wheel scrolled grid.";
+        }
+
+        return true;
+    }
+
     return false;
 }
 

@@ -312,6 +312,8 @@
     <ClInclude Include="UI\Panels\TabbedWindowPage.h" />
     <ClInclude Include="UI\Panels\TabbedWindowModel.h" />
     <ClInclude Include="UI\Panels\Window.h" />
+    <ClInclude Include="UI\Scrolling\Scrollbar.h" />
+    <ClInclude Include="UI\Scrolling\ScrollBehavior.h" />
     <ClInclude Include="UI\Widgets\Button.h" />
     <ClInclude Include="UI\Widgets\ContainerWidget.h" />
     <ClInclude Include="UI\Widgets\Label.h" />
@@ -486,6 +488,8 @@
     <ClCompile Include="UI\Panels\TabbedWindowModel.cpp" />
     <ClCompile Include="UI\Panels\TabbedWindowPage.cpp" />
     <ClCompile Include="UI\Panels\Window.cpp" />
+    <ClCompile Include="UI\Scrolling\ScrollBehavior.cpp" />
+    <ClCompile Include="UI\Scrolling\Scrollbar.cpp" />
     <ClCompile Include="UI\Widgets\Button.cpp" />
     <ClCompile Include="UI\Widgets\ContainerWidget.cpp" />
     <ClCompile Include="UI\Widgets\Label.cpp" />
