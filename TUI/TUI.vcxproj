@@ -318,6 +318,7 @@
     <ClInclude Include="UI\Widgets\ContainerWidget.h" />
     <ClInclude Include="UI\Widgets\Label.h" />
     <ClInclude Include="UI\Widgets\ListBox.h" />
+    <ClInclude Include="UI\Widgets\ScrollBox.h" />
     <ClInclude Include="UI\Widgets\TextView.h" />
     <ClInclude Include="UI\Widgets\TileGridView.h" />
     <ClInclude Include="UI\Widgets\Widget.h" />
@@ -494,6 +495,7 @@
     <ClCompile Include="UI\Widgets\ContainerWidget.cpp" />
     <ClCompile Include="UI\Widgets\Label.cpp" />
     <ClCompile Include="UI\Widgets\ListBox.cpp" />
+    <ClCompile Include="UI\Widgets\ScrollBox.cpp" />
     <ClCompile Include="UI\Widgets\TextView.cpp" />
     <ClCompile Include="UI\Widgets\TileGridView.cpp" />
     <ClCompile Include="UI\Widgets\Widget.cpp" />
